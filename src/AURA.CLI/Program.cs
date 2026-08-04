@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using AURA.Agents;
 using AURA.Core;
 using AURA.Core.Bootstrap;
 using AURA.Core.Launchers;
@@ -20,6 +21,7 @@ namespace AURA.CLI
         private static SimulationRuntime _runtime;
         private static Runner _runner;
         private static PluginWatcher _pluginWatcher;
+        private static AgentManager _agentManager;
         private static ILogger _logger;
 
         private static void Main(string[] args)
@@ -46,6 +48,7 @@ namespace AURA.CLI
             _pluginWatcher = new PluginWatcher(_logger);
             _runner = new Runner(_pluginWatcher.Launchers.Concat(
                 new ILauncher[] { new PythonLauncher(), new JavaLauncher(), new DotnetLauncher() }));
+            _agentManager = new AgentManager(_logger);
 
             _runtime.LoadFromStoreAsync().GetAwaiter().GetResult();
 
@@ -117,6 +120,12 @@ namespace AURA.CLI
                     case "plugins":
                         PrintPlugins();
                         break;
+                    case "agents":
+                        PrintAgents();
+                        break;
+                    case "ask":
+                        Ask(parts);
+                        break;
                     case "run":
                         RunFile(parts);
                         break;
@@ -156,6 +165,14 @@ namespace AURA.CLI
             }
 
             string filePath = parts[1];
+
+            // F3: run aichat|termux-ai starts a long-lived assistant cell.
+            if (_agentManager.Resolve(filePath) != null)
+            {
+                RunAssistant(parts);
+                return;
+            }
+
             string cellId = null;
             var appArgs = new System.Collections.Generic.List<string>();
             var limits = new ResourceLimits();
@@ -191,6 +208,86 @@ namespace AURA.CLI
             Console.WriteLine("  comando: " + cell.AppPath + " " + cell.Args);
             Console.WriteLine("  pid    : " + cell.ProcessId);
             Console.WriteLine("  log    : " + cell.LogFile);
+        }
+
+        private static void RunAssistant(string[] parts)
+        {
+            string assistant = parts[1];
+            string cellId = null;
+            for (int i = 2; i < parts.Length; i++)
+            {
+                if (parts[i] == "--cell" && i + 1 < parts.Length)
+                {
+                    cellId = parts[++i];
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(cellId))
+            {
+                cellId = assistant;
+            }
+
+            Cell cell = _agentManager.StartAssistantCell(_runtime, cellId, assistant);
+            Console.WriteLine("Célula assistente criada (iniciar com 'cell start " + cell.Id + "'):");
+            Console.WriteLine("  id     : " + cell.Id);
+            Console.WriteLine("  app    : " + cell.AppPath);
+            Console.WriteLine("  log    : " + cell.LogFile);
+        }
+
+        private static void PrintAgents()
+        {
+            Console.WriteLine("Assistentes configurados:");
+            AgentInfo[] available = _agentManager.AvailableAssistants().ToArray();
+            foreach (AgentInfo agent in _agentManager.Assistants)
+            {
+                bool ok = agent.Executable != null && System.IO.File.Exists(agent.Executable);
+                Console.WriteLine("  " + (ok ? "[ok]   " : "[ausente] ") + agent);
+            }
+
+            if (available.Length == 0)
+            {
+                Console.WriteLine("Nenhum assistente disponível. Rode: bash scripts/migrar-ferramentas.sh");
+            }
+        }
+
+        private static void Ask(string[] parts)
+        {
+            if (parts.Length < 2)
+            {
+                Console.WriteLine("Uso: ask \"sua pergunta\" [--assistente aichat] [--cell <id>]");
+                return;
+            }
+
+            var args = new System.Collections.Generic.List<string>();
+            string assistant = "aichat";
+            string cellId = null;
+
+            for (int i = 1; i < parts.Length; i++)
+            {
+                if (parts[i] == "--assistente" && i + 1 < parts.Length)
+                {
+                    assistant = parts[++i];
+                }
+                else if (parts[i] == "--cell" && i + 1 < parts.Length)
+                {
+                    cellId = parts[++i];
+                }
+                else
+                {
+                    args.Add(parts[i]);
+                }
+            }
+
+            string question = string.Join(" ", args);
+            if (string.IsNullOrWhiteSpace(question))
+            {
+                Console.WriteLine("A pergunta não pode ser vazia.");
+                return;
+            }
+
+            Console.WriteLine("Assistente '" + assistant + "' respondendo...");
+            string answer = _agentManager.AskAsync(_runtime, question, assistant, cellId).GetAwaiter().GetResult();
+            Console.WriteLine(answer);
         }
 
         private static bool TryParseLimit(string[] parts, ref int i, ResourceLimits limits)
@@ -377,6 +474,9 @@ namespace AURA.CLI
             Console.WriteLine("  persist                 Salva o índice de células em disco");
             Console.WriteLine("  diagnostico             Diagnóstico do sistema");
             Console.WriteLine("  internet                Verifica conexão");
+            Console.WriteLine("  agents                  Lista assistentes (aichat/termux-ai)");
+            Console.WriteLine("  ask \"pergunta\"          Pergunta via assistente, logada em célula");
+            Console.WriteLine("  run aichat --cell chat  Inicia assistente como célula");
             Console.WriteLine("  modulos                 Lista módulos disponíveis");
             Console.WriteLine("  launchers               Lista resolutores de extensão");
             Console.WriteLine("  plugins                 Lista plugins carregados");
