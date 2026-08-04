@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AssemblyName>AURA</AssemblyName>
+    <RootNamespace>AURA.GUI</RootNamespace>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AURA.Core\AURA.Core.csproj" />
+    <ProjectReference Include="..\AURA.SystemInfo\AURA.SystemInfo.csproj" />
+    <ProjectReference Include="..\AURA.Network\AURA.Network.csproj" />
+    <ProjectReference Include="..\AURA.Modules\AURA.Modules.csproj" />
+  </ItemGroup>
+
+</Project>
