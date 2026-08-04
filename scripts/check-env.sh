@@ -25,10 +25,11 @@ check "aichat-functions" "$HOME/.config/aichat/functions/functions.json" "Rode: 
 check "aichat-config" "$HOME/.config/aichat/config.yaml" "Recrie ~/.config/aichat/config.yaml (model+clients)"
 
 # Ferramentas que dependem do mount /data/data/com.termux (podem sumir)
+# Mas podem ter sido migradas para ~/bin (blindadas) — checar lá primeiro.
 TERMUX=/data/data/com.termux/files
-check "aichat" "$TERMUX/usr/bin/aichat" "Reinstale no Termux: pkg install aichat"
+check "aichat" "$HOME/bin/aichat" "Rode: bash scripts/migrar-ferramentas.sh (se o mount voltou)"
 check "termux-ai" "$HOME/.local/share/termux-ai/config.json" "Reconfigure termux-ai (provider openai + api_url OpenRouter)"
-check "jq" "$TERMUX/usr/bin/jq" "pkg install jq (ou instale em ~/bin)"
+check "jq" "$HOME/bin/jq" "Rode: bash scripts/migrar-ferramentas.sh (ou pkg install jq)"
 
 # Ferramentas do sistema proot
 check "dotnet" "$(command -v dotnet || echo /usr/bin/dotnet)" "apt install dotnet-sdk-10.0"
