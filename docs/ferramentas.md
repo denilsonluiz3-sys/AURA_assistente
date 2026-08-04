@@ -109,3 +109,26 @@ eval "$(argc --argc-eval "$0" "$@")"
 3. **Validar**: `smoke-test.sh` + `dotnet build` locais; CI no GitHub confirma.
 4. **Entregar**: merge; Release quando for F4.
 5. **Iterar**: bugs viram issues; termux-ai relata do celular; eu corrijo.
+
+## Estabilidade do ambiente (proot/Termux)
+
+**Problema real observado**: o proot desmonta `/data/data/com.termux` no meio
+da sessão. Ferramentas que moram lá (`aichat`, `jq`) somem; `/root` sobrevive.
+
+**Regras para manter o ambiente estável:**
+
+1. **Tudo crítico vive em `/root`** (estável por construção):
+   - `~/bin/argc`, `~/.config/aichat/functions/`, `~/.config/aichat/config.yaml`,
+     `~/.local/share/termux-ai/config.json`.
+2. **Após qualquer remontagem, rode**: `bash scripts/check-env.sh`
+   — reporta exatamente o que sumiu e o comando para restaurar.
+3. **O repo git local pode corromper** (inodes `-?????????`). Sempre que isso
+   ocorrer, use o clone íntegro: `git clone git@github.com:denilsonluiz3-sys/AURA_assistente.git`.
+4. **Builds locais são instáveis** (deps.json incompleto, VSTest ARM64
+   bloqueado). Não dependa deles para decisão — **confie no GitHub Actions**
+   (runner x64 limpo, ~30s) para validar build+tests+smoke.
+5. **Padrão fire-and-forget**: push → CI roda em ~30s → trabalhe noutra coisa →
+   volte e leia o resultado na API.
+
+**Se o mount voltar** (proot reiniciado): copie `aichat` e `jq` para `/root/bin`
+para blindar contra a próxima remontagem.
