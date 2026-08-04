@@ -1,5 +1,7 @@
 # AURA — Orquestrador de Aplicativos (user-space sobre Linux LTS)
 
+![CI](https://github.com/denilsonluiz3-sys/AURA_assistente/actions/workflows/build-test.yml/badge.svg)
+
 AURA não é um kernel nem um OS tradicional. É um **orquestrador**: o usuário
 escolhe o programa (`.py`, `.jar`, `.dll`, ...), e a AURA decide **como rodar**
 — dentro de uma **célula isolada**, com ciclo de vida gerenciado (start,
