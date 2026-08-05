@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="AURA.Mobile.Pages.LogsPage"
+             Title="Logs + IA"
+             BackgroundColor="{DynamicResource AuraBackground}">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="20" RowSpacing="10">
+
+        <Label Text="Logs do app + diagnóstico por IA"
+               FontAttributes="Bold"
+               FontSize="18"
+               TextColor="{DynamicResource AuraTextPrimary}" />
+
+        <Label Grid.Row="1"
+               Text="Clique em Analisar para enviar o log à IA (OpenRouter) e obter causa + correção sugerida."
+               FontSize="13"
+               TextColor="{DynamicResource AuraTextSecondary}" />
+
+        <Editor x:Name="LogViewer"
+                Grid.Row="2"
+                TextColor="{DynamicResource AuraTextPrimary}"
+                BackgroundColor="{DynamicResource AuraSurface}"
+                FontFamily="monospace"
+                FontSize="11"
+                IsReadOnly="True"
+                AutoSize="TextChanges" />
+
+        <VerticalStackLayout Grid.Row="3" Spacing="8">
+            <ActivityIndicator x:Name="BusyIndicator"
+                               IsRunning="False"
+                               IsVisible="False"
+                               Color="{DynamicResource AuraAccent}" />
+            <Button x:Name="AnalyzeButton"
+                    Text="🔍 Analisar com IA"
+                    Clicked="OnAnalyzeClicked"
+                    BackgroundColor="{DynamicResource AuraAccent}"
+                    TextColor="White"
+                    CornerRadius="8" />
+            <Button x:Name="RefreshButton"
+                    Text="Recarregar log"
+                    Clicked="OnRefreshClicked"
+                    BackgroundColor="{DynamicResource AuraSurface}"
+                    TextColor="{DynamicResource AuraTextPrimary}"
+                    CornerRadius="8" />
+        </VerticalStackLayout>
+
+    </Grid>
+</ContentPage>

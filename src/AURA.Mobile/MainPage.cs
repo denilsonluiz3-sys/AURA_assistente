@@ -9,7 +9,8 @@ public class MainPage : TabbedPage
         ChatPage chat,
         MemoryPage memory,
         ExecutorsPage executors,
-        ModulesPage modules)
+        ModulesPage modules,
+        LogsPage logs)
     {
         AuraLog.Info("MainPage.ctor BEGIN");
         Title = "AURA";
@@ -21,6 +22,7 @@ public class MainPage : TabbedPage
         Children.Add(memory);
         Children.Add(executors);
         Children.Add(modules);
+        Children.Add(logs);
         AuraLog.Info("MainPage.ctor OK");
     }
 }

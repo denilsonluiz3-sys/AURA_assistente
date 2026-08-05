@@ -54,6 +54,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<MemoryPage>();
         builder.Services.AddSingleton<ExecutorsPage>();
         builder.Services.AddSingleton<ModulesPage>();
+        builder.Services.AddSingleton<LogsPage>();
 
         AuraLog.Info("MauiProgram: services registered");
 

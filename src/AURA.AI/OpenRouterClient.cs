@@ -40,20 +40,25 @@ namespace AURA.AI
             _logger = logger ?? new ConsoleLogger();
         }
 
-        public HttpRequestMessage BuildRequest(string question)
+        public HttpRequestMessage BuildRequest(string question, string? systemPrompt = null)
         {
             if (string.IsNullOrWhiteSpace(question))
             {
                 throw new ArgumentException("A pergunta não pode ser vazia.", nameof(question));
             }
 
+            var messages = new List<object>();
+            if (!string.IsNullOrWhiteSpace(systemPrompt))
+            {
+                messages.Add(new { role = "system", content = systemPrompt });
+            }
+
+            messages.Add(new { role = "user", content = question });
+
             var payload = new
             {
                 model = Options.Model,
-                messages = new[]
-                {
-                    new { role = "user", content = question }
-                }
+                messages
             };
 
             string json = JsonSerializer.Serialize(payload);
@@ -70,7 +75,7 @@ namespace AURA.AI
         }
 
         public async Task<string> ChatAsync(string question,
-            HttpClient? httpClient = null, CancellationToken ct = default)
+            HttpClient? httpClient = null, CancellationToken ct = default, string? systemPrompt = null)
         {
             if (string.IsNullOrWhiteSpace(Options.ApiKey))
             {
@@ -79,7 +84,7 @@ namespace AURA.AI
             }
 
             HttpClient client = httpClient ?? new HttpClient();
-            HttpRequestMessage request = BuildRequest(question);
+            HttpRequestMessage request = BuildRequest(question, systemPrompt);
 
             HttpResponseMessage response = await client.SendAsync(request, ct).ConfigureAwait(false);
             string body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);

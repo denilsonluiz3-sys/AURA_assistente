@@ -178,6 +178,52 @@ namespace AURA.Mobile
         public static void Error(string message) => Write("ERROR", message);
         public static void Fatal(string message) => Write("FATAL", message);
 
+        /// <summary>Caminho do arquivo de log atual (FilesDir/external), ou vazio se ainda não iniciado.</summary>
+        public static string LogFilePath
+        {
+            get
+            {
+                lock (Sync)
+                {
+                    return _filePath;
+                }
+            }
+        }
+
+        /// <summary>Últimas linhas do log atual (para exibir na interface de diagnóstico).</summary>
+        public static string ReadRecentLog(int maxLines = 500)
+        {
+            try
+            {
+                lock (Sync)
+                {
+                    if (!_fileReady || string.IsNullOrEmpty(_filePath) || !File.Exists(_filePath))
+                    {
+                        return PendingBuffer.ToString();
+                    }
+                }
+
+                string[] lines = File.ReadAllLines(_filePath);
+                if (lines.Length <= maxLines)
+                {
+                    return string.Join(Environment.NewLine, lines);
+                }
+
+                var sb = new StringBuilder();
+                sb.AppendLine($"... (log truncado de {lines.Length} linhas, mostrando as últimas {maxLines}) ...");
+                for (int i = lines.Length - maxLines; i < lines.Length; i++)
+                {
+                    sb.AppendLine(lines[i]);
+                }
+
+                return sb.ToString();
+            }
+            catch
+            {
+                return "(falha ao ler o log)";
+            }
+        }
+
         public static void Exception(string where, Exception? ex)
         {
             if (ex == null)
