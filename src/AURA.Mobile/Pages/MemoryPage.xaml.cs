@@ -28,16 +28,24 @@ public partial class MemoryPage : ContentPage
 
     private async Task RefreshAsync()
     {
-        var entries = await Task.Run(() => _memoryStore.Read(64));
-        Entries.Clear();
-        foreach (var entry in entries)
+        try
         {
-            Entries.Add(entry);
-        }
+            var entries = await Task.Run(() => _memoryStore.Read(64));
+            Entries.Clear();
+            foreach (var entry in entries)
+            {
+                Entries.Add(entry);
+            }
 
-        if (Entries.Count == 0)
+            if (Entries.Count == 0)
+            {
+                Entries.Add(new MemoryEntry { Role = "AURA", Text = "Nenhuma memória registrada ainda." });
+            }
+        }
+        catch (Exception ex)
         {
-            Entries.Add(new MemoryEntry { Role = "AURA", Text = "Nenhuma memória registrada ainda." });
+            Entries.Clear();
+            Entries.Add(new MemoryEntry { Role = "Erro", Text = ex.Message });
         }
     }
 

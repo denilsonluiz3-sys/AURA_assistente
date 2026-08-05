@@ -54,6 +54,7 @@ public partial class ChatPage : ContentPage
         catch (Exception ex)
         {
             AnswerLabel.Text = "Erro: " + ex.Message;
+            AuraLog.Exception("ChatPage.OnSendClicked", ex);
         }
         finally
         {

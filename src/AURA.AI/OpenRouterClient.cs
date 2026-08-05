@@ -53,10 +53,6 @@ namespace AURA.AI
                 messages = new[]
                 {
                     new { role = "user", content = question }
-                },
-                @const = new Dictionary<string, object>
-                {
-                    ["include_reasoning"] = false
                 }
             };
 
@@ -90,8 +86,16 @@ namespace AURA.AI
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.Error("LLM: " + response.StatusCode + " " + body);
-                throw new HttpRequestException("Falha na chamada LLM: " + response.StatusCode);
+                string detail = string.IsNullOrWhiteSpace(body) ? "(sem corpo)" : body;
+                if (detail.Length > 500)
+                {
+                    detail = detail.Substring(0, 500);
+                }
+
+                _logger.Error("LLM: " + response.StatusCode + " " + detail);
+                throw new HttpRequestException(
+                    string.Format("Falha na chamada LLM ({0} {1}): {2}",
+                        (int)response.StatusCode, response.StatusCode, detail));
             }
 
             using var document = JsonDocument.Parse(body);
