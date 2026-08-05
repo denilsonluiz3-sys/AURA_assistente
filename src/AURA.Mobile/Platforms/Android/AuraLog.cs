@@ -4,7 +4,6 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using Android.Content;
-using Android.OS;
 using Android.Provider;
 using Android.Runtime;
 using Android.Util;
@@ -100,7 +99,7 @@ namespace AURA.Mobile
         {
             try
             {
-                if (Build.VERSION.SdkInt < BuildVersionCodes.Q)
+                if (!OperatingSystem.IsAndroidVersionAtLeast(29))
                 {
                     return;
                 }
