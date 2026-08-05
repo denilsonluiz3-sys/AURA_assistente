@@ -13,6 +13,7 @@ on:
       - 'src/AURA.AI/**'
       - 'src/AURA.Network/**'
       - 'src/AURA.SystemInfo/**'
+      - '.github/workflows/build-android-apk.yml'
   workflow_dispatch:
 
 env:
