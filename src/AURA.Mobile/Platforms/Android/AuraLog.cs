@@ -4,6 +4,8 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using Android.Content;
+using Android.OS;
+using Android.Provider;
 using Android.Runtime;
 using Android.Util;
 
@@ -37,6 +39,10 @@ namespace AURA.Mobile
         private static readonly StringBuilder PendingBuffer = new StringBuilder(8192);
         private static string _filePath = string.Empty;
         private static bool _fileReady;
+
+        private static Android.Net.Uri? _downloadUri;
+        private static StreamWriter? _downloadWriter;
+        private static Context? _appContext;
 
         private static Java.Lang.Thread.IUncaughtExceptionHandler? _previousUncaughtHandler;
 
@@ -74,11 +80,59 @@ namespace AURA.Mobile
                             PendingBuffer.Clear();
                         }
                     }
+
+                    _appContext = context;
+                    TryCreateDownloadMirror(context);
                 }
             }
             catch
             {
                 // Logging nunca pode derrubar o app.
+            }
+        }
+
+        /// <summary>
+        /// Cria um espelho do log em Download/AURA/ via MediaStore. Em Android 11+
+        /// a pasta Android/data fica invisível para gerenciadores de arquivos; já a
+        /// pasta Downloads é sempre acessível sem permissão extra.
+        /// </summary>
+        private static void TryCreateDownloadMirror(Context context)
+        {
+            try
+            {
+                if (Build.VERSION.SdkInt < BuildVersionCodes.Q)
+                {
+                    return;
+                }
+
+                string fileName = string.Format("aura_{0:yyyyMMdd_HHmmss}.log", DateTime.Now);
+
+                var values = new ContentValues();
+                values.Put(MediaStore.Downloads.InterfaceConsts.DisplayName, fileName);
+                values.Put(MediaStore.Downloads.InterfaceConsts.MimeType, "text/plain");
+                values.Put(MediaStore.Downloads.InterfaceConsts.RelativePath, "Download/AURA");
+
+                Android.Net.Uri? uri =
+                    context.ContentResolver.Insert(MediaStore.Downloads.ExternalContentUri, values);
+
+                if (uri == null)
+                {
+                    return;
+                }
+
+                Stream? stream = context.ContentResolver.OpenOutputStream(uri, "wa");
+                if (stream == null)
+                {
+                    return;
+                }
+
+                _downloadUri = uri;
+                _downloadWriter = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
+                Write("INFO ", "Espelho em Download/AURA/" + fileName);
+            }
+            catch
+            {
+                // Sem espelho em Downloads (ex.: falha do MediaStore) - não é fatal.
             }
         }
 
@@ -157,6 +211,14 @@ namespace AURA.Mobile
                     try
                     {
                         File.AppendAllText(_filePath, line + Environment.NewLine);
+                    }
+                    catch
+                    {
+                    }
+
+                    try
+                    {
+                        _downloadWriter?.WriteLine(line);
                     }
                     catch
                     {
