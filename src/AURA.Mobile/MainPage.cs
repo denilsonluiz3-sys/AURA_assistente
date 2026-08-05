@@ -12,7 +12,9 @@ public class MainPage : TabbedPage
         ExecutorsPage executors,
         ModulesPage modules,
         LogsPage logs,
-        FixesPage fixes)
+        FixesPage fixes,
+        TerminalPage terminal,
+        BrowserPage browser)
     {
         AuraLog.Info("MainPage.ctor BEGIN");
         Title = "AURA";
@@ -27,6 +29,8 @@ public class MainPage : TabbedPage
         Children.Add(modules);
         Children.Add(logs);
         Children.Add(fixes);
+        Children.Add(terminal);
+        Children.Add(browser);
         AuraLog.Info("MainPage.ctor OK");
     }
 }

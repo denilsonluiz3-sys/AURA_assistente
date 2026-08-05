@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="AURA.Mobile.Pages.BrowserPage"
+             Title="Navegador"
+             BackgroundColor="{DynamicResource AuraBackground}">
+
+    <Grid RowDefinitions="Auto,*" RowSpacing="0">
+
+        <Grid Padding="8,6"
+              ColumnDefinitions="Auto,Auto,Auto,*,Auto"
+              ColumnSpacing="6"
+              BackgroundColor="{DynamicResource AuraSurface}">
+            <Button x:Name="BackButton"
+                    Text="‹"
+                    Clicked="OnBackClicked"
+                    BackgroundColor="{DynamicResource AuraSurface}"
+                    TextColor="{DynamicResource AuraTextPrimary}"
+                    Padding="12,2"
+                    CornerRadius="6"
+                    FontSize="18" />
+            <Button Grid.Column="1"
+                    x:Name="ForwardButton"
+                    Text="›"
+                    Clicked="OnForwardClicked"
+                    BackgroundColor="{DynamicResource AuraSurface}"
+                    TextColor="{DynamicResource AuraTextPrimary}"
+                    Padding="12,2"
+                    CornerRadius="6"
+                    FontSize="18" />
+            <Button Grid.Column="2"
+                    x:Name="ReloadButton"
+                    Text="⟳"
+                    Clicked="OnReloadClicked"
+                    BackgroundColor="{DynamicResource AuraSurface}"
+                    TextColor="{DynamicResource AuraTextPrimary}"
+                    Padding="12,2"
+                    CornerRadius="6"
+                    FontSize="18" />
+            <Entry Grid.Column="3"
+                   x:Name="UrlEntry"
+                   Placeholder="URL ou pesquisa"
+                   Keyboard="Url"
+                   ReturnType="Go"
+                   Completed="OnGoClicked"
+                   TextColor="{DynamicResource AuraTextPrimary}"
+                   PlaceholderColor="{DynamicResource AuraTextSecondary}"
+                   BackgroundColor="{DynamicResource AuraBackground}" />
+            <Button Grid.Column="4"
+                    Text="Ir"
+                    Clicked="OnGoClicked"
+                    BackgroundColor="{DynamicResource AuraAccent}"
+                    TextColor="White"
+                    Padding="14,2"
+                    CornerRadius="6" />
+        </Grid>
+
+        <WebView x:Name="Browser"
+                 Grid.Row="1"
+                 Navigating="OnNavigating"
+                 Navigated="OnNavigated" />
+
+    </Grid>
+</ContentPage>
