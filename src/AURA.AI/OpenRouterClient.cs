@@ -83,7 +83,7 @@ namespace AURA.AI
                     "ApiKey do provedor LLM não configurada. Defina OpenRouterOptions.ApiKey.");
             }
 
-            HttpClient client = httpClient ?? new HttpClient();
+            HttpClient client = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
             HttpRequestMessage request = BuildRequest(question, systemPrompt);
 
             HttpResponseMessage response = await client.SendAsync(request, ct).ConfigureAwait(false);

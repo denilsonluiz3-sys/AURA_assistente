@@ -13,7 +13,7 @@
                TextColor="{DynamicResource AuraTextPrimary}" />
 
         <Label Grid.Row="1"
-               Text="Clique em Analisar para enviar o log à IA (OpenRouter) e obter causa + correção sugerida."
+               Text="Analisar envia o log à IA (OpenRouter). Se não conectar, use Testar conexão para ver o erro exato. Copiar/Compartilhar enviam o log para fora do app."
                FontSize="13"
                TextColor="{DynamicResource AuraTextSecondary}" />
 
@@ -26,24 +26,44 @@
                 IsReadOnly="True"
                 AutoSize="TextChanges" />
 
-        <VerticalStackLayout Grid.Row="3" Spacing="8">
-            <ActivityIndicator x:Name="BusyIndicator"
-                               IsRunning="False"
-                               IsVisible="False"
-                               Color="{DynamicResource AuraAccent}" />
-            <Button x:Name="AnalyzeButton"
-                    Text="🔍 Analisar com IA"
-                    Clicked="OnAnalyzeClicked"
-                    BackgroundColor="{DynamicResource AuraAccent}"
-                    TextColor="White"
-                    CornerRadius="8" />
-            <Button x:Name="RefreshButton"
-                    Text="Recarregar log"
-                    Clicked="OnRefreshClicked"
-                    BackgroundColor="{DynamicResource AuraSurface}"
-                    TextColor="{DynamicResource AuraTextPrimary}"
-                    CornerRadius="8" />
-        </VerticalStackLayout>
+        <ScrollView Grid.Row="3">
+            <VerticalStackLayout Spacing="8">
+                <ActivityIndicator x:Name="BusyIndicator"
+                                   IsRunning="False"
+                                   IsVisible="False"
+                                   Color="{DynamicResource AuraAccent}" />
+                <Button x:Name="AnalyzeButton"
+                        Text="Analisar com IA"
+                        Clicked="OnAnalyzeClicked"
+                        BackgroundColor="{DynamicResource AuraAccent}"
+                        TextColor="White"
+                        CornerRadius="8" />
+                <Button x:Name="TestButton"
+                        Text="Testar conexão"
+                        Clicked="OnTestClicked"
+                        BackgroundColor="{DynamicResource AuraSurface}"
+                        TextColor="{DynamicResource AuraTextPrimary}"
+                        CornerRadius="8" />
+                <Button x:Name="CopyButton"
+                        Text="Copiar log"
+                        Clicked="OnCopyClicked"
+                        BackgroundColor="{DynamicResource AuraSurface}"
+                        TextColor="{DynamicResource AuraTextPrimary}"
+                        CornerRadius="8" />
+                <Button x:Name="ShareButton"
+                        Text="Compartilhar log"
+                        Clicked="OnShareClicked"
+                        BackgroundColor="{DynamicResource AuraSurface}"
+                        TextColor="{DynamicResource AuraTextPrimary}"
+                        CornerRadius="8" />
+                <Button x:Name="RefreshButton"
+                        Text="Recarregar log"
+                        Clicked="OnRefreshClicked"
+                        BackgroundColor="{DynamicResource AuraSurface}"
+                        TextColor="{DynamicResource AuraTextPrimary}"
+                        CornerRadius="8" />
+            </VerticalStackLayout>
+        </ScrollView>
 
     </Grid>
 </ContentPage>

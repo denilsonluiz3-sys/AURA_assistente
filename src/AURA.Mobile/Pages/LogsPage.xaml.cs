@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http;
 using AURA.AI;
 
 namespace AURA.Mobile.Pages;
@@ -34,6 +36,120 @@ public partial class LogsPage : ContentPage
         {
             LogViewer.Text = "Erro ao carregar o log: " + ex.Message;
         }
+    }
+
+    private async void OnCopyClicked(object sender, EventArgs e)
+    {
+        string content = AuraLog.ReadRecentLog(2000);
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            LogViewer.Text = "(log vazio)";
+            return;
+        }
+
+        await Clipboard.Default.SetTextAsync(content);
+        LogViewer.Text = "Log copiado para a área de transferência.\n\n" + content;
+    }
+
+    private async void OnShareClicked(object sender, EventArgs e)
+    {
+        string content = AuraLog.ReadRecentLog(2000);
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            LogViewer.Text = "(log vazio)";
+            return;
+        }
+
+        string filePath = Path.Combine(FileSystem.CacheDirectory, "aura_log.txt");
+        await File.WriteAllTextAsync(filePath, content);
+
+        await Share.Default.RequestAsync(new ShareFileRequest
+        {
+            Title = "Log AURA",
+            File = new ShareFile(filePath, "text/plain")
+        });
+    }
+
+    private async void OnTestClicked(object sender, EventArgs e)
+    {
+        TestButton.IsEnabled = false;
+        BusyIndicator.IsRunning = true;
+        BusyIndicator.IsVisible = true;
+        LogViewer.Text = "Testando conexão...\n";
+
+        var sb = new System.Text.StringBuilder();
+        try
+        {
+            var hasKey = !string.IsNullOrWhiteSpace(_client.Options.ApiKey);
+            sb.AppendLine($"Chave OpenRouter: {(hasKey ? "configurada (" + _client.Options.ApiKey.Length + " chars)" : "AUSENTE — defina na aba Assistente")}");
+            sb.AppendLine($"Modelo: {_client.Options.Model}");
+            sb.AppendLine($"URL: {_client.Options.BaseUrl}");
+            sb.AppendLine();
+
+            if (!hasKey)
+            {
+                sb.AppendLine("RESULTADO: falha — nenhuma chave de API configurada.");
+                LogViewer.Text = sb.ToString();
+                return;
+            }
+
+            // 1. Conexão de rede local.
+            var current = Connectivity.Current.NetworkAccess;
+            sb.AppendLine($"1) Acesso à rede: {current}");
+
+            // 2. DNS/HTTPS até a base da OpenRouter.
+            using var handler = new HttpClientHandler
+            {
+                AllowAutoRedirect = true,
+                AutomaticDecompression = DecompressionMethods.All
+            };
+            using var http = new HttpClient(handler);
+            http.Timeout = TimeSpan.FromSeconds(60);
+
+            var baseUri = new Uri(_client.Options.BaseUrl);
+            sb.AppendLine($"2) Conectando a {baseUri.Host} (TLS)...");
+            using (var probe = new HttpRequestMessage(HttpMethod.Head, new Uri(baseUri.GetLeftPart(UriPartial.Authority))))
+            {
+                using HttpResponseMessage ping = await http.SendAsync(probe);
+                sb.AppendLine($"   Resposta: HTTP {(int)ping.StatusCode} {ping.StatusCode}");
+            }
+
+            // 3. Chamada real de chat (1-token) para verificar credenciais + modelo.
+            sb.AppendLine("3) Chamada de teste ao LLM...");
+            string modelEcho = await _client.ChatAsync(
+                "Responda apenas: OK",
+                http,
+                systemPrompt: "Você responde apenas OK.");
+            sb.AppendLine($"   Resposta do modelo: \"{modelEcho}\"");
+            sb.AppendLine();
+            sb.AppendLine("RESULTADO: CONEXÃO OK — a IA respondeu.");
+            AuraLog.Info("Teste de conexão AURA: OK");
+        }
+        catch (HttpRequestException hex)
+        {
+            sb.AppendLine();
+            sb.AppendLine("RESULTADO: FALHA de HTTP.");
+            sb.AppendLine("Erro: " + hex.Message);
+            AuraLog.Exception("LogsPage.OnTestClicked (Http)", hex);
+        }
+        catch (TaskCanceledException)
+        {
+            sb.AppendLine();
+            sb.AppendLine("RESULTADO: FALHA — tempo esgotado (60s).");
+            sb.AppendLine("Dica: verifique se o Wi-Fi/dados está ativo e se o aparelho tem acesso à internet.");
+        }
+        catch (Exception ex)
+        {
+            sb.AppendLine();
+            sb.AppendLine("RESULTADO: FALHA inesperada.");
+            sb.AppendLine("Erro: " + ex);
+            AuraLog.Exception("LogsPage.OnTestClicked", ex);
+        }
+
+        LogViewer.Text = sb.ToString();
+        TestButton.IsEnabled = true;
+        BusyIndicator.IsRunning = false;
+        BusyIndicator.IsVisible = false;
     }
 
     private async void OnAnalyzeClicked(object sender, EventArgs e)
@@ -73,7 +189,8 @@ public partial class LogsPage : ContentPage
         }
         catch (Exception ex)
         {
-            LogViewer.Text = "Falha na análise: " + ex.Message;
+            LogViewer.Text = "Falha na análise: " + ex.Message +
+                "\n\nUse 'Testar conexão' para ver detalhes.";
             AuraLog.Exception("LogsPage.OnAnalyzeClicked", ex);
         }
         finally
