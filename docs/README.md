@@ -29,8 +29,6 @@ Hardware → Linux LTS (kernel) → Serviços AURA (user space) → Células iso
   - `Runner` (resolução), `PythonLauncher`, `JavaLauncher`, `DotnetLauncher`.
 - **AURA.CLI** — front-end de console com os comandos `run`, `cells`, `cell ...`.
 - `AURA.SystemInfo` / `AURA.Network` / `AURA.Modules` — diagnóstico e rede.
-- `AURA.GUI` — WinForms, **somente Windows** (`net10.0-windows`); fora da
-  solution para o build Linux/Termux funcionar.
 
 ## Compilar
 
