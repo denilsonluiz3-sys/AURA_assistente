@@ -18,14 +18,20 @@ as camadas disponíveis (opencode / aichat / termux-ai / GitHub).
 | CI++ | Cache NuGet, `global.json` (SDK 10.0.110), schedule diário, badge | success |
 | aichat | Config OpenRouter `qwen/qwen-plus`, `use_tools` ativo, 10 tools llm-functions, `argc` instalado, role `aura-review` | build functions OK |
 | termux-ai | Provider `openai` + api_url OpenRouter (patch `openai.py`) | respondeu "4" |
+| F3 | `AgentManager` consolida **aichat + termux-ai + opencode**; `aura ask` (one-shot logado em célula); `aura run <assistente> --cell <id>`; opencode roda na raiz do repo (`ResolveWorkspaceDirectory`) | build 0 erros, smoke-test OK |
+| Executors | `AURA.Abstractions` (IToolExecutor/ExecutionRequest/ExecutionResult) + `ShellExecutor` (refatorado), `GitExecutor`, `PythonExecutor`, `NodeExecutor` via `ProcessExecutorBase` | 4 executores testados (hello-shell/git/python/node) |
+| Workspace | `scripts/aura-workspace.sh` (clone/open/status) + `workspace/AURA_assistente` — clone isolado para auto-melhoria | clone OK, status OK |
+| Mobile | `src/AURA.Mobile` (MAUI `net10.0-android`, `com.aura.genesis`): abas Início (diagnóstico+rede+agentes), Assistente (IA OpenRouter via AURA.AI), Memória (AURA.Memory), Executores (Shell/Git/Python/Node), Módulos (AURA.Modules) — referencia o Core/Abstractions atuais; `OpenRouterClient.Options` exposto publicamente | build dos projetos compartilhados OK; APK via CI (sem workload Android local) |
+| CI++ (mobile) | `.github/workflows/build-android-apk.yml`: instala `maui-android` + JDK 17 e publica APK/AAB como artefato | pendente (primeiro run) |
 
 ## 2. O que falta concluir
 
-### F3 — Célula assistente (PRÓXIMA)
-- `AgentManager` que orquestra aichat/termux-ai como app comum.
-- `aura run aichat --cell chat` (aichat já tem launcher? — verificar).
-- `aura ask "pergunta"` → responde e loga na célula.
-- Implementar `IAgent` (stub existe em `AURA.Core/Abstractions`).
+### F3 — Célula assistente (CONCLUÍDO)
+- ~~`AgentManager` que orquestra aichat/termux-ai como app comum.~~ ✅
+- ~~`aura run aichat --cell chat`.~~ ✅ (e opencode/termux-ai)
+- ~~`aura ask "pergunta"` → responde e loga na célula.~~ ✅
+- Pendente: implementar `IAgent` (stub existe em `AURA.Core/Abstractions`);
+  validar `opencode run` interativo como célula de auto-melhoria no workspace.
 
 ### F4 — Loja de módulos
 - Loja local `~/AURA/loja` + `aura update`; depois HTTPS.
@@ -45,6 +51,10 @@ as camadas disponíveis (opencode / aichat / termux-ai / GitHub).
 - Migrar `aichat`+`jq` → `~/bin` (script pronto; **aguarda mount do Termux**).
 - Testar function calling do aichat (estava 429 upstream; aichat offline).
 - Botão/check de status do repo em `docs/ferramentas.md` com o badge.
+- **Mobile APK**: primeira build do `build-android-apk.yml` (push main) gera o
+  APK com o projeto GitHub; instalar no celular via artefato do Actions.
+  Nota: `AURA.Mobile` fica **fora** do `AURA.sln` para não quebrar o CI atual
+  (que não tem workload `maui-android`).
 
 ## 3. Ordem de execução (anti-conflito)
 

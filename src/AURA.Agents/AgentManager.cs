@@ -52,6 +52,12 @@ namespace AURA.Agents
                     Name = "termux-ai",
                     Description = "termux-ai (Python, on-device)",
                     Executable = ResolveExecutable("termux-ai")
+                },
+                new AgentInfo
+                {
+                    Name = "opencode",
+                    Description = "opencode CLI (agente de terminal, edita o repo)",
+                    Executable = ResolveExecutable("opencode")
                 }
             })
         {
@@ -131,7 +137,7 @@ namespace AURA.Agents
             Definition definition = BuildDefinition(assistant);
             Cell cell = runtime.CreateCell(cellId,
                 definition.FileName, definition.Arguments + " \"" + EscapeArg(question) + "\"",
-                templatePath: null, workingDirectory: Path.GetDirectoryName(assistant.Executable));
+                templatePath: null, workingDirectory: WorkingDirectoryFor(assistant));
 
             await runtime.StartCellAsync(cell.Id);
 
@@ -174,7 +180,7 @@ namespace AURA.Agents
             // aichat uses -s <session> to keep conversational state across asks.
             Cell cell = runtime.CreateCell(id, definition.FileName,
                 definition.SessionArgs, templatePath: null,
-                workingDirectory: Path.GetDirectoryName(assistant.Executable));
+                workingDirectory: WorkingDirectoryFor(assistant));
 
             return cell;
         }
@@ -200,8 +206,61 @@ namespace AURA.Agents
                 return new Definition(assistant.Executable, string.Empty, "-s aura-ask");
             }
 
+            if (assistant.Name.Equals("opencode", StringComparison.OrdinalIgnoreCase))
+            {
+                // opencode run "<question>" is the non-interactive (TUI-free)
+                // mode; it runs in the AURA repo so it can read and edit files.
+                return new Definition(assistant.Executable, "run", "run");
+            }
+
             // termux-ai: default behavior answers a prompt.
             return new Definition(assistant.Executable, string.Empty, string.Empty);
+        }
+
+        /// <summary>
+        /// opencode is a repo-aware agent: cells must run inside the AURA
+        /// repository (self-improvement space), not in the executable's dir.
+        /// Other assistants run in their own install dir.
+        /// </summary>
+        private string WorkingDirectoryFor(AgentInfo assistant)
+        {
+            if (assistant.Name.Equals("opencode", StringComparison.OrdinalIgnoreCase))
+            {
+                return ResolveWorkspaceDirectory();
+            }
+
+            string exeDir = Path.GetDirectoryName(assistant.Executable);
+            return string.IsNullOrEmpty(exeDir) ? "." : exeDir;
+        }
+
+        /// <summary>
+        /// Finds the AURA repository root: $AURA_ROOT, else walk up from the
+        /// current directory until a folder containing AURA.sln is found.
+        /// </summary>
+        public static string ResolveWorkspaceDirectory()
+        {
+            string envRoot = Environment.GetEnvironmentVariable("AURA_ROOT");
+            if (!string.IsNullOrEmpty(envRoot) && File.Exists(Path.Combine(envRoot, "AURA.sln")))
+            {
+                return envRoot;
+            }
+
+            string current = Directory.GetCurrentDirectory();
+            while (true)
+            {
+                if (File.Exists(Path.Combine(current, "AURA.sln")))
+                {
+                    return current;
+                }
+
+                string parent = Path.GetDirectoryName(current);
+                if (string.IsNullOrEmpty(parent) || parent == current)
+                {
+                    return current;
+                }
+
+                current = parent;
+            }
         }
 
         private sealed class Definition

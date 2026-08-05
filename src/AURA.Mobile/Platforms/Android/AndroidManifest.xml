@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+	<application android:allowBackup="true" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true"></application>
+
+	<!-- Necessário para o assistente de IA (OpenRouter), diagnóstico de rede e download de módulos. -->
+	<uses-permission android:name="android.permission.INTERNET" />
+	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+	<!--
+		Não pedimos permissão de armazenamento externo de propósito: a memória
+		e os módulos ficam em FileSystem.AppDataDirectory (pasta privada do app),
+		que não exige permissão em runtime em nenhuma versão do Android.
+	-->
+</manifest>

@@ -30,12 +30,13 @@ namespace AURA.AI
     /// </summary>
     public sealed class OpenRouterClient
     {
-        private readonly OpenRouterOptions _options;
         private readonly ILogger _logger;
+
+        public OpenRouterOptions Options { get; }
 
         public OpenRouterClient(OpenRouterOptions options, ILogger? logger = null)
         {
-            _options = options ?? throw new ArgumentNullException(nameof(options));
+            Options = options ?? throw new ArgumentNullException(nameof(options));
             _logger = logger ?? new ConsoleLogger();
         }
 
@@ -48,7 +49,7 @@ namespace AURA.AI
 
             var payload = new
             {
-                model = _options.Model,
+                model = Options.Model,
                 messages = new[]
                 {
                     new { role = "user", content = question }
@@ -60,12 +61,12 @@ namespace AURA.AI
             };
 
             string json = JsonSerializer.Serialize(payload);
-            var request = new HttpRequestMessage(HttpMethod.Post, _options.BaseUrl);
-            request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + _options.ApiKey);
-            if (_options.AppReference != null)
+            var request = new HttpRequestMessage(HttpMethod.Post, Options.BaseUrl);
+            request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + Options.ApiKey);
+            if (Options.AppReference != null)
             {
                 request.Headers.TryAddWithoutValidation("X-Title", "AURA");
-                request.Headers.TryAddWithoutValidation("X-URL", _options.AppReference);
+                request.Headers.TryAddWithoutValidation("X-URL", Options.AppReference);
             }
 
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -75,7 +76,7 @@ namespace AURA.AI
         public async Task<string> ChatAsync(string question,
             HttpClient? httpClient = null, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(_options.ApiKey))
+            if (string.IsNullOrWhiteSpace(Options.ApiKey))
             {
                 throw new InvalidOperationException(
                     "ApiKey do provedor LLM não configurada. Defina OpenRouterOptions.ApiKey.");

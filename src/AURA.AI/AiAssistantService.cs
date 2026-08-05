@@ -41,11 +41,11 @@ namespace AURA.AI
             }
 
             HttpClient client = http ?? new HttpClient();
-            using var payload = new
+            var payload = new
             {
                 model = opt.Model,
                 messages = new[] { new { role = "user", content = question } },
-                const = new { include_reasoning = false }
+                @const = new { include_reasoning = false }
             };
 
             string json = JsonSerializer.Serialize(payload);

@@ -1,0 +1,70 @@
+name: build-android-apk
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/AURA.Mobile/**'
+      - 'src/AURA.Abstractions/**'
+      - 'src/AURA.Core/**'
+      - 'src/AURA.Modules/**'
+      - 'src/AURA.Agents/**'
+      - 'src/AURA.Memory/**'
+      - 'src/AURA.AI/**'
+      - 'src/AURA.Network/**'
+      - 'src/AURA.SystemInfo/**'
+  workflow_dispatch:
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+  DOTNET_GCHeapHardLimit: '1C0000000'
+  DOTNET_GCHeapCount: '2'
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup JDK 17 (Android)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-mobile-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            nuget-mobile-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore src/AURA.Mobile/AURA.Mobile.csproj
+
+      - name: Build APK (Release)
+        run: dotnet build src/AURA.Mobile/AURA.Mobile.csproj -c Release --no-restore -p:AndroidPackageFormats=apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-mobile-apk
+          path: src/AURA.Mobile/bin/Release/net10.0-android/*.apk
+
+      - name: Upload release bundle (AAB)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-mobile-aab
+          path: src/AURA.Mobile/bin/Release/net10.0-android/*.aab

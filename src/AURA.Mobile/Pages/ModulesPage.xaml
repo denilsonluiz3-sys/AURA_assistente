@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:modules="clr-namespace:AURA.Modules;assembly=AURA.Modules"
+             x:Class="AURA.Mobile.Pages.ModulesPage"
+             Title="Módulos"
+             BackgroundColor="{StaticResource AuraBackground}">
+
+    <Grid RowDefinitions="Auto,*" Padding="20" RowSpacing="12">
+
+        <Label Text="Catálogo de módulos (AURA.Modules)"
+               FontAttributes="Bold"
+               FontSize="18"
+               TextColor="{StaticResource AuraTextPrimary}" />
+
+        <CollectionView x:Name="ModulesView" Grid.Row="1">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="modules:ModuleInfo">
+                    <Frame BackgroundColor="{StaticResource AuraSurface}"
+                           BorderColor="Transparent"
+                           CornerRadius="12"
+                           Padding="12"
+                           Margin="0,4">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="{Binding DisplayName}"
+                                   FontAttributes="Bold"
+                                   FontSize="15"
+                                   TextColor="{StaticResource AuraTextPrimary}" />
+                            <Label Text="{Binding ShortDescription}"
+                                   FontSize="13"
+                                   TextColor="{StaticResource AuraTextSecondary}" />
+                        </VerticalStackLayout>
+                    </Frame>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+    </Grid>
+</ContentPage>

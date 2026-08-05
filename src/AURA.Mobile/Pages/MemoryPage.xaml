@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:memory="clr-namespace:AURA.Memory;assembly=AURA.Memory"
+             x:Class="AURA.Mobile.Pages.MemoryPage"
+             Title="Memória"
+             BackgroundColor="{StaticResource AuraBackground}">
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="20" RowSpacing="12">
+
+        <Label Text="Memória persistente (AURA.Memory)"
+               FontAttributes="Bold"
+               FontSize="18"
+               TextColor="{StaticResource AuraTextPrimary}" />
+
+        <CollectionView x:Name="EntriesView" Grid.Row="1">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="memory:MemoryEntry">
+                    <Frame BackgroundColor="{StaticResource AuraSurface}"
+                           BorderColor="Transparent"
+                           CornerRadius="12"
+                           Padding="12"
+                           Margin="0,4">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="{Binding Role}"
+                                   FontAttributes="Bold"
+                                   FontSize="13"
+                                   TextColor="{StaticResource AuraAccent}" />
+                            <Label Text="{Binding Text}"
+                                   FontSize="13"
+                                   TextColor="{StaticResource AuraTextPrimary}" />
+                        </VerticalStackLayout>
+                    </Frame>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="12">
+            <Button Text="Atualizar"
+                    Clicked="OnRefreshClicked"
+                    BackgroundColor="{StaticResource AuraAccent}"
+                    TextColor="White"
+                    CornerRadius="8" />
+            <Button Grid.Column="1"
+                    Text="Limpar"
+                    Clicked="OnClearClicked"
+                    BackgroundColor="{StaticResource AuraError}"
+                    TextColor="White"
+                    CornerRadius="8" />
+        </Grid>
+
+    </Grid>
+</ContentPage>

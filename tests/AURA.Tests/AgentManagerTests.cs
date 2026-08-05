@@ -71,5 +71,25 @@ namespace AURA.Tests
         {
             Assert.Null(AgentManager.ResolveExecutable("binario_que_nao_existe_aichat_xyz"));
         }
+
+        [Fact]
+        public void DefaultAssistants_ConsolidateAichatTermuxAiAndOpencode()
+        {
+            var manager = new AgentManager(new FakeLogger());
+
+            Assert.NotNull(manager.Resolve("aichat"));
+            Assert.NotNull(manager.Resolve("termux-ai"));
+            Assert.NotNull(manager.Resolve("opencode"));
+        }
+
+        [Fact]
+        public void ResolveWorkspaceDirectory_ReturnsDirContainingAuraSln()
+        {
+            string workspace = AgentManager.ResolveWorkspaceDirectory();
+
+            Assert.False(string.IsNullOrWhiteSpace(workspace));
+            Assert.True(File.Exists(Path.Combine(workspace, "AURA.sln")),
+                "workspace deve apontar para a raiz do repo AURA (onde AURA.sln existe).");
+        }
     }
 }

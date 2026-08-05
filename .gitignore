@@ -11,6 +11,9 @@ logs/
 plugins/*.dll
 plugins/*.pdb
 
+# Espaço de auto-melhoria (clone isolado do repo)
+/workspace/
+
 # .NET
 *.nupkg
 TestResults/

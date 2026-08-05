@@ -117,7 +117,7 @@ namespace AURA.Memory
 
         private void PersistLocked(MemoryDocument document)
         {
-            string directory = Path.GetDirectoryName(_path);
+            string directory = System.IO.Path.GetDirectoryName(_path);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);

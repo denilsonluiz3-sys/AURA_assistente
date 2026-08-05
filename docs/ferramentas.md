@@ -63,6 +63,54 @@ Quero X ──► opencode (planeja) ──► aichat/termux-ai (executa apoio) 
 - **Issues**: roadmap F3–F7 com labels; bugs com reprodução.
 - **Releases**: futuras — distribuição de plugins e binário (alimenta `aura update`).
 
+## Executores de ferramentas (AURA.Abstractions)
+
+A AURA agora expõe executores padronizados para as ferramentas de ambiente,
+todos no mesmo contrato `IToolExecutor` (em `src/AURA.Abstractions/Execution/`):
+
+| Executor | Binário | Uso (request.Command) |
+|---|---|---|
+| `ShellExecutor` | `/bin/sh` | Comando shell completo (roda via `sh -c`) |
+| `GitExecutor` | `git` | Subcomando git (ex.: `status`, `diff`, `commit`) |
+| `PythonExecutor` | `python3`/`python` | Script, módulo ou flag (ex.: `-c`) |
+| `NodeExecutor` | `node` | Script ou flag (ex.: `-e`) |
+
+- Base compartilhada: `ProcessExecutorBase` (disparo, captura stdout/stderr,
+  timeout, variáveis de ambiente).
+- Se o binário não existir, `IsAvailable()` retorna `false` e `ExecuteAsync`
+  devolve um `ExecutionResult` de erro — não derruba a aplicação.
+- Sem dependências externas (BCL do .NET apenas); compilam no Termux.
+
+Exemplo:
+
+```csharp
+var git = new GitExecutor();
+var result = await git.ExecuteAsync(new ExecutionRequest
+{
+    Command = "status",
+    WorkingDirectory = "/root/AURA"
+});
+Console.WriteLine(result.StandardOutput);
+```
+
+## Espaço de auto-melhoria (workspace)
+
+Para a AURA melhorar a si mesma, existe um clone isolado do repositório em
+`workspace/AURA_assistente`, usado pelas células `opencode`:
+
+```bash
+bash scripts/aura-workspace.sh clone    # clona/atualiza o workspace
+bash scripts/aura-workspace.sh open     # abre célula opencode no workspace
+bash scripts/aura-workspace.sh status   # estado do workspace
+```
+
+- `open` roda a célula `dev` do opencode **dentro do clone**, para que ele
+  possa ler/editar os arquivos da AURA sem tocar no repo principal.
+- O `AgentManager` faz o mesmo em `aura ask --assistente opencode`: o diretório
+  de trabalho da célula vira a raiz do repo AURA (via `AURA_ROOT` ou subida até
+  `AURA.sln`).
+- Se o clone estiver corrompido (sem `HEAD`), o script remove e clona de novo.
+
 ## Como adicionar ferramentas úteis ao aichat (llm-functions)
 
 O aichat suporta **tools e agents** via

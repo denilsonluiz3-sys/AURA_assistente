@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:AURA.Mobile.Pages"
+             x:Class="AURA.Mobile.Pages.ExecutorsPage"
+             Title="Executores"
+             BackgroundColor="{StaticResource AuraBackground}">
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="20" RowSpacing="12">
+
+        <Label Text="Executores AURA"
+               FontAttributes="Bold"
+               FontSize="18"
+               TextColor="{StaticResource AuraTextPrimary}" />
+
+        <CollectionView x:Name="ExecutorsView" Grid.Row="1">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="local:ExecutorStatus">
+                    <Frame BackgroundColor="{StaticResource AuraSurface}"
+                           BorderColor="Transparent"
+                           CornerRadius="12"
+                           Padding="12"
+                           Margin="0,4">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="{Binding Name}"
+                                   FontAttributes="Bold"
+                                   FontSize="15"
+                                   TextColor="{StaticResource AuraTextPrimary}" />
+                            <Label Text="{Binding Status}"
+                                   FontSize="13"
+                                   TextColor="{Binding StatusColor}" />
+                        </VerticalStackLayout>
+                    </Frame>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <Button Grid.Row="2"
+                Text="Atualizar"
+                Clicked="OnRefreshClicked"
+                BackgroundColor="{StaticResource AuraAccent}"
+                TextColor="White"
+                CornerRadius="8" />
+
+    </Grid>
+</ContentPage>
