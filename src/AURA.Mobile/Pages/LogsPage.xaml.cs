@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using AURA.AI;
+using AURA.Mobile.Diagnostics;
 
 namespace AURA.Mobile.Pages;
 
@@ -17,7 +18,7 @@ public partial class LogsPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        _client.Options.ApiKey = Preferences.Default.Get("openrouter_key", string.Empty);
+        RuntimeConfig.Apply(_client);
         LoadLog();
     }
 
@@ -104,7 +105,7 @@ public partial class LogsPage : ContentPage
                 AutomaticDecompression = DecompressionMethods.All
             };
             using var http = new HttpClient(handler);
-            http.Timeout = TimeSpan.FromSeconds(60);
+            http.Timeout = TimeSpan.FromSeconds(Math.Max(30, _client.Options.TimeoutSeconds));
 
             var baseUri = new Uri(_client.Options.BaseUrl);
             sb.AppendLine($"2) Conectando a {baseUri.Host} (TLS)...");
@@ -161,7 +162,7 @@ public partial class LogsPage : ContentPage
             return;
         }
 
-        string logContent = AuraLog.ReadRecentLog(120);
+        string logContent = AuraLog.ReadRecentLog(RuntimeConfig.LogLinesForAnalysis);
         if (string.IsNullOrWhiteSpace(logContent))
         {
             LogViewer.Text = "Log vazio — não há o que analisar.";

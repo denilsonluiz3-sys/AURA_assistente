@@ -7,13 +7,13 @@
 
     <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Padding="20" RowSpacing="12">
 
-        <Label Text="Assistente de IA (OpenRouter)"
+        <Label Text="Assistente de IA"
                FontAttributes="Bold"
                FontSize="18"
                TextColor="{DynamicResource AuraTextPrimary}" />
 
         <Label Grid.Row="1"
-               Text="Sua pergunta é respondida pela AURA.AI (mesmo provedor do CLI) e registrada na memória."
+               Text="Escolha o provedor e o modelo. A resposta é registrada na memória."
                FontSize="13"
                TextColor="{DynamicResource AuraTextSecondary}" />
 
@@ -26,25 +26,45 @@
             </VerticalStackLayout>
         </ScrollView>
 
-        <VerticalStackLayout Grid.Row="3" Spacing="8">
-            <Entry x:Name="ApiKeyEntry"
-                   Placeholder="Chave OpenRouter (sk-or-...)"
-                   IsPassword="True" />
-            <Editor x:Name="QuestionEditor"
-                    HeightRequest="80"
-                    Placeholder="Pergunta para a AURA..."
-                    AutoSize="TextChanges" />
-            <Button x:Name="SendButton"
-                    Text="Enviar"
-                    Clicked="OnSendClicked"
-                    BackgroundColor="{DynamicResource AuraAccent}"
-                    TextColor="White"
-                    CornerRadius="8" />
-            <ActivityIndicator x:Name="BusyIndicator"
-                               IsRunning="False"
-                               IsVisible="False"
-                               Color="{DynamicResource AuraAccent}" />
-        </VerticalStackLayout>
+        <ScrollView Grid.Row="3">
+            <VerticalStackLayout Spacing="8">
+                <Label Text="Provedor"
+                       FontSize="12"
+                       TextColor="{DynamicResource AuraTextSecondary}" />
+                <Picker x:Name="ProviderPicker"
+                        Title="Provedor"
+                        SelectedIndexChanged="OnProviderChanged" />
+
+                <Label Text="Modelo"
+                       FontSize="12"
+                       TextColor="{DynamicResource AuraTextSecondary}" />
+                <Picker x:Name="ModelPicker"
+                        Title="Modelo" />
+
+                <Label x:Name="ApiKeyLabel"
+                       Text="Chave de API"
+                       FontSize="12"
+                       TextColor="{DynamicResource AuraTextSecondary}" />
+                <Entry x:Name="ApiKeyEntry"
+                       Placeholder="sk-... (deixe vazio se não precisar)"
+                       IsPassword="True" />
+
+                <Editor x:Name="QuestionEditor"
+                        HeightRequest="80"
+                        Placeholder="Pergunta para a AURA..."
+                        AutoSize="TextChanges" />
+                <Button x:Name="SendButton"
+                        Text="Enviar"
+                        Clicked="OnSendClicked"
+                        BackgroundColor="{DynamicResource AuraAccent}"
+                        TextColor="White"
+                        CornerRadius="8" />
+                <ActivityIndicator x:Name="BusyIndicator"
+                                   IsRunning="False"
+                                   IsVisible="False"
+                                   Color="{DynamicResource AuraAccent}" />
+            </VerticalStackLayout>
+        </ScrollView>
 
     </Grid>
 </ContentPage>

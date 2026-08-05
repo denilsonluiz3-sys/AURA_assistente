@@ -22,6 +22,7 @@ namespace AURA.AI
         public string BaseUrl { get; set; } = "https://openrouter.ai/api/v1/chat/completions";
         public string Model { get; set; } = "qwen/qwen-plus";
         public int MaxTokens { get; set; } = 1500;
+        public int TimeoutSeconds { get; set; } = 90;
         public string? AppReference { get; set; }
     }
 
@@ -85,7 +86,7 @@ namespace AURA.AI
                     "ApiKey do provedor LLM não configurada. Defina OpenRouterOptions.ApiKey.");
             }
 
-            HttpClient client = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
+            HttpClient client = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(Options.TimeoutSeconds > 0 ? Options.TimeoutSeconds : 90) };
             HttpRequestMessage request = BuildRequest(question, systemPrompt);
 
             HttpResponseMessage response = await client.SendAsync(request, ct).ConfigureAwait(false);
