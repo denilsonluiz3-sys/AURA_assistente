@@ -5,10 +5,16 @@ trabalho usando as 4 camadas de assistência disponíveis:
 
 | Camada | Ferramenta | Papel |
 |---|---|---|
-| 1 | **opencode** (eu) | Núcleo: código C#, arquitetura, testes, decisões |
+| 1 | **opencode** (eu) | Núcleo: código C#, arquitetura, testes, decisões; **agente do `AgentManager`** que edita o repo (auto-melhoria) |
 | 2 | **aichat** | Assistente LLM poderoso: revisão, geração, análise, tools |
 | 3 | **termux-ai** | Assistente leve no celular: consultas rápidas, fallback |
 | 4 | **GitHub** | Fonte de verdade: histórico, CI, issues, releases |
+
+> **Consolidação F3**: os três assistentes (opencode, aichat, termux-ai) são
+> apps comuns da AURA (`aura ask "..." --assistente <nome>` /
+> `aura run <nome> --cell <id>`). Só o **opencode** enxerga/edita o repo —
+> `scripts/aura-workspace.sh` cria o clone de auto-melhoria em
+> `~/AURA/workspace/AURA_assistente`. Prompts: `prompts/` (formato LobeHub).
 
 ## Princípio de delegação
 

@@ -10,7 +10,7 @@ public partial class BrowserPage : ContentPage
         InitializeComponent();
     }
 
-    protected override async void OnAppearing()
+    protected override void OnAppearing()
     {
         base.OnAppearing();
 
@@ -18,11 +18,11 @@ public partial class BrowserPage : ContentPage
         {
             _initialized = true;
             UrlEntry.Text = HomeUrl;
-            await Browser.GoToAsync(HomeUrl);
+            Browser.Source = HomeUrl;
         }
     }
 
-    private async void OnGoClicked(object sender, EventArgs e)
+    private void OnGoClicked(object sender, EventArgs e)
     {
         string input = UrlEntry.Text?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(input))
@@ -30,8 +30,7 @@ public partial class BrowserPage : ContentPage
             return;
         }
 
-        string url = NormalizeUrl(input);
-        await Browser.GoToAsync(url);
+        Browser.Source = NormalizeUrl(input);
     }
 
     private void OnBackClicked(object sender, EventArgs e)

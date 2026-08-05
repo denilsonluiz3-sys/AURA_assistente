@@ -86,8 +86,10 @@ public class TxtLauncher : ILauncher
 - **F2 (feita):** limites de recursos por célula via `prlimit` (`--as`, `--cpu`,
   `--nofile`, `--nproc`) — sem root, funciona no Termux. `run --mem 256 app.py`
   ou `cell limits <id> --mem 256`.
-- **F3 (em andamento):** célula "assistente" — orquestrar aichat/termux-ai como
-  um app comum (`aura run aichat --cell chat`) + `aura ask "pergunta"`.
+- **F3 (em andamento):** célula "assistente" — orquestrar aichat/termux-ai/
+  opencode como app comum (`aura run <assistente> --cell <id>`) +
+  `aura ask "pergunta"`. O opencode roda na raiz do repo (auto-melhoria);
+  `scripts/aura-workspace.sh` cria o clone de trabalho; prompts em `prompts/`.
 - **F4:** loja de módulos remota (`aura update`) — primeiro loja local
   (`~/AURA/loja`), depois HTTPS. Reaproveita o PluginWatcher.
 - **F5:** daemon + API HTTP — no Termux via `termux-services` (runit, não

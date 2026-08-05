@@ -18,6 +18,7 @@ as camadas disponíveis (opencode / aichat / termux-ai / GitHub).
 | CI++ | Cache NuGet, `global.json` (SDK 10.0.110), schedule diário, badge | success |
 | aichat | Config OpenRouter `qwen/qwen-plus`, `use_tools` ativo, 10 tools llm-functions, `argc` instalado, role `aura-review` | build functions OK |
 | termux-ai | Provider `openai` + api_url OpenRouter (patch `openai.py`) | respondeu "4" |
+| opencode | Adicionado como assistente do `AgentManager`; célula roda no repo (`run opencode --cell dev`); `ask --assistente opencode` edita o repo | `agents` lista os 3 `[ok]` |
 | F3 | `AgentManager` consolida **aichat + termux-ai + opencode**; `aura ask` (one-shot logado em célula); `aura run <assistente> --cell <id>`; opencode roda na raiz do repo (`ResolveWorkspaceDirectory`) | build 0 erros, smoke-test OK |
 | Executors | `AURA.Abstractions` (IToolExecutor/ExecutionRequest/ExecutionResult) + `ShellExecutor` (refatorado), `GitExecutor`, `PythonExecutor`, `NodeExecutor` via `ProcessExecutorBase` | 4 executores testados (hello-shell/git/python/node) |
 | Workspace | `scripts/aura-workspace.sh` (clone/open/status) + `workspace/AURA_assistente` — clone isolado para auto-melhoria | clone OK, status OK |
@@ -32,6 +33,9 @@ as camadas disponíveis (opencode / aichat / termux-ai / GitHub).
 - ~~`aura ask "pergunta"` → responde e loga na célula.~~ ✅
 - Pendente: implementar `IAgent` (stub existe em `AURA.Core/Abstractions`);
   validar `opencode run` interativo como célula de auto-melhoria no workspace.
+- ✅ opencode consolidado: `AgentManager` + célula roda no repo
+  (`WorkingDirectoryFor`) + `scripts/aura-workspace.sh` (clone/open/status) +
+  `prompts/aura-dev.md` (formato LobeHub) para iterar o prompt.
 
 ### F4 — Loja de módulos
 - Loja local `~/AURA/loja` + `aura update`; depois HTTPS.
