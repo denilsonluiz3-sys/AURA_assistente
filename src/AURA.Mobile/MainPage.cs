@@ -11,6 +11,7 @@ public class MainPage : TabbedPage
         ExecutorsPage executors,
         ModulesPage modules)
     {
+        AuraLog.Info("MainPage.ctor BEGIN");
         Title = "AURA";
         BarBackgroundColor = Color.FromArgb("#101014");
         BarTextColor = Color.FromArgb("#f2f2f5");
@@ -20,5 +21,6 @@ public class MainPage : TabbedPage
         Children.Add(memory);
         Children.Add(executors);
         Children.Add(modules);
+        AuraLog.Info("MainPage.ctor OK");
     }
 }

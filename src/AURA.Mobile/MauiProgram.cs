@@ -13,9 +13,12 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
+        AuraLog.Info("MauiProgram.CreateMauiApp BEGIN");
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>();
+
+        AuraLog.Info("MauiProgram: builder created");
 
         // --- Infraestrutura AURA (mesmo Core/Abstractions usados no CLI/Termux) ---
         builder.Services.AddSingleton<ILogger, ConsoleLogger>();
@@ -52,6 +55,10 @@ public static class MauiProgram
         builder.Services.AddSingleton<ExecutorsPage>();
         builder.Services.AddSingleton<ModulesPage>();
 
-        return builder.Build();
+        AuraLog.Info("MauiProgram: services registered");
+
+        var app = builder.Build();
+        AuraLog.Info("MauiProgram.CreateMauiApp OK");
+        return app;
     }
 }
