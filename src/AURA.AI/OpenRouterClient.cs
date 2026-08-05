@@ -21,6 +21,7 @@ namespace AURA.AI
         public string ApiKey { get; set; }
         public string BaseUrl { get; set; } = "https://openrouter.ai/api/v1/chat/completions";
         public string Model { get; set; } = "qwen/qwen-plus";
+        public int MaxTokens { get; set; } = 1500;
         public string? AppReference { get; set; }
     }
 
@@ -58,6 +59,7 @@ namespace AURA.AI
             var payload = new
             {
                 model = Options.Model,
+                max_tokens = Options.MaxTokens,
                 messages
             };
 

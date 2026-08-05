@@ -161,7 +161,7 @@ public partial class LogsPage : ContentPage
             return;
         }
 
-        string logContent = AuraLog.ReadRecentLog(400);
+        string logContent = AuraLog.ReadRecentLog(120);
         if (string.IsNullOrWhiteSpace(logContent))
         {
             LogViewer.Text = "Log vazio — não há o que analisar.";

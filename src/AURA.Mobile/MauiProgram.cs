@@ -33,7 +33,8 @@ public static class MauiProgram
         {
             ApiKey = Preferences.Default.Get("openrouter_key", string.Empty),
             BaseUrl = "https://openrouter.ai/api/v1/chat/completions",
-            Model = "qwen/qwen-plus"
+            Model = "qwen/qwen-plus",
+            MaxTokens = 1500
         }, sp.GetRequiredService<ILogger>()));
         builder.Services.AddSingleton<AiAssistant>();
 
