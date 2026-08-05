@@ -27,6 +27,7 @@ TestResults/
 *.env
 .env
 config/openrouter.env
+keystore/
 *.pem
 *.key
 id_ed25519*

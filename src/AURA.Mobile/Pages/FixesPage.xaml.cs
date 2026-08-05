@@ -125,6 +125,7 @@ public partial class FixesPage : ContentPage
         }
 
         int applied = 0;
+        int ignoredKeyFixes = 0;
         foreach (FixProposal fix in selected)
         {
             try
@@ -159,9 +160,8 @@ public partial class FixesPage : ContentPage
                         }
                         break;
                     case "api_key":
-                        RuntimeConfig.ApiKey = fix.Suggested;
-                        _client.Options.ApiKey = fix.Suggested;
-                        break;
+                        ignoredKeyFixes++;
+                        continue;
                     default:
                         continue;
                 }
@@ -178,9 +178,13 @@ public partial class FixesPage : ContentPage
         RuntimeConfig.Apply(_client);
         ShowCurrentConfig();
 
+        string ignoredNote = ignoredKeyFixes > 0
+            ? $"\n{ignoredKeyFixes} sugestão(ões) de chave de API ignorada(s): digite a chave manualmente na aba Assistente."
+            : string.Empty;
+
         StatusLabel.Text =
             $"Aplicadas {applied} de {selected.Count} correção(ões).\n\n" +
-            "Configuração atual:\n" + ShowCurrentConfigRaw();
+            "Configuração atual:\n" + ShowCurrentConfigRaw() + ignoredNote;
         AuraLog.Info("Correções aplicadas: " + applied + "/" + selected.Count);
     }
 

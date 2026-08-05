@@ -7,6 +7,7 @@ public class MainPage : TabbedPage
     public MainPage(
         HomePage home,
         ChatPage chat,
+        AgentPage agent,
         MemoryPage memory,
         ExecutorsPage executors,
         ModulesPage modules,
@@ -20,6 +21,7 @@ public class MainPage : TabbedPage
 
         Children.Add(home);
         Children.Add(chat);
+        Children.Add(agent);
         Children.Add(memory);
         Children.Add(executors);
         Children.Add(modules);

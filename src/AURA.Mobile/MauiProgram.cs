@@ -31,7 +31,7 @@ public static class MauiProgram
         // IA (OpenRouter) — mesma stack do AURA.AI usado no CLI.
         builder.Services.AddSingleton(sp => new OpenRouterClient(new OpenRouterOptions
         {
-            ApiKey = Preferences.Default.Get("openrouter_key", string.Empty),
+            ApiKey = Preferences.Default.Get("ai_api_key", string.Empty),
             BaseUrl = "https://openrouter.ai/api/v1/chat/completions",
             Model = "qwen/qwen-plus",
             MaxTokens = 1500
@@ -52,6 +52,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<HomePage>();
         builder.Services.AddSingleton<ChatPage>();
+        builder.Services.AddSingleton<AgentPage>();
         builder.Services.AddSingleton<MemoryPage>();
         builder.Services.AddSingleton<ExecutorsPage>();
         builder.Services.AddSingleton<ModulesPage>();

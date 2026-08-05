@@ -119,6 +119,15 @@ public partial class ChatPage : ContentPage
             return;
         }
 
+        if (!string.IsNullOrWhiteSpace(apiKey) &&
+            (apiKey.Length > 200 ||
+             apiKey.IndexOfAny(new[] { ' ', '\t', '\r', '\n' }) >= 0))
+        {
+            AnswerLabel.Text = "Chave de API inválida (parece conter texto de log). " +
+                "Toque em 'Restaurar padrão' na aba Correções e digite a chave manualmente.";
+            return;
+        }
+
         Preferences.Default.Set("ai_api_key", apiKey);
         RuntimeConfig.ApiKey = apiKey;
         _client.Options.ApiKey = apiKey;
