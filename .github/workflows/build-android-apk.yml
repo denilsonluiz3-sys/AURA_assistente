@@ -56,11 +56,12 @@ jobs:
       - name: Build APK (Release)
         run: dotnet build src/AURA.Mobile/AURA.Mobile.csproj -c Release --no-restore -p:AndroidPackageFormats=apk
 
-      - name: Upload APK artifact
+      - name: Upload APK artifact (apenas o assinado)
         uses: actions/upload-artifact@v4
         with:
           name: aura-mobile-apk
-          path: src/AURA.Mobile/bin/Release/net10.0-android/*.apk
+          path: src/AURA.Mobile/bin/Release/net10.0-android/*-Signed.apk
+          if-no-files-found: error
 
       - name: Upload release bundle (AAB)
         if: always()
