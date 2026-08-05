@@ -54,8 +54,24 @@ jobs:
       - name: Restore
         run: dotnet restore src/AURA.Mobile/AURA.Mobile.csproj
 
-      - name: Build APK (Release)
-        run: dotnet build src/AURA.Mobile/AURA.Mobile.csproj -c Release --no-restore -p:AndroidPackageFormats=apk
+      - name: Setup keystore de assinatura (secret)
+        run: |
+          if [ -n "${{ secrets.AURA_KEYSTORE_B64 }}" ]; then
+            mkdir -p keystore
+            echo "${{ secrets.AURA_KEYSTORE_B64 }}" | base64 -d > keystore/aura-release.jks
+            echo "KEYSTORE_PRESENT=1" >> "$GITHUB_ENV"
+            echo "Keystore restaurada do secret."
+          else
+            echo "::warning::Secret AURA_KEYSTORE_B64 ausente; APK será assinado com keystore de debug (instalação por cima falhará)."
+          fi
+
+      - name: Build APK (Release, assinado com keystore fixa)
+        run: |
+          SIGN_ARGS=""
+          if [ "$KEYSTORE_PRESENT" = "1" ]; then
+            SIGN_ARGS="-p:AndroidSigningKeyStore=keystore/aura-release.jks -p:AndroidSigningKeyAlias=${{ secrets.AURA_KEYSTORE_ALIAS }} -p:AndroidSigningKeyPass=${{ secrets.AURA_KEYSTORE_PASS }} -p:AndroidSigningStorePass=${{ secrets.AURA_KEYSTORE_PASS }} -p:AndroidUseDebugSigning=false"
+          fi
+          dotnet build src/AURA.Mobile/AURA.Mobile.csproj -c Release --no-restore -p:AndroidPackageFormats=apk $SIGN_ARGS
 
       - name: Upload APK artifact (apenas o assinado)
         uses: actions/upload-artifact@v4
