@@ -113,7 +113,7 @@ public partial class AgentPage : ContentPage
                 : isTool
                     ? Color.FromArgb("#22222b")
                     : Color.FromArgb("#1b1b22");
-        HorizontalOptions alignment = user ? LayoutOptions.End : LayoutOptions.Start;
+        LayoutOptions alignment = user ? LayoutOptions.End : LayoutOptions.Start;
         Color textColor = isTool
             ? Color.FromArgb("#9a9aa5")
             : Color.FromArgb("#f2f2f5");
