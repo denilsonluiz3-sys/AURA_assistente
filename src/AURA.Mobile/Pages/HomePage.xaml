@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="AURA.Mobile.Pages.HomePage"
              Title="Início"
-             BackgroundColor="{StaticResource AuraBackground}">
+             BackgroundColor="{DynamicResource AuraBackground}">
 
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="16">
@@ -11,13 +11,13 @@
             <Label Text="AURA"
                    FontSize="30"
                    FontAttributes="Bold"
-                   TextColor="{StaticResource AuraTextPrimary}" />
+                   TextColor="{DynamicResource AuraTextPrimary}" />
 
             <Label x:Name="VersionLabel"
                    FontSize="14"
-                   TextColor="{StaticResource AuraTextSecondary}" />
+                   TextColor="{DynamicResource AuraTextSecondary}" />
 
-            <Frame BackgroundColor="{StaticResource AuraSurface}"
+            <Frame BackgroundColor="{DynamicResource AuraSurface}"
                    BorderColor="Transparent"
                    CornerRadius="12"
                    Padding="16">
@@ -25,15 +25,15 @@
                     <Label Text="Sistema"
                            FontAttributes="Bold"
                            FontSize="16"
-                           TextColor="{StaticResource AuraTextPrimary}" />
-                    <Label x:Name="OsLabel" FontSize="13" TextColor="{StaticResource AuraTextSecondary}" />
-                    <Label x:Name="CpuLabel" FontSize="13" TextColor="{StaticResource AuraTextSecondary}" />
-                    <Label x:Name="RamLabel" FontSize="13" TextColor="{StaticResource AuraTextSecondary}" />
-                    <Label x:Name="DiskLabel" FontSize="13" TextColor="{StaticResource AuraTextSecondary}" />
+                           TextColor="{DynamicResource AuraTextPrimary}" />
+                    <Label x:Name="OsLabel" FontSize="13" TextColor="{DynamicResource AuraTextSecondary}" />
+                    <Label x:Name="CpuLabel" FontSize="13" TextColor="{DynamicResource AuraTextSecondary}" />
+                    <Label x:Name="RamLabel" FontSize="13" TextColor="{DynamicResource AuraTextSecondary}" />
+                    <Label x:Name="DiskLabel" FontSize="13" TextColor="{DynamicResource AuraTextSecondary}" />
                 </VerticalStackLayout>
             </Frame>
 
-            <Frame BackgroundColor="{StaticResource AuraSurface}"
+            <Frame BackgroundColor="{DynamicResource AuraSurface}"
                    BorderColor="Transparent"
                    CornerRadius="12"
                    Padding="16">
@@ -41,13 +41,13 @@
                     <Label Text="Rede"
                            FontAttributes="Bold"
                            FontSize="16"
-                           TextColor="{StaticResource AuraTextPrimary}" />
-                    <Label x:Name="NetLabel" FontSize="13" TextColor="{StaticResource AuraTextSecondary}" />
-                    <Label x:Name="IpLabel" FontSize="13" TextColor="{StaticResource AuraTextSecondary}" />
+                           TextColor="{DynamicResource AuraTextPrimary}" />
+                    <Label x:Name="NetLabel" FontSize="13" TextColor="{DynamicResource AuraTextSecondary}" />
+                    <Label x:Name="IpLabel" FontSize="13" TextColor="{DynamicResource AuraTextSecondary}" />
                 </VerticalStackLayout>
             </Frame>
 
-            <Frame BackgroundColor="{StaticResource AuraSurface}"
+            <Frame BackgroundColor="{DynamicResource AuraSurface}"
                    BorderColor="Transparent"
                    CornerRadius="12"
                    Padding="16">
@@ -55,14 +55,14 @@
                     <Label Text="Assistentes disponíveis (agentes)"
                            FontAttributes="Bold"
                            FontSize="16"
-                           TextColor="{StaticResource AuraTextPrimary}" />
-                    <Label x:Name="AgentsLabel" FontSize="13" TextColor="{StaticResource AuraTextSecondary}" />
+                           TextColor="{DynamicResource AuraTextPrimary}" />
+                    <Label x:Name="AgentsLabel" FontSize="13" TextColor="{DynamicResource AuraTextSecondary}" />
                 </VerticalStackLayout>
             </Frame>
 
             <Button Text="Atualizar"
                     Clicked="OnRefreshClicked"
-                    BackgroundColor="{StaticResource AuraAccent}"
+                    BackgroundColor="{DynamicResource AuraAccent}"
                     TextColor="White"
                     CornerRadius="8" />
 

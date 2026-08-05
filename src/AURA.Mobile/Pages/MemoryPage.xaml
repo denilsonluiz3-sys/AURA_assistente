@@ -4,19 +4,19 @@
              xmlns:memory="clr-namespace:AURA.Memory;assembly=AURA.Memory"
              x:Class="AURA.Mobile.Pages.MemoryPage"
              Title="Memória"
-             BackgroundColor="{StaticResource AuraBackground}">
+             BackgroundColor="{DynamicResource AuraBackground}">
 
     <Grid RowDefinitions="Auto,*,Auto" Padding="20" RowSpacing="12">
 
         <Label Text="Memória persistente (AURA.Memory)"
                FontAttributes="Bold"
                FontSize="18"
-               TextColor="{StaticResource AuraTextPrimary}" />
+               TextColor="{DynamicResource AuraTextPrimary}" />
 
         <CollectionView x:Name="EntriesView" Grid.Row="1">
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="memory:MemoryEntry">
-                    <Frame BackgroundColor="{StaticResource AuraSurface}"
+                    <Frame BackgroundColor="{DynamicResource AuraSurface}"
                            BorderColor="Transparent"
                            CornerRadius="12"
                            Padding="12"
@@ -25,10 +25,10 @@
                             <Label Text="{Binding Role}"
                                    FontAttributes="Bold"
                                    FontSize="13"
-                                   TextColor="{StaticResource AuraAccent}" />
+                                   TextColor="{DynamicResource AuraAccent}" />
                             <Label Text="{Binding Text}"
                                    FontSize="13"
-                                   TextColor="{StaticResource AuraTextPrimary}" />
+                                   TextColor="{DynamicResource AuraTextPrimary}" />
                         </VerticalStackLayout>
                     </Frame>
                 </DataTemplate>
@@ -38,13 +38,13 @@
         <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="12">
             <Button Text="Atualizar"
                     Clicked="OnRefreshClicked"
-                    BackgroundColor="{StaticResource AuraAccent}"
+                    BackgroundColor="{DynamicResource AuraAccent}"
                     TextColor="White"
                     CornerRadius="8" />
             <Button Grid.Column="1"
                     Text="Limpar"
                     Clicked="OnClearClicked"
-                    BackgroundColor="{StaticResource AuraError}"
+                    BackgroundColor="{DynamicResource AuraError}"
                     TextColor="White"
                     CornerRadius="8" />
         </Grid>

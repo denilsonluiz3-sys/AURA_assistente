@@ -3,26 +3,26 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="AURA.Mobile.Pages.ChatPage"
              Title="Assistente"
-             BackgroundColor="{StaticResource AuraBackground}">
+             BackgroundColor="{DynamicResource AuraBackground}">
 
     <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Padding="20" RowSpacing="12">
 
         <Label Text="Assistente de IA (OpenRouter)"
                FontAttributes="Bold"
                FontSize="18"
-               TextColor="{StaticResource AuraTextPrimary}" />
+               TextColor="{DynamicResource AuraTextPrimary}" />
 
         <Label Grid.Row="1"
                Text="Sua pergunta é respondida pela AURA.AI (mesmo provedor do CLI) e registrada na memória."
                FontSize="13"
-               TextColor="{StaticResource AuraTextSecondary}" />
+               TextColor="{DynamicResource AuraTextSecondary}" />
 
         <ScrollView Grid.Row="2">
             <VerticalStackLayout Spacing="10">
                 <Label x:Name="AnswerLabel"
                        Text="Digite sua pergunta abaixo."
                        FontSize="14"
-                       TextColor="{StaticResource AuraTextPrimary}" />
+                       TextColor="{DynamicResource AuraTextPrimary}" />
             </VerticalStackLayout>
         </ScrollView>
 
@@ -37,13 +37,13 @@
             <Button x:Name="SendButton"
                     Text="Enviar"
                     Clicked="OnSendClicked"
-                    BackgroundColor="{StaticResource AuraAccent}"
+                    BackgroundColor="{DynamicResource AuraAccent}"
                     TextColor="White"
                     CornerRadius="8" />
             <ActivityIndicator x:Name="BusyIndicator"
                                IsRunning="False"
                                IsVisible="False"
-                               Color="{StaticResource AuraAccent}" />
+                               Color="{DynamicResource AuraAccent}" />
         </VerticalStackLayout>
 
     </Grid>

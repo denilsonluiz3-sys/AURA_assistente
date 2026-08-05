@@ -4,19 +4,19 @@
              xmlns:modules="clr-namespace:AURA.Modules;assembly=AURA.Modules"
              x:Class="AURA.Mobile.Pages.ModulesPage"
              Title="Módulos"
-             BackgroundColor="{StaticResource AuraBackground}">
+             BackgroundColor="{DynamicResource AuraBackground}">
 
     <Grid RowDefinitions="Auto,*" Padding="20" RowSpacing="12">
 
         <Label Text="Catálogo de módulos (AURA.Modules)"
                FontAttributes="Bold"
                FontSize="18"
-               TextColor="{StaticResource AuraTextPrimary}" />
+               TextColor="{DynamicResource AuraTextPrimary}" />
 
         <CollectionView x:Name="ModulesView" Grid.Row="1">
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="modules:ModuleInfo">
-                    <Frame BackgroundColor="{StaticResource AuraSurface}"
+                    <Frame BackgroundColor="{DynamicResource AuraSurface}"
                            BorderColor="Transparent"
                            CornerRadius="12"
                            Padding="12"
@@ -25,10 +25,10 @@
                             <Label Text="{Binding DisplayName}"
                                    FontAttributes="Bold"
                                    FontSize="15"
-                                   TextColor="{StaticResource AuraTextPrimary}" />
+                                   TextColor="{DynamicResource AuraTextPrimary}" />
                             <Label Text="{Binding ShortDescription}"
                                    FontSize="13"
-                                   TextColor="{StaticResource AuraTextSecondary}" />
+                                   TextColor="{DynamicResource AuraTextSecondary}" />
                         </VerticalStackLayout>
                     </Frame>
                 </DataTemplate>

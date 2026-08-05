@@ -4,19 +4,19 @@
              xmlns:local="clr-namespace:AURA.Mobile.Pages"
              x:Class="AURA.Mobile.Pages.ExecutorsPage"
              Title="Executores"
-             BackgroundColor="{StaticResource AuraBackground}">
+             BackgroundColor="{DynamicResource AuraBackground}">
 
     <Grid RowDefinitions="Auto,*,Auto" Padding="20" RowSpacing="12">
 
         <Label Text="Executores AURA"
                FontAttributes="Bold"
                FontSize="18"
-               TextColor="{StaticResource AuraTextPrimary}" />
+               TextColor="{DynamicResource AuraTextPrimary}" />
 
         <CollectionView x:Name="ExecutorsView" Grid.Row="1">
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="local:ExecutorStatus">
-                    <Frame BackgroundColor="{StaticResource AuraSurface}"
+                    <Frame BackgroundColor="{DynamicResource AuraSurface}"
                            BorderColor="Transparent"
                            CornerRadius="12"
                            Padding="12"
@@ -25,7 +25,7 @@
                             <Label Text="{Binding Name}"
                                    FontAttributes="Bold"
                                    FontSize="15"
-                                   TextColor="{StaticResource AuraTextPrimary}" />
+                                   TextColor="{DynamicResource AuraTextPrimary}" />
                             <Label Text="{Binding Status}"
                                    FontSize="13"
                                    TextColor="{Binding StatusColor}" />
@@ -38,7 +38,7 @@
         <Button Grid.Row="2"
                 Text="Atualizar"
                 Clicked="OnRefreshClicked"
-                BackgroundColor="{StaticResource AuraAccent}"
+                BackgroundColor="{DynamicResource AuraAccent}"
                 TextColor="White"
                 CornerRadius="8" />
 
