@@ -1,43 +1,30 @@
 #!/usr/bin/env bash
-# AURA - Commit + Pull + Push
-
+# AURA — commit + push rápido para o main.
+# Uso:
+#   bash scripts/git-push.sh "mensagem do commit"   (commit + pull --rebase + push)
+#   bash scripts/git-push.sh                        (usa mensagem automática)
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-if ! git rev-parse --git-dir >/dev/null 2>&1; then
-    echo "Erro: este diretório não é um repositório Git."
-    exit 1
-fi
+MSG="${1:-chore: atualizacoes $(date '+%Y-%m-%d %H:%M')}"
 
-BRANCH=$(git branch --show-current)
-
-MSG="${1:-chore: atualização automática $(date '+%Y-%m-%d %H:%M')}"
-
-echo
-echo "=== Branch: $BRANCH ==="
+echo "=== status ==="
 git status -sb
-echo
 
-if [[ -n "$(git status --porcelain)" ]]; then
-    echo "=== Adicionando arquivos ==="
-    git add -A
-
-    echo "=== Commit ==="
-    git commit -m "$MSG"
+if [ -z "$(git status --porcelain)" ]; then
+  echo "Nada para commitar; apenas sincronizando."
 else
-    echo "Nenhuma alteração encontrada."
+  echo "=== add + commit ==="
+  git add -A
+  git commit -m "$MSG"
 fi
 
-echo
-echo "=== Sincronizando ==="
-git pull --rebase origin "$BRANCH"
+echo "=== pull --rebase ==="
+git pull --rebase origin main
 
-echo
-echo "=== Enviando ==="
-git push origin "$BRANCH"
+echo "=== push ==="
+git push origin main
 
-echo
-echo "✓ Concluído!"
-echo "Commit: $(git rev-parse --short HEAD)"
+echo "=== pronto: $(git rev-parse --short HEAD) ==="
