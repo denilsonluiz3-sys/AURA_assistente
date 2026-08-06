@@ -16,6 +16,7 @@ dotnet restore src/AURA.Mobile/AURA.Mobile.csproj
 echo "=== Build APK (Release) ==="
 dotnet build src/AURA.Mobile/AURA.Mobile.csproj -c Release --no-restore \
   -p:AndroidPackageFormats=apk \
+  -p:AndroidSdkDirectory="${ANDROID_HOME:-/usr/local/android}" \
   -p:AcceptAndroidSDKLicenses=true
 
 APK="$(ls -1 src/AURA.Mobile/bin/Release/net10.0-android/*-Signed.apk 2>/dev/null | head -1 || true)"
