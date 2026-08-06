@@ -10,6 +10,13 @@ export DOTNET_GCHeapCount="${DOTNET_GCHeapCount:-2}"
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+# Se houver um SDK .NET glibc dedicado (container Alpine), usá-lo.
+if [ -x /opt/dotnet-glibc/dotnet ]; then
+  export DOTNET_ROOT=/opt/dotnet-glibc
+  export PATH="/opt/dotnet-glibc:$PATH"
+  export LD_LIBRARY_PATH=/lib
+fi
+
 echo "=== Restore ==="
 dotnet restore src/AURA.Mobile/AURA.Mobile.csproj
 
