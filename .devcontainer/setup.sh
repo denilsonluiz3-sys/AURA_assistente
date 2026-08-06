@@ -2,6 +2,12 @@
 # AURA — setup do Codespaces/devcontainer: workload MAUI + Android SDK.
 set -euo pipefail
 
+if grep -qi 'alpine\|musl' /etc/os-release 2>/dev/null; then
+  echo "ERRO: base do container é musl/Alpine. O .NET Android (libZipSharp) exige glibc." >&2
+  echo "Use a imagem 'mcr.microsoft.com/devcontainers/base:ubuntu-24.04'." >&2
+  exit 1
+fi
+
 export DEBIAN_FRONTEND=noninteractive
 export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
 export DOTNET_GCHeapHardLimit=1C0000000 DOTNET_GCHeapCount=2
