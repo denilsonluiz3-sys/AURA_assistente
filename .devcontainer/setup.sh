@@ -13,23 +13,38 @@ SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 # glibc dedicado para o build do Android rodar sobre o musl.
 if grep -qi 'alpine\|musl' /etc/os-release 2>/dev/null; then
   echo "Container musl/Alpine detectado; preparando compatibilidade glibc..."
-  apk add --no-cache gcompat libstdc++ zlib unzip curl 2>/dev/null || \
-    apk add gcompat libstdc++ zlib unzip curl 2>/dev/null || true
+  # apk v3 buga com pacote unico; passar sempre >=2 pacotes.
+  apk add --no-cache gcompat libstdc++ zlib icu-libs tzdata unzip curl 2>/dev/null || true
 
   if [ ! -x /opt/dotnet-glibc/dotnet ]; then
     echo "Instalando .NET SDK glibc (linux-x64) em /opt/dotnet-glibc..."
-    curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh
-    chmod +x /tmp/dotnet-install.sh
-    /tmp/dotnet-install.sh --channel 10.0 --install-dir /opt/dotnet-glibc
-    rm -f /tmp/dotnet-install.sh
+    # Tarball glibc direto (dotnet-install.sh pega a build musl no Alpine).
+    curl -fsSL -o /tmp/dotnet-sdk.tar.gz \
+      https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.302/dotnet-sdk-10.0.302-linux-x64.tar.gz
+    mkdir -p /opt/dotnet-glibc
+    tar -xzf /tmp/dotnet-sdk.tar.gz -C /opt/dotnet-glibc
+    rm -f /tmp/dotnet-sdk.tar.gz
+  fi
+
+  if [ ! -x /opt/jdk17/bin/java ]; then
+    echo "Instalando JDK 17 (Temurin glibc) em /opt/jdk17..."
+    curl -fsSL -o /tmp/jdk17.tar.gz \
+      "https://api.adoptium.net/v3/binary/latest/17/ga/linux/x64/jdk/hotspot/normal/eclipse"
+    mkdir -p /opt/jdk17
+    tar -xzf /tmp/jdk17.tar.gz -C /opt/jdk17 --strip-components=1
+    rm -f /tmp/jdk17.tar.gz
   fi
 
   export DOTNET_ROOT=/opt/dotnet-glibc
-  export PATH="/opt/dotnet-glibc:$PATH"
+  export PATH="/opt/dotnet-glibc:/opt/jdk17/bin:$PATH"
   export LD_LIBRARY_PATH=/lib
-  echo "export DOTNET_ROOT=/opt/dotnet-glibc" > /etc/profile.d/aura-dotnet.sh
-  echo 'export PATH="/opt/dotnet-glibc:$PATH"' >> /etc/profile.d/aura-dotnet.sh
-  echo 'export LD_LIBRARY_PATH=/lib' >> /etc/profile.d/aura-dotnet.sh
+  export JAVA_HOME=/opt/jdk17
+  {
+    echo "export DOTNET_ROOT=/opt/dotnet-glibc"
+    echo 'export PATH="/opt/dotnet-glibc:/opt/jdk17/bin:$PATH"'
+    echo 'export LD_LIBRARY_PATH=/lib'
+    echo "export JAVA_HOME=/opt/jdk17"
+  } > /etc/profile.d/aura-dotnet.sh
 fi
 
 echo "=== .NET workload MAUI Android ==="
@@ -54,6 +69,6 @@ dotnet --version
 java -version 2>&1 | head -1
 node --version
 python3 --version
-go version
+go version 2>&1 | head -1
 
 echo "=== Pronto. Para gerar o APK: bash scripts/build-apk-codespaces.sh ==="
