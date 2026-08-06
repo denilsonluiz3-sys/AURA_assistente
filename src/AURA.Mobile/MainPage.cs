@@ -42,6 +42,32 @@ public class MainPage : TabbedPage
         AuraLog.Info("MainPage.ctor OK");
     }
 
+    private bool _permissionsAsked;
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        if (_permissionsAsked)
+            return;
+        _permissionsAsked = true;
+
+        try
+        {
+            await StoragePermissionHelper.EnsureStorageAccessAsync();
+
+            if (!StoragePermissionHelper.IsAllFilesAccessGranted()
+                && !Preferences.Get("all_files_access_asked", false))
+            {
+                Preferences.Set("all_files_access_asked", true);
+                StoragePermissionHelper.RequestAllFilesAccess();
+            }
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Info("Permissões de armazenamento: " + ex.Message);
+        }
+    }
+
     private static NavigationPage MakeSection(string title, params (string Label, Page Page)[] items)
     {
         var section = new SectionPage(title, items);

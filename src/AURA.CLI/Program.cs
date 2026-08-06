@@ -47,7 +47,7 @@ namespace AURA.CLI
             _runtime = new SimulationRuntime(_logger);
             _pluginWatcher = new PluginWatcher(_logger);
             _runner = new Runner(_pluginWatcher.Launchers.Concat(
-                new ILauncher[] { new PythonLauncher(), new JavaLauncher(), new DotnetLauncher() }));
+                new ILauncher[] { new PythonLauncher(), new JavaLauncher(), new DotnetLauncher(), new NodeLauncher(), new GoLauncher() }));
             _agentManager = new AgentManager(_logger);
 
             _runtime.LoadFromStoreAsync().GetAwaiter().GetResult();

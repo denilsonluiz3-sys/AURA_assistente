@@ -47,13 +47,27 @@ cli() { printf '%s\n' "$1" | timeout 90 dotnet "$AURA_CLI_DLL"; }
 # --- Arquivo de teste -------------------------------------------------------
 
 TMP_FILE="$(mktemp /tmp/aura_smoke_XXXXXX.py)"
-trap 'rm -f "$TMP_FILE"' EXIT
+TMP_NODE="$(mktemp /tmp/aura_smoke_XXXXXX.js)"
+TMP_GO="$(mktemp /tmp/aura_smoke_XXXXXX.go)"
+trap 'rm -f "$TMP_FILE" "$TMP_NODE" "$TMP_GO"' EXIT
 
 cat > "$TMP_FILE" <<'PY'
 import time
 print("AURA_SMOKE_OK", flush=True)
 time.sleep(2)
 PY
+
+cat > "$TMP_NODE" <<'JS'
+console.log("AURA_SMOKE_NODE_OK");
+JS
+
+cat > "$TMP_GO" <<'GO'
+package main
+
+import "fmt"
+
+func main() { fmt.Println("AURA_SMOKE_GO_OK") }
+GO
 
 # --- Passos -----------------------------------------------------------------
 
@@ -65,10 +79,10 @@ else
 fi
 
 OUT="$(cli 'launchers')"
-if grep -q "PythonLauncher" <<< "$OUT"; then
+if grep -q "PythonLauncher" <<< "$OUT" && grep -q "JavaLauncher" <<< "$OUT" && grep -q "NodeLauncher" <<< "$OUT" && grep -q "GoLauncher" <<< "$OUT"; then
   pass "launchers"
 else
-  fail "launchers não mostra PythonLauncher"
+  fail "launchers não mostra todos os launchers"
 fi
 
 CELL_ID="smoke_$$"
@@ -88,6 +102,54 @@ fi
 
 cli "cell stop $CELL_ID" >/dev/null
 cli "cell delete $CELL_ID" >/dev/null
+
+# --- Célula Node.js (se node instalado) -------------------------------------
+
+if command -v node >/dev/null 2>&1; then
+  NODE_CELL_ID="smoke_node_$$"
+  NODE_RUN_OUT="$(cli "run $TMP_NODE --cell $NODE_CELL_ID")"
+  if grep -q "Célula criada e iniciada" <<< "$NODE_RUN_OUT"; then
+    pass "run node $NODE_CELL_ID"
+  else
+    fail "run node não criou a célula: $NODE_RUN_OUT"
+  fi
+
+  NODE_LOG_OUT="$(cli "cell log $NODE_CELL_ID")"
+  if grep -q "AURA_SMOKE_NODE_OK" <<< "$NODE_LOG_OUT"; then
+    pass "log node contém AURA_SMOKE_NODE_OK"
+  else
+    fail "log node sem AURA_SMOKE_NODE_OK: $NODE_LOG_OUT"
+  fi
+
+  cli "cell stop $NODE_CELL_ID" >/dev/null
+  cli "cell delete $NODE_CELL_ID" >/dev/null
+else
+  pass "node não instalado; teste de célula node pulado"
+fi
+
+# --- Célula Go (se go instalado) --------------------------------------------
+
+if command -v go >/dev/null 2>&1; then
+  GO_CELL_ID="smoke_go_$$"
+  GO_RUN_OUT="$(cli "run $TMP_GO --cell $GO_CELL_ID")"
+  if grep -q "Célula criada e iniciada" <<< "$GO_RUN_OUT"; then
+    pass "run go $GO_CELL_ID"
+  else
+    fail "run go não criou a célula: $GO_RUN_OUT"
+  fi
+
+  GO_LOG_OUT="$(cli "cell log $GO_CELL_ID")"
+  if grep -q "AURA_SMOKE_GO_OK" <<< "$GO_LOG_OUT"; then
+    pass "log go contém AURA_SMOKE_GO_OK"
+  else
+    fail "log go sem AURA_SMOKE_GO_OK: $GO_LOG_OUT"
+  fi
+
+  cli "cell stop $GO_CELL_ID" >/dev/null
+  cli "cell delete $GO_CELL_ID" >/dev/null
+else
+  pass "go não instalado; teste de célula go pulado"
+fi
 
 CELLS_OUT="$(cli 'cells')"
 if grep -q "$CELL_ID" <<< "$CELLS_OUT"; then

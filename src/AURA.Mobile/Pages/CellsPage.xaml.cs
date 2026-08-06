@@ -1,5 +1,6 @@
 using AURA.Core.Launchers;
 using AURA.Core.Runtime;
+using Cell = AURA.Core.Runtime.Cell;
 
 namespace AURA.Mobile.Pages;
 

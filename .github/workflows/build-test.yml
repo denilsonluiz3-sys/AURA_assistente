@@ -25,6 +25,36 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup Java 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Go 1.23
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Check executors
+        run: |
+          echo "Runtimes disponíveis para as células AURA:"
+          dotnet --version
+          python3 --version
+          java -version 2>&1 | head -1
+          node --version
+          go version
+
       - name: Cache NuGet packages
         uses: actions/cache@v4
         with:

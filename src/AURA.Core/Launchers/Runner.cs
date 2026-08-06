@@ -20,7 +20,9 @@ namespace AURA.Core.Launchers
             {
                 new PythonLauncher(),
                 new JavaLauncher(),
-                new DotnetLauncher()
+                new DotnetLauncher(),
+                new NodeLauncher(),
+                new GoLauncher()
             })
         {
         }

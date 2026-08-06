@@ -1,5 +1,6 @@
 using AURA.Core.Launchers;
 using AURA.Core.Runtime;
+using Cell = AURA.Core.Runtime.Cell;
 
 namespace AURA.Mobile.Pages;
 
@@ -22,7 +23,7 @@ public partial class RunPage : ContentPage
         {
             var result = await FilePicker.Default.PickAsync(new PickOptions
             {
-                Title = "Escolha um programa para rodar em célula"
+                PickerTitle = "Escolha um programa para rodar em célula"
             });
 
             if (result == null)
