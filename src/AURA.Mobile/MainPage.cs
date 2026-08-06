@@ -14,23 +14,37 @@ public class MainPage : TabbedPage
         LogsPage logs,
         FixesPage fixes,
         TerminalPage terminal,
-        BrowserPage browser)
+        BrowserPage browser,
+        CellsPage cells,
+        RunPage run)
     {
         AuraLog.Info("MainPage.ctor BEGIN");
-        Title = "AURA";
         BarBackgroundColor = Color.FromArgb("#101014");
         BarTextColor = Color.FromArgb("#f2f2f5");
 
-        Children.Add(home);
-        Children.Add(chat);
-        Children.Add(agent);
-        Children.Add(memory);
-        Children.Add(executors);
-        Children.Add(modules);
-        Children.Add(logs);
-        Children.Add(fixes);
-        Children.Add(terminal);
-        Children.Add(browser);
+        Children.Add(MakeSection("Sistema",
+            ("Início", home),
+            ("Logs", logs),
+            ("Correções", fixes)));
+        Children.Add(MakeSection("Assistente",
+            ("Chat", chat),
+            ("Agente", agent),
+            ("Memória", memory)));
+        Children.Add(MakeSection("Ferramentas",
+            ("Terminal", terminal),
+            ("Executores", executors),
+            ("Módulos", modules),
+            ("Navegador", browser)));
+        Children.Add(MakeSection("Apps",
+            ("Células", cells),
+            ("Rodar programa", run)));
+
         AuraLog.Info("MainPage.ctor OK");
+    }
+
+    private static NavigationPage MakeSection(string title, params (string Label, Page Page)[] items)
+    {
+        var section = new SectionPage(title, items);
+        return new NavigationPage(section) { Title = title };
     }
 }

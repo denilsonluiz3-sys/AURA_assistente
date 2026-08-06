@@ -1,6 +1,8 @@
 using AURA.AI;
 using AURA.Agents;
 using AURA.Core.Logging;
+using AURA.Core.Launchers;
+using AURA.Core.Runtime;
 using AURA.Memory;
 using AURA.Mobile.Pages;
 using AURA.Modules.Executors;
@@ -48,6 +50,14 @@ public static class MauiProgram
         builder.Services.AddSingleton<PythonExecutor>();
         builder.Services.AddSingleton<NodeExecutor>();
 
+        // Runtime de células + runner ("AURA decide como rodar"), mesmo core do CLI.
+        // Células ficam na pasta privada do app (sem permissão extra).
+        builder.Services.AddSingleton(sp => new SimulationRuntime(
+            sp.GetRequiredService<ILogger>(),
+            Path.Combine(FileSystem.AppDataDirectory, "cells"),
+            new DirectoryCellBackend()));
+        builder.Services.AddSingleton<Runner>();
+
         // Páginas
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<HomePage>();
@@ -60,6 +70,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<FixesPage>();
         builder.Services.AddSingleton<TerminalPage>();
         builder.Services.AddSingleton<BrowserPage>();
+        builder.Services.AddSingleton<CellsPage>();
+        builder.Services.AddSingleton<RunPage>();
 
         AuraLog.Info("MauiProgram: services registered");
 
