@@ -118,7 +118,7 @@ namespace AURA.Core.Runtime
         }
 
         public Cell CreateCell(string id, string appPath, string args = null,
-            string templatePath = null, string workingDirectory = null, ResourceLimits limits = null)
+            string templatePath = null, string workingDirectory = null, ResourceLimits? limits = null)
         {
             if (string.IsNullOrWhiteSpace(id))
             {
