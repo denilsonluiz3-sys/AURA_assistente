@@ -6,14 +6,19 @@
              Title="Módulos"
              BackgroundColor="{DynamicResource AuraBackground}">
 
-    <Grid RowDefinitions="Auto,*" Padding="20" RowSpacing="12">
+    <Grid RowDefinitions="Auto,Auto,*" Padding="20" RowSpacing="12">
 
         <Label Text="Catálogo de módulos (AURA.Modules)"
                FontAttributes="Bold"
                FontSize="18"
                TextColor="{DynamicResource AuraTextPrimary}" />
 
-        <CollectionView x:Name="ModulesView" Grid.Row="1">
+        <Label x:Name="ConfigSummaryLabel"
+               Grid.Row="1"
+               FontSize="13"
+               TextColor="{DynamicResource AuraTextSecondary}" />
+
+        <CollectionView x:Name="ModulesView" Grid.Row="2">
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="modules:ModuleInfo">
                     <Frame BackgroundColor="{DynamicResource AuraSurface}"

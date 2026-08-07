@@ -1,5 +1,6 @@
 using AURA.AI;
 using AURA.Agents;
+using AURA.Core.Configuration;
 using AURA.Core.Events;
 using AURA.Core.Logging;
 using AURA.Core.Launchers;
@@ -26,6 +27,13 @@ public static class MauiProgram
         // --- Infraestrutura AURA (mesmo Core/Abstractions usados no CLI/Termux) ---
         builder.Services.AddSingleton<ILogger, ConsoleLogger>();
         builder.Services.AddSingleton<EventBus>();
+
+        // Configuração persistida (settings.json/modules.json na pasta privada do app).
+        string configDir = Path.Combine(FileSystem.AppDataDirectory, "config");
+        builder.Services.AddSingleton(sp => new ConfigLoader(sp.GetRequiredService<ILogger>())
+            .LoadSettings(Path.Combine(configDir, "settings.json")));
+        builder.Services.AddSingleton(sp => new ConfigLoader(sp.GetRequiredService<ILogger>())
+            .LoadModules(Path.Combine(configDir, "modules.json")));
 
         // Memória persistente do app: pasta privada do Android (sem permissão extra).
         builder.Services.AddSingleton(sp => new MemoryStore(

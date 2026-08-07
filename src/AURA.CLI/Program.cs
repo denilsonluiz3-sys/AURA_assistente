@@ -24,6 +24,7 @@ namespace AURA.CLI
         private static PluginWatcher _pluginWatcher;
         private static AgentManager _agentManager;
         private static ILogger _logger;
+        private static AuraBootstrap _bootstrap;
 
         private static void Main(string[] args)
         {
@@ -43,6 +44,7 @@ namespace AURA.CLI
 
             var bootstrap = new AuraBootstrap();
             bootstrap.Start();
+            _bootstrap = bootstrap;
 
             _logger = bootstrap.Logger;
             _runtime = new SimulationRuntime(_logger);
@@ -59,6 +61,13 @@ namespace AURA.CLI
                 _logger.Info("[evento] assistente " + evt.Assistant + " respondeu (célula " + evt.CellId + ")"));
 
             _runtime.LoadFromStoreAsync().GetAwaiter().GetResult();
+
+            if (!bootstrap.Settings.FirstRunCompleted)
+            {
+                PrintWelcome();
+                bootstrap.Settings.FirstRunCompleted = true;
+                bootstrap.SaveSettings();
+            }
 
             PrintHelp();
             RunLoop(args);
@@ -121,6 +130,9 @@ namespace AURA.CLI
                         break;
                     case "modulos":
                         PrintModules();
+                        break;
+                    case "config":
+                        PrintConfig();
                         break;
                     case "launchers":
                         PrintLaunchers();
@@ -464,6 +476,29 @@ namespace AURA.CLI
             Console.WriteLine("Status            : " + status.Message);
         }
 
+        private static void PrintWelcome()
+        {
+            Console.WriteLine("Bem-vindo ao AURA Orchestrator!");
+            Console.WriteLine("Comandos básicos: 'ajuda' para ajuda, 'run <arquivo>' para executar,");
+            Console.WriteLine("'agents' para listar assistentes, 'config' para ver a configuração.");
+            Console.WriteLine();
+        }
+
+        private static void PrintConfig()
+        {
+            Console.WriteLine("Configuração (" + _bootstrap.SettingsPath + "):");
+            Console.WriteLine("  Internet           : " + _bootstrap.Settings.Internet);
+            Console.WriteLine("  FirstRunCompleted  : " + _bootstrap.Settings.FirstRunCompleted);
+            Console.WriteLine("  Theme              : " + _bootstrap.Settings.Theme);
+            Console.WriteLine();
+            Console.WriteLine("Módulos preparados (" + _bootstrap.ModulesPath + "):");
+            Console.WriteLine("  Windows    : " + _bootstrap.Modules.Modules.Windows);
+            Console.WriteLine("  AI         : " + _bootstrap.Modules.Modules.AI);
+            Console.WriteLine("  Automation : " + _bootstrap.Modules.Modules.Automation);
+            Console.WriteLine("  Memory     : " + _bootstrap.Modules.Modules.Memory);
+            Console.WriteLine("  Plugins    : " + _bootstrap.Modules.Modules.Plugins);
+        }
+
         private static void PrintModules()
         {
             foreach (ModuleInfo module in ModuleCatalog.GetAll())
@@ -486,6 +521,7 @@ namespace AURA.CLI
             Console.WriteLine("  ask \"pergunta\"          Pergunta via assistente, logada em célula");
             Console.WriteLine("  run aichat --cell chat  Inicia assistente como célula");
             Console.WriteLine("  modulos                 Lista módulos disponíveis");
+            Console.WriteLine("  config                  Mostra configuração (settings + módulos)");
             Console.WriteLine("  launchers               Lista resolutores de extensão");
             Console.WriteLine("  plugins                 Lista plugins carregados");
             Console.WriteLine("  ajuda                   Mostra esta ajuda");
