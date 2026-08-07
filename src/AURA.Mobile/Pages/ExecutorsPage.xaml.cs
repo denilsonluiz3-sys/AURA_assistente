@@ -1,4 +1,5 @@
 using AURA.Abstractions.Execution;
+using AURA.Core.Events;
 using AURA.Modules.Executors;
 
 namespace AURA.Mobile.Pages;
@@ -9,14 +10,16 @@ public partial class ExecutorsPage : ContentPage
     private readonly GitExecutor _git;
     private readonly PythonExecutor _python;
     private readonly NodeExecutor _node;
+    private readonly EventBus _events;
 
-    public ExecutorsPage(ShellExecutor shell, GitExecutor git, PythonExecutor python, NodeExecutor node)
+    public ExecutorsPage(ShellExecutor shell, GitExecutor git, PythonExecutor python, NodeExecutor node, EventBus events)
     {
         InitializeComponent();
         _shell = shell;
         _git = git;
         _python = python;
         _node = node;
+        _events = events;
         ExecutorPicker.SelectedIndex = 0;
     }
 
@@ -84,6 +87,14 @@ public partial class ExecutorsPage : ContentPage
                 ? "(sem saída)"
                 : result.CombineOutput();
             ResultEditor.Text = status + "\n" + new string('-', 32) + "\n" + body;
+
+            _events.Publish(new ExecutorCompletedEvent
+            {
+                Executor = executor.Name,
+                Command = command,
+                Success = result.Success,
+                Duration = result.Duration
+            });
         }
         catch (Exception ex)
         {

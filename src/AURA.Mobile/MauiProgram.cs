@@ -1,5 +1,6 @@
 using AURA.AI;
 using AURA.Agents;
+using AURA.Core.Events;
 using AURA.Core.Logging;
 using AURA.Core.Launchers;
 using AURA.Core.Runtime;
@@ -24,6 +25,7 @@ public static class MauiProgram
 
         // --- Infraestrutura AURA (mesmo Core/Abstractions usados no CLI/Termux) ---
         builder.Services.AddSingleton<ILogger, ConsoleLogger>();
+        builder.Services.AddSingleton<EventBus>();
 
         // Memória persistente do app: pasta privada do Android (sem permissão extra).
         builder.Services.AddSingleton(sp => new MemoryStore(
@@ -40,7 +42,10 @@ public static class MauiProgram
         }, sp.GetRequiredService<ILogger>()));
         builder.Services.AddSingleton<AiAssistant>();
 
-        builder.Services.AddSingleton(sp => new AgentManager(sp.GetRequiredService<ILogger>()));
+        builder.Services.AddSingleton(sp => new AgentManager(sp.GetRequiredService<ILogger>())
+        {
+            Events = sp.GetRequiredService<EventBus>()
+        });
         builder.Services.AddSingleton<SystemAnalyzer>();
         builder.Services.AddSingleton<NetworkManager>();
 
@@ -55,7 +60,10 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new SimulationRuntime(
             sp.GetRequiredService<ILogger>(),
             Path.Combine(FileSystem.AppDataDirectory, "cells"),
-            new DirectoryCellBackend()));
+            new DirectoryCellBackend())
+        {
+            Events = sp.GetRequiredService<EventBus>()
+        });
         builder.Services.AddSingleton<Runner>();
 
         // Páginas
@@ -76,6 +84,20 @@ public static class MauiProgram
         AuraLog.Info("MauiProgram: services registered");
 
         var app = builder.Build();
+
+        // Memória registra eventos de ciclo de vida das células (reativa MemoryKind.CellEvent).
+        try
+        {
+            var bus = app.Services.GetRequiredService<EventBus>();
+            var memory = app.Services.GetRequiredService<MemoryStore>();
+            bus.Subscribe<CellStateChangedEvent>(evt =>
+                memory.Append(MemoryEntry.CellStateChange(evt.CellId, evt.To)));
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("MauiProgram.MemoryEventSink", ex);
+        }
+
         AuraLog.Info("MauiProgram.CreateMauiApp OK");
         return app;
     }

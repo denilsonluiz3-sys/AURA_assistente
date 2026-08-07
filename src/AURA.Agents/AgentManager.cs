@@ -38,6 +38,12 @@ namespace AURA.Agents
         private readonly ILogger _logger;
         private readonly IReadOnlyList<AgentInfo> _assistants;
 
+        /// <summary>
+        /// EventBus opcional. Quando definido, publica AssistantRespondedEvent
+        /// ao final de cada AskAsync.
+        /// </summary>
+        public AURA.Core.Events.EventBus Events { get; set; }
+
         public AgentManager(ILogger logger)
             : this(logger, new AgentInfo[]
             {
@@ -148,6 +154,17 @@ namespace AURA.Agents
             string log = runtime.ReadCellLog(cell.Id);
 
             _logger.Info("ask: assistente='" + assistant.Name + "' célula='" + cell.Id + "'");
+            if (Events != null)
+            {
+                Events.Publish(new AURA.Core.Events.AssistantRespondedEvent
+                {
+                    Assistant = assistant.Name,
+                    Question = question,
+                    Answer = log,
+                    CellId = cell.Id
+                });
+            }
+
             return log;
         }
 
