@@ -73,6 +73,7 @@ public partial class LogsPage : ContentPage
 
     private async void OnTestClicked(object sender, EventArgs e)
     {
+        RuntimeConfig.Apply(_client);
         TestButton.IsEnabled = false;
         BusyIndicator.IsRunning = true;
         BusyIndicator.IsVisible = true;
@@ -155,6 +156,7 @@ public partial class LogsPage : ContentPage
 
     private async void OnAnalyzeClicked(object sender, EventArgs e)
     {
+        RuntimeConfig.Apply(_client);
         string apiKey = _client.Options.ApiKey;
         if (string.IsNullOrWhiteSpace(apiKey))
         {

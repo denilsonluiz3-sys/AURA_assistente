@@ -137,11 +137,14 @@ public partial class AgentPage : ContentPage
             Content = label
         };
 
-        ConversationContainer.Add(border);
-
-        Dispatcher.Dispatch(() =>
+        MainThread.BeginInvokeOnMainThread(() =>
         {
-            ConversationScroll.ScrollToAsync(0, ConversationContainer.Height, true);
+            ConversationContainer.Add(border);
+
+            Dispatcher.Dispatch(() =>
+            {
+                ConversationScroll.ScrollToAsync(0, ConversationContainer.Height, true);
+            });
         });
     }
 

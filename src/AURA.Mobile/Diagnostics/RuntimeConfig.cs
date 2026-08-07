@@ -49,7 +49,23 @@ namespace AURA.Mobile.Diagnostics
         {
             ProviderInfo provider = ProviderCatalog.Find(Provider);
             string model = Model;
-            if (string.IsNullOrWhiteSpace(model) && provider.Models.Count > 0)
+
+            // O modelo salvo só vale se pertencer ao provedor resolvido; senão,
+            // cai para o primeiro do provedor (evita mandar ID de outra API, ex. Groq na OpenRouter).
+            bool modelBelongsToProvider = false;
+            if (!string.IsNullOrWhiteSpace(model))
+            {
+                foreach (ProviderModel m in provider.Models)
+                {
+                    if (string.Equals(m.Id, model, System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        modelBelongsToProvider = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!modelBelongsToProvider && provider.Models.Count > 0)
             {
                 model = provider.Models[0].Id;
             }

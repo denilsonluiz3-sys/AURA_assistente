@@ -169,11 +169,14 @@ public partial class TerminalPage : ContentPage
             LineBreakMode = LineBreakMode.WordWrap
         };
 
-        OutputStack.Add(label);
-
-        Dispatcher.Dispatch(async () =>
+        MainThread.BeginInvokeOnMainThread(() =>
         {
-            await OutputScroll.ScrollToAsync(0, OutputStack.Height, animated: true);
+            OutputStack.Add(label);
+
+            Dispatcher.Dispatch(async () =>
+            {
+                await OutputScroll.ScrollToAsync(0, OutputStack.Height, animated: true);
+            });
         });
     }
 }
