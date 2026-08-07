@@ -7,6 +7,7 @@ using AURA.Core.Launchers;
 using AURA.Core.Runtime;
 using AURA.Memory;
 using AURA.Mobile.Pages;
+using AURA.Modules;
 using AURA.Modules.Executors;
 using AURA.Network;
 using AURA.SystemInfo;
@@ -34,6 +35,14 @@ public static class MauiProgram
             .LoadSettings(Path.Combine(configDir, "settings.json")));
         builder.Services.AddSingleton(sp => new ConfigLoader(sp.GetRequiredService<ILogger>())
             .LoadModules(Path.Combine(configDir, "modules.json")));
+
+        // Gestor de módulos opcionais: baixa o pacote, aplica (ativa em
+        // modules.json) e remove (desativa + limpa dados locais).
+        builder.Services.AddSingleton(sp => new ModuleManager(
+            sp.GetRequiredService<ILogger>(),
+            Path.Combine(FileSystem.AppDataDirectory, "modules"),
+            Path.Combine(configDir, "modules.json"),
+            sp.GetRequiredService<EventBus>()));
 
         // Memória persistente do app: pasta privada do Android (sem permissão extra).
         builder.Services.AddSingleton(sp => new MemoryStore(

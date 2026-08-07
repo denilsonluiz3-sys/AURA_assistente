@@ -1,0 +1,8 @@
+{
+  "id": "system",
+  "name": "Início e Sistema",
+  "version": "1.0.0",
+  "description": "Painel inicial com diagnóstico do sistema, rede e agentes disponíveis.",
+  "features": ["Página Início", "Diagnóstico", "Status de rede"],
+  "pages": ["HomePage"]
+}

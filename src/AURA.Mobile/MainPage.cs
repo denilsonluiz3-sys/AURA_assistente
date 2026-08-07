@@ -1,76 +1,115 @@
+using AURA.Core.Events;
 using AURA.Mobile.Pages;
+using AURA.Modules;
 
-namespace AURA.Mobile;
-
-public class MainPage : TabbedPage
+namespace AURA.Mobile
 {
-    public MainPage(
-        HomePage home,
-        ChatPage chat,
-        AgentPage agent,
-        MemoryPage memory,
-        ExecutorsPage executors,
-        ModulesPage modules,
-        LogsPage logs,
-        FixesPage fixes,
-        TerminalPage terminal,
-        BrowserPage browser,
-        CellsPage cells,
-        RunPage run)
+    public class MainPage : TabbedPage
     {
-        AuraLog.Info("MainPage.ctor BEGIN");
-        BarBackgroundColor = Color.FromArgb("#101014");
-        BarTextColor = Color.FromArgb("#f2f2f5");
+        private readonly ModuleManager _manager;
+        private readonly List<(string ModuleId, string Section, string Label, Page Page)> _entries;
+        private bool _permissionsAsked;
 
-        Children.Add(MakeSection("Sistema",
-            ("Início", home),
-            ("Logs", logs),
-            ("Correções", fixes)));
-        Children.Add(MakeSection("Assistente",
-            ("Chat", chat),
-            ("Agente", agent),
-            ("Memória", memory)));
-        Children.Add(MakeSection("Ferramentas",
-            ("Terminal", terminal),
-            ("Executores", executors),
-            ("Módulos", modules),
-            ("Navegador", browser)));
-        Children.Add(MakeSection("Apps",
-            ("Células", cells),
-            ("Rodar programa", run)));
-
-        AuraLog.Info("MainPage.ctor OK");
-    }
-
-    private bool _permissionsAsked;
-
-    protected override async void OnAppearing()
-    {
-        base.OnAppearing();
-        if (_permissionsAsked)
-            return;
-        _permissionsAsked = true;
-
-        try
+        public MainPage(
+            EventBus events,
+            ModuleManager manager,
+            HomePage home,
+            ChatPage chat,
+            AgentPage agent,
+            MemoryPage memory,
+            ExecutorsPage executors,
+            ModulesPage modules,
+            LogsPage logs,
+            FixesPage fixes,
+            TerminalPage terminal,
+            BrowserPage browser,
+            CellsPage cells,
+            RunPage run)
         {
-            await StoragePermissionHelper.EnsureStorageAccessAsync();
+            AuraLog.Info("MainPage.ctor BEGIN");
+            _manager = manager;
 
-            if (!StoragePermissionHelper.IsAllFilesAccessGranted()
-                && !Preferences.Get("all_files_access_asked", false))
+            events.Subscribe<ModuleStateChangedEvent>(_ =>
+                MainThread.BeginInvokeOnMainThread(RebuildTabs));
+            _entries = new List<(string, string, string, Page)>
             {
-                Preferences.Set("all_files_access_asked", true);
-                StoragePermissionHelper.RequestAllFilesAccess();
+                ("system", "Sistema", "Início", home),
+                ("logs", "Sistema", "Logs", logs),
+                ("logs", "Sistema", "Correções", fixes),
+                ("ai", "Assistente", "Chat", chat),
+                ("ai", "Assistente", "Agente", agent),
+                ("memory", "Assistente", "Memória", memory),
+                ("terminal", "Ferramentas", "Terminal", terminal),
+                ("executors", "Ferramentas", "Executores", executors),
+                (null, "Ferramentas", "Módulos", modules),
+                (null, "Ferramentas", "Navegador", browser),
+                ("cells", "Apps", "Células", cells),
+                ("cells", "Apps", "Rodar programa", run)
+            };
+
+            BarBackgroundColor = Color.FromArgb("#101014");
+            BarTextColor = Color.FromArgb("#f2f2f5");
+
+            AuraLog.Info("MainPage.ctor OK");
+        }
+
+        protected override async void OnAppearing()
+        {
+            base.OnAppearing();
+            RebuildTabs();
+
+            if (_permissionsAsked)
+                return;
+            _permissionsAsked = true;
+
+            try
+            {
+                await StoragePermissionHelper.EnsureStorageAccessAsync();
+
+                if (!StoragePermissionHelper.IsAllFilesAccessGranted()
+                    && !Preferences.Get("all_files_access_asked", false))
+                {
+                    Preferences.Set("all_files_access_asked", true);
+                    StoragePermissionHelper.RequestAllFilesAccess();
+                }
+            }
+            catch (Exception ex)
+            {
+                AuraLog.Info("Permissões de armazenamento: " + ex.Message);
             }
         }
-        catch (Exception ex)
-        {
-            AuraLog.Info("Permissões de armazenamento: " + ex.Message);
-        }
-    }
 
-    private static NavigationPage MakeSection(string title, params (string Label, Page Page)[] items)
-    {
-        var section = new SectionPage(title, items);
-        return new NavigationPage(section) { Title = title };
+        /// <summary>
+        /// Reconstrói as abas: só entra o núcleo (Módulos/Navegador) e os
+        /// módulos que já foram baixados e aplicados.
+        /// </summary>
+        public void RebuildTabs()
+        {
+            Children.Clear();
+
+            foreach (IGrouping<string, (string ModuleId, string Section, string Label, Page Page)> group
+                in _entries.GroupBy(e => e.Section))
+            {
+                var items = group
+                    .Where(e => e.ModuleId == null || _manager.IsApplied(e.ModuleId))
+                    .Select(e => (e.Label, e.Page))
+                    .ToArray();
+
+                if (items.Length == 0)
+                {
+                    continue;
+                }
+
+                Children.Add(MakeSection(group.Key, items));
+            }
+
+            AuraLog.Info("MainPage.RebuildTabs: " + Children.Count + " seções ativas");
+        }
+
+        private static NavigationPage MakeSection(string title, params (string Label, Page Page)[] items)
+        {
+            var section = new SectionPage(title, items);
+            return new NavigationPage(section) { Title = title };
+        }
     }
 }
