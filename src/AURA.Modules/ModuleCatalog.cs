@@ -31,7 +31,8 @@ namespace AURA.Modules
                     "Automação de tarefas administrativas"
                 },
                 Difficulty = ModuleDifficulty.Avancado,
-                EstimatedTime = "2 semanas"
+                EstimatedTime = "2 semanas",
+                Status = ModuleStatus.Planejado
             },
             new ModuleInfo
             {
@@ -52,7 +53,8 @@ namespace AURA.Modules
                     "Sugestões baseadas no estado real do PC"
                 },
                 Difficulty = ModuleDifficulty.Intermediario,
-                EstimatedTime = "3 semanas"
+                EstimatedTime = "3 semanas",
+                Status = ModuleStatus.Implementado
             },
             new ModuleInfo
             {
@@ -73,7 +75,8 @@ namespace AURA.Modules
                     "Rotinas agendadas sem intervenção"
                 },
                 Difficulty = ModuleDifficulty.Intermediario,
-                EstimatedTime = "2 semanas"
+                EstimatedTime = "2 semanas",
+                Status = ModuleStatus.Planejado
             },
             new ModuleInfo
             {
@@ -94,7 +97,8 @@ namespace AURA.Modules
                     "Perfil personalizado do usuário"
                 },
                 Difficulty = ModuleDifficulty.Basico,
-                EstimatedTime = "1 semana"
+                EstimatedTime = "1 semana",
+                Status = ModuleStatus.Implementado
             },
             new ModuleInfo
             {
@@ -115,7 +119,8 @@ namespace AURA.Modules
                     "Instalação de recursos sem recompilar a AURA"
                 },
                 Difficulty = ModuleDifficulty.Avancado,
-                EstimatedTime = "4 semanas"
+                EstimatedTime = "4 semanas",
+                Status = ModuleStatus.Implementado
             }
         };
 

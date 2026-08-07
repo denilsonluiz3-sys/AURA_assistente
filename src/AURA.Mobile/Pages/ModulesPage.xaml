@@ -34,6 +34,10 @@
                             <Label Text="{Binding ShortDescription}"
                                    FontSize="13"
                                    TextColor="{DynamicResource AuraTextSecondary}" />
+                            <Label Text="{Binding Status}"
+                                   FontSize="11"
+                                   FontAttributes="Bold"
+                                   TextColor="{DynamicResource AuraAccent}" />
                         </VerticalStackLayout>
                     </Frame>
                 </DataTemplate>

@@ -730,7 +730,8 @@ namespace AURA.CLI
         {
             foreach (ModuleInfo module in ModuleCatalog.GetAll())
             {
-                Console.WriteLine(module.Icon + " " + module.DisplayName + " - " + module.ShortDescription);
+                Console.WriteLine(module.Icon + " " + module.DisplayName +
+                    " [" + module.Status + "] - " + module.ShortDescription);
             }
         }
 
