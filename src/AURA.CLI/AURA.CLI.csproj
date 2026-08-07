@@ -13,6 +13,7 @@
     <ProjectReference Include="..\AURA.Network\AURA.Network.csproj" />
     <ProjectReference Include="..\AURA.Modules\AURA.Modules.csproj" />
     <ProjectReference Include="..\AURA.Agents\AURA.Agents.csproj" />
+    <ProjectReference Include="..\AURA.AI\AURA.AI.csproj" />
     <ProjectReference Include="..\AURA.Windows\AURA.Windows.csproj" />
   </ItemGroup>
 

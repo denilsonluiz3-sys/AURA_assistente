@@ -1,5 +1,8 @@
 using System;
+using System.IO;
 using System.Linq;
+using AURA.AI;
+using AURA.Abstractions.Execution;
 using AURA.Agents;
 using AURA.Core;
 using AURA.Core.Bootstrap;
@@ -8,6 +11,7 @@ using AURA.Core.Launchers;
 using AURA.Core.Logging;
 using AURA.Core.Runtime;
 using AURA.Modules;
+using AURA.Modules.Executors;
 using AURA.Network;
 using AURA.SystemInfo;
 
@@ -25,6 +29,11 @@ namespace AURA.CLI
         private static AgentManager _agentManager;
         private static ILogger _logger;
         private static AuraBootstrap _bootstrap;
+        private static readonly ShellExecutor Shell = new();
+        private static readonly GitExecutor Git = new();
+        private static readonly PythonExecutor Python = new();
+        private static readonly NodeExecutor Node = new();
+        private static OpenRouterClient _aiClient;
 
         private static void Main(string[] args)
         {
@@ -145,6 +154,18 @@ namespace AURA.CLI
                         break;
                     case "ask":
                         Ask(parts);
+                        break;
+                    case "chat":
+                        ChatCommand(parts);
+                        break;
+                    case "agent":
+                        AgentCommand(parts);
+                        break;
+                    case "aichave":
+                        AiKeyCommand(parts);
+                        break;
+                    case "exec":
+                        ExecCommand(parts);
                         break;
                     case "run":
                         RunFile(parts);
@@ -268,6 +289,212 @@ namespace AURA.CLI
             {
                 Console.WriteLine("Nenhum assistente disponível. Rode: bash scripts/migrar-ferramentas.sh");
             }
+        }
+
+        private static void ExecCommand(string[] parts)
+        {
+            if (parts.Length < 3)
+            {
+                Console.WriteLine("Uso: exec <shell|git|python|node> <comando> [argumentos...]");
+                return;
+            }
+
+            IToolExecutor executor = parts[1].ToLowerInvariant() switch
+            {
+                "shell" => Shell,
+                "git" => Git,
+                "python" or "python3" or "py" => Python,
+                "node" => Node,
+                _ => null
+            };
+
+            if (executor == null)
+            {
+                Console.WriteLine("Executor desconhecido: " + parts[1] + " (use shell, git, python ou node)");
+                return;
+            }
+
+            if (!executor.IsAvailable())
+            {
+                Console.WriteLine("Executor '" + executor.Name + "' não está disponível neste ambiente.");
+                return;
+            }
+
+            var request = new ExecutionRequest
+            {
+                Command = parts[2],
+                Arguments = parts.Skip(3).ToList(),
+                Timeout = TimeSpan.FromSeconds(60)
+            };
+
+            Console.WriteLine("Executando via " + executor.Name + ": " + request.Command +
+                (request.Arguments.Count > 0 ? " " + string.Join(" ", request.Arguments) : string.Empty));
+            Console.WriteLine();
+
+            ExecutionResult result = executor.ExecuteAsync(request).GetAwaiter().GetResult();
+
+            string output = result.CombineOutput();
+            if (!string.IsNullOrWhiteSpace(output))
+            {
+                Console.WriteLine(output);
+            }
+            else
+            {
+                Console.WriteLine("(sem saída)");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("== exit " + result.ExitCode + " (" + (result.Success ? "OK" : "FALHOU") + ") em " +
+                result.Duration.TotalSeconds.ToString("0.0") + "s ==");
+        }
+
+        private static void ChatCommand(string[] parts)
+        {
+            string question = string.Join(" ", parts.Skip(1)).Trim();
+            if (string.IsNullOrWhiteSpace(question))
+            {
+                Console.WriteLine("Uso: chat \"sua pergunta\" [--model <modelo>]");
+                return;
+            }
+
+            string? model = null;
+            int modelIdx = Array.IndexOf(parts, "--model");
+            if (modelIdx >= 0 && modelIdx + 1 < parts.Length)
+            {
+                model = parts[modelIdx + 1];
+            }
+
+            OpenRouterClient client = EnsureAiClient(model);
+            Console.WriteLine("Modelo: " + client.Options.Model + " · " + client.Options.BaseUrl);
+            Console.WriteLine("Pensando...");
+
+            try
+            {
+                string answer = client.ChatAsync(question).GetAwaiter().GetResult();
+                Console.WriteLine();
+                Console.WriteLine(answer);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Erro: " + ex.Message);
+                _logger.Error(ex.ToString());
+            }
+        }
+
+        private static void AgentCommand(string[] parts)
+        {
+            string instruction = string.Join(" ", parts.Skip(1)).Trim();
+            if (string.IsNullOrWhiteSpace(instruction))
+            {
+                Console.WriteLine("Uso: agent \"instrução\" — agente de arquivos num workspace (listar/ler/editar/rodar comandos)");
+                return;
+            }
+
+            OpenRouterClient client = EnsureAiClient();
+            string workspace = Path.Combine(UserAuraDir(), "workspace");
+            Directory.CreateDirectory(workspace);
+
+            var tools = new System.Collections.Generic.List<AgentTool>
+            {
+                new ListDirTool(workspace),
+                new ReadFileTool(workspace),
+                new WriteFileTool(workspace),
+                new EditFileTool(workspace),
+                new ShellAgentTool(workspace)
+            };
+
+            string systemPrompt =
+                "Você é o agente de arquivos da AURA, um assistente que trabalha " +
+                "dentro de um workspace no dispositivo (semelhante ao opencode). " +
+                "Você PODE listar, ler, criar, editar e sobrescrever arquivos do " +
+                "workspace e rodar comandos de shell para concluir a tarefa. " +
+                "Sempre responda em português. Workspace: " + workspace;
+
+            var session = new AgentSession(client, tools, systemPrompt);
+            session.Step += step =>
+            {
+                Console.WriteLine();
+                Console.WriteLine("  ◆ " + step.ToolName + " " + step.Arguments);
+                if (!string.IsNullOrWhiteSpace(step.Result))
+                {
+                    Console.WriteLine("    " + step.Result.Replace("\n", "\n    "));
+                }
+            };
+
+            Console.WriteLine("Modelo: " + client.Options.Model + " · workspace: " + workspace);
+            Console.WriteLine("Executando agente...");
+
+            try
+            {
+                string answer = session.RunAsync(instruction).GetAwaiter().GetResult();
+                Console.WriteLine();
+                Console.WriteLine("=== RESPOSTA DO AGENTE ===");
+                Console.WriteLine(answer);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Erro: " + ex.Message);
+                _logger.Error(ex.ToString());
+            }
+        }
+
+        private static void AiKeyCommand(string[] parts)
+        {
+            if (parts.Length < 2)
+            {
+                Console.WriteLine("Uso: aichave <sk-or-...> — salva a chave em ~/.aura/ai_key.txt");
+                Console.WriteLine("     Ou defina a variável OPENROUTER_API_KEY.");
+                return;
+            }
+
+            string key = parts[1].Trim();
+            if (key.Length > 200 || key.IndexOfAny(new[] { ' ', '\t', '\r', '\n' }) >= 0)
+            {
+                Console.WriteLine("Chave inválida (parece conter texto de log). Use apenas a chave 'sk-or-...'.");
+                return;
+            }
+
+            string file = Path.Combine(UserAuraDir(), "ai_key.txt");
+            Directory.CreateDirectory(Path.GetDirectoryName(file));
+            File.WriteAllText(file, key);
+            Console.WriteLine("Chave salva em " + file);
+        }
+
+        private static string UserAuraDir()
+        {
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".aura");
+        }
+
+        private static OpenRouterClient EnsureAiClient(string? model = null)
+        {
+            if (_aiClient != null)
+            {
+                if (!string.IsNullOrWhiteSpace(model))
+                {
+                    _aiClient.Options.Model = model;
+                }
+
+                return _aiClient;
+            }
+
+            string apiKey = Environment.GetEnvironmentVariable("OPENROUTER_API_KEY") ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                string keyFile = Path.Combine(UserAuraDir(), "ai_key.txt");
+                if (File.Exists(keyFile))
+                {
+                    apiKey = File.ReadAllText(keyFile).Trim();
+                }
+            }
+
+            _aiClient = new OpenRouterClient(new OpenRouterOptions
+            {
+                ApiKey = apiKey,
+                Model = string.IsNullOrWhiteSpace(model) ? "qwen/qwen-plus" : model,
+                AppReference = "CLI"
+            });
+
+            return _aiClient;
         }
 
         private static void Ask(string[] parts)
@@ -519,6 +746,10 @@ namespace AURA.CLI
             Console.WriteLine("  internet                Verifica conexão");
             Console.WriteLine("  agents                  Lista assistentes (aichat/termux-ai)");
             Console.WriteLine("  ask \"pergunta\"          Pergunta via assistente, logada em célula");
+            Console.WriteLine("  chat \"pergunta\"          Pergunta direta à IA (OpenRouter) [--model x]");
+            Console.WriteLine("  agent \"instrução\"        Agente de arquivos num workspace (IA + ferramentas)");
+            Console.WriteLine("  aichave <sk-or-...>      Salva a chave da IA em ~/.aura/ai_key.txt");
+            Console.WriteLine("  exec <shell|git|python|node> <cmd> [args]   Executa via executor");
             Console.WriteLine("  run aichat --cell chat  Inicia assistente como célula");
             Console.WriteLine("  modulos                 Lista módulos disponíveis");
             Console.WriteLine("  config                  Mostra configuração (settings + módulos)");
