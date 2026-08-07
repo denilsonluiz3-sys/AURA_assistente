@@ -6,7 +6,7 @@
              Title="Executores"
              BackgroundColor="{DynamicResource AuraBackground}">
 
-    <Grid RowDefinitions="Auto,*,Auto" Padding="20" RowSpacing="12">
+    <Grid RowDefinitions="Auto,*,Auto,Auto" Padding="20" RowSpacing="12">
 
         <Label Text="Executores AURA"
                FontAttributes="Bold"
@@ -35,7 +35,41 @@
             </CollectionView.ItemTemplate>
         </CollectionView>
 
-        <Button Grid.Row="2"
+        <Border Grid.Row="2"
+                BackgroundColor="{DynamicResource AuraSurface}"
+                StrokeThickness="0"
+                CornerRadius="12"
+                Padding="12">
+            <VerticalStackLayout Spacing="8">
+                <Label Text="Executar"
+                       FontAttributes="Bold"
+                       FontSize="15"
+                       TextColor="{DynamicResource AuraTextPrimary}" />
+                <Picker x:Name="ExecutorPicker"
+                        Title="Executor"
+                        ItemsSource="Shell,Git,Python,Node" />
+                <Entry x:Name="CommandEntry"
+                       Placeholder="Comando (ex.: status p/ git, script.py p/ python, ls p/ shell)"
+                       TextColor="{DynamicResource AuraTextPrimary}" />
+                <Entry x:Name="ArgsEntry"
+                       Placeholder="Argumentos (opcional, separados por espaço)"
+                       TextColor="{DynamicResource AuraTextPrimary}" />
+                <Button x:Name="ExecButton"
+                        Text="Executar"
+                        Clicked="OnExecuteClicked"
+                        BackgroundColor="{DynamicResource AuraAccent}"
+                        TextColor="White"
+                        CornerRadius="8" />
+                <Editor x:Name="ResultEditor"
+                        IsReadOnly="True"
+                        HeightRequest="150"
+                        Placeholder="Resultado aparecerá aqui."
+                        BackgroundColor="{DynamicResource AuraBackground}"
+                        TextColor="{DynamicResource AuraTextPrimary}" />
+            </VerticalStackLayout>
+        </Border>
+
+        <Button Grid.Row="3"
                 Text="Atualizar"
                 Clicked="OnRefreshClicked"
                 BackgroundColor="{DynamicResource AuraAccent}"

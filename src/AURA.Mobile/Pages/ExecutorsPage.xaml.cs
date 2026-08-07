@@ -1,3 +1,4 @@
+using AURA.Abstractions.Execution;
 using AURA.Modules.Executors;
 
 namespace AURA.Mobile.Pages;
@@ -16,6 +17,7 @@ public partial class ExecutorsPage : ContentPage
         _git = git;
         _python = python;
         _node = node;
+        ExecutorPicker.SelectedIndex = 0;
     }
 
     protected override async void OnAppearing()
@@ -27,6 +29,71 @@ public partial class ExecutorsPage : ContentPage
     private async void OnRefreshClicked(object sender, EventArgs e)
     {
         await RefreshAsync();
+    }
+
+    private async void OnExecuteClicked(object sender, EventArgs e)
+    {
+        string selected = ExecutorPicker.SelectedItem as string;
+        ProcessExecutorBase executor = selected switch
+        {
+            "Shell" => _shell,
+            "Git" => _git,
+            "Python" => _python,
+            "Node" => _node,
+            _ => null
+        };
+
+        if (executor == null)
+        {
+            ResultEditor.Text = "Selecione um executor.";
+            return;
+        }
+
+        if (!executor.IsAvailable())
+        {
+            ResultEditor.Text = "Ferramenta '" + executor.Name + "' não disponível neste dispositivo.";
+            return;
+        }
+
+        string command = CommandEntry.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            ResultEditor.Text = "Informe um comando (ex.: git → status; python → script.py; shell → ls).";
+            return;
+        }
+
+        string[] argParts = (ArgsEntry.Text ?? string.Empty)
+            .Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+        var request = new ExecutionRequest
+        {
+            Command = command,
+            Arguments = new List<string>(argParts),
+            Timeout = TimeSpan.FromSeconds(60)
+        };
+
+        ExecButton.IsEnabled = false;
+        ResultEditor.Text = "Executando...";
+        try
+        {
+            ExecutionResult result = await executor.ExecuteAsync(request);
+            string status = (result.Success ? "OK" : "FALHOU") +
+                " (exit " + result.ExitCode + ", " +
+                result.Duration.TotalSeconds.ToString("0.0") + "s)";
+            string body = string.IsNullOrWhiteSpace(result.CombineOutput())
+                ? "(sem saída)"
+                : result.CombineOutput();
+            ResultEditor.Text = status + "\n" + new string('-', 32) + "\n" + body;
+        }
+        catch (Exception ex)
+        {
+            ResultEditor.Text = "Erro ao executar: " + ex.Message;
+            AuraLog.Exception("ExecutorsPage.Execute", ex);
+        }
+        finally
+        {
+            ExecButton.IsEnabled = true;
+        }
     }
 
     private async Task RefreshAsync()
