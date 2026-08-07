@@ -24,6 +24,13 @@ workflows:
       - name: Instalar workload MAUI Android
         script: |
           $DOTNET_BIN workload install maui-android
+      - name: Instalar dependências do Android SDK (API 36)
+        script: |
+          $DOTNET_BIN build src/AURA.Mobile/AURA.Mobile.csproj \
+            -t:InstallAndroidDependencies \
+            -f net10.0-android \
+            -p:AndroidSdkDirectory=/usr/local/share/android-sdk \
+            -p:AcceptAndroidSDKLicenses=True
       - name: Publicar APK (Release)
         script: |
           cd $CM_BUILD_DIR
