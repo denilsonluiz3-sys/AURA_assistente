@@ -18,7 +18,8 @@ workflows:
         script: |
           wget https://dot.net/v1/dotnet-install.sh
           chmod +x dotnet-install.sh
-          ./dotnet-install.sh --install-dir $DOTNET_PATH --channel 10.0
+          # Versão fixada pelo global.json do repositório (10.0.110).
+          ./dotnet-install.sh --install-dir $DOTNET_PATH --version 10.0.110
           $DOTNET_BIN --version
       - name: Instalar workload MAUI Android
         script: |
