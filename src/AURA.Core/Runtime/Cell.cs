@@ -32,8 +32,19 @@ namespace AURA.Core.Runtime
 
         public ResourceLimits Limits { get; set; }
 
+        /// <summary>
+        /// Root real da célula, definido pelo runtime no momento da criação
+        /// (Path.Combine(cellsRoot, Id)). Mantém RootDirectory/LogFile corretos
+        /// mesmo quando o runtime usa um root customizado (ex.: Android).
+        /// Vazio = usa o default ~/AURA/cells (comportamento original).
+        /// </summary>
         [System.Text.Json.Serialization.JsonIgnore]
-        public string RootDirectory => Path.Combine(SimulationRuntime.ExpandUserHome(SimulationRuntime.DefaultCellsRoot), Id);
+        public string CellRoot { get; set; }
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string RootDirectory => string.IsNullOrEmpty(CellRoot)
+            ? Path.Combine(SimulationRuntime.ExpandUserHome(SimulationRuntime.DefaultCellsRoot), Id)
+            : CellRoot;
 
         [System.Text.Json.Serialization.JsonIgnore]
         public string LogFile =>

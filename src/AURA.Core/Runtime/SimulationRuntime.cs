@@ -57,7 +57,22 @@ namespace AURA.Core.Runtime
             _persist = persist;
             Directory.CreateDirectory(_cellsRoot);
 
-            _store = persist ? new CellStore(_logger) : null;
+            _store = persist ? new CellStore(_logger, GetStorePath(_cellsRoot)) : null;
+        }
+
+        /// <summary>
+        /// Caminho do índice de células. Preserva ~/AURA/cells.json quando o
+        /// root é o default (comportamento histórico do Termux); para roots
+        /// customizados (ex.: Android) grava dentro do próprio root.
+        /// </summary>
+        private static string GetStorePath(string cellsRoot)
+        {
+            if (cellsRoot == ExpandUserHome(DefaultCellsRoot))
+            {
+                return ExpandUserHome("~/AURA/cells.json");
+            }
+
+            return System.IO.Path.Combine(cellsRoot, "cells.json");
         }
 
         public string CellsRoot => _cellsRoot;
@@ -121,7 +136,8 @@ namespace AURA.Core.Runtime
                 Args = args ?? string.Empty,
                 TemplatePath = templatePath,
                 WorkingDirectory = workingDirectory ?? Path.GetDirectoryName(appPath),
-                Limits = limits
+                Limits = limits,
+                CellRoot = Path.Combine(_cellsRoot, id)
             };
 
             _backend.Create(cell);
@@ -315,6 +331,7 @@ namespace AURA.Core.Runtime
                 }
 
                 _cells[cell.Id] = cell;
+                cell.CellRoot = Path.Combine(_cellsRoot, cell.Id);
 
                 if (cell.State == CellState.Stopped)
                 {
