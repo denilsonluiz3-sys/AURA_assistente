@@ -43,6 +43,25 @@ cd AURA && dotnet build AURA.sln
 Publicar para o celular: compilar **no próprio Termux** (cross-publish
 single-file para `linux-bionic-arm64` está quebrado no .NET 9/10).
 
+## Mobile (AURA.Mobile) é separado do `AURA.sln` de propósito
+
+O app Android **não** está no `AURA.sln`: ele exige workload `maui-android`,
+SDK Android e — para Release assinado — os segredos do keystore
+(`AURA_KEYSTORE_*`), que só existem no GitHub Actions. Por isso:
+
+- `dotnet build AURA.sln` no Termux valida **só o CLI/core** (rápido e leve);
+- o mobile é buildado pelo workflow `.github/workflows/build-android-apk.yml`
+  a cada push que toca `src/AURA.Mobile/**` (ou via `workflow_dispatch`);
+- para pegar quebra do mobile **antes** de subir, rode localmente:
+
+```bash
+bash scripts/build-mobile.sh          # compila (-t:Compile) com o SDK local
+```
+
+O SDK Android esperado fica em `/opt/android-sdk` (defina `ANDROID_SDK_DIR`
+se for outro caminho). Gerar o APK localmente sem os segredos produz um APK
+assinado com a keystore de debug (instalável por sideload).
+
 ## Uso
 
 ```text

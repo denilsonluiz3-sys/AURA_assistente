@@ -26,5 +26,8 @@ namespace AURA.Modules
         public ModuleDifficulty Difficulty { get; set; }
 
         public string EstimatedTime { get; set; }
+
+        /// <summary>Estado real: implementado (em uso) ou só planejado.</summary>
+        public ModuleStatus Status { get; set; } = ModuleStatus.Planejado;
     }
 }
