@@ -5,9 +5,35 @@
              Title="Navegador"
              BackgroundColor="{DynamicResource AuraBackground}">
 
-    <Grid RowDefinitions="Auto,Auto,*" RowSpacing="0">
+    <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="0">
 
-        <Grid Padding="8,6"
+        <!-- Barra de abas -->
+        <Grid ColumnDefinitions="*,Auto"
+              ColumnSpacing="0"
+              BackgroundColor="{DynamicResource AuraSurface}">
+            <ScrollView Orientation="Horizontal"
+                        HorizontalScrollBarVisibility="Never"
+                        Grid.Column="0">
+                <HorizontalStackLayout x:Name="TabBar"
+                                       Spacing="6"
+                                       Padding="8,6" />
+            </ScrollView>
+            <Button Grid.Column="1"
+                    x:Name="NewTabButton"
+                    Text="＋"
+                    Clicked="OnNewTabClicked"
+                    BackgroundColor="{DynamicResource AuraAccent}"
+                    TextColor="White"
+                    FontSize="16"
+                    Padding="12,0"
+                    HeightRequest="36"
+                    Margin="0,5,8,5"
+                    CornerRadius="6" />
+        </Grid>
+
+        <!-- Navegação + endereço -->
+        <Grid Grid.Row="1"
+              Padding="8,4"
               ColumnDefinitions="Auto,Auto,Auto,*,Auto"
               ColumnSpacing="6"
               BackgroundColor="{DynamicResource AuraSurface}">
@@ -18,7 +44,8 @@
                     TextColor="{DynamicResource AuraTextPrimary}"
                     Padding="12,2"
                     CornerRadius="6"
-                    FontSize="18" />
+                    FontSize="18"
+                    IsEnabled="False" />
             <Button Grid.Column="1"
                     x:Name="ForwardButton"
                     Text="›"
@@ -27,7 +54,8 @@
                     TextColor="{DynamicResource AuraTextPrimary}"
                     Padding="12,2"
                     CornerRadius="6"
-                    FontSize="18" />
+                    FontSize="18"
+                    IsEnabled="False" />
             <Button Grid.Column="2"
                     x:Name="ReloadButton"
                     Text="⟳"
@@ -55,14 +83,15 @@
                     CornerRadius="6" />
         </Grid>
 
-        <Grid Grid.Row="1"
+        <!-- Ferramentas -->
+        <Grid Grid.Row="2"
               Padding="8,4"
-              ColumnDefinitions="Auto,Auto,*,Auto"
+              ColumnDefinitions="Auto,Auto,*,Auto,Auto"
               ColumnSpacing="6"
               BackgroundColor="{DynamicResource AuraSurface}">
             <Picker x:Name="EnginePicker"
                     Title="Buscador"
-                    WidthRequest="120"
+                    WidthRequest="110"
                     FontSize="12"
                     TextColor="{DynamicResource AuraTextPrimary}" />
             <Button Grid.Column="1"
@@ -88,12 +117,70 @@
                     Padding="10,2"
                     CornerRadius="6"
                     FontSize="12" />
+            <Button Grid.Column="4"
+                    x:Name="MenuButton"
+                    Text="⋯"
+                    Clicked="OnMenuClicked"
+                    BackgroundColor="{DynamicResource AuraSurface}"
+                    TextColor="{DynamicResource AuraAccent}"
+                    Padding="12,2"
+                    CornerRadius="6"
+                    FontSize="16" />
         </Grid>
 
-        <WebView x:Name="Browser"
-                 Grid.Row="2"
-                 Navigating="OnNavigating"
-                 Navigated="OnNavigated" />
+        <!-- Host das abas (só a aba ativa fica visível) -->
+        <Grid Grid.Row="3"
+              x:Name="TabHost" />
+
+        <!-- Busca na página (sobreposta no rodapé) -->
+        <Grid Grid.Row="3"
+              x:Name="FindBar"
+              IsVisible="False"
+              VerticalOptions="End"
+              Padding="8,6"
+              ColumnDefinitions="*,Auto,Auto,Auto,Auto"
+              ColumnSpacing="4"
+              BackgroundColor="{DynamicResource AuraSurface}">
+            <Entry x:Name="FindEntry"
+                   Placeholder="Buscar na página"
+                   FontSize="13"
+                   ReturnType="Search"
+                   Completed="OnFindSubmit"
+                   TextColor="{DynamicResource AuraTextPrimary}"
+                   PlaceholderColor="{DynamicResource AuraTextSecondary}" />
+            <Button Grid.Column="1"
+                    x:Name="FindPrevButton"
+                    Text="‹"
+                    Clicked="OnFindPrev"
+                    FontSize="13"
+                    BackgroundColor="{DynamicResource AuraSurface}"
+                    TextColor="{DynamicResource AuraTextPrimary}"
+                    Padding="10,2"
+                    CornerRadius="6" />
+            <Button Grid.Column="2"
+                    x:Name="FindNextButton"
+                    Text="›"
+                    Clicked="OnFindNext"
+                    FontSize="13"
+                    BackgroundColor="{DynamicResource AuraSurface}"
+                    TextColor="{DynamicResource AuraTextPrimary}"
+                    Padding="10,2"
+                    CornerRadius="6" />
+            <Button Grid.Column="3"
+                    x:Name="FindCloseButton"
+                    Text="✕"
+                    Clicked="OnFindClose"
+                    FontSize="13"
+                    BackgroundColor="{DynamicResource AuraSurface}"
+                    TextColor="{DynamicResource AuraTextPrimary}"
+                    Padding="10,2"
+                    CornerRadius="6" />
+            <Label Grid.Column="4"
+                   x:Name="FindResultLabel"
+                   FontSize="11"
+                   VerticalOptions="Center"
+                   TextColor="{DynamicResource AuraTextSecondary}" />
+        </Grid>
 
     </Grid>
 </ContentPage>

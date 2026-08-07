@@ -60,7 +60,7 @@ namespace AURA.CLI
             _runtime.Events = bootstrap.Events;
             _pluginWatcher = new PluginWatcher(_logger);
             _runner = new Runner(_pluginWatcher.Launchers.Concat(
-                new ILauncher[] { new PythonLauncher(), new JavaLauncher(), new DotnetLauncher(), new NodeLauncher(), new GoLauncher() }));
+                new ILauncher[] { new PythonLauncher(), new JarLauncher(), new DllLauncher(), new NodeLauncher(), new GoLauncher() }));
             _agentManager = new AgentManager(_logger);
             _agentManager.Events = bootstrap.Events;
 
