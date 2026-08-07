@@ -62,7 +62,7 @@ namespace AURA.Core.Launchers
         /// starts it inside a brand-new cell owned by the runtime.
         /// </summary>
         public async System.Threading.Tasks.Task<Cell> RunAsync(SimulationRuntime runtime, string id, string filePath,
-            string arguments = null, string templatePath = null, ResourceLimits limits = null)
+            string arguments = null, string templatePath = null, ResourceLimits? limits = null)
         {
             if (runtime == null)
             {
