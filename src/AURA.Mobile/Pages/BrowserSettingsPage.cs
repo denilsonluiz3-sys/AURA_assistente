@@ -23,6 +23,36 @@ namespace AURA.Mobile.Pages
             jsSwitch.Toggled += (s, e) => Preferences.Default.Set(BrowserPage.JsEnabledKey, e.Value);
             stack.Add(Row("JavaScript habilitado", jsSwitch));
 
+            var adsSwitch = new Switch
+            {
+                IsToggled = Preferences.Default.Get(BrowserPage.AdsEnabledKey, true),
+                OnColor = Color.FromArgb("#4c6ef5")
+            };
+            adsSwitch.Toggled += (s, e) => Preferences.Default.Set(BrowserPage.AdsEnabledKey, e.Value);
+            stack.Add(Row("Bloquear anúncios (oculta banners)", adsSwitch));
+
+            var stealthSwitch = new Switch
+            {
+                IsToggled = Preferences.Default.Get(BrowserPage.StealthEnabledKey, true),
+                OnColor = Color.FromArgb("#4c6ef5")
+            };
+            stealthSwitch.Toggled += (s, e) => Preferences.Default.Set(BrowserPage.StealthEnabledKey, e.Value);
+            stack.Add(Row("Anti-identificação (esconder WebView)", stealthSwitch));
+
+            stack.Add(new Label
+            {
+                Text = "Anti-identificação: usa um User-Agent de Chrome comum (sem o marcador \"wv\") e mascara sinais de WebView, para o site não detectar um navegador embutido/espaço separado. Na célula isolada essa proteção é sempre forçada.",
+                FontSize = 11,
+                TextColor = Color.FromArgb("#8a8a95")
+            });
+
+            stack.Add(new Label
+            {
+                Text = "Captura de tela fica bloqueada enquanto o navegador estiver aberto (sem prints nem pré-visualização no app switcher).",
+                FontSize = 11,
+                TextColor = Color.FromArgb("#8a8a95")
+            });
+
             // User-Agent
             stack.Add(new Label
             {

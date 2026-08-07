@@ -5,10 +5,10 @@
              Title="Navegador"
              BackgroundColor="{DynamicResource AuraBackground}">
 
-    <Grid RowDefinitions="Auto,Auto,*" RowSpacing="0">
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
 
         <!-- Barra de abas -->
-        <Grid ColumnDefinitions="*,Auto"
+        <Grid ColumnDefinitions="*,Auto,Auto"
               ColumnSpacing="0"
               BackgroundColor="{DynamicResource AuraSurface}">
             <ScrollView Orientation="Horizontal"
@@ -29,10 +29,76 @@
                     HeightRequest="36"
                     Margin="0,5,8,5"
                     CornerRadius="6" />
+            <Label Grid.Column="2"
+                   x:Name="IsolatedLabel"
+                   Text="🛡"
+                   FontSize="14"
+                   VerticalOptions="Center"
+                   IsVisible="False"
+                   TextColor="{DynamicResource AuraAccent}"
+                   Padding="6,0,8,0">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnIsolatedLabelTapped" />
+                </Label.GestureRecognizers>
+            </Label>
         </Grid>
 
-        <!-- Navegação + endereço + menu -->
+        <!-- Host das abas (só a aba ativa fica visível) -->
         <Grid Grid.Row="1"
+              x:Name="TabHost" />
+
+        <!-- Busca na página (sobreposta no rodapé da área do conteúdo) -->
+        <Grid Grid.Row="1"
+              x:Name="FindBar"
+              IsVisible="False"
+              VerticalOptions="End"
+              Padding="8,6"
+              ColumnDefinitions="*,Auto,Auto,Auto,Auto"
+              ColumnSpacing="4"
+              BackgroundColor="{DynamicResource AuraSurface}">
+            <Entry x:Name="FindEntry"
+                   Placeholder="Buscar na página"
+                   FontSize="13"
+                   ReturnType="Search"
+                   Completed="OnFindSubmit"
+                   TextColor="{DynamicResource AuraTextPrimary}"
+                   PlaceholderColor="{DynamicResource AuraTextSecondary}" />
+            <Button Grid.Column="1"
+                    x:Name="FindPrevButton"
+                    Text="‹"
+                    Clicked="OnFindPrev"
+                    FontSize="13"
+                    BackgroundColor="{DynamicResource AuraSurface}"
+                    TextColor="{DynamicResource AuraTextPrimary}"
+                    Padding="10,2"
+                    CornerRadius="6" />
+            <Button Grid.Column="2"
+                    x:Name="FindNextButton"
+                    Text="›"
+                    Clicked="OnFindNext"
+                    FontSize="13"
+                    BackgroundColor="{DynamicResource AuraSurface}"
+                    TextColor="{DynamicResource AuraTextPrimary}"
+                    Padding="10,2"
+                    CornerRadius="6" />
+            <Button Grid.Column="3"
+                    x:Name="FindCloseButton"
+                    Text="✕"
+                    Clicked="OnFindClose"
+                    FontSize="13"
+                    BackgroundColor="{DynamicResource AuraSurface}"
+                    TextColor="{DynamicResource AuraTextPrimary}"
+                    Padding="10,2"
+                    CornerRadius="6" />
+            <Label Grid.Column="4"
+                   x:Name="FindResultLabel"
+                   FontSize="11"
+                   VerticalOptions="Center"
+                   TextColor="{DynamicResource AuraTextSecondary}" />
+        </Grid>
+
+        <!-- Navegação + endereço + menu (barra inferior) -->
+        <Grid Grid.Row="2"
               Padding="8,4"
               ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto"
               ColumnSpacing="6"
@@ -90,60 +156,6 @@
                     Padding="12,2"
                     CornerRadius="6"
                     FontSize="16" />
-        </Grid>
-
-        <!-- Host das abas (só a aba ativa fica visível) -->
-        <Grid Grid.Row="2"
-              x:Name="TabHost" />
-
-        <!-- Busca na página (sobreposta no rodapé) -->
-        <Grid Grid.Row="2"
-              x:Name="FindBar"
-              IsVisible="False"
-              VerticalOptions="End"
-              Padding="8,6"
-              ColumnDefinitions="*,Auto,Auto,Auto,Auto"
-              ColumnSpacing="4"
-              BackgroundColor="{DynamicResource AuraSurface}">
-            <Entry x:Name="FindEntry"
-                   Placeholder="Buscar na página"
-                   FontSize="13"
-                   ReturnType="Search"
-                   Completed="OnFindSubmit"
-                   TextColor="{DynamicResource AuraTextPrimary}"
-                   PlaceholderColor="{DynamicResource AuraTextSecondary}" />
-            <Button Grid.Column="1"
-                    x:Name="FindPrevButton"
-                    Text="‹"
-                    Clicked="OnFindPrev"
-                    FontSize="13"
-                    BackgroundColor="{DynamicResource AuraSurface}"
-                    TextColor="{DynamicResource AuraTextPrimary}"
-                    Padding="10,2"
-                    CornerRadius="6" />
-            <Button Grid.Column="2"
-                    x:Name="FindNextButton"
-                    Text="›"
-                    Clicked="OnFindNext"
-                    FontSize="13"
-                    BackgroundColor="{DynamicResource AuraSurface}"
-                    TextColor="{DynamicResource AuraTextPrimary}"
-                    Padding="10,2"
-                    CornerRadius="6" />
-            <Button Grid.Column="3"
-                    x:Name="FindCloseButton"
-                    Text="✕"
-                    Clicked="OnFindClose"
-                    FontSize="13"
-                    BackgroundColor="{DynamicResource AuraSurface}"
-                    TextColor="{DynamicResource AuraTextPrimary}"
-                    Padding="10,2"
-                    CornerRadius="6" />
-            <Label Grid.Column="4"
-                   x:Name="FindResultLabel"
-                   FontSize="11"
-                   VerticalOptions="Center"
-                   TextColor="{DynamicResource AuraTextSecondary}" />
         </Grid>
 
     </Grid>
