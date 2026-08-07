@@ -6,7 +6,7 @@ namespace AURA.Core.Launchers
     /// <summary>
     /// Runs .NET assemblies (.dll) inside a cell via the "dotnet" host.
     /// </summary>
-    public sealed class DotnetLauncher : ILauncher
+    public sealed class DllLauncher : ILauncher
     {
         private static readonly string[] Extensions = { ".dll" };
 

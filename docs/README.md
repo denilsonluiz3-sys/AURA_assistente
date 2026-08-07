@@ -26,7 +26,7 @@ Hardware → Linux LTS (kernel) → Serviços AURA (user space) → Células iso
     do template (até 5 tentativas, para evitar loop infinito).
   - `ICellBackend` — `DirectoryCellBackend` (hoje) → `Qcow2Backend` (futuro, KVM).
 - **AURA.Core/Launchers** — "AURA decide como rodar": extensão → launcher.
-  - `Runner` (resolução), `PythonLauncher`, `JavaLauncher`, `DotnetLauncher`.
+  - `Runner` (resolução por extensão), launchers `DllLauncher` (.dll), `JarLauncher` (.jar), `PythonLauncher` (.py), `NodeLauncher`, `GoLauncher`.
 - **AURA.CLI** — front-end de console com os comandos `run`, `cells`, `cell ...`.
 - `AURA.SystemInfo` / `AURA.Network` / `AURA.Modules` — diagnóstico e rede.
 

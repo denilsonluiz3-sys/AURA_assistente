@@ -7,7 +7,7 @@ namespace AURA.Core.Launchers
     /// Runs Java archive files (.jar) inside a cell via "java -jar".
     /// Termux provides openjdk-17 (headless JRE).
     /// </summary>
-    public sealed class JavaLauncher : ILauncher
+    public sealed class JarLauncher : ILauncher
     {
         private static readonly string[] Extensions = { ".jar" };
 

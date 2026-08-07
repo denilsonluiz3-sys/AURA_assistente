@@ -79,7 +79,7 @@ else
 fi
 
 OUT="$(cli 'launchers')"
-if grep -q "PythonLauncher" <<< "$OUT" && grep -q "JavaLauncher" <<< "$OUT" && grep -q "NodeLauncher" <<< "$OUT" && grep -q "GoLauncher" <<< "$OUT"; then
+if grep -q "PythonLauncher" <<< "$OUT" && grep -q "JarLauncher" <<< "$OUT" && grep -q "NodeLauncher" <<< "$OUT" && grep -q "GoLauncher" <<< "$OUT"; then
   pass "launchers"
 else
   fail "launchers não mostra todos os launchers"

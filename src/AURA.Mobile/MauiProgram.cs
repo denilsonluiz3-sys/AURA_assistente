@@ -23,6 +23,13 @@ public static class MauiProgram
         builder
             .UseMauiApp<App>();
 
+#if ANDROID
+        // Handler Android do WebView: mantém o comportamento do MAUI e corrige
+        // rolagem + downloads + target=_blank (ver AuraWebViewHandler).
+        builder.ConfigureMauiHandlers(handlers =>
+            handlers.AddHandler<Microsoft.Maui.Controls.WebView, AURA.Mobile.Platforms.Android.WebView.AuraWebViewHandler>());
+#endif
+
         AuraLog.Info("MauiProgram: builder created");
 
         // --- Infraestrutura AURA (mesmo Core/Abstractions usados no CLI/Termux) ---
