@@ -116,7 +116,7 @@ public partial class CellsPage : ContentPage
             return;
         }
 
-        bool confirm = await DisplayAlert(
+        bool confirm = await DisplayAlertAsync(
             "Excluir célula",
             "Excluir '" + cell.Id + "' e todos os seus dados?",
             "Excluir",

@@ -20,6 +20,7 @@ public partial class ExecutorsPage : ContentPage
         _python = python;
         _node = node;
         _events = events;
+        ExecutorPicker.ItemsSource = new[] { "Shell", "Git", "Python", "Node" };
         ExecutorPicker.SelectedIndex = 0;
     }
 
