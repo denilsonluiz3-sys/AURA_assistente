@@ -1,14 +1,20 @@
+using AURA.Core.Configuration;
+
 namespace AURA.Mobile;
 
 public partial class App : Application
 {
-    public App(MainPage mainPage)
+    private readonly AuraConfiguration _settings;
+
+    public App(MainPage mainPage, AuraConfiguration settings)
     {
+        _settings = settings;
         AuraLog.Info("App.ctor BEGIN");
         try
         {
             InitializeComponent();
             AuraLog.Info("App.ctor InitializeComponent OK");
+            UserAppTheme = ApplyTheme(_settings?.Theme);
             MainPage = mainPage;
             AuraLog.Info("App.ctor MainPage set OK");
         }
@@ -17,6 +23,21 @@ public partial class App : Application
             AuraLog.Exception("App.ctor", ex);
             throw;
         }
+    }
+
+    private static AppTheme ApplyTheme(string theme)
+    {
+        if (string.Equals(theme, "Dark", StringComparison.OrdinalIgnoreCase))
+        {
+            return AppTheme.Dark;
+        }
+
+        if (string.Equals(theme, "Light", StringComparison.OrdinalIgnoreCase))
+        {
+            return AppTheme.Light;
+        }
+
+        return AppTheme.Unspecified;
     }
 
     protected override void OnStart()
