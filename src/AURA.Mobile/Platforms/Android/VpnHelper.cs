@@ -1,4 +1,6 @@
 using Android.Content;
+using Android.Provider;
+using AndroidApp = Android.App.Application;
 
 namespace AURA.Mobile.Platforms.Android
 {
@@ -13,16 +15,16 @@ namespace AURA.Mobile.Platforms.Android
 
         public static void OpenVpnSettings()
         {
-            var intent = new Intent(Android.Provider.Settings.ActionVpnSettings);
+            var intent = new Intent(Settings.ActionVpnSettings);
             intent.AddFlags(ActivityFlags.NewTask);
-            Android.App.Application.Context.StartActivity(intent);
+            AndroidApp.Context.StartActivity(intent);
         }
 
         public static bool IsOrbotInstalled()
         {
             try
             {
-                Android.App.Application.Context.PackageManager.GetPackageInfo(OrbotPackage, 0);
+                AndroidApp.Context.PackageManager.GetPackageInfo(OrbotPackage, 0);
                 return true;
             }
             catch (Java.Lang.Exception)
@@ -35,7 +37,7 @@ namespace AURA.Mobile.Platforms.Android
         {
             try
             {
-                Intent launch = Android.App.Application.Context
+                Intent launch = AndroidApp.Context
                     .PackageManager.GetLaunchIntentForPackage(OrbotPackage);
                 if (launch == null)
                 {
@@ -43,7 +45,7 @@ namespace AURA.Mobile.Platforms.Android
                 }
 
                 launch.AddFlags(ActivityFlags.NewTask);
-                Android.App.Application.Context.StartActivity(launch);
+                AndroidApp.Context.StartActivity(launch);
                 return true;
             }
             catch (Java.Lang.Exception)

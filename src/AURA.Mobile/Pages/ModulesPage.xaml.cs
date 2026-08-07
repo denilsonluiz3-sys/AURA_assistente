@@ -7,7 +7,6 @@ namespace AURA.Mobile.Pages
     public partial class ModulesPage : ContentPage
     {
         private readonly ModuleManager _manager;
-        private bool _refreshing;
 
         public ModulesPage(ModuleManager manager)
         {
