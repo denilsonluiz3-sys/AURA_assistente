@@ -46,8 +46,7 @@
                        FontSize="15"
                        TextColor="{DynamicResource AuraTextPrimary}" />
                 <Picker x:Name="ExecutorPicker"
-                        Title="Executor"
-                        ItemsSource="Shell,Git,Python,Node" />
+                        Title="Executor" />
                 <Entry x:Name="CommandEntry"
                        Placeholder="Comando (ex.: status p/ git, script.py p/ python, ls p/ shell)"
                        TextColor="{DynamicResource AuraTextPrimary}" />
