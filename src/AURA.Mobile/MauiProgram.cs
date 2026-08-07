@@ -86,6 +86,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<FixesPage>();
         builder.Services.AddSingleton<TerminalPage>();
         builder.Services.AddSingleton<BrowserPage>();
+        builder.Services.AddSingleton<ImageSearchPage>();
         builder.Services.AddSingleton<CellsPage>();
         builder.Services.AddSingleton<RunPage>();
 
