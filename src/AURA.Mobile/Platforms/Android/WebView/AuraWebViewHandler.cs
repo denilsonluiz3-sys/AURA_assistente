@@ -16,6 +16,12 @@ namespace AURA.Mobile.Platforms.Android.WebView
     /// </summary>
     public sealed class AuraWebViewHandler : WebViewHandler
     {
+        /// <summary>
+        /// Disparado quando o usuário faz toque longo numa imagem. O argumento é
+        /// a URL da imagem (src). A BrowserPage usa para busca reversa.
+        /// </summary>
+        public static event Action<global::Android.Webkit.WebView, string>? ImageLongPress;
+
         static AuraWebViewHandler()
         {
             Mapper.AppendToMapping("AuraWebViewSetup", MapAuraSetup);
@@ -47,6 +53,16 @@ namespace AURA.Mobile.Platforms.Android.WebView
                 // Garante que o gesto de rolar chegue ao WebView.
                 webView.OverScrollMode = OverScrollMode.Always;
                 webView.SetOnTouchListener(new AuraTouchListener());
+
+                // Toque longo em imagem → busca reversa.
+                webView.SetOnLongClickListener(new AuraLongClickListener(wv =>
+                {
+                    string? url = wv.GetHitTestResult()?.Extra;
+                    if (!string.IsNullOrWhiteSpace(url))
+                    {
+                        ImageLongPress?.Invoke(wv, url!);
+                    }
+                }));
             }
             catch (System.Exception ex)
             {

@@ -5,7 +5,7 @@
              Title="Navegador"
              BackgroundColor="{DynamicResource AuraBackground}">
 
-    <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="0">
+    <Grid RowDefinitions="Auto,Auto,*" RowSpacing="0">
 
         <!-- Barra de abas -->
         <Grid ColumnDefinitions="*,Auto"
@@ -31,10 +31,10 @@
                     CornerRadius="6" />
         </Grid>
 
-        <!-- Navegação + endereço -->
+        <!-- Navegação + endereço + menu -->
         <Grid Grid.Row="1"
               Padding="8,4"
-              ColumnDefinitions="Auto,Auto,Auto,*,Auto"
+              ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto"
               ColumnSpacing="6"
               BackgroundColor="{DynamicResource AuraSurface}">
             <Button x:Name="BackButton"
@@ -81,43 +81,7 @@
                     TextColor="White"
                     Padding="14,2"
                     CornerRadius="6" />
-        </Grid>
-
-        <!-- Ferramentas -->
-        <Grid Grid.Row="2"
-              Padding="8,4"
-              ColumnDefinitions="Auto,Auto,*,Auto,Auto"
-              ColumnSpacing="6"
-              BackgroundColor="{DynamicResource AuraSurface}">
-            <Picker x:Name="EnginePicker"
-                    Title="Buscador"
-                    WidthRequest="110"
-                    FontSize="12"
-                    TextColor="{DynamicResource AuraTextPrimary}" />
-            <Button Grid.Column="1"
-                    x:Name="ImageButton"
-                    Text="Imagem"
-                    Clicked="OnImageSearchClicked"
-                    BackgroundColor="{DynamicResource AuraSurface}"
-                    TextColor="{DynamicResource AuraAccent}"
-                    Padding="10,2"
-                    CornerRadius="6"
-                    FontSize="12" />
-            <Label Grid.Column="2"
-                   x:Name="OnionTipLabel"
-                   FontSize="11"
-                   IsVisible="False"
-                   TextColor="{DynamicResource AuraTextSecondary}" />
-            <Button Grid.Column="3"
-                    x:Name="VpnButton"
-                    Text="VPN"
-                    Clicked="OnVpnClicked"
-                    BackgroundColor="{DynamicResource AuraSurface}"
-                    TextColor="{DynamicResource AuraAccent}"
-                    Padding="10,2"
-                    CornerRadius="6"
-                    FontSize="12" />
-            <Button Grid.Column="4"
+            <Button Grid.Column="5"
                     x:Name="MenuButton"
                     Text="⋯"
                     Clicked="OnMenuClicked"
@@ -129,11 +93,11 @@
         </Grid>
 
         <!-- Host das abas (só a aba ativa fica visível) -->
-        <Grid Grid.Row="3"
+        <Grid Grid.Row="2"
               x:Name="TabHost" />
 
         <!-- Busca na página (sobreposta no rodapé) -->
-        <Grid Grid.Row="3"
+        <Grid Grid.Row="2"
               x:Name="FindBar"
               IsVisible="False"
               VerticalOptions="End"

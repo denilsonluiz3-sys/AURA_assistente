@@ -29,13 +29,12 @@ namespace AURA.Mobile.Pages
             InitializeComponent();
             _imageSearch = imageSearch;
 
-            EnginePicker.ItemsSource = _engines.Select(e => e.Name).ToList();
+            NavigationPage.SetHasNavigationBar(this, false);
 
-            int saved = Preferences.Default.Get(EnginePrefKey, -1);
-            EnginePicker.SelectedIndex = saved >= 0 && saved < _engines.Count ? saved : 0;
-            EnginePicker.SelectedIndexChanged += OnEngineChanged;
+#if ANDROID
+            AURA.Mobile.Platforms.Android.WebView.AuraWebViewHandler.ImageLongPress += OnImageLongPress;
+#endif
         }
-
         protected override void OnAppearing()
         {
             base.OnAppearing();
@@ -47,6 +46,17 @@ namespace AURA.Mobile.Pages
             }
 
             ApplySettings();
+        }
+
+        protected override bool OnBackButtonPressed()
+        {
+            if (_active?.View.CanGoBack == true)
+            {
+                _active.View.GoBack();
+                return true;
+            }
+
+            return base.OnBackButtonPressed();
         }
 
         // --- Abas ---
@@ -66,8 +76,6 @@ namespace AURA.Mobile.Pages
                 Url = url;
             }
         }
-
-        private BrowserTab? ActiveTab => _active;
 
         private void NewTab(string url)
         {
@@ -284,6 +292,9 @@ namespace AURA.Mobile.Pages
                 "Navegador",
                 "Cancelar",
                 null,
+                "Buscador padrão",
+                "Buscar imagem",
+                "VPN / Tor",
                 "Buscar na página",
                 "Abrir página inicial",
                 "Compartilhar link",
@@ -293,6 +304,15 @@ namespace AURA.Mobile.Pages
 
             switch (action)
             {
+                case "Buscador padrão":
+                    await PickEngineAsync();
+                    break;
+                case "Buscar imagem":
+                    await PickImageSearchAsync();
+                    break;
+                case "VPN / Tor":
+                    OpenVpn();
+                    break;
                 case "Buscar na página":
                     ShowFindBar();
                     break;
@@ -313,6 +333,33 @@ namespace AURA.Mobile.Pages
                     ApplySettings();
                     break;
             }
+        }
+
+        private async Task PickEngineAsync()
+        {
+            string[] names = _engines.Select(e => e.Name).ToArray();
+            string chosen = await DisplayActionSheetAsync("Buscador padrão", "Cancelar", null, names);
+            int idx = _engines.FindIndex(e => e.Name == chosen);
+            if (idx < 0)
+            {
+                return;
+            }
+
+            Preferences.Default.Set(EnginePrefKey, idx);
+            Preferences.Default.Set(EngineNamePrefKey, chosen);
+        }
+
+        private async Task PickImageSearchAsync()
+        {
+            string[] names = SearchCatalog.ImageProviders.Select(p => p.Name).ToArray();
+            string chosen = await DisplayActionSheetAsync("Buscar imagem por", "Cancelar", null, names);
+            ImageSearchProvider? provider = SearchCatalog.ImageProviders.FirstOrDefault(p => p.Name == chosen);
+            if (provider == null || string.IsNullOrEmpty(_active?.Url))
+            {
+                return;
+            }
+
+            OpenImageSearch(provider, _active.Url);
         }
 
         private async Task ShareLinkAsync()
@@ -354,6 +401,41 @@ namespace AURA.Mobile.Pages
             {
                 AuraLog.Exception("Browser.OpenExternal", ex);
             }
+        }
+
+        private void OpenVpn()
+        {
+#if ANDROID
+            AURA.Mobile.Platforms.Android.VpnHelper.OpenVpnSettings();
+#else
+            LoadInActive("https://www.android.com/vpn/");
+#endif
+        }
+
+        // --- Buscar imagem (toque longo na imagem) ---
+
+        private async void OnImageLongPress(global::Android.Webkit.WebView wv, string imageUrl)
+        {
+            if (string.IsNullOrWhiteSpace(imageUrl))
+            {
+                return;
+            }
+
+            string[] names = SearchCatalog.ImageProviders.Select(p => p.Name).ToArray();
+            string chosen = await DisplayActionSheetAsync("Buscar imagem", "Cancelar", null, names);
+            ImageSearchProvider? provider = SearchCatalog.ImageProviders.FirstOrDefault(p => p.Name == chosen);
+            if (provider == null)
+            {
+                return;
+            }
+
+            OpenImageSearch(provider, imageUrl);
+        }
+
+        private void OpenImageSearch(ImageSearchProvider provider, string imageUrl)
+        {
+            string encoded = Uri.EscapeDataString(imageUrl);
+            NewTab(string.Format(provider.ByUrlTemplate, encoded));
         }
 
         // --- Busca na página ---
@@ -488,21 +570,7 @@ namespace AURA.Mobile.Pages
             return string.IsNullOrWhiteSpace(home) ? DefaultHome : home;
         }
 
-        // --- Imagem / VPN / Onion ---
-
-        private async void OnImageSearchClicked(object sender, EventArgs e)
-        {
-            await Navigation.PushAsync(_imageSearch);
-        }
-
-        private void OnVpnClicked(object sender, EventArgs e)
-        {
-#if ANDROID
-            AURA.Mobile.Platforms.Android.VpnHelper.OpenVpnSettings();
-#else
-            LoadInActive("https://www.android.com/vpn/");
-#endif
-        }
+        // --- Onion (.onion) ---
 
         private static bool IsOnionAddress(string input)
         {
@@ -543,18 +611,7 @@ namespace AURA.Mobile.Pages
         // --- Pesquisa / URL ---
 
         private SearchEngine CurrentEngine =>
-            _engines[Math.Max(0, EnginePicker.SelectedIndex)];
-
-        private void OnEngineChanged(object sender, EventArgs e)
-        {
-            if (EnginePicker.SelectedIndex < 0)
-            {
-                return;
-            }
-
-            Preferences.Default.Set(EnginePrefKey, EnginePicker.SelectedIndex);
-            Preferences.Default.Set(EngineNamePrefKey, CurrentEngine.Name);
-        }
+            _engines[Math.Clamp(Preferences.Default.Get(EnginePrefKey, 0), 0, _engines.Count - 1)];
 
         private string NormalizeUrl(string input)
         {
