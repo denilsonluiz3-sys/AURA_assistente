@@ -5,7 +5,7 @@
              Title="Navegador"
              BackgroundColor="{DynamicResource AuraBackground}">
 
-    <Grid RowDefinitions="Auto,*" RowSpacing="0">
+    <Grid RowDefinitions="Auto,Auto,*" RowSpacing="0">
 
         <Grid Padding="8,6"
               ColumnDefinitions="Auto,Auto,Auto,*,Auto"
@@ -55,8 +55,43 @@
                     CornerRadius="6" />
         </Grid>
 
+        <Grid Grid.Row="1"
+              Padding="8,4"
+              ColumnDefinitions="Auto,Auto,*,Auto"
+              ColumnSpacing="6"
+              BackgroundColor="{DynamicResource AuraSurface}">
+            <Picker x:Name="EnginePicker"
+                    Title="Buscador"
+                    WidthRequest="120"
+                    FontSize="12"
+                    TextColor="{DynamicResource AuraTextPrimary}" />
+            <Button Grid.Column="1"
+                    x:Name="ImageButton"
+                    Text="Imagem"
+                    Clicked="OnImageSearchClicked"
+                    BackgroundColor="{DynamicResource AuraSurface}"
+                    TextColor="{DynamicResource AuraAccent}"
+                    Padding="10,2"
+                    CornerRadius="6"
+                    FontSize="12" />
+            <Label Grid.Column="2"
+                   x:Name="OnionTipLabel"
+                   FontSize="11"
+                   IsVisible="False"
+                   TextColor="{DynamicResource AuraTextSecondary}" />
+            <Button Grid.Column="3"
+                    x:Name="VpnButton"
+                    Text="VPN"
+                    Clicked="OnVpnClicked"
+                    BackgroundColor="{DynamicResource AuraSurface}"
+                    TextColor="{DynamicResource AuraAccent}"
+                    Padding="10,2"
+                    CornerRadius="6"
+                    FontSize="12" />
+        </Grid>
+
         <WebView x:Name="Browser"
-                 Grid.Row="1"
+                 Grid.Row="2"
                  Navigating="OnNavigating"
                  Navigated="OnNavigated" />
 
