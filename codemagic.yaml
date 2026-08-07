@@ -1,0 +1,37 @@
+workflows:
+  aura-mobile-apk:
+    name: AURA Mobile Android (APK)
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      vars:
+        DOTNET_PATH: $CM_BUILD_DIR/dotnet
+        DOTNET_BIN: $CM_BUILD_DIR/dotnet/dotnet
+        # Para assinar com sua própria keystore (instalação sobre o APK antigo):
+        #   1) Suba a keystore em "Code signing identities" (Codemagic).
+        #   2) Adicione abaixo `android_signing: [ <reference-name> ]`.
+        #   3) Passe -p:AndroidKeyStore=True e os -p:AndroidSigning* (CM_KEYSTORE_PATH,
+        #      CM_KEY_ALIAS, CM_KEY_PASSWORD, CM_KEYSTORE_PASSWORD).
+        # Sem isso, o APK sai assinado com a keystore de debug (instala por sideload).
+    scripts:
+      - name: Instalar .NET SDK 10
+        script: |
+          wget https://dot.net/v1/dotnet-install.sh
+          chmod +x dotnet-install.sh
+          ./dotnet-install.sh --install-dir $DOTNET_PATH --channel 10.0
+          $DOTNET_BIN --version
+      - name: Instalar workload MAUI Android
+        script: |
+          $DOTNET_BIN workload install maui-android
+      - name: Publicar APK (Release)
+        script: |
+          cd $CM_BUILD_DIR
+          $DOTNET_BIN publish src/AURA.Mobile/AURA.Mobile.csproj \
+            -f net10.0-android \
+            -c Release \
+            -p:AndroidPackageFormats=apk \
+            -p:ApplicationVersion=$BUILD_NUMBER \
+            -p:ApplicationDisplayVersion="1.0.0" \
+            -o $CM_BUILD_DIR/artifacts
+    artifacts:
+      - artifacts/*.apk
