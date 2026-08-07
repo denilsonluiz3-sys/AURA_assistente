@@ -1,0 +1,8 @@
+{
+  "id": "cells",
+  "name": "Células",
+  "version": "1.0.0",
+  "description": "Processos isolados com ciclo de vida, limites e a rota de execução automática.",
+  "features": ["Células", "Rodar programa", "Limites de CPU/RAM"],
+  "pages": ["CellsPage", "RunPage"]
+}
