@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# AURA — validação local do AURA.Mobile pegando TODOS os erros de uma vez.
-# Roda o build em Release (ativa o XamlC, que valida as propriedades do XAML;
-# build Debug/-t:Compile NÃO pega esses erros).
-# O empacotamento local falha em ARM64 (libZipSharpNative só existe em x64) —
-# isso é tolerado. Qualquer erro XamlC (XCxxxx) ou de C# (CSxxxx) é falha real.
+# AURA — validação local do AURA.Mobile.
+# No host ARM64, o build completo aborta em XARLP7000 (EmbeddedResource /
+# libZipSharpNative, que só existe em x64) ANTES de compilar o C#, gerando
+# falso positivo de "OK". Por isso usamos `-t:Compile`: ele compila o C# (e o
+# XamlC, quando aplicável) sem entrar no empacotamento Android, pegando de
+# verdade os erros CS/XC do código — inclusive os arquivos de Platforms/.
+# A validação final (empacotamento + XamlC completo) é feita no Codemagic.
 #
 # Uso:
-#   bash scripts/build-mobile.sh            (build Release com XamlC)
+#   bash scripts/build-mobile.sh            (valida C# via -t:Compile)
 #   ANDROID_SDK_DIR=/caminho bash scripts/build-mobile.sh
 set -u
 
@@ -21,8 +23,8 @@ fi
 
 export DOTNET_GCHeapHardLimit=0x50000000 DOTNET_GCConserveMemory=9 DOTNET_GCHeapHardLimitPercent=50
 
-echo "=== build Release AURA.Mobile (XamlC ativo, SDK=$SDK) ==="
-OUTPUT="$(dotnet build src/AURA.Mobile/AURA.Mobile.csproj -f net10.0-android -c Release -v q --nologo -p:AndroidSdkDirectory="$SDK" 2>&1)"
+echo "=== validação C#/XamlC AURA.Mobile (-t:Compile, SDK=$SDK) ==="
+OUTPUT="$(dotnet build src/AURA.Mobile/AURA.Mobile.csproj -f net10.0-android -c Release -t:Compile -v q --nologo -p:AndroidSdkDirectory="$SDK" 2>&1)"
 
 echo "$OUTPUT" | grep -E "error (XC[0-9]+|CS[0-9]+)" | sort -u
 
@@ -31,4 +33,8 @@ if echo "$OUTPUT" | grep -qE "error (XC[0-9]+|CS[0-9]+)"; then
   exit 1
 fi
 
-echo "OK: XamlC e C# limpos. Empacotamento local pode falhar por ARM64; use o Codemagic para gerar o APK."
+if echo "$OUTPUT" | grep -qE "Build FAILED"; then
+  echo "ATENÇÃO: o build completo (empacotamento) ainda pode falhar por XARLP7000 no ARM64; C# compilou OK." >&2
+fi
+
+echo "OK: C# compilou limpo. XamlC/empacotamento finais validados no Codemagic."

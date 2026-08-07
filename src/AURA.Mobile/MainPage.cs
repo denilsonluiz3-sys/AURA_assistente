@@ -7,7 +7,7 @@ namespace AURA.Mobile
     public class MainPage : TabbedPage
     {
         private readonly ModuleManager _manager;
-        private readonly List<(string ModuleId, string Section, string Label, Page Page)> _entries;
+        private readonly List<(string? ModuleId, string Section, string Label, Page Page)> _entries;
         private bool _permissionsAsked;
 
         public MainPage(
@@ -31,7 +31,7 @@ namespace AURA.Mobile
 
             events.Subscribe<ModuleStateChangedEvent>(_ =>
                 MainThread.BeginInvokeOnMainThread(RebuildTabs));
-            _entries = new List<(string, string, string, Page)>
+            _entries = new List<(string?, string, string, Page)>
             {
                 ("system", "Sistema", "Início", home),
                 ("logs", "Sistema", "Logs", logs),
