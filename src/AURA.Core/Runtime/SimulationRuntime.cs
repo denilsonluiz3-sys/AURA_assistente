@@ -79,6 +79,12 @@ namespace AURA.Core.Runtime
 
         public ICellBackend Backend => _backend;
 
+        /// <summary>
+        /// EventBus opcional. Quando definido, o runtime publica
+        /// CellStateChangedEvent a cada transição de estado de célula.
+        /// </summary>
+        public AURA.Core.Events.EventBus Events { get; set; }
+
         public IReadOnlyCollection<Cell> Cells => _cells.Values.ToArray();
 
         public Cell GetCell(string id)
@@ -144,6 +150,7 @@ namespace AURA.Core.Runtime
             _cells[id] = cell;
             _logger.Info("Célula criada: " + cell.ToString());
 
+            PublishCellState(cell, string.Empty);
             Persist();
 
             return cell;
@@ -157,6 +164,7 @@ namespace AURA.Core.Runtime
                 return cell;
             }
 
+            string previous = cell.State.ToString();
             cell.State = CellState.Running;
             cell.LastStartedUtc = DateTime.UtcNow;
             cell.RestartCount++;
@@ -175,12 +183,14 @@ namespace AURA.Core.Runtime
                 cell.State = CellState.Crashed;
                 cell.ProcessId = null;
                 _logger.Error("Falha ao iniciar célula '" + id + "': " + ex.Message);
+                PublishCellState(cell, previous);
                 throw;
             }
 
             cell.ProcessId = process.Id;
             _logger.Info("Célula iniciada: " + cell.ToString());
 
+            PublishCellState(cell, previous);
             Persist();
             _ = WatchCellAsync(cell, recycleOnCrash);
 
@@ -195,6 +205,7 @@ namespace AURA.Core.Runtime
             if (process == null)
             {
                 cell.State = CellState.Stopped;
+                PublishCellState(cell, CellState.Crashed.ToString());
                 return;
             }
 
@@ -217,6 +228,7 @@ namespace AURA.Core.Runtime
             _processes.TryRemove(id, out _);
             _logger.Info("Célula parada: " + id);
 
+            PublishCellState(cell, CellState.Running.ToString());
             Persist();
         }
 
@@ -243,6 +255,7 @@ namespace AURA.Core.Runtime
             cell.State = CellState.Paused;
             _logger.Info("Célula pausada: " + id);
 
+            PublishCellState(cell, CellState.Running.ToString());
             Persist();
         }
 
@@ -273,6 +286,7 @@ namespace AURA.Core.Runtime
             cell.State = CellState.Running;
             _logger.Info("Célula retomada: " + id);
 
+            PublishCellState(cell, CellState.Paused.ToString());
             Persist();
         }
 
@@ -288,6 +302,16 @@ namespace AURA.Core.Runtime
             _backend.Delete(cell);
             _cells.TryRemove(id, out _);
             _logger.Info("Célula excluída: " + id);
+
+            if (Events != null)
+            {
+                Events.Publish(new AURA.Core.Events.CellStateChangedEvent
+                {
+                    CellId = cell.Id,
+                    From = cell.State.ToString(),
+                    To = "Deleted"
+                });
+            }
 
             Persist();
         }
@@ -403,6 +427,19 @@ namespace AURA.Core.Runtime
             if (_persist && _store != null)
             {
                 _store.Save(this);
+            }
+        }
+
+        private void PublishCellState(Cell cell, string from)
+        {
+            if (Events != null)
+            {
+                Events.Publish(new AURA.Core.Events.CellStateChangedEvent
+                {
+                    CellId = cell.Id,
+                    From = from,
+                    To = cell.State.ToString()
+                });
             }
         }
 

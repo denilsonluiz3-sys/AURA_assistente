@@ -3,6 +3,7 @@ using System.Linq;
 using AURA.Agents;
 using AURA.Core;
 using AURA.Core.Bootstrap;
+using AURA.Core.Events;
 using AURA.Core.Launchers;
 using AURA.Core.Logging;
 using AURA.Core.Runtime;
@@ -45,10 +46,17 @@ namespace AURA.CLI
 
             _logger = bootstrap.Logger;
             _runtime = new SimulationRuntime(_logger);
+            _runtime.Events = bootstrap.Events;
             _pluginWatcher = new PluginWatcher(_logger);
             _runner = new Runner(_pluginWatcher.Launchers.Concat(
                 new ILauncher[] { new PythonLauncher(), new JavaLauncher(), new DotnetLauncher(), new NodeLauncher(), new GoLauncher() }));
             _agentManager = new AgentManager(_logger);
+            _agentManager.Events = bootstrap.Events;
+
+            bootstrap.Events.Subscribe<CellStateChangedEvent>(evt =>
+                _logger.Info("[evento] célula " + evt.CellId + ": " + evt.From + " -> " + evt.To));
+            bootstrap.Events.Subscribe<AssistantRespondedEvent>(evt =>
+                _logger.Info("[evento] assistente " + evt.Assistant + " respondeu (célula " + evt.CellId + ")"));
 
             _runtime.LoadFromStoreAsync().GetAwaiter().GetResult();
 

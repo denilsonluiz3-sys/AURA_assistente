@@ -61,7 +61,14 @@ namespace AURA.Core.Events
 
             foreach (Delegate handler in snapshot)
             {
-                ((Action<TEvent>)handler).Invoke(@event);
+                try
+                {
+                    ((Action<TEvent>)handler).Invoke(@event);
+                }
+                catch
+                {
+                    // Um handler que lança exceção não pode derrubar o publisher.
+                }
             }
         }
     }
