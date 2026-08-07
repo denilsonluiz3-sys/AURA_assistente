@@ -718,20 +718,25 @@ namespace AURA.CLI
             Console.WriteLine("  FirstRunCompleted  : " + _bootstrap.Settings.FirstRunCompleted);
             Console.WriteLine("  Theme              : " + _bootstrap.Settings.Theme);
             Console.WriteLine();
-            Console.WriteLine("Módulos preparados (" + _bootstrap.ModulesPath + "):");
-            Console.WriteLine("  Windows    : " + _bootstrap.Modules.Modules.Windows);
-            Console.WriteLine("  AI         : " + _bootstrap.Modules.Modules.AI);
-            Console.WriteLine("  Automation : " + _bootstrap.Modules.Modules.Automation);
-            Console.WriteLine("  Memory     : " + _bootstrap.Modules.Modules.Memory);
-            Console.WriteLine("  Plugins    : " + _bootstrap.Modules.Modules.Plugins);
+            Console.WriteLine("Módulos (" + _bootstrap.ModulesPath + "):");
+            foreach (ModuleInfo m in ModuleCatalog.GetAll())
+            {
+                string state = m.IsCore
+                    ? "núcleo"
+                    : _bootstrap.Modules.Modules.IsEnabled(m.Id) ? "aplicado" : "não aplicado";
+                Console.WriteLine("  " + m.DisplayName.PadRight(24) + ": " + state);
+            }
         }
 
         private static void PrintModules()
         {
             foreach (ModuleInfo module in ModuleCatalog.GetAll())
             {
+                string kind = module.IsCore
+                    ? "núcleo"
+                    : string.IsNullOrWhiteSpace(module.PackageUrl) ? "planejado" : "baixável";
                 Console.WriteLine(module.Icon + " " + module.DisplayName +
-                    " [" + module.Status + "] - " + module.ShortDescription);
+                    " [" + module.Status + ", " + kind + "] - " + module.ShortDescription);
             }
         }
 

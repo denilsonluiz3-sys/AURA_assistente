@@ -1,44 +1,89 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:modules="clr-namespace:AURA.Modules;assembly=AURA.Modules"
+             xmlns:vm="clr-namespace:AURA.Mobile.ViewModels"
              x:Class="AURA.Mobile.Pages.ModulesPage"
              Title="Módulos"
              BackgroundColor="{DynamicResource AuraBackground}">
 
-    <Grid RowDefinitions="Auto,Auto,*" Padding="20" RowSpacing="12">
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="16" RowSpacing="8">
 
-        <Label Text="Catálogo de módulos (AURA.Modules)"
+        <Label Text="Central de Módulos"
                FontAttributes="Bold"
                FontSize="18"
                TextColor="{DynamicResource AuraTextPrimary}" />
-
-        <Label x:Name="ConfigSummaryLabel"
+        <Label x:Name="SummaryLabel"
                Grid.Row="1"
-               FontSize="13"
+               FontSize="12"
                TextColor="{DynamicResource AuraTextSecondary}" />
 
-        <CollectionView x:Name="ModulesView" Grid.Row="2">
+        <Grid Grid.Row="2"
+              ColumnDefinitions="Auto,Auto,*"
+              ColumnSpacing="8">
+            <Button x:Name="DownloadAllButton"
+                    Text="Baixar todos"
+                    Clicked="OnDownloadAllClicked"
+                    BackgroundColor="{DynamicResource AuraSurface}"
+                    TextColor="{DynamicResource AuraAccent}"
+                    CornerRadius="8"
+                    Padding="10,6"
+                    FontSize="12" />
+            <Button Grid.Column="1"
+                    x:Name="ApplyAllButton"
+                    Text="Aplicar todos"
+                    Clicked="OnApplyAllClicked"
+                    BackgroundColor="{DynamicResource AuraSurface}"
+                    TextColor="{DynamicResource AuraAccent}"
+                    CornerRadius="8"
+                    Padding="10,6"
+                    FontSize="12" />
+        </Grid>
+
+        <Label x:Name="StatusLabel"
+               Grid.Row="3"
+               FontSize="12"
+               IsVisible="False"
+               TextColor="{DynamicResource AuraTextSecondary}" />
+
+        <CollectionView x:Name="ModulesView" Grid.Row="3">
             <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="modules:ModuleInfo">
+                <DataTemplate x:DataType="vm:ModuleRow">
                     <Frame BackgroundColor="{DynamicResource AuraSurface}"
                            BorderColor="Transparent"
                            CornerRadius="12"
                            Padding="12"
                            Margin="0,4">
-                        <VerticalStackLayout Spacing="4">
-                            <Label Text="{Binding DisplayName}"
-                                   FontAttributes="Bold"
-                                   FontSize="15"
-                                   TextColor="{DynamicResource AuraTextPrimary}" />
-                            <Label Text="{Binding ShortDescription}"
-                                   FontSize="13"
-                                   TextColor="{DynamicResource AuraTextSecondary}" />
-                            <Label Text="{Binding Status}"
-                                   FontSize="11"
-                                   FontAttributes="Bold"
-                                   TextColor="{DynamicResource AuraAccent}" />
-                        </VerticalStackLayout>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <VerticalStackLayout Spacing="4">
+                                <HorizontalStackLayout Spacing="8">
+                                    <Label Text="{Binding Module.DisplayName}"
+                                           FontAttributes="Bold"
+                                           FontSize="15"
+                                           TextColor="{DynamicResource AuraTextPrimary}" />
+                                    <Label Text="{Binding Module.PackageVersion}"
+                                           FontSize="11"
+                                           TextColor="{DynamicResource AuraTextSecondary}" />
+                                </HorizontalStackLayout>
+                                <Label Text="{Binding Module.ShortDescription}"
+                                       FontSize="12"
+                                       TextColor="{DynamicResource AuraTextSecondary}" />
+                                <Label Text="{Binding StateText}"
+                                       FontSize="11"
+                                       FontAttributes="Bold"
+                                       TextColor="{DynamicResource AuraAccent}" />
+                            </VerticalStackLayout>
+                            <Button Grid.Column="1"
+                                    Text="{Binding ActionText}"
+                                    IsVisible="{Binding ShowAction}"
+                                    CommandParameter="{Binding Module}"
+                                    Clicked="OnActionClicked"
+                                    VerticalOptions="Center"
+                                    BackgroundColor="{DynamicResource AuraAccent}"
+                                    TextColor="White"
+                                    CornerRadius="8"
+                                    Padding="12,8"
+                                    FontSize="12" />
+                        </Grid>
                     </Frame>
                 </DataTemplate>
             </CollectionView.ItemTemplate>

@@ -1,0 +1,8 @@
+{
+  "id": "memory",
+  "name": "Memória",
+  "version": "1.0.0",
+  "description": "Guarda preferências e histórico para a AURA lembrar do contexto entre sessões.",
+  "features": ["Memória persistente", "Histórico de células"],
+  "pages": ["MemoryPage"]
+}

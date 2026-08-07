@@ -50,4 +50,17 @@ namespace AURA.Core.Events
 
         public DateTime OccurredAt { get; set; } = DateTime.UtcNow;
     }
+
+    /// <summary>
+    /// Publicado quando um módulo opcional é aplicado ou removido, para a UI
+    /// reordenar as abas/funções visíveis.
+    /// </summary>
+    public sealed class ModuleStateChangedEvent : IEvent
+    {
+        public string ModuleId { get; set; }
+
+        public bool Applied { get; set; }
+
+        public DateTime OccurredAt { get; set; } = DateTime.UtcNow;
+    }
 }
