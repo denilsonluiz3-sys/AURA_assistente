@@ -20,8 +20,10 @@ public partial class AgentPage : ContentPage
         RuntimeConfig.Apply(_client);
 
         string workspace = AgentWorkspace.EnsureCreated();
-        WorkspaceLabel.Text = "Workspace: " + workspace +
-            $" ({AgentWorkspace.CountFiles()} arquivo(s))";
+        string activeRoot = AgentWorkspace.ActiveRoot;
+        WorkspaceLabel.Text = ProjectAccessService.StatusText + "\n" +
+            "Workspace: " + activeRoot +
+            $" ({AgentWorkspace.CountFiles(activeRoot)} arquivo(s))";
         ModelLabel.Text = $"Modelo: {_client.Options.Model} · {_client.Options.BaseUrl}";
 
         EnsureSession();
@@ -34,7 +36,7 @@ public partial class AgentPage : ContentPage
             return;
         }
 
-        string root = AgentWorkspace.WorkspaceRoot;
+        string root = AgentWorkspace.ActiveRoot;
         var tools = new List<AgentTool>
         {
             new ListDirTool(root),
@@ -46,7 +48,8 @@ public partial class AgentPage : ContentPage
 
         string systemPrompt =
             "Você é o agente de arquivos da AURA, um assistente que trabalha " +
-            "dentro de um workspace no dispositivo (semelhante ao opencode). " +
+            "dentro do workspace local da AURA. Quando houver um projeto vinculado, " +
+            "esse workspace é uma cópia de trabalho sincronizada com a pasta escolhida. " +
             "Você PODE listar, ler, criar, editar e sobrescrever arquivos do " +
             "workspace e executar comandos shell (sh -c) nesse diretório. " +
             "Prefira ferramentas a respostas vagas: quando o usuário pedir uma " +
@@ -60,6 +63,42 @@ public partial class AgentPage : ContentPage
         AppendBubble(
             "Pronto. Posso listar, ler, criar e editar arquivos do workspace e " +
             "rodar comandos shell. O que deseja fazer?", user: false);
+    }
+
+    private async void OnLinkProjectClicked(object sender, EventArgs e)
+    {
+        ProjectButton.IsEnabled = false;
+        try
+        {
+            bool linked = await ProjectAccessService.LinkAsync();
+            if (!linked)
+                return;
+
+            // As ferramentas guardam a raiz no momento da criação da sessão.
+            // Ao trocar o projeto, recriamos a sessão para apontar para a nova raiz.
+            _session = null;
+            WorkspaceLabel.Text = ProjectAccessService.StatusText + "\n" +
+                "Workspace: " + AgentWorkspace.ActiveRoot +
+                $" ({AgentWorkspace.CountFiles(AgentWorkspace.ActiveRoot)} arquivo(s))";
+
+            EnsureSession();
+            AppendBubble(
+                "Projeto vinculado. A AURA trabalha na cópia local e sincroniza " +
+                "as alterações de volta ao projeto após cada tarefa.", user: false);
+        }
+        catch (OperationCanceledException)
+        {
+            AppendBubble("Seleção de projeto cancelada.", user: false);
+        }
+        catch (Exception ex)
+        {
+            AppendBubble("Erro ao vincular projeto: " + ex.Message, user: false, isError: true);
+            AuraLog.Exception("AgentPage.OnLinkProjectClicked", ex);
+        }
+        finally
+        {
+            ProjectButton.IsEnabled = true;
+        }
     }
 
     private async void OnRunClicked(object sender, EventArgs e)
@@ -82,6 +121,13 @@ public partial class AgentPage : ContentPage
         {
             string answer = await _session!.RunAsync(text);
             AppendBubble(answer, user: false);
+
+            if (ProjectAccessService.IsLinked)
+            {
+                int synced = await ProjectAccessService.SyncBackAsync();
+                AppendBubble($"↥ Projeto sincronizado: {synced} arquivo(s) atualizado(s).",
+                    user: false, isTool: true);
+            }
         }
         catch (Exception ex)
         {
