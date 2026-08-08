@@ -6,4 +6,9 @@
     <RootNamespace>AURA.Installer</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\AURA.Modules\AURA.Modules.csproj" />
+    <ProjectReference Include="..\AURA.SystemInfo\AURA.SystemInfo.csproj" />
+  </ItemGroup>
+
 </Project>

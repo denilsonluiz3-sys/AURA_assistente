@@ -1,7 +1,10 @@
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using AURA.Abstractions.Execution;
 using AURA.Installer;
+using AURA.SystemInfo;
 using Xunit;
 
 namespace AURA.Tests
@@ -181,6 +184,127 @@ namespace AURA.Tests
 
                 Assert.Equal(ArtifactType.JarJava, result.Identification.Type);
                 Assert.Null(result.Dependencies); // analisador de Jar ainda não existe nesta etapa
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        /// <summary>Dublê de IToolExecutor pra controlar em teste se o "runtime" está disponível ou não.</summary>
+        private sealed class FakeToolExecutor : IToolExecutor
+        {
+            private readonly bool _available;
+
+            public FakeToolExecutor(string name, bool available)
+            {
+                Name = name;
+                _available = available;
+            }
+
+            public string Name { get; }
+
+            public bool IsAvailable() => _available;
+
+            public Task<ExecutionResult> ExecuteAsync(ExecutionRequest request, CancellationToken cancellationToken = default)
+                => throw new System.NotImplementedException("Não usado na Etapa 3.");
+        }
+
+        private static SystemDiagnosticsResult FakeDiagnostics(double freeDiskSpaceGb) => new()
+        {
+            OperatingSystem = "teste",
+            Architecture = "teste",
+            ProcessorCount = 1,
+            TotalMemoryGb = 8,
+            AvailableMemoryGb = 4,
+            SystemDrive = "/",
+            TotalDiskSpaceGb = 100,
+            FreeDiskSpaceGb = freeDiskSpaceGb,
+            MeetsMinimumRequirements = true
+        };
+
+        [Fact]
+        public async Task PythonEnvironmentSelector_RuntimeAvailableAndDiskOk_IsReadyToInstall()
+        {
+            var selector = new PythonEnvironmentSelector(
+                new FakeToolExecutor("python3", available: true),
+                () => FakeDiagnostics(freeDiskSpaceGb: 10));
+
+            var report = new DependencyReport { Dependencies = { "requests", "flask" } };
+            var result = await selector.SelectAsync(report);
+
+            Assert.True(result.RuntimeAvailable);
+            Assert.Equal("python3", result.RuntimeBinary);
+            Assert.True(result.HasEnoughDiskSpace);
+            Assert.True(result.ReadyToInstall);
+            Assert.Empty(result.Warnings);
+        }
+
+        [Fact]
+        public async Task PythonEnvironmentSelector_RuntimeMissing_SuggestsInstallAndIsNotReady()
+        {
+            var selector = new PythonEnvironmentSelector(
+                new FakeToolExecutor("python3", available: false),
+                () => FakeDiagnostics(freeDiskSpaceGb: 10));
+
+            var report = new DependencyReport();
+            var result = await selector.SelectAsync(report);
+
+            Assert.False(result.RuntimeAvailable);
+            Assert.Null(result.RuntimeBinary);
+            Assert.False(result.ReadyToInstall);
+            Assert.NotEmpty(result.InstallRuntimeSuggestions);
+            Assert.Contains(result.Warnings, w => w.Contains("Python não encontrado"));
+        }
+
+        [Fact]
+        public async Task PythonEnvironmentSelector_LowDiskSpace_WarnsAndIsNotReady()
+        {
+            var selector = new PythonEnvironmentSelector(
+                new FakeToolExecutor("python3", available: true),
+                () => FakeDiagnostics(freeDiskSpaceGb: 0.001)); // ~1MB livre
+
+            var report = new DependencyReport { Dependencies = { "numpy", "pandas", "scipy" } };
+            var result = await selector.SelectAsync(report);
+
+            Assert.True(result.RuntimeAvailable);
+            Assert.False(result.HasEnoughDiskSpace);
+            Assert.False(result.ReadyToInstall);
+            Assert.Contains(result.Warnings, w => w.Contains("Espaço livre em disco"));
+        }
+
+        [Fact]
+        public async Task ArtifactAnalysisService_AnalyzeWithEnvironment_ChainsAllThreeStagesForPython()
+        {
+            string path = WriteTempPythonFile("import requests\n");
+            try
+            {
+                var service = ArtifactAnalysisService.CreateDefault();
+                var result = await service.AnalyzeWithEnvironmentAsync(path);
+
+                Assert.Equal(ArtifactType.Python, result.Identification.Type);
+                Assert.NotNull(result.Dependencies);
+                Assert.NotNull(result.Environment);
+                Assert.Equal(ArtifactType.Python, result.Environment!.ArtifactType);
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public async Task ArtifactAnalysisService_AnalyzeWithEnvironment_UnsupportedType_ReturnsNullEnvironment()
+        {
+            byte[] fakeJar = new byte[] { 0x50, 0x4B, 0x03, 0x04 };
+            string path = WriteTempFile("app.jar", fakeJar);
+            try
+            {
+                var service = ArtifactAnalysisService.CreateDefault();
+                var result = await service.AnalyzeWithEnvironmentAsync(path);
+
+                Assert.Null(result.Dependencies);
+                Assert.Null(result.Environment);
             }
             finally
             {
