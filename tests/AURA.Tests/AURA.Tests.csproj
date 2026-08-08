@@ -21,6 +21,7 @@
     <ProjectReference Include="..\..\src\AURA.Network\AURA.Network.csproj" />
     <ProjectReference Include="..\..\src\AURA.Modules\AURA.Modules.csproj" />
     <ProjectReference Include="..\..\src\AURA.AI\AURA.AI.csproj" />
+    <ProjectReference Include="..\..\src\AURA.Installer\AURA.Installer.csproj" />
   </ItemGroup>
 
 </Project>
