@@ -1,6 +1,9 @@
 using Android.App;
+using Android.Content;
 using Android.Content.PM;
+using Android.Net;
 using Android.OS;
+using System.Threading.Tasks;
 
 namespace AURA.Mobile;
 
@@ -9,6 +12,9 @@ namespace AURA.Mobile;
         ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density)]
 public class MainActivity : MauiAppCompatActivity
 {
+    private const int PickProjectTreeRequest = 4107;
+    private TaskCompletionSource<Uri?>? _projectPicker;
+
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         AuraLog.Info("MainActivity.OnCreate BEGIN");
@@ -30,8 +36,44 @@ public class MainActivity : MauiAppCompatActivity
         AuraLog.Info("MainActivity.OnResume OK");
     }
 
+    public Task<Uri?> PickProjectDirectoryAsync(CancellationToken cancellationToken = default)
+    {
+        if (_projectPicker != null)
+            throw new InvalidOperationException("O seletor de projeto já está aberto.");
+
+        _projectPicker = new TaskCompletionSource<Uri?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        cancellationToken.Register(() =>
+        {
+            _projectPicker?.TrySetCanceled(cancellationToken);
+            _projectPicker = null;
+        });
+
+        var intent = new Intent(Intent.ActionOpenDocumentTree);
+        intent.AddFlags(ActivityFlags.GrantReadUriPermission |
+                        ActivityFlags.GrantWriteUriPermission |
+                        ActivityFlags.GrantPersistableUriPermission);
+        StartActivityForResult(intent, PickProjectTreeRequest);
+        return _projectPicker.Task;
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+
+        if (requestCode != PickProjectTreeRequest)
+            return;
+
+        Uri? uri = resultCode == Result.Ok ? data?.Data : null;
+        _projectPicker?.TrySetResult(uri);
+        _projectPicker = null;
+    }
+
     protected override void OnDestroy()
     {
+        _projectPicker?.TrySetResult(null);
+        _projectPicker = null;
         AuraLog.Info("MainActivity.OnDestroy");
         base.OnDestroy();
     }
