@@ -1,0 +1,208 @@
+diff --git a/src/AURA.Mobile/Platforms/Android/MainActivity.cs b/src/AURA.Mobile/Platforms/Android/MainActivity.cs
+--- a/src/AURA.Mobile/Platforms/Android/MainActivity.cs
++++ b/src/AURA.Mobile/Platforms/Android/MainActivity.cs
+@@ -1,6 +1,8 @@
+ using Android.App;
++using Android.Content;
+ using Android.Content.PM;
++using Android.Net;
+ using Android.OS;
++using System.Threading.Tasks;
+
+ namespace AURA.Mobile;
+
+@@ -8,6 +10,9 @@ namespace AURA.Mobile;
+     ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation | ConfigChanges.UiMode |
+         ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density)]
+ public class MainActivity : MauiAppCompatActivity
+ {
++    private const int PickProjectTreeRequest = 4107;
++    private TaskCompletionSource<Uri?>? _projectPicker;
++
+     protected override void OnCreate(Bundle? savedInstanceState)
+     {
+         AuraLog.Info("MainActivity.OnCreate BEGIN");
+@@ -24,6 +29,35 @@ public class MainActivity : MauiAppCompatActivity
+         AuraLog.Info("MainActivity.OnResume OK");
+     }
+
++    public Task<Uri?> PickProjectDirectoryAsync(CancellationToken cancellationToken = default)
++    {
++        if (_projectPicker != null)
++            throw new InvalidOperationException("O seletor de projeto já está aberto.");
++
++        _projectPicker = new TaskCompletionSource<Uri?>(
++            TaskCreationOptions.RunContinuationsAsynchronously);
++
++        cancellationToken.Register(() =>
++        {
++            _projectPicker?.TrySetCanceled(cancellationToken);
++            _projectPicker = null;
++        });
++
++        var intent = new Intent(Intent.ActionOpenDocumentTree);
++        intent.AddFlags(ActivityFlags.GrantReadUriPermission |
++                        ActivityFlags.GrantWriteUriPermission |
++                        ActivityFlags.GrantPersistableUriPermission);
++        StartActivityForResult(intent, PickProjectTreeRequest);
++        return _projectPicker.Task;
++    }
++
++    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
++    {
++        base.OnActivityResult(requestCode, resultCode, data);
++
++        if (requestCode != PickProjectTreeRequest)
++            return;
++
++        Uri? uri = resultCode == Result.Ok ? data?.Data : null;
++        _projectPicker?.TrySetResult(uri);
++        _projectPicker = null;
++    }
++
+     protected override void OnDestroy()
+     {
++        _projectPicker?.TrySetResult(null);
++        _projectPicker = null;
+         AuraLog.Info("MainActivity.OnDestroy");
+         base.OnDestroy();
+     }
+ }
+diff --git a/src/AURA.Mobile/Diagnostics/AgentWorkspace.cs b/src/AURA.Mobile/Diagnostics/AgentWorkspace.cs
+--- a/src/AURA.Mobile/Diagnostics/AgentWorkspace.cs
++++ b/src/AURA.Mobile/Diagnostics/AgentWorkspace.cs
+@@ -8,6 +8,10 @@ public static class AgentWorkspace
+     {
+         public static string WorkspaceRoot => Path.Combine(FileSystem.AppDataDirectory, "workspace");
+
++        /// <summary>
++        /// Cópia local do projeto explicitamente vinculado pelo usuário.
++        /// Se não houver projeto vinculado, cai no workspace privado original.
++        /// </summary>
++        public static string ActiveRoot => ProjectAccessService.IsLinked
++            ? ProjectAccessService.ProjectWorkspaceRoot
++            : WorkspaceRoot;
++
+         public static string EnsureCreated()
+         {
+             Directory.CreateDirectory(WorkspaceRoot);
+diff --git a/src/AURA.Mobile/Pages/AgentPage.xaml
+--- a/src/AURA.Mobile/Pages/AgentPage.xaml
++++ b/src/AURA.Mobile/Pages/AgentPage.xaml
+@@ -12,6 +12,13 @@
+                    FontSize="11"
+                    TextColor="{DynamicResource AuraTextSecondary}" />
+         </VerticalStackLayout>
+
++        <Button Grid.Row="0"
++                x:Name="ProjectButton"
++                Text="📁 Vincular projeto"
++                Clicked="OnLinkProjectClicked"
++                HorizontalOptions="End"
++                VerticalOptions="Start"
++                BackgroundColor="{DynamicResource AuraAccent}"
++                TextColor="White"
++                CornerRadius="8"
++                Padding="12,6" />
++
+         <ScrollView x:Name="ConversationScroll"
+                     Grid.Row="1">
+             <VerticalStackLayout x:Name="ConversationContainer"
+diff --git a/src/AURA.Mobile/Pages/AgentPage.xaml.cs b/src/AURA.Mobile/Pages/AgentPage.xaml.cs
+--- a/src/AURA.Mobile/Pages/AgentPage.xaml.cs
++++ b/src/AURA.Mobile/Pages/AgentPage.xaml.cs
+@@ -14,11 +14,16 @@ public partial class AgentPage : ContentPage
+     protected override void OnAppearing()
+     {
+         base.OnAppearing();
+         RuntimeConfig.Apply(_client);
+
+         string workspace = AgentWorkspace.EnsureCreated();
+-        WorkspaceLabel.Text = "Workspace: " + workspace +
+-            $" ({AgentWorkspace.CountFiles()} arquivo(s))";
++        string activeRoot = AgentWorkspace.ActiveRoot;
++        WorkspaceLabel.Text = ProjectAccessService.StatusText + "\n" +
++            "Workspace: " + activeRoot +
++            $" ({AgentWorkspace.CountFiles(activeRoot)} arquivo(s))";
+         ModelLabel.Text = $"Modelo: {_client.Options.Model} · {_client.Options.BaseUrl}";
+
+         EnsureSession();
+     }
+@@ -31,7 +36,7 @@ public partial class AgentPage : ContentPage
+             return;
+         }
+
+-        string root = AgentWorkspace.WorkspaceRoot;
++        string root = AgentWorkspace.ActiveRoot;
+         var tools = new List<AgentTool>
+         {
+             new ListDirTool(root),
+@@ -44,7 +49,8 @@ public partial class AgentPage : ContentPage
+         string systemPrompt =
+             "Você é o agente de arquivos da AURA, um assistente que trabalha " +
+-            "dentro de um workspace no dispositivo (semelhante ao opencode). " +
++            "dentro do workspace local da AURA. Quando houver um projeto vinculado, " +
++            "esse workspace é uma cópia de trabalho sincronizada com a pasta escolhida. " +
+             "Você PODE listar, ler, criar, editar e sobrescrever arquivos do " +
+             "workspace e executar comandos shell (sh -c) nesse diretório. " +
+             "Prefira ferramentas a respostas vagas: quando o usuário pedir uma " +
+@@ -56,6 +62,35 @@ public partial class AgentPage : ContentPage
+         AppendBubble(
+             "Pronto. Posso listar, ler, criar e editar arquivos do workspace e " +
+             "rodar comandos shell. O que deseja fazer?", user: false);
+     }
+
++    private async void OnLinkProjectClicked(object sender, EventArgs e)
++    {
++        ProjectButton.IsEnabled = false;
++        try
++        {
++            bool linked = await ProjectAccessService.LinkAsync();
++            if (!linked)
++                return;
++
++            // As ferramentas guardam a raiz no momento da criação da sessão.
++            // Ao trocar o projeto, recriamos a sessão para apontar para a nova raiz.
++            _session = null;
++            WorkspaceLabel.Text = ProjectAccessService.StatusText + "\n" +
++                "Workspace: " + AgentWorkspace.ActiveRoot +
++                $" ({AgentWorkspace.CountFiles(AgentWorkspace.ActiveRoot)} arquivo(s))";
++
++            EnsureSession();
++            AppendBubble(
++                "Projeto vinculado. A AURA trabalha na cópia local e sincroniza " +
++                "as alterações de volta ao projeto após cada tarefa.", user: false);
++        }
++        catch (OperationCanceledException)
++        {
++            AppendBubble("Seleção de projeto cancelada.", user: false);
++        }
++        catch (Exception ex)
++        {
++            AppendBubble("Erro ao vincular projeto: " + ex.Message, user: false, isError: true);
++            AuraLog.Exception("AgentPage.OnLinkProjectClicked", ex);
++        }
++        finally
++        {
++            ProjectButton.IsEnabled = true;
++        }
++    }
++
+     private async void OnRunClicked(object sender, EventArgs e)
+     {
+         string text = CommandEditor.Text?.Trim() ?? string.Empty;
+         if (string.IsNullOrWhiteSpace(text))
+@@ -78,6 +113,11 @@ public partial class AgentPage : ContentPage
+         {
+             string answer = await _session!.RunAsync(text);
+             AppendBubble(answer, user: false);
++
++            if (ProjectAccessService.IsLinked)
++            {
++                int synced = await ProjectAccessService.SyncBackAsync();
++                AppendBubble($"↥ Projeto sincronizado: {synced} arquivo(s) atualizado(s).",
++                    user: false, isTool: true);
++            }
+         }
+         catch (Exception ex)
+         {

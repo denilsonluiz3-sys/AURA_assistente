@@ -10,6 +10,14 @@ namespace AURA.Mobile.Diagnostics
     {
         public static string WorkspaceRoot => Path.Combine(FileSystem.AppDataDirectory, "workspace");
 
+        /// <summary>
+        /// Cópia local do projeto explicitamente vinculado pelo usuário.
+        /// Se não houver projeto vinculado, cai no workspace privado original.
+        /// </summary>
+        public static string ActiveRoot => ProjectAccessService.IsLinked
+            ? ProjectAccessService.ProjectWorkspaceRoot
+            : WorkspaceRoot;
+
         public static string EnsureCreated()
         {
             Directory.CreateDirectory(WorkspaceRoot);
