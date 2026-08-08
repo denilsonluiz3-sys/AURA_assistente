@@ -20,6 +20,17 @@
                    TextColor="{DynamicResource AuraTextSecondary}" />
         </VerticalStackLayout>
 
+        <Button Grid.Row="0"
+                x:Name="ProjectButton"
+                Text="📁 Vincular projeto"
+                Clicked="OnLinkProjectClicked"
+                HorizontalOptions="End"
+                VerticalOptions="Start"
+                BackgroundColor="{DynamicResource AuraAccent}"
+                TextColor="White"
+                CornerRadius="8"
+                Padding="12,6" />
+
         <ScrollView x:Name="ConversationScroll"
                     Grid.Row="1">
             <VerticalStackLayout x:Name="ConversationContainer"
