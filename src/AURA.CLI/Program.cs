@@ -201,7 +201,7 @@ namespace AURA.CLI
         {
             if (parts.Length < 2)
             {
-                Console.WriteLine("Uso: run <arquivo> [argumentos...] [--cell <id>]");
+                Console.WriteLine("Uso: run <arquivo> [argumentos...] [--cell <id>] [--wait]");
                 return;
             }
 
@@ -217,12 +217,17 @@ namespace AURA.CLI
             string cellId = null;
             var appArgs = new System.Collections.Generic.List<string>();
             var limits = new ResourceLimits();
+            bool wait = false;
 
             for (int i = 2; i < parts.Length; i++)
             {
                 if (parts[i] == "--cell" && i + 1 < parts.Length)
                 {
                     cellId = parts[++i];
+                }
+                else if (parts[i] == "--wait")
+                {
+                    wait = true;
                 }
                 else if (TryParseLimit(parts, ref i, limits))
                 {
@@ -249,6 +254,14 @@ namespace AURA.CLI
             Console.WriteLine("  comando: " + cell.AppPath + " " + cell.Args);
             Console.WriteLine("  pid    : " + cell.ProcessId);
             Console.WriteLine("  log    : " + cell.LogFile);
+
+            if (wait)
+            {
+                _runtime.WaitCellAsync(cell.Id).GetAwaiter().GetResult();
+                Console.WriteLine();
+                Console.WriteLine("--- saída da célula ---");
+                Console.WriteLine(_runtime.ReadCellLog(cell.Id));
+            }
         }
 
         private static void RunAssistant(string[] parts)
@@ -744,6 +757,7 @@ namespace AURA.CLI
         {
             Console.WriteLine("Comandos:");
             Console.WriteLine("  run <arquivo> [args]   Escolhe um programa; AURA decide como rodar");
+            Console.WriteLine("  run --wait app.go      Roda em primeiro plano e mostra a saída");
             Console.WriteLine("  run --mem 256 --cpu 30 app.py   Aplica limites (prlimit) à célula");
             Console.WriteLine("  cells                   Lista as células");
             Console.WriteLine("  cell start|stop|pause|resume|delete|log|limits <id>");
