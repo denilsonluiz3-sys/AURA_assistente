@@ -328,6 +328,26 @@ namespace AURA.Core.Runtime
         }
 
         /// <summary>
+        /// Aguarda o processo da célula terminar e devolve o exit code.
+        /// Usado pelo CLI `run --wait` para rodar o programa em primeiro plano.
+        /// </summary>
+        public async Task<int?> WaitCellAsync(string id)
+        {
+            Cell cell = RequireCell(id);
+            Process process = GetRunningProcess(cell);
+            if (process == null)
+            {
+                return null;
+            }
+
+            await process.WaitForExitAsync();
+            // Garante que a saída assíncrona (BeginOutputReadLine) seja drenada
+            // antes de devolver — senão as últimas linhas podem ser perdidas.
+            process.WaitForExit(2000);
+            return process.ExitCode;
+        }
+
+        /// <summary>
         /// Loads persisted cells and reattaches to still-alive processes
         /// (orphans from a previous AURA run). Dead cells are marked Crashed
         /// so the recycle logic can rebuild them.

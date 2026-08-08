@@ -131,18 +131,13 @@ fi
 
 if command -v go >/dev/null 2>&1; then
   GO_CELL_ID="smoke_go_$$"
-  GO_RUN_OUT="$(cli "run $TMP_GO --cell $GO_CELL_ID")"
-  if grep -q "Célula criada e iniciada" <<< "$GO_RUN_OUT"; then
-    pass "run go $GO_CELL_ID"
+  # --wait: roda em primeiro plano até o `go run` compilar, executar e sair,
+  # evitando que o processo seja encerrado antes de produzir saída.
+  GO_RUN_OUT="$(cli "run $TMP_GO --cell $GO_CELL_ID --wait")"
+  if grep -q "AURA_SMOKE_GO_OK" <<< "$GO_RUN_OUT"; then
+    pass "run go $GO_CELL_ID (saída AURA_SMOKE_GO_OK)"
   else
-    fail "run go não criou a célula: $GO_RUN_OUT"
-  fi
-
-  GO_LOG_OUT="$(cli "cell log $GO_CELL_ID")"
-  if grep -q "AURA_SMOKE_GO_OK" <<< "$GO_LOG_OUT"; then
-    pass "log go contém AURA_SMOKE_GO_OK"
-  else
-    fail "log go sem AURA_SMOKE_GO_OK: $GO_LOG_OUT"
+    fail "run go sem AURA_SMOKE_GO_OK: $GO_RUN_OUT"
   fi
 
   cli "cell stop $GO_CELL_ID" >/dev/null
