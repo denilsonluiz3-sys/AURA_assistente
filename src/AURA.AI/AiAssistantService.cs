@@ -19,9 +19,9 @@ namespace AURA.AI
     {
         public static readonly OpenRouterOptions DefaultOptions = new OpenRouterOptions
         {
-            ApiKey = Environment.GetEnvironmentVariable("AURA_OPENROUTER_KEY") ?? string.Empty,
-            BaseUrl = "https://openrouter.ai/api/v1/chat/completions",
-            Model = "qwen/qwen-plus"
+            ApiKey = Environment.GetEnvironmentVariable("AURA_OPENROUTER_KEY") ?? "ollama",
+            BaseUrl = "http://127.0.0.1:11434/v1/chat/completions",
+            Model = "qwen2.5-coder:1.5b"
         };
 
         /// <summary>Thread-safe entry point for asking the AI anything.</summary>

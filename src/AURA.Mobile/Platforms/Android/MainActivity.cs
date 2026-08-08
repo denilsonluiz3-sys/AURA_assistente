@@ -1,7 +1,7 @@
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
-using Android.Net;
+using AndroidUri = Android.Net.Uri;
 using Android.OS;
 using System.Threading.Tasks;
 
@@ -13,7 +13,7 @@ namespace AURA.Mobile;
 public class MainActivity : MauiAppCompatActivity
 {
     private const int PickProjectTreeRequest = 4107;
-    private TaskCompletionSource<Uri?>? _projectPicker;
+    private TaskCompletionSource<AndroidUri?>? _projectPicker;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -36,12 +36,12 @@ public class MainActivity : MauiAppCompatActivity
         AuraLog.Info("MainActivity.OnResume OK");
     }
 
-    public Task<Uri?> PickProjectDirectoryAsync(CancellationToken cancellationToken = default)
+    public Task<AndroidUri?> PickProjectDirectoryAsync(CancellationToken cancellationToken = default)
     {
         if (_projectPicker != null)
             throw new InvalidOperationException("O seletor de projeto já está aberto.");
 
-        _projectPicker = new TaskCompletionSource<Uri?>(
+        _projectPicker = new TaskCompletionSource<AndroidUri?>(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
         cancellationToken.Register(() =>
