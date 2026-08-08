@@ -60,7 +60,7 @@ public static class ProjectAccessService
         if (activity == null)
             throw new InvalidOperationException("Activity Android da AURA não está disponível.");
 
-        AndroidUri treeAndroidUri = Android.Net.AndroidUri.Parse(raw)!;
+        AndroidUri treeAndroidUri = AndroidUri.Parse(raw)!;
         return await SyncDirectoryAsync(activity.ContentResolver, treeAndroidUri,
             ProjectWorkspaceRoot, treeAndroidUri, ct);
     }
