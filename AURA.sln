@@ -24,6 +24,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AURA.Windows", "src\AURA.Wi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AURA.Tests", "tests\AURA.Tests\AURA.Tests.csproj", "{E13FB843-E18F-4A3E-AA15-6C9FDDBFFB0F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AURA.Installer", "src\AURA.Installer\AURA.Installer.csproj", "{8D3E2A5B-1C4F-4A6E-9B7D-2E0F5C8A1D42}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -74,6 +76,10 @@ Global
 		{E13FB843-E18F-4A3E-AA15-6C9FDDBFFB0F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E13FB843-E18F-4A3E-AA15-6C9FDDBFFB0F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E13FB843-E18F-4A3E-AA15-6C9FDDBFFB0F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8D3E2A5B-1C4F-4A6E-9B7D-2E0F5C8A1D42}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8D3E2A5B-1C4F-4A6E-9B7D-2E0F5C8A1D42}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8D3E2A5B-1C4F-4A6E-9B7D-2E0F5C8A1D42}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8D3E2A5B-1C4F-4A6E-9B7D-2E0F5C8A1D42}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
