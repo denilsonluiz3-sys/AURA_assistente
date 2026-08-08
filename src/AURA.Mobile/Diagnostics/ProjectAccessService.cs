@@ -1,7 +1,7 @@
 using System.IO;
 #if ANDROID
 using Android.Content;
-using Android.Net;
+using AndroidUri = Android.Net.Uri;
 using Android.Provider;
 #endif
 
@@ -15,14 +15,14 @@ namespace AURA.Mobile.Diagnostics;
 /// </summary>
 public static class ProjectAccessService
 {
-    private const string UriPreference = "agent_project_tree_uri";
+    private const string AndroidUriPreference = "agent_project_tree_uri";
     private const string ProjectFolder = "project";
 
     public static string ProjectWorkspaceRoot =>
         Path.Combine(AgentWorkspace.WorkspaceRoot, ProjectFolder);
 
     public static bool IsLinked =>
-        !string.IsNullOrWhiteSpace(Preferences.Default.Get(UriPreference, string.Empty));
+        !string.IsNullOrWhiteSpace(Preferences.Default.Get(AndroidUriPreference, string.Empty));
 
     public static string StatusText => IsLinked
         ? "Projeto vinculado: " + Preferences.Default.Get("agent_project_name", "projeto")
@@ -35,14 +35,14 @@ public static class ProjectAccessService
         if (activity == null)
             throw new InvalidOperationException("Activity Android da AURA não está disponível.");
 
-        Uri? uri = await activity.PickProjectDirectoryAsync(ct);
+        AndroidUri? uri = await activity.PickProjectDirectoryAsync(ct);
         if (uri == null)
             return false;
 
-        var flags = ActivityFlags.GrantReadUriPermission | ActivityFlags.GrantWriteUriPermission;
-        activity.ContentResolver.TakePersistableUriPermission(uri, flags);
+        var flags = ActivityFlags.GrantReadAndroidUriPermission | ActivityFlags.GrantWriteAndroidUriPermission;
+        activity.ContentResolver.TakePersistableAndroidUriPermission(uri, flags);
 
-        Preferences.Default.Set(UriPreference, uri.ToString());
+        Preferences.Default.Set(AndroidUriPreference, uri.ToString());
         Preferences.Default.Set("agent_project_name",
             GetDisplayName(activity.ContentResolver, uri) ?? "projeto");
 
@@ -52,7 +52,7 @@ public static class ProjectAccessService
 
     public static async Task<int> SyncBackAsync(CancellationToken ct = default)
     {
-        string raw = Preferences.Default.Get(UriPreference, string.Empty);
+        string raw = Preferences.Default.Get(AndroidUriPreference, string.Empty);
         if (string.IsNullOrWhiteSpace(raw))
             return 0;
 
@@ -60,52 +60,52 @@ public static class ProjectAccessService
         if (activity == null)
             throw new InvalidOperationException("Activity Android da AURA não está disponível.");
 
-        Uri treeUri = Android.Net.Uri.Parse(raw)!;
-        return await SyncDirectoryAsync(activity.ContentResolver, treeUri,
-            ProjectWorkspaceRoot, treeUri, ct);
+        AndroidUri treeAndroidUri = Android.Net.AndroidUri.Parse(raw)!;
+        return await SyncDirectoryAsync(activity.ContentResolver, treeAndroidUri,
+            ProjectWorkspaceRoot, treeAndroidUri, ct);
     }
 
     public static void Unlink()
     {
-        Preferences.Default.Remove(UriPreference);
+        Preferences.Default.Remove(AndroidUriPreference);
         Preferences.Default.Remove("agent_project_name");
         if (Directory.Exists(ProjectWorkspaceRoot))
             Directory.Delete(ProjectWorkspaceRoot, true);
     }
 
-    private static async Task ImportTreeAsync(ContentResolver resolver, Uri treeUri,
+    private static async Task ImportTreeAsync(ContentResolver resolver, AndroidUri treeAndroidUri,
         string localRoot, CancellationToken ct)
     {
         if (Directory.Exists(localRoot))
             Directory.Delete(localRoot, true);
         Directory.CreateDirectory(localRoot);
 
-        string rootId = DocumentsContract.GetTreeDocumentId(treeUri)!;
-        Uri rootUri = DocumentsContract.BuildDocumentUriUsingTree(treeUri, rootId)!;
-        await ImportDirectoryAsync(resolver, treeUri, rootUri, localRoot, ct);
+        string rootId = DocumentsContract.GetTreeDocumentId(treeAndroidUri)!;
+        AndroidUri rootAndroidUri = DocumentsContract.BuildDocumentAndroidUriUsingTree(treeAndroidUri, rootId)!;
+        await ImportDirectoryAsync(resolver, treeAndroidUri, rootAndroidUri, localRoot, ct);
     }
 
-    private static async Task ImportDirectoryAsync(ContentResolver resolver, Uri treeUri,
-        Uri directoryUri, string localDirectory, CancellationToken ct)
+    private static async Task ImportDirectoryAsync(ContentResolver resolver, AndroidUri treeAndroidUri,
+        AndroidUri directoryAndroidUri, string localDirectory, CancellationToken ct)
     {
         Directory.CreateDirectory(localDirectory);
-        foreach (var child in QueryChildren(resolver, treeUri,
-                     DocumentsContract.GetDocumentId(directoryUri)!))
+        foreach (var child in QueryChildren(resolver, treeAndroidUri,
+                     DocumentsContract.GetDocumentId(directoryAndroidUri)!))
         {
             ct.ThrowIfCancellationRequested();
             string safeName = SanitizeName(child.Name);
-            Uri childUri = DocumentsContract.BuildDocumentUriUsingTree(treeUri, child.Id)!;
+            AndroidUri childAndroidUri = DocumentsContract.BuildDocumentAndroidUriUsingTree(treeAndroidUri, child.Id)!;
             string localPath = Path.Combine(localDirectory, safeName);
 
             if (child.MimeType == DocumentsContract.Document.MimeTypeDir)
             {
                 if (!ShouldIgnore(safeName))
-                    await ImportDirectoryAsync(resolver, treeUri, childUri, localPath, ct);
+                    await ImportDirectoryAsync(resolver, treeAndroidUri, childAndroidUri, localPath, ct);
             }
             else
             {
                 if (ShouldIgnore(safeName)) continue;
-                using Stream? input = resolver.OpenInputStream(childUri);
+                using Stream? input = resolver.OpenInputStream(childAndroidUri);
                 if (input == null) continue;
                 await using FileStream output = File.Create(localPath);
                 await input.CopyToAsync(output, ct);
@@ -113,8 +113,8 @@ public static class ProjectAccessService
         }
     }
 
-    private static async Task<int> SyncDirectoryAsync(ContentResolver resolver, Uri treeUri,
-        string localDirectory, Uri remoteDirectory, CancellationToken ct)
+    private static async Task<int> SyncDirectoryAsync(ContentResolver resolver, AndroidUri treeAndroidUri,
+        string localDirectory, AndroidUri remoteDirectory, CancellationToken ct)
     {
         int count = 0;
         if (!Directory.Exists(localDirectory)) return 0;
@@ -127,7 +127,7 @@ public static class ProjectAccessService
 
             if (Directory.Exists(localPath))
             {
-                Uri? childDir = FindChild(resolver, treeUri, remoteDirectory, name);
+                AndroidUri? childDir = FindChild(resolver, treeAndroidUri, remoteDirectory, name);
                 if (childDir == null)
                 {
                     childDir = DocumentsContract.CreateDocument(
@@ -136,11 +136,11 @@ public static class ProjectAccessService
                 }
                 if (childDir != null)
                     count += await SyncDirectoryAsync(
-                        resolver, treeUri, localPath, childDir, ct);
+                        resolver, treeAndroidUri, localPath, childDir, ct);
                 continue;
             }
 
-            Uri? remoteFile = FindChild(resolver, treeUri, remoteDirectory, name);
+            AndroidUri? remoteFile = FindChild(resolver, treeAndroidUri, remoteDirectory, name);
             if (remoteFile == null)
             {
                 remoteFile = DocumentsContract.CreateDocument(
@@ -158,9 +158,9 @@ public static class ProjectAccessService
     }
 
     private static IEnumerable<DocumentEntry> QueryChildren(ContentResolver resolver,
-        Uri treeUri, string parentId)
+        AndroidUri treeAndroidUri, string parentId)
     {
-        Uri childrenUri = DocumentsContract.BuildChildDocumentsUriUsingTree(treeUri, parentId)!;
+        AndroidUri childrenAndroidUri = DocumentsContract.BuildChildDocumentsAndroidUriUsingTree(treeAndroidUri, parentId)!;
         string[] projection =
         {
             DocumentsContract.Document.ColumnDocumentId,
@@ -168,7 +168,7 @@ public static class ProjectAccessService
             DocumentsContract.Document.ColumnMimeType
         };
 
-        using var cursor = resolver.Query(childrenUri, projection, null, null, null);
+        using var cursor = resolver.Query(childrenAndroidUri, projection, null, null, null);
         if (cursor == null) yield break;
 
         int idCol = cursor.GetColumnIndex(DocumentsContract.Document.ColumnDocumentId);
@@ -184,19 +184,19 @@ public static class ProjectAccessService
         }
     }
 
-    private static Uri? FindChild(ContentResolver resolver, Uri treeUri,
-        Uri parentUri, string name)
+    private static AndroidUri? FindChild(ContentResolver resolver, AndroidUri treeAndroidUri,
+        AndroidUri parentAndroidUri, string name)
     {
         foreach (var child in QueryChildren(
-                     resolver, treeUri, DocumentsContract.GetDocumentId(parentUri)!))
+                     resolver, treeAndroidUri, DocumentsContract.GetDocumentId(parentAndroidUri)!))
         {
             if (string.Equals(child.Name, name, StringComparison.Ordinal))
-                return DocumentsContract.BuildDocumentUriUsingTree(treeUri, child.Id);
+                return DocumentsContract.BuildDocumentAndroidUriUsingTree(treeAndroidUri, child.Id);
         }
         return null;
     }
 
-    private static string? GetDisplayName(ContentResolver resolver, Uri uri)
+    private static string? GetDisplayName(ContentResolver resolver, AndroidUri uri)
     {
         string[] projection = { DocumentsContract.Document.ColumnDisplayName };
         using var cursor = resolver.Query(uri, projection, null, null, null);
