@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Text.Json;
 using AURA.Core.Logging;
+using AURA.Memory;
 
 namespace AURA.AI
 {
@@ -24,6 +25,7 @@ namespace AURA.AI
         private readonly List<AgentTool> _tools;
         private readonly List<AgentMessage> _messages = new();
         private readonly string? _systemPrompt;
+        private readonly SolutionStore _solutionStore;
 
         public AgentSession(OpenRouterClient client, IEnumerable<AgentTool> tools,
             string? systemPrompt = null, ILogger? logger = null)
@@ -32,6 +34,7 @@ namespace AURA.AI
             _tools = (tools ?? Enumerable.Empty<AgentTool>()).ToList();
             _systemPrompt = systemPrompt;
             _logger = logger ?? new ConsoleLogger();
+            _solutionStore = new SolutionStore();
         }
 
         /// <summary>Emitido a cada ferramenta executada (para atualizar a UI).</summary>
@@ -97,6 +100,24 @@ namespace AURA.AI
 
             throw new InvalidOperationException(
                 "O agente atingiu o limite de " + MaxRounds + " passos de ferramentas.");
+        }
+
+        /// <summary>
+        /// Consulta somente soluções que já foram validadas.
+        /// A consulta não executa a solução e não substitui a IA.
+        /// </summary>
+        private SolutionRule? TryGetKnownSolution(
+            RequestContext request)
+        {
+            if (request == null)
+            {
+                return null;
+            }
+
+            return _solutionStore.Find(
+                request.Intent,
+                request.Target,
+                request.Goal);
         }
 
         private async Task<string> ExecuteToolAsync(
