@@ -205,7 +205,7 @@ public sealed class RuntimeManager : IRuntimeManager
         {
             Command = fileName,
             Arguments = commandArgs,
-            WorkingDirectory = workdir,
+            WorkingDirectory = workdir ?? Directory.GetCurrentDirectory(),
             Timeout = timeout ?? TimeSpan.FromSeconds(30),
         };
 

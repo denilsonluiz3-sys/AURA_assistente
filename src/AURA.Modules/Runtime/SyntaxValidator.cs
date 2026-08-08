@@ -111,7 +111,7 @@ public sealed class SyntaxValidator : ISyntaxValidator
             _ => Array.Empty<string>(),
         };
 
-        return candidates.Select(BinaryPath.FindOnPath)
+        return candidates.Select(c => BinaryPath.FindOnPath(c))
             .FirstOrDefault(path => path is not null);
     }
 
