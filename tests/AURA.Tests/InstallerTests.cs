@@ -311,5 +311,109 @@ namespace AURA.Tests
                 File.Delete(path);
             }
         }
+
+        [Fact]
+        public async Task PythonInstaller_DryRun_DoesNotCallExecutorAndBuildsCommand()
+        {
+            var executor = new RecordingFakeExecutor(available: true, success: true);
+            var installer = new PythonInstaller(executor);
+            var report = new DependencyReport { Dependencies = { "requests", "flask" } };
+
+            var result = await installer.InstallAsync(report, dryRun: true);
+
+            Assert.True(result.DryRun);
+            Assert.True(result.Success);
+            Assert.Equal(0, executor.ExecuteCallCount); // dry-run não pode chamar o executor
+            Assert.Single(result.Commands);
+            Assert.Contains("pip install requests flask", result.Commands[0]);
+        }
+
+        [Fact]
+        public async Task PythonInstaller_NoDependencies_ReturnsNothingToInstall()
+        {
+            var executor = new RecordingFakeExecutor(available: true, success: true);
+            var installer = new PythonInstaller(executor);
+            var report = new DependencyReport();
+
+            var result = await installer.InstallAsync(report, dryRun: false);
+
+            Assert.True(result.Success);
+            Assert.Empty(result.Commands);
+            Assert.Equal(0, executor.ExecuteCallCount);
+        }
+
+        [Fact]
+        public async Task PythonInstaller_RealRun_CallsExecutorWithPipInstallArgs()
+        {
+            var executor = new RecordingFakeExecutor(available: true, success: true);
+            var installer = new PythonInstaller(executor);
+            var report = new DependencyReport { Dependencies = { "numpy" } };
+
+            var result = await installer.InstallAsync(report, dryRun: false);
+
+            Assert.False(result.DryRun);
+            Assert.True(result.Success);
+            Assert.Equal(1, executor.ExecuteCallCount);
+            Assert.Equal("-m", executor.LastRequest!.Command);
+            Assert.Equal(new[] { "pip", "install", "numpy" }, executor.LastRequest!.Arguments);
+        }
+
+        [Fact]
+        public async Task PythonInstaller_RealRun_RuntimeMissing_FailsWithoutCallingExecutor()
+        {
+            var executor = new RecordingFakeExecutor(available: false, success: true);
+            var installer = new PythonInstaller(executor);
+            var report = new DependencyReport { Dependencies = { "numpy" } };
+
+            var result = await installer.InstallAsync(report, dryRun: false);
+
+            Assert.False(result.Success);
+            Assert.Equal(0, executor.ExecuteCallCount);
+            Assert.Contains("Python não encontrado", result.StandardError);
+        }
+
+        [Fact]
+        public async Task InstallationService_UnsupportedType_ReturnsNull()
+        {
+            var service = new InstallationService(new IInstaller[] { new PythonInstaller() });
+            var report = new DependencyReport();
+
+            var result = await service.InstallAsync(ArtifactType.JarJava, report);
+
+            Assert.Null(result);
+        }
+
+        /// <summary>Dublê de IToolExecutor que grava a última requisição recebida, pra Etapa 4.</summary>
+        private sealed class RecordingFakeExecutor : IToolExecutor
+        {
+            private readonly bool _available;
+            private readonly bool _success;
+
+            public RecordingFakeExecutor(bool available, bool success)
+            {
+                _available = available;
+                _success = success;
+            }
+
+            public int ExecuteCallCount { get; private set; }
+            public ExecutionRequest? LastRequest { get; private set; }
+
+            public string Name => "python";
+
+            public bool IsAvailable() => _available;
+
+            public Task<ExecutionResult> ExecuteAsync(ExecutionRequest request, CancellationToken cancellationToken = default)
+            {
+                ExecuteCallCount++;
+                LastRequest = request;
+                return Task.FromResult(new ExecutionResult
+                {
+                    Success = _success,
+                    ExitCode = _success ? 0 : 1,
+                    StandardOutput = "instalado com sucesso",
+                    StandardError = string.Empty
+                });
+            }
+        }
     }
 }
