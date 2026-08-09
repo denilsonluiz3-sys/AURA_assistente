@@ -21,7 +21,6 @@
                            TextColor="{DynamicResource AuraCyan}" />
                     <Label Text="ASSISTENTE"
                            FontSize="11"
-                           LetterSpacing="3"
                            FontAttributes="Bold"
                            TextColor="{DynamicResource AuraCyan}" />
                 </HorizontalStackLayout>
@@ -58,7 +57,6 @@
                     <VerticalStackLayout Spacing="3">
                         <Label Text="PROVEDOR"
                                FontSize="10"
-                               LetterSpacing="1"
                                TextColor="{DynamicResource AuraTextMuted}" />
                         <Picker x:Name="ProviderPicker"
                                 Title="Provedor"
@@ -67,7 +65,6 @@
                     <VerticalStackLayout Grid.Column="1" Spacing="3">
                         <Label Text="MODELO"
                                FontSize="10"
-                               LetterSpacing="1"
                                TextColor="{DynamicResource AuraTextMuted}" />
                         <Picker x:Name="ModelPicker" Title="Modelo" />
                     </VerticalStackLayout>
@@ -78,7 +75,6 @@
                     <Label x:Name="ApiKeyLabel"
                            Text="CHAVE DE API"
                            FontSize="10"
-                           LetterSpacing="1"
                            TextColor="{DynamicResource AuraTextMuted}" />
                     <Entry x:Name="ApiKeyEntry"
                            Placeholder="sk-or-… (deixe vazio se não precisar)"
