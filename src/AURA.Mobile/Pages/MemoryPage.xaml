@@ -22,7 +22,6 @@
                        TextColor="{DynamicResource AuraWarning}" />
                 <Label Text="MEMÓRIA PERSISTENTE"
                        FontSize="11"
-                       LetterSpacing="2"
                        FontAttributes="Bold"
                        TextColor="{DynamicResource AuraWarning}" />
             </HorizontalStackLayout>
@@ -51,7 +50,6 @@
                                     </Border.BackgroundColor>
                                     <Label Text="{Binding Role}"
                                            FontSize="10"
-                                           LetterSpacing="1"
                                            FontAttributes="Bold"
                                            TextColor="White" />
                                 </Border>

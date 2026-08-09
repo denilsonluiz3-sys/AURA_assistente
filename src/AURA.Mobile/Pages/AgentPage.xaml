@@ -26,7 +26,6 @@
                                TextColor="{DynamicResource AuraAccent}" />
                         <Label Text="AGENTE"
                                FontSize="11"
-                               LetterSpacing="3"
                                FontAttributes="Bold"
                                TextColor="{DynamicResource AuraAccent}" />
                     </HorizontalStackLayout>
