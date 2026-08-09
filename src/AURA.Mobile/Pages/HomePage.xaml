@@ -13,11 +13,9 @@
                 <Label Text="A U R A"
                        FontSize="32"
                        FontAttributes="Bold"
-                       LetterSpacing="6"
                        TextColor="{DynamicResource AuraAccent}" />
                 <Label x:Name="VersionLabel"
                        FontSize="12"
-                       LetterSpacing="1"
                        TextColor="{DynamicResource AuraTextSecondary}" />
             </VerticalStackLayout>
 
@@ -30,7 +28,6 @@
                                TextColor="{DynamicResource AuraAccent}" />
                         <Label Text="SISTEMA"
                                FontSize="11"
-                               LetterSpacing="2"
                                FontAttributes="Bold"
                                TextColor="{DynamicResource AuraAccent}" />
                     </HorizontalStackLayout>
@@ -53,7 +50,6 @@
                                TextColor="{DynamicResource AuraCyan}" />
                         <Label Text="REDE"
                                FontSize="11"
-                               LetterSpacing="2"
                                FontAttributes="Bold"
                                TextColor="{DynamicResource AuraCyan}" />
                     </HorizontalStackLayout>
@@ -74,7 +70,6 @@
                                TextColor="{DynamicResource AuraSuccess}" />
                         <Label Text="AGENTES DISPONÍVEIS"
                                FontSize="11"
-                               LetterSpacing="2"
                                FontAttributes="Bold"
                                TextColor="{DynamicResource AuraSuccess}" />
                     </HorizontalStackLayout>
