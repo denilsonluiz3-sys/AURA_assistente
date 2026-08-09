@@ -29,6 +29,14 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+    <!-- ONNX Runtime: TFM net9.0-android (consumido pelo net10.0-android do app).
+         Traz a runtime nativa (.so) do Android para inferência CPU local do Kokoro TTS. -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.28.0" />
+  </ItemGroup>
+
+  <!-- Modelo Kokoro TTS + voz pf_dora (pt-br) + vocab. Assets empacotados no APK. -->
+  <ItemGroup>
+    <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <!-- Referencia o Core/Abstractions/Agents/Memória/AI/rede/diagnóstico do repo GitHub. -->

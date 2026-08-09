@@ -11,6 +11,7 @@ using AURA.Modules;
 using AURA.Modules.Executors;
 using AURA.Network;
 using AURA.SystemInfo;
+using AURA.Mobile.Speech;
 
 namespace AURA.Mobile;
 
@@ -65,6 +66,10 @@ public static class MauiProgram
             MaxTokens = 1500
         }, sp.GetRequiredService<ILogger>()));
         builder.Services.AddSingleton<AiAssistant>();
+
+        // TTS local (Kokoro via ONNX Runtime). Carregado sob demanda na
+        // primeira fala; assets (modelo/voz/vocab) vêm empacotados no APK.
+        builder.Services.AddSingleton<ISpeechService, KokoroSpeechService>();
 
         builder.Services.AddSingleton(sp => new AgentManager(sp.GetRequiredService<ILogger>())
         {
