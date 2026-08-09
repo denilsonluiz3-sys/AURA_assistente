@@ -39,6 +39,14 @@
                            LineBreakMode="TailTruncation" />
                 </VerticalStackLayout>
 
+            <Grid Grid.Column="1" ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
+                <Button x:Name="SpeakTestButton"
+                        Text="🔊"
+                        Clicked="OnSpeakTestClicked"
+                        Style="{StaticResource BtnGhost}"
+                        VerticalOptions="Center"
+                        Padding="10,6"
+                        FontSize="12" />
                 <Button Grid.Column="1"
                         x:Name="ProjectButton"
                         Text="📁 Vincular"
@@ -47,6 +55,7 @@
                         VerticalOptions="Center"
                         Padding="10,6"
                         FontSize="12" />
+            </Grid>
             </Grid>
         </Border>
 
