@@ -18,12 +18,16 @@ namespace AURA.AI
     /// </summary>
     public sealed class AgentSession
     {
-        private const int MaxRounds = 20;
+        private const int MaxRounds = 8;
 
         private readonly OpenRouterClient _client;
         private readonly ILogger _logger;
         private readonly List<AgentTool> _tools;
         private readonly List<AgentMessage> _messages = new();
+
+        // Limite de segurança para impedir crescimento indefinido
+        // do contexto enviado ao modelo.
+        private const int MaxHistoryMessages = 16;
         private readonly string? _systemPrompt;
         private readonly SolutionStore _solutionStore;
 
@@ -42,6 +46,30 @@ namespace AURA.AI
 
         public IReadOnlyList<AgentMessage> Messages => _messages;
 
+        private void TrimHistory()
+        {
+            if (_messages.Count <= MaxHistoryMessages)
+                return;
+
+            AgentMessage? system = _messages
+                .FirstOrDefault(m =>
+                    string.Equals(m.Role, "system", StringComparison.OrdinalIgnoreCase));
+
+            var recent = _messages
+                .Where(m => !string.Equals(m.Role, "system", StringComparison.OrdinalIgnoreCase))
+                .TakeLast(MaxHistoryMessages - (system != null ? 1 : 0))
+                .ToList();
+
+            _messages.Clear();
+
+            if (system != null)
+                _messages.Add(system);
+
+            _messages.AddRange(recent);
+
+            _logger.Info("agent: histórico podado para " + _messages.Count + " mensagens");
+        }
+
         public async Task<string> RunAsync(string userText,
             HttpClient? httpClient = null, CancellationToken ct = default)
         {
@@ -55,6 +83,8 @@ namespace AURA.AI
             int round = 0;
             while (round++ < MaxRounds)
             {
+                TrimHistory();
+
                 AgentChatResponse response = await _client.ChatToolsAsync(
                     _messages,
                     _tools.Select(t => t.Definition).ToList(),
@@ -66,6 +96,8 @@ namespace AURA.AI
                 {
                     throw new InvalidOperationException(response.Error);
                 }
+
+                _logger.Info("agent: round=" + round + " toolCalls=" + (response.ToolCalls?.Count ?? 0) + " hasContent=" + !string.IsNullOrEmpty(response.Content));
 
                 if (response.ToolCalls is { Count: > 0 })
                 {

@@ -140,6 +140,9 @@ namespace AURA.CLI
                     case "modulos":
                         PrintModules();
                         break;
+                    case "reload":
+                        ReloadCommand();
+                        break;
                     case "config":
                         PrintConfig();
                         break;
@@ -462,7 +465,7 @@ private static void AuraCommand(string[] parts)
             if (parts.Length < 2)
             {
                 Console.WriteLine("Uso: aichave <sk-or-...> — salva a chave em ~/.aura/ai_key.txt");
-                Console.WriteLine("     Ou defina a variável OPENROUTER_API_KEY.");
+                Console.WriteLine("     Ou defina a variável OPENAI_API_KEY.");
                 return;
             }
 
@@ -484,6 +487,36 @@ private static void AuraCommand(string[] parts)
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".aura");
         }
 
+
+        private static void ReloadCommand()
+        {
+            try
+            {
+                Console.WriteLine("[AURA] Recarregando configuração de provedores...");
+
+                // Descarta o cliente atual.
+                _aiClient = null;
+
+                // ProviderRuntime.Load() lê novamente:
+                // - config/providers.json
+                // - seleção do provider/model
+                // - chaves configuradas
+                //
+                // O novo cliente só será criado quando necessário.
+                ProviderRuntime runtime = ProviderRuntime.Load();
+
+                Console.WriteLine("[OK] Catálogo de provedores recarregado.");
+                Console.WriteLine("[INFO] " + ProviderRuntime.Describe(runtime));
+
+                Console.WriteLine("[OK] Cliente LLM será recriado na próxima chamada.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[ERRO] Falha ao recarregar provedores.");
+                Console.WriteLine(ex.Message);
+            }
+        }
+
         private static OpenRouterClient EnsureAiClient(string? model = null)
         {
             if (_aiClient != null)
@@ -496,55 +529,18 @@ private static void AuraCommand(string[] parts)
                 return _aiClient;
             }
 
-            string provider =
-                Environment.GetEnvironmentVariable("AURA_PROVIDER")
-                ?? "ollama";
-
-            provider = provider.Trim().ToLowerInvariant();
-
-            if (provider == "ollama")
+            if (!string.IsNullOrWhiteSpace(model))
             {
-                _aiClient = new OpenRouterClient(
-                    new OpenRouterOptions
-                    {
-                        Provider = "ollama",
-                        ApiKey = string.Empty,
-                        BaseUrl = "http://127.0.0.1:11434/v1/chat/completions",
-                        Model = string.IsNullOrWhiteSpace(model)
-                            ? "qwen2.5-coder:1.5b"
-                            : model,
-                        MaxTokens = 1500,
-                        TimeoutSeconds = 120
-                    });
-
-                return _aiClient;
+                Environment.SetEnvironmentVariable("AURA_MODEL", model);
             }
 
-            string apiKey =
-                Environment.GetEnvironmentVariable("OPENROUTER_API_KEY")
-                ?? string.Empty;
-
-            if (string.IsNullOrWhiteSpace(apiKey))
-            {
-                string keyFile = Path.Combine(UserAuraDir(), "ai_key.txt");
-
-                if (File.Exists(keyFile))
-                {
-                    apiKey = File.ReadAllText(keyFile).Trim();
-                }
-            }
+            ProviderRuntime runtime = ProviderRuntime.Load();
 
             _aiClient = new OpenRouterClient(
-                new OpenRouterOptions
-                {
-                    Provider = "openrouter",
-                    ApiKey = apiKey,
-                    Model = string.IsNullOrWhiteSpace(model)
-                        ? "qwen2.5-coder:1.5b"
-                        : model,
-                    BaseUrl = "http://127.0.0.1:11434/v1/chat/completions",
-                    AppReference = "AURA-Ollama"
-                });
+                runtime.CreateOptions());
+
+            Console.WriteLine(
+                "[INFO] " + ProviderRuntime.Describe(runtime));
 
             return _aiClient;
         }
@@ -805,12 +801,13 @@ private static void AuraCommand(string[] parts)
             Console.WriteLine("  internet                Verifica conexão");
             Console.WriteLine("  agents                  Lista assistentes (aichat/termux-ai)");
             Console.WriteLine("  ask \"pergunta\"          Pergunta via assistente, logada em célula");
-            Console.WriteLine("  chat \"pergunta\"          Pergunta direta à IA (OpenRouter) [--model x]");
+            Console.WriteLine("  chat \"pergunta\"          Pergunta direta à IA [--model x]");
             Console.WriteLine("  agent \"instrução\"        Agente de arquivos num workspace (IA + ferramentas)");
             Console.WriteLine("  aichave <sk-or-...>      Salva a chave da IA em ~/.aura/ai_key.txt");
             Console.WriteLine("  exec <shell|git|python|node> <cmd> [args]   Executa via executor");
             Console.WriteLine("  run aichat --cell chat  Inicia assistente como célula");
             Console.WriteLine("  modulos                 Lista módulos disponíveis");
+            Console.WriteLine("  reload                 Recarrega provedores, chaves e cliente LLM");
             Console.WriteLine("  config                  Mostra configuração (settings + módulos)");
             Console.WriteLine("  launchers               Lista resolutores de extensão");
             Console.WriteLine("  plugins                 Lista plugins carregados");

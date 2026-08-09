@@ -1,12 +1,16 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
 
 namespace AURA.AI
 {
     public sealed class ProviderModel
     {
-        public string Id { get; init; } = string.Empty;
-        public string Label { get; init; } = string.Empty;
-        public string Category { get; init; } = string.Empty;
+        public string Id { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
         public bool IsFree { get; init; }
 
         public override string ToString() =>
@@ -15,111 +19,299 @@ namespace AURA.AI
 
     public sealed class ProviderInfo
     {
+        public string Id { get; set; } = string.Empty;
         public string Name { get; init; } = string.Empty;
         public string BaseUrl { get; init; } = string.Empty;
         public bool NeedsKey { get; init; } = true;
         public string KeyHint { get; init; } = string.Empty;
-        public List<ProviderModel> Models { get; init; } = new();
+        public string KeyEnv { get; init; } = string.Empty;
+        public List<ProviderModel> Models { get; set; } = new();
     }
 
     public static class ProviderCatalog
     {
-        private static readonly List<ProviderInfo> ProvidersList = Build();
+        private static readonly List<ProviderInfo> ProvidersList = Load();
 
         public static List<ProviderInfo> Providers => ProvidersList;
 
-        private static List<ProviderInfo> Build()
+        /// <summary>
+        /// Recarrega o catálogo de providers a partir de config/providers.json.
+        /// </summary>
+        public static void Reload()
         {
-            return new List<ProviderInfo>
+            ProvidersList.Clear();
+
+            foreach (var provider in Load())
             {
-                new ProviderInfo
+                ProvidersList.Add(provider);
+            }
+        }
+
+        private static List<ProviderInfo> Load()
+        {
+            try
+            {
+                string? path = FindCatalogFile();
+
+                if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
                 {
-                    Name = "OpenRouter",
-                    BaseUrl = "https://openrouter.ai/api/v1/chat/completions",
-                    NeedsKey = true,
-                    KeyHint = "sk-or-...",
-                    Models = new List<ProviderModel>
+                    string json = File.ReadAllText(path);
+
+                    ProviderCatalogFile? catalog =
+                        JsonSerializer.Deserialize<ProviderCatalogFile>(
+                            json,
+                            new JsonSerializerOptions
+                            {
+                                PropertyNameCaseInsensitive = true
+                            });
+
+                    if (catalog?.Providers != null &&
+                        catalog.Providers.Count > 0)
                     {
-                        new() { Id = "qwen/qwen-plus", Label = "Qwen Plus", Category = "Razoável", IsFree = false },
-                        new() { Id = "qwen/qwen3.7-plus", Label = "Qwen 3.7 Plus", Category = "Flagship", IsFree = false },
-                        new() { Id = "qwen/qwen3.5-plus-20260420", Label = "Qwen 3.5 Plus", Category = "Flagship", IsFree = false },
-                        new() { Id = "openrouter/free", Label = "Auto (qualquer grátis)", Category = "Grátis", IsFree = true },
-                        new() { Id = "openai/gpt-oss-20b:free", Label = "GPT-OSS 20B", Category = "Grátis", IsFree = true },
-                        new() { Id = "google/gemma-4-26b-a4b-it:free", Label = "Gemma 4 26B", Category = "Grátis", IsFree = true },
-                        new() { Id = "nvidia/nemotron-3-nano-30b-a3b:free", Label = "Nemotron Nano 30B", Category = "Grátis", IsFree = true },
-                        new() { Id = "poolside/laguna-s-2.1:free", Label = "Laguna S 2.1", Category = "Grátis", IsFree = true },
+                        Normalize(catalog.Providers);
+
+                        Console.WriteLine(
+                            "[AURA] Provider catalog carregado: " +
+                            catalog.Providers.Count + " providers.");
+
+                        return catalog.Providers;
                     }
-                },
-                new ProviderInfo
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(
+                    "[AURA] Falha ao carregar config/providers.json: " +
+                    ex.Message);
+            }
+
+            Console.Error.WriteLine(
+                "[AURA] Usando catálogo interno de fallback.");
+
+            return BuildFallback();
+        }
+
+        private static string? FindCatalogFile()
+        {
+            var candidates = new List<string>();
+
+            string current = Directory.GetCurrentDirectory();
+
+            candidates.Add(
+                Path.Combine(current, "config", "providers.json"));
+
+            candidates.Add(
+                Path.Combine(current, "..", "config", "providers.json"));
+
+            candidates.Add(
+                Path.Combine(current, "..", "..", "config", "providers.json"));
+
+            string? baseDir = AppContext.BaseDirectory;
+
+            candidates.Add(
+                Path.Combine(baseDir, "config", "providers.json"));
+
+            candidates.Add(
+                Path.Combine(baseDir, "..", "..", "..", "..",
+                    "config", "providers.json"));
+
+            foreach (string candidate in candidates)
+            {
+                try
                 {
-                    Name = "Groq (grátis)",
-                    BaseUrl = "https://api.groq.com/openai/v1/chat/completions",
-                    NeedsKey = true,
-                    KeyHint = "gsk_...",
-                    Models = new List<ProviderModel>
+                    string full = Path.GetFullPath(candidate);
+
+                    if (File.Exists(full))
                     {
-                        new() { Id = "llama-3.3-70b-versatile", Label = "Llama 3.3 70B", Category = "Grátis", IsFree = true },
-                        new() { Id = "llama-3.1-8b-instant", Label = "Llama 3.1 8B", Category = "Grátis", IsFree = true },
-                        new() { Id = "llama-3.2-3b-preview", Label = "Llama 3.2 3B", Category = "Grátis", IsFree = true },
-                        new() { Id = "qwen-2.5-32b", Label = "Qwen 2.5 32B", Category = "Grátis", IsFree = true },
+                        return full;
                     }
-                },
-                new ProviderInfo
+                }
+                catch
                 {
-                    Name = "Cerebras (grátis)",
-                    BaseUrl = "https://api.cerebras.ai/v1/chat/completions",
-                    NeedsKey = true,
-                    KeyHint = "csk-...",
-                    Models = new List<ProviderModel>
-                    {
-                        new() { Id = "llama-3.3-70b", Label = "Llama 3.3 70B", Category = "Grátis", IsFree = true },
-                        new() { Id = "llama-3.1-8b", Label = "Llama 3.1 8B", Category = "Grátis", IsFree = true },
-                    }
-                },
-                new ProviderInfo
+                    // Ignora caminhos inválidos.
+                }
+            }
+
+            return null;
+        }
+
+        private static void Normalize(List<ProviderInfo> providers)
+        {
+            foreach (ProviderInfo provider in providers)
+            {
+                if (string.IsNullOrWhiteSpace(provider.Id))
                 {
-                    Name = "Google Gemini",
-                    BaseUrl = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                    NeedsKey = true,
-                    KeyHint = "AIza...",
-                    Models = new List<ProviderModel>
-                    {
-                        new() { Id = "gemini-2.5-flash", Label = "Gemini 2.5 Flash", Category = "Grátis", IsFree = true },
-                        new() { Id = "gemini-2.5-pro", Label = "Gemini 2.5 Pro", Category = "Pago", IsFree = false },
-                    }
-                },
-                new ProviderInfo
+                    provider.Id = NormalizeId(provider.Name);
+                }
+
+                if (provider.Models == null)
                 {
-                    Name = "Ollama (local)",
-                    BaseUrl = "http://localhost:11434/v1/chat/completions",
-                    NeedsKey = false,
-                    KeyHint = "deixe vazio",
-                    Models = new List<ProviderModel>
+                    provider.Models = new List<ProviderModel>();
+                }
+
+                foreach (ProviderModel model in provider.Models)
+                {
+                    if (string.IsNullOrWhiteSpace(model.Label))
                     {
-                        new() { Id = "llama3.2", Label = "Llama 3.2", Category = "Local", IsFree = true },
-                        new() { Id = "qwen2.5", Label = "Qwen 2.5", Category = "Local", IsFree = true },
-                        new() { Id = "mistral", Label = "Mistral", Category = "Local", IsFree = true },
+                        model.Label = model.Id;
                     }
-                },
-            };
+
+                    if (string.IsNullOrWhiteSpace(model.Category))
+                    {
+                        model.Category =
+                            model.IsFree ? "Grátis" : "Modelo";
+                    }
+                }
+            }
+        }
+
+        private static string NormalizeId(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            return new string(
+                value
+                    .Trim()
+                    .ToLowerInvariant()
+                    .Select(c =>
+                        char.IsLetterOrDigit(c) ? c : '-')
+                    .ToArray())
+                .Trim('-');
         }
 
         public static ProviderInfo? Find(string? name)
         {
             if (string.IsNullOrWhiteSpace(name))
             {
-                return ProvidersList[0];
+                return ProvidersList.FirstOrDefault();
             }
 
-            foreach (var p in ProvidersList)
+            string wanted = name.Trim();
+
+            return ProvidersList.FirstOrDefault(p =>
+                string.Equals(
+                    p.Id,
+                    wanted,
+                    StringComparison.OrdinalIgnoreCase)
+                ||
+                string.Equals(
+                    p.Name,
+                    wanted,
+                    StringComparison.OrdinalIgnoreCase));
+        }
+
+        public static ProviderModel? FindModel(
+            string? provider,
+            string? model)
+        {
+            if (string.IsNullOrWhiteSpace(model))
             {
-                if (string.Equals(p.Name, name, System.StringComparison.OrdinalIgnoreCase))
-                {
-                    return p;
-                }
+                return null;
             }
 
-            return ProvidersList[0];
+            ProviderInfo? info = Find(provider);
+
+            if (info == null)
+            {
+                return null;
+            }
+
+            return info.Models.FirstOrDefault(m =>
+                string.Equals(
+                    m.Id,
+                    model.Trim(),
+                    StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static List<ProviderInfo> BuildFallback()
+        {
+            return new List<ProviderInfo>
+            {
+                new ProviderInfo
+                {
+                    Id = "openai",
+                    Name = "OpenAI",
+                    BaseUrl =
+                        "https://api.openai.com/v1/chat/completions",
+                    NeedsKey = true,
+                    KeyEnv = "OPENAI_API_KEY",
+                    KeyHint = "OPENAI_API_KEY",
+                    Models = new List<ProviderModel>
+                    {
+                        new ProviderModel
+                        {
+                            Id = "gpt-5",
+                            Label = "GPT-5",
+                            Category = "Flagship"
+                        },
+                        new ProviderModel
+                        {
+                            Id = "gpt-5-mini",
+                            Label = "GPT-5 Mini",
+                            Category = "Eficiente"
+                        }
+                    }
+                },
+
+                new ProviderInfo
+                {
+                    Id = "openrouter",
+                    Name = "OpenRouter",
+                    BaseUrl =
+                        "https://openrouter.ai/api/v1/chat/completions",
+                    NeedsKey = true,
+                    KeyEnv = "OPENROUTER_API_KEY",
+                    KeyHint = "OPENROUTER_API_KEY",
+                    Models = new List<ProviderModel>
+                    {
+                        new ProviderModel
+                        {
+                            Id = "qwen/qwen-plus",
+                            Label = "Qwen Plus",
+                            Category = "Razoável"
+                        },
+                        new ProviderModel
+                        {
+                            Id = "openrouter/free",
+                            Label = "Auto grátis",
+                            Category = "Grátis",
+                            IsFree = true
+                        }
+                    }
+                },
+
+                new ProviderInfo
+                {
+                    Id = "ollama",
+                    Name = "Ollama (local)",
+                    BaseUrl =
+                        "http://127.0.0.1:11434/v1/chat/completions",
+                    NeedsKey = false,
+                    Models = new List<ProviderModel>
+                    {
+                        new ProviderModel
+                        {
+                            Id = "qwen2.5-coder:1.5b",
+                            Label = "Qwen 2.5 Coder 1.5B",
+                            Category = "Local",
+                            IsFree = true
+                        }
+                    }
+                }
+            };
+        }
+
+        private sealed class ProviderCatalogFile
+        {
+            public int SchemaVersion { get; set; }
+
+            public string Description { get; set; } = string.Empty;
+
+            public List<ProviderInfo> Providers { get; set; } =
+                new();
         }
     }
 }
