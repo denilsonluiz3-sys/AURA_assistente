@@ -39,10 +39,10 @@ namespace AURA.Mobile
                 ("ai", "Assistente", "Chat", chat),
                 ("ai", "Assistente", "Agente", agent),
                 ("memory", "Assistente", "Memória", memory),
+                (null, "Assistente", "Navegador", browser),
                 ("terminal", "Ferramentas", "Terminal", terminal),
                 ("executors", "Ferramentas", "Executores", executors),
                 (null, "Ferramentas", "Módulos", modules),
-                (null, "Ferramentas", "Navegador", browser),
                 ("cells", "Apps", "Células", cells),
                 ("cells", "Apps", "Rodar programa", run)
             };
