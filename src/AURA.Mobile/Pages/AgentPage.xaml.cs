@@ -1,4 +1,5 @@
 using AURA.AI;
+using AURA.Memory;
 using AURA.Mobile.Diagnostics;
 
 namespace AURA.Mobile.Pages;
@@ -6,12 +7,14 @@ namespace AURA.Mobile.Pages;
 public partial class AgentPage : ContentPage
 {
     private readonly OpenRouterClient _client;
+    private readonly MemoryStore _memory;
     private AgentSession? _session;
 
-    public AgentPage(OpenRouterClient client)
+    public AgentPage(OpenRouterClient client, MemoryStore memory)
     {
         InitializeComponent();
         _client = client;
+        _memory = memory;
     }
 
     protected override void OnAppearing()
@@ -57,7 +60,7 @@ public partial class AgentPage : ContentPage
             "Responda em português, de forma curta e objetiva. " +
             "Caminhos são sempre relativos ao workspace.";
 
-        _session = new AgentSession(_client, tools, systemPrompt);
+        _session = new AgentSession(_client, tools, systemPrompt, memory: _memory);
         _session.Step += OnAgentStep;
 
         AppendBubble(
