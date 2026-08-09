@@ -24,7 +24,8 @@
     <PublishTrimmed>false</PublishTrimmed>
     <RunAOTCompilation>false</RunAOTCompilation>
     <AndroidPackageFormats>apk</AndroidPackageFormats>
-    <SupportedOSPlatformVersion>23</SupportedOSPlatformVersion>
+    <!-- minSdk 24 (Android 7.0): exigido pelo OnnxRuntime (ai.onnxruntime) -->
+    <SupportedOSPlatformVersion>24</SupportedOSPlatformVersion>
   </PropertyGroup>
 
   <ItemGroup>
