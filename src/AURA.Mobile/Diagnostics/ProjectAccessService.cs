@@ -48,7 +48,9 @@ public static class ProjectAccessService
             activity.ContentResolver.TakePersistableUriPermission(uri, flags);
         }
         catch (Exception ex) when (ex is System.Security.SecurityException
-            or Java.Lang.SecurityException or ArgumentException)
+            or Java.Lang.SecurityException
+            or System.ArgumentException
+            or Java.Lang.IllegalArgumentException)
         {
             // Sem persistência a permissão vale só para a sessão atual;
             // o vínculo segue funcionando até o app ser encerrado.

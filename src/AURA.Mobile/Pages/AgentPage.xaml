@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:AURA.Mobile.Controls"
              x:Class="AURA.Mobile.Pages.AgentPage"
              Title="Agente"
              BackgroundColor="{DynamicResource AuraBackground}">
@@ -18,6 +19,7 @@
                 StrokeThickness="1"
                 Padding="16,12"
                 StrokeShape="RoundRectangle 0,0,0,0">
+            <VerticalStackLayout Spacing="6">
             <Grid ColumnDefinitions="*,Auto">
                 <VerticalStackLayout Spacing="2">
                     <HorizontalStackLayout Spacing="6">
@@ -39,7 +41,7 @@
                            LineBreakMode="TailTruncation" />
                 </VerticalStackLayout>
 
-            <Grid Grid.Column="1" ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
+            <Grid Grid.Column="1" ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
                 <Button x:Name="SpeakTestButton"
                         Text="🔊"
                         Clicked="OnSpeakTestClicked"
@@ -48,6 +50,14 @@
                         Padding="10,6"
                         FontSize="12" />
                 <Button Grid.Column="1"
+                        x:Name="ConfigButton"
+                        Text="⚙"
+                        Clicked="OnToggleConfigClicked"
+                        Style="{StaticResource BtnGhost}"
+                        VerticalOptions="Center"
+                        Padding="10,6"
+                        FontSize="12" />
+                <Button Grid.Column="2"
                         x:Name="ProjectButton"
                         Text="📁 Vincular"
                         Clicked="OnLinkProjectClicked"
@@ -57,6 +67,18 @@
                         FontSize="12" />
             </Grid>
             </Grid>
+
+            <!-- Configuração IA (provedor/modelo/chave) compartilhada com o Chat -->
+            <Border x:Name="ConfigPanel"
+                    IsVisible="False"
+                    BackgroundColor="{DynamicResource AuraSurface2}"
+                    Stroke="{DynamicResource AuraBorder}"
+                    StrokeThickness="1"
+                    Padding="12,10"
+                    StrokeShape="RoundRectangle 10,10,10,10">
+                <controls:AiConfigView x:Name="AiConfig" />
+            </Border>
+            </VerticalStackLayout>
         </Border>
 
         <!-- ── Área de conversa ───────────────────────────────── -->
