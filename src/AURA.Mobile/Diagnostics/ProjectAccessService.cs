@@ -38,8 +38,22 @@ public static class ProjectAccessService
         if (uri == null)
             return false;
 
-        var flags = ActivityFlags.GrantReadUriPermission | ActivityFlags.GrantWriteUriPermission;
-        activity.ContentResolver.TakePersistableUriPermission(uri, flags);
+        var flags = ActivityFlags.GrantReadUriPermission
+                  | ActivityFlags.GrantWriteUriPermission
+                  | ActivityFlags.GrantPersistableUriPermission;
+        try
+        {
+            // Persistir a concessão exige o flag GrantPersistableUriPermission,
+            // que também precisa ter sido pedido no intent (MainActivity faz isso).
+            activity.ContentResolver.TakePersistableUriPermission(uri, flags);
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException
+            or Java.Lang.SecurityException or ArgumentException)
+        {
+            // Sem persistência a permissão vale só para a sessão atual;
+            // o vínculo segue funcionando até o app ser encerrado.
+            AuraLog.Info("Permissão SAF não pôde ser persistida (" + uri + "): " + ex.Message);
+        }
 
         Preferences.Default.Set(UriPreference, uri.ToString());
         Preferences.Default.Set("agent_project_name",
@@ -197,11 +211,66 @@ public static class ProjectAccessService
 
     private static string? GetDisplayName(ContentResolver resolver, Android.Net.Uri uri)
     {
-        string[] projection = { DocumentsContract.Document.ColumnDisplayName };
-        using var cursor = resolver.Query(uri, projection, null, null, null);
-        if (cursor != null && cursor.MoveToFirst())
-            return cursor.GetString(0);
-        return null;
+        try
+        {
+            Android.Net.Uri queryUri = uri;
+            if (DocumentsContract.IsTreeUri(uri))
+            {
+                // content://.../tree/... não é consultável diretamente
+                // (UnsupportedOperationException). Deriva a URI do documento raiz
+                // da árvore antes de consultar os metadados.
+                string? treeId = DocumentsContract.GetTreeDocumentId(uri);
+                if (string.IsNullOrWhiteSpace(treeId))
+                    return FallbackName(uri);
+                queryUri = DocumentsContract.BuildDocumentUriUsingTree(uri, treeId);
+                if (queryUri == null)
+                    return FallbackName(uri);
+            }
+
+            string[] projection = { DocumentsContract.Document.ColumnDisplayName };
+            using var cursor = resolver.Query(queryUri, projection, null, null, null);
+            if (cursor != null && cursor.MoveToFirst())
+            {
+                string? name = cursor.GetString(0);
+                if (!string.IsNullOrWhiteSpace(name))
+                    return name;
+            }
+        }
+        catch (System.NotSupportedException)
+        {
+            // Provider não suporta a consulta (mapping .NET de UnsupportedOperationException).
+        }
+        catch (Java.Lang.UnsupportedOperationException)
+        {
+        }
+        catch (System.Security.SecurityException)
+        {
+            // Sem permissão para ler os metadados do documento.
+        }
+        catch (Java.Lang.SecurityException)
+        {
+        }
+        catch (ArgumentException)
+        {
+            // URI inválida ou documento não encontrado.
+        }
+
+        return FallbackName(uri);
+    }
+
+    private static string FallbackName(Android.Net.Uri uri)
+    {
+        // tree/primary:Workspace  -> "Workspace"
+        // tree/9016-4EF8:Fotos     -> "Fotos"  (SD card)
+        string? last = uri.LastPathSegment;
+        if (string.IsNullOrWhiteSpace(last))
+            return "projeto";
+
+        int separator = last.LastIndexOf(':');
+        if (separator >= 0 && separator < last.Length - 1)
+            last = last[(separator + 1)..];
+
+        return string.IsNullOrWhiteSpace(last) ? "projeto" : last;
     }
 #endif
 
