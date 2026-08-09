@@ -6,85 +6,106 @@
              Title="Módulos"
              BackgroundColor="{DynamicResource AuraBackground}">
 
-    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="16" RowSpacing="8">
+    <Grid RowDefinitions="Auto,Auto,*" >
 
-        <Label Text="Central de Módulos"
-               FontAttributes="Bold"
-               FontSize="18"
-               TextColor="{DynamicResource AuraTextPrimary}" />
-        <Label x:Name="SummaryLabel"
+        <!-- ── Header ─────────────────────────────────────────── -->
+        <Border Grid.Row="0"
+                BackgroundColor="{DynamicResource AuraSurface}"
+                Stroke="{DynamicResource AuraBorder}"
+                StrokeThickness="1"
+                Padding="16,14"
+                StrokeShape="RoundRectangle 0,0,0,0">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                <VerticalStackLayout Spacing="2">
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="⊞"
+                               FontSize="16"
+                               TextColor="{DynamicResource AuraAccent}" />
+                        <Label Text="MÓDULOS"
+                               FontSize="11"
+                               LetterSpacing="2"
+                               FontAttributes="Bold"
+                               TextColor="{DynamicResource AuraAccent}" />
+                    </HorizontalStackLayout>
+                    <Label x:Name="SummaryLabel"
+                           FontSize="11"
+                           TextColor="{DynamicResource AuraTextMuted}" />
+                </VerticalStackLayout>
+
+                <Button Grid.Column="1"
+                        x:Name="DownloadAllButton"
+                        Text="⬇ Baixar"
+                        Clicked="OnDownloadAllClicked"
+                        Style="{StaticResource BtnGhost}"
+                        Padding="10,6"
+                        FontSize="12" />
+                <Button Grid.Column="2"
+                        x:Name="ApplyAllButton"
+                        Text="✓ Aplicar"
+                        Clicked="OnApplyAllClicked"
+                        Style="{StaticResource BtnGhost}"
+                        Padding="10,6"
+                        FontSize="12" />
+            </Grid>
+        </Border>
+
+        <!-- Status de operação em andamento -->
+        <Label x:Name="StatusLabel"
                Grid.Row="1"
                FontSize="12"
-               TextColor="{DynamicResource AuraTextSecondary}" />
-
-        <Grid Grid.Row="2"
-              ColumnDefinitions="Auto,Auto,*"
-              ColumnSpacing="8">
-            <Button x:Name="DownloadAllButton"
-                    Text="Baixar todos"
-                    Clicked="OnDownloadAllClicked"
-                    BackgroundColor="{DynamicResource AuraSurface}"
-                    TextColor="{DynamicResource AuraAccent}"
-                    CornerRadius="8"
-                    Padding="10,6"
-                    FontSize="12" />
-            <Button Grid.Column="1"
-                    x:Name="ApplyAllButton"
-                    Text="Aplicar todos"
-                    Clicked="OnApplyAllClicked"
-                    BackgroundColor="{DynamicResource AuraSurface}"
-                    TextColor="{DynamicResource AuraAccent}"
-                    CornerRadius="8"
-                    Padding="10,6"
-                    FontSize="12" />
-        </Grid>
-
-        <Label x:Name="StatusLabel"
-               Grid.Row="3"
-               FontSize="12"
                IsVisible="False"
-               TextColor="{DynamicResource AuraTextSecondary}" />
+               Margin="16,6,16,0"
+               TextColor="{DynamicResource AuraWarning}" />
 
-        <CollectionView x:Name="ModulesView" Grid.Row="3">
+        <!-- ── Lista de módulos ───────────────────────────────── -->
+        <CollectionView x:Name="ModulesView" Grid.Row="2" Margin="0,4">
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="vm:ModuleRow">
-                    <Frame BackgroundColor="{DynamicResource AuraSurface}"
-                           BorderColor="Transparent"
-                           CornerRadius="12"
-                           Padding="12"
-                           Margin="0,4">
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <Border Margin="14,5"
+                            BackgroundColor="{DynamicResource AuraSurface}"
+                            Stroke="{DynamicResource AuraBorder}"
+                            StrokeThickness="1"
+                            Padding="14,12"
+                            StrokeShape="RoundRectangle 14,14,14,14">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                             <VerticalStackLayout Spacing="4">
                                 <HorizontalStackLayout Spacing="8">
+                                    <Label Text="{Binding Module.Icon}"
+                                           FontSize="16"
+                                           VerticalOptions="Center" />
                                     <Label Text="{Binding Module.DisplayName}"
-                                           FontAttributes="Bold"
                                            FontSize="15"
+                                           FontAttributes="Bold"
                                            TextColor="{DynamicResource AuraTextPrimary}" />
-                                    <Label Text="{Binding Module.PackageVersion}"
-                                           FontSize="11"
-                                           TextColor="{DynamicResource AuraTextSecondary}" />
+                                    <Border Padding="5,2"
+                                            StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 5,5,5,5"
+                                            BackgroundColor="{DynamicResource AuraAccentDim}"
+                                            VerticalOptions="Center">
+                                        <Label Text="{Binding StateText}"
+                                               FontSize="10"
+                                               LetterSpacing="0.5"
+                                               FontAttributes="Bold"
+                                               TextColor="{DynamicResource AuraAccent}" />
+                                    </Border>
                                 </HorizontalStackLayout>
                                 <Label Text="{Binding Module.ShortDescription}"
                                        FontSize="12"
-                                       TextColor="{DynamicResource AuraTextSecondary}" />
-                                <Label Text="{Binding StateText}"
-                                       FontSize="11"
-                                       FontAttributes="Bold"
-                                       TextColor="{DynamicResource AuraAccent}" />
+                                       TextColor="{DynamicResource AuraTextSecondary}"
+                                       LineBreakMode="WordWrap" />
                             </VerticalStackLayout>
+
                             <Button Grid.Column="1"
                                     Text="{Binding ActionText}"
                                     IsVisible="{Binding ShowAction}"
                                     CommandParameter="{Binding Module}"
                                     Clicked="OnActionClicked"
                                     VerticalOptions="Center"
-                                    BackgroundColor="{DynamicResource AuraAccent}"
-                                    TextColor="White"
-                                    CornerRadius="8"
+                                    Style="{StaticResource BtnPrimary}"
                                     Padding="12,8"
                                     FontSize="12" />
                         </Grid>
-                    </Frame>
+                    </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
