@@ -1,13 +1,16 @@
 using AURA.Core.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AURA.Mobile;
 
 public partial class App : Application
 {
     private readonly AuraConfiguration _settings;
+    private readonly IServiceProvider _services;
 
-    public App(MainPage mainPage, AuraConfiguration settings)
+    public App(IServiceProvider services, AuraConfiguration settings)
     {
+        _services = services;
         _settings = settings;
         AuraLog.Info("App.ctor BEGIN");
         try
@@ -15,7 +18,7 @@ public partial class App : Application
             InitializeComponent();
             AuraLog.Info("App.ctor InitializeComponent OK");
             UserAppTheme = ApplyTheme(_settings?.Theme);
-            MainPage = mainPage;
+            MainPage = _services.GetRequiredService<MainPage>();
             AuraLog.Info("App.ctor MainPage set OK");
         }
         catch (Exception ex)
