@@ -138,6 +138,36 @@ namespace AURA.Tests
         }
 
         [Fact]
+        public async Task ShellExecutor_Stderr_IsCapturedSeparately()
+        {
+            var executor = new ShellExecutor();
+
+            var result = await executor.ExecuteAsync(new ExecutionRequest
+            {
+                Command = "printf 'aviso-no-stderr' 1>&2"
+            });
+
+            Assert.True(result.Success);
+            Assert.Contains("aviso-no-stderr", result.StandardError);
+            Assert.DoesNotContain("aviso-no-stderr", result.StandardOutput);
+        }
+
+        [Fact]
+        public async Task ShellExecutor_NonexistentCommand_ReportsFailure()
+        {
+            var executor = new ShellExecutor();
+
+            var result = await executor.ExecuteAsync(new ExecutionRequest
+            {
+                Command = "comando-inexistente-xyz-123"
+            });
+
+            Assert.False(result.Success);
+            Assert.NotEqual(0, result.ExitCode);
+            Assert.False(string.IsNullOrWhiteSpace(result.StandardError));
+        }
+
+        [Fact]
         public async Task GitExecutor_WithWorkingDirectory_RunsGitStatus()
         {
             var executor = new GitExecutor();
