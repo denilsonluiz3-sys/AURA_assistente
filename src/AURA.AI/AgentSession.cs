@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.Core.Logging;
+using AURA.Memory;
 
 namespace AURA.AI
 {
@@ -13,6 +14,8 @@ namespace AURA.AI
     /// ferramentas registradas, executa as chamadas de ferramenta solicitadas
     /// pelo modelo, anexa os resultados e repete até o modelo responder texto
     /// final (estilo opencode/agentes de terminal).
+    /// Quando um MemoryStore é fornecido, cada turno user/assistant é persistido
+    /// em ~/AURA/memory.json, garantindo continuidade de contexto entre sessões.
     /// </summary>
     public sealed class AgentSession
     {
@@ -23,14 +26,16 @@ namespace AURA.AI
         private readonly List<AgentTool> _tools;
         private readonly List<AgentMessage> _messages = new();
         private readonly string? _systemPrompt;
+        private readonly MemoryStore? _memory;
 
         public AgentSession(OpenRouterClient client, IEnumerable<AgentTool> tools,
-            string? systemPrompt = null, ILogger? logger = null)
+            string? systemPrompt = null, ILogger? logger = null, MemoryStore? memory = null)
         {
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _tools = (tools ?? Enumerable.Empty<AgentTool>()).ToList();
             _systemPrompt = systemPrompt;
             _logger = logger ?? new ConsoleLogger();
+            _memory = memory;
         }
 
         /// <summary>Emitido a cada ferramenta executada (para atualizar a UI).</summary>
@@ -47,6 +52,7 @@ namespace AURA.AI
             }
 
             _messages.Add(new AgentMessage { Role = "user", Content = userText });
+            _memory?.Append(MemoryEntry.Question(userText));
 
             int round = 0;
             while (round++ < MaxRounds)
@@ -91,6 +97,7 @@ namespace AURA.AI
 
                 string final = response.Content ?? "(resposta vazia)";
                 _messages.Add(new AgentMessage { Role = "assistant", Content = final });
+                _memory?.Append(MemoryEntry.Answer(final));
                 return final;
             }
 
