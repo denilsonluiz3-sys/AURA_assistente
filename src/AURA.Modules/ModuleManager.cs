@@ -24,14 +24,16 @@ namespace AURA.Modules
         private readonly HttpClient _http;
         private readonly EventBus _events;
 
-        public ModuleManager(ILogger logger, string packagesDir, string modulesPath, EventBus events = null)
+        public ModuleManager(ILogger logger, string packagesDir, string modulesPath, EventBus events = null, HttpMessageHandler httpHandler = null)
         {
             _logger = logger;
             _packagesDir = packagesDir;
             _modulesPath = modulesPath;
             _configLoader = new ConfigLoader(logger);
             _events = events;
-            _http = new HttpClient { Timeout = TimeSpan.FromSeconds(40) };
+            _http = httpHandler != null
+                ? new HttpClient(httpHandler) { Timeout = TimeSpan.FromSeconds(40) }
+                : new HttpClient { Timeout = TimeSpan.FromSeconds(40) };
         }
 
         public string GetPackagePath(string id) => Path.Combine(_packagesDir, id, "module.json");
