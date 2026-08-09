@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using AURA.AI;
 using AURA.Abstractions.Execution;
 using AURA.Agents;
@@ -10,6 +11,7 @@ using AURA.Core.Events;
 using AURA.Core.Launchers;
 using AURA.Core.Logging;
 using AURA.Core.Runtime;
+using AURA.Memory;
 using AURA.Modules;
 using AURA.Modules.Executors;
 using AURA.Network;
@@ -34,6 +36,8 @@ namespace AURA.CLI
         private static readonly PythonExecutor Python = new();
         private static readonly NodeExecutor Node = new();
         private static OpenRouterClient _aiClient;
+        private static readonly HttpClient SharedHttpClient = new HttpClient();
+        private static MemoryStore _memory;
 
         private static void Main(string[] args)
         {
@@ -61,6 +65,7 @@ namespace AURA.CLI
             _pluginWatcher = new PluginWatcher(_logger);
             _runner = new Runner(_pluginWatcher.Launchers.Concat(
                 new ILauncher[] { new PythonLauncher(), new JarLauncher(), new DllLauncher(), new NodeLauncher(), new GoLauncher() }));
+            _memory = new MemoryStore(_logger);
             _agentManager = new AgentManager(_logger);
             _agentManager.Events = bootstrap.Events;
 
@@ -383,7 +388,7 @@ namespace AURA.CLI
 
             try
             {
-                string answer = client.ChatAsync(question).GetAwaiter().GetResult();
+                string answer = client.ChatAsync(question, SharedHttpClient).GetAwaiter().GetResult();
                 Console.WriteLine();
                 Console.WriteLine(answer);
             }
@@ -423,7 +428,7 @@ namespace AURA.CLI
                 "workspace e rodar comandos de shell para concluir a tarefa. " +
                 "Sempre responda em português. Workspace: " + workspace;
 
-            var session = new AgentSession(client, tools, systemPrompt);
+            var session = new AgentSession(client, tools, systemPrompt, _logger, _memory);
             session.Step += step =>
             {
                 Console.WriteLine();
@@ -439,7 +444,7 @@ namespace AURA.CLI
 
             try
             {
-                string answer = session.RunAsync(instruction).GetAwaiter().GetResult();
+                string answer = session.RunAsync(instruction, SharedHttpClient).GetAwaiter().GetResult();
                 Console.WriteLine();
                 Console.WriteLine("=== RESPOSTA DO AGENTE ===");
                 Console.WriteLine(answer);
