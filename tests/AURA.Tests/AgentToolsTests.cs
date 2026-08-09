@@ -1,8 +1,14 @@
 using System;
 using System.IO;
+using System.Net;
+using System.Net.Http;
+using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using AURA.AI;
+using AURA.Core.Logging;
+using AURA.Memory;
 using Xunit;
 
 namespace AURA.Tests;
@@ -153,5 +159,85 @@ public class AgentToolsTests
         {
             Directory.Delete(root, recursive: true);
         }
+    }
+}
+
+public class AgentSessionMemoryTests
+{
+    private sealed class FakeLogger : ILogger
+    {
+        public void Info(string m) { }
+        public void Warning(string m) { }
+        public void Error(string m) { }
+    }
+
+    private sealed class FakeHandler : HttpMessageHandler
+    {
+        private readonly string _reply;
+        public FakeHandler(string reply) => _reply = reply;
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage _, CancellationToken __)
+        {
+            string body = JsonSerializer.Serialize(new
+            {
+                choices = new[]
+                {
+                    new { message = new { role = "assistant", content = _reply } }
+                }
+            });
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json")
+            });
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_PersistsTurnInMemoryStore()
+    {
+        string memPath = Path.Combine(Path.GetTempPath(),
+            "aura-mem-test-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var memory = new MemoryStore(new FakeLogger(), memPath);
+            var client = new OpenRouterClient(
+                new OpenRouterOptions { ApiKey = "sk-test", Model = "test/model" },
+                new FakeLogger());
+
+            var session = new AgentSession(client, Array.Empty<AgentTool>(),
+                systemPrompt: null, logger: new FakeLogger(), memory: memory);
+
+            string httpReply = "Olá, sou o agente!";
+            using var http = new HttpClient(new FakeHandler(httpReply));
+            string result = await session.RunAsync("Oi agente", http);
+
+            Assert.Equal(httpReply, result);
+
+            IReadOnlyList<MemoryEntry> entries = memory.Read();
+            Assert.Equal(2, entries.Count);
+            Assert.Equal("user",      entries[0].Role);
+            Assert.Equal("Oi agente", entries[0].Text);
+            Assert.Equal("assistant", entries[1].Role);
+            Assert.Equal(httpReply,   entries[1].Text);
+        }
+        finally
+        {
+            if (File.Exists(memPath)) File.Delete(memPath);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_WithoutMemoryStore_DoesNotThrow()
+    {
+        var client = new OpenRouterClient(
+            new OpenRouterOptions { ApiKey = "sk-test", Model = "test/model" },
+            new FakeLogger());
+
+        var session = new AgentSession(client, Array.Empty<AgentTool>());
+
+        using var http = new HttpClient(new FakeHandler("resposta ok"));
+        string result = await session.RunAsync("pergunta", http);
+        Assert.Equal("resposta ok", result);
     }
 }
