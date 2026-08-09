@@ -24,6 +24,7 @@ public partial class AgentPage : ContentPage
     {
         base.OnAppearing();
         RuntimeConfig.Apply(_client);
+        AiConfig.Load(_client);
 
         string workspace = AgentWorkspace.EnsureCreated();
         string activeRoot = AgentWorkspace.ActiveRoot;
@@ -155,6 +156,15 @@ public partial class AgentPage : ContentPage
         string resultPreview = Shorten(step.Result, 140);
         AppendBubble("◆ " + step.ToolName + " " + argsPreview + "\n" + resultPreview,
             user: false, isTool: true);
+    }
+
+    private void OnToggleConfigClicked(object sender, EventArgs e)
+    {
+        ConfigPanel.IsVisible = !ConfigPanel.IsVisible;
+        if (ConfigPanel.IsVisible)
+        {
+            AiConfig.Load(_client);
+        }
     }
 
     private async void OnSpeakTestClicked(object sender, EventArgs e)

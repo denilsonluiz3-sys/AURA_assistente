@@ -40,14 +40,19 @@ namespace AURA.AI
                     KeyHint = "sk-or-...",
                     Models = new List<ProviderModel>
                     {
-                        new() { Id = "qwen/qwen-plus", Label = "Qwen Plus", Category = "Razoável", IsFree = false },
-                        new() { Id = "qwen/qwen3.7-plus", Label = "Qwen 3.7 Plus", Category = "Flagship", IsFree = false },
-                        new() { Id = "qwen/qwen3.5-plus-20260420", Label = "Qwen 3.5 Plus", Category = "Flagship", IsFree = false },
                         new() { Id = "openrouter/free", Label = "Auto (qualquer grátis)", Category = "Grátis", IsFree = true },
+                        new() { Id = "openai/gpt-oss-120b", Label = "GPT-OSS 120B", Category = "Flagship", IsFree = false },
                         new() { Id = "openai/gpt-oss-20b:free", Label = "GPT-OSS 20B", Category = "Grátis", IsFree = true },
-                        new() { Id = "google/gemma-4-26b-a4b-it:free", Label = "Gemma 4 26B", Category = "Grátis", IsFree = true },
+                        new() { Id = "nvidia/nemotron-3-ultra-550b-a55b:free", Label = "Nemotron 3 Ultra", Category = "Grátis", IsFree = true },
+                        new() { Id = "nvidia/nemotron-3-super-120b-a12b:free", Label = "Nemotron 3 Super", Category = "Grátis", IsFree = true },
                         new() { Id = "nvidia/nemotron-3-nano-30b-a3b:free", Label = "Nemotron Nano 30B", Category = "Grátis", IsFree = true },
+                        new() { Id = "nvidia/nemotron-nano-9b-v2:free", Label = "Nemotron Nano 9B v2", Category = "Grátis", IsFree = true },
+                        new() { Id = "google/gemma-4-31b-it:free", Label = "Gemma 4 31B", Category = "Grátis", IsFree = true },
+                        new() { Id = "google/gemma-4-26b-a4b-it:free", Label = "Gemma 4 26B", Category = "Grátis", IsFree = true },
                         new() { Id = "poolside/laguna-s-2.1:free", Label = "Laguna S 2.1", Category = "Grátis", IsFree = true },
+                        new() { Id = "poolside/laguna-xs-2.1:free", Label = "Laguna XS 2.1", Category = "Grátis", IsFree = true },
+                        new() { Id = "inclusionai/ling-3.0-flash:free", Label = "Ling 3.0 Flash", Category = "Grátis", IsFree = true },
+                        new() { Id = "cohere/north-mini-code:free", Label = "North Mini Code", Category = "Grátis", IsFree = true },
                     }
                 },
                 new ProviderInfo
@@ -58,10 +63,9 @@ namespace AURA.AI
                     KeyHint = "gsk_...",
                     Models = new List<ProviderModel>
                     {
-                        new() { Id = "llama-3.3-70b-versatile", Label = "Llama 3.3 70B", Category = "Grátis", IsFree = true },
-                        new() { Id = "llama-3.1-8b-instant", Label = "Llama 3.1 8B", Category = "Grátis", IsFree = true },
-                        new() { Id = "llama-3.2-3b-preview", Label = "Llama 3.2 3B", Category = "Grátis", IsFree = true },
-                        new() { Id = "qwen-2.5-32b", Label = "Qwen 2.5 32B", Category = "Grátis", IsFree = true },
+                        new() { Id = "openai/gpt-oss-120b", Label = "GPT-OSS 120B", Category = "Grátis", IsFree = true },
+                        new() { Id = "openai/gpt-oss-20b", Label = "GPT-OSS 20B", Category = "Grátis", IsFree = true },
+                        new() { Id = "qwen/qwen3.6-27b", Label = "Qwen 3.6 27B", Category = "Grátis", IsFree = true },
                     }
                 },
                 new ProviderInfo
@@ -72,8 +76,8 @@ namespace AURA.AI
                     KeyHint = "csk-...",
                     Models = new List<ProviderModel>
                     {
-                        new() { Id = "llama-3.3-70b", Label = "Llama 3.3 70B", Category = "Grátis", IsFree = true },
-                        new() { Id = "llama-3.1-8b", Label = "Llama 3.1 8B", Category = "Grátis", IsFree = true },
+                        new() { Id = "gpt-oss-120b", Label = "GPT-OSS 120B", Category = "Grátis", IsFree = true },
+                        new() { Id = "gemma-4-31b", Label = "Gemma 4 31B", Category = "Grátis", IsFree = true },
                     }
                 },
                 new ProviderInfo
@@ -84,8 +88,9 @@ namespace AURA.AI
                     KeyHint = "AIza...",
                     Models = new List<ProviderModel>
                     {
-                        new() { Id = "gemini-2.5-flash", Label = "Gemini 2.5 Flash", Category = "Grátis", IsFree = true },
-                        new() { Id = "gemini-2.5-pro", Label = "Gemini 2.5 Pro", Category = "Pago", IsFree = false },
+                        new() { Id = "gemini-3.6-flash", Label = "Gemini 3.6 Flash", Category = "Grátis", IsFree = true },
+                        new() { Id = "gemini-3-flash-preview", Label = "Gemini 3 Flash", Category = "Grátis", IsFree = true },
+                        new() { Id = "gemini-3.1-pro-preview", Label = "Gemini 3.1 Pro", Category = "Pago", IsFree = false },
                     }
                 },
                 new ProviderInfo

@@ -96,7 +96,7 @@
                             <Button Grid.Column="1"
                                     Text="{Binding ActionText}"
                                     IsVisible="{Binding ShowAction}"
-                                    CommandParameter="{Binding Module}"
+                                    CommandParameter="{Binding .}"
                                     Clicked="OnActionClicked"
                                     VerticalOptions="Center"
                                     Style="{StaticResource BtnPrimary}"

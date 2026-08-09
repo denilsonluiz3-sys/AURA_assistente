@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:AURA.Mobile.Controls"
              x:Class="AURA.Mobile.Pages.ChatPage"
              Title="Assistente"
              BackgroundColor="{DynamicResource AuraBackground}">
@@ -52,34 +53,8 @@
                 StrokeShape="RoundRectangle 0,0,0,0">
             <VerticalStackLayout Spacing="10">
 
-                <!-- Provedor + Modelo lado a lado -->
-                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                    <VerticalStackLayout Spacing="3">
-                        <Label Text="PROVEDOR"
-                               FontSize="10"
-                               TextColor="{DynamicResource AuraTextMuted}" />
-                        <Picker x:Name="ProviderPicker"
-                                Title="Provedor"
-                                SelectedIndexChanged="OnProviderChanged" />
-                    </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Column="1" Spacing="3">
-                        <Label Text="MODELO"
-                               FontSize="10"
-                               TextColor="{DynamicResource AuraTextMuted}" />
-                        <Picker x:Name="ModelPicker" Title="Modelo" />
-                    </VerticalStackLayout>
-                </Grid>
-
-                <!-- Chave de API -->
-                <VerticalStackLayout Spacing="3">
-                    <Label x:Name="ApiKeyLabel"
-                           Text="CHAVE DE API"
-                           FontSize="10"
-                           TextColor="{DynamicResource AuraTextMuted}" />
-                    <Entry x:Name="ApiKeyEntry"
-                           Placeholder="sk-or-… (deixe vazio se não precisar)"
-                           IsPassword="True" />
-                </VerticalStackLayout>
+                <!-- Provedor + Modelo + Chave (compartilhado com o Agente) -->
+                <controls:AiConfigView x:Name="AiConfig" />
 
                 <!-- Editor de pergunta + envio -->
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
