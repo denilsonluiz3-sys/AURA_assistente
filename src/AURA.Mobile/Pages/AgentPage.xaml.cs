@@ -1,4 +1,5 @@
 using AURA.AI;
+using AURA.Memory;
 using AURA.Mobile.Diagnostics;
 
 namespace AURA.Mobile.Pages;
@@ -6,12 +7,14 @@ namespace AURA.Mobile.Pages;
 public partial class AgentPage : ContentPage
 {
     private readonly OpenRouterClient _client;
+    private readonly MemoryStore _memory;
     private AgentSession? _session;
 
-    public AgentPage(OpenRouterClient client)
+    public AgentPage(OpenRouterClient client, MemoryStore memory)
     {
         InitializeComponent();
         _client = client;
+        _memory = memory;
     }
 
     protected override void OnAppearing()
@@ -57,7 +60,7 @@ public partial class AgentPage : ContentPage
             "Responda em português, de forma curta e objetiva. " +
             "Caminhos são sempre relativos ao workspace.";
 
-        _session = new AgentSession(_client, tools, systemPrompt);
+        _session = new AgentSession(_client, tools, systemPrompt, memory: _memory);
         _session.Step += OnAgentStep;
 
         AppendBubble(
@@ -152,21 +155,35 @@ public partial class AgentPage : ContentPage
 
     private void AppendBubble(string text, bool user, bool isTool = false, bool isError = false)
     {
+        // Cores alinhadas à nova paleta de App.xaml
         Color background = user
-            ? Color.FromArgb("#2c3a63")
+            ? Color.FromArgb("#1e2d54")   // AuraUserBubble
             : isError
-                ? Color.FromArgb("#4a2326")
+                ? Color.FromArgb("#2a0f12")
                 : isTool
-                    ? Color.FromArgb("#22222b")
-                    : Color.FromArgb("#1b1b22");
+                    ? Color.FromArgb("#0f1420")   // AuraToolBubble
+                    : Color.FromArgb("#13131d");  // AuraAgentBubble
+
+        Color stroke = user
+            ? Color.FromArgb("#2a3a6a")   // AuraBorderAccent
+            : isError
+                ? Color.FromArgb("#5a1f24")
+                : Color.FromArgb("#242438");  // AuraBorder
+
         LayoutOptions alignment = user ? LayoutOptions.End : LayoutOptions.Start;
-        Color textColor = isTool
-            ? Color.FromArgb("#9a9aa5")
-            : Color.FromArgb("#f2f2f5");
+
+        Color textColor = isError
+            ? Color.FromArgb("#e05560")
+            : isTool
+                ? Color.FromArgb("#7a7a90")   // AuraTextSecondary
+                : Color.FromArgb("#e8e8f0");  // AuraTextPrimary
+
+        // Prefixo de ícone para tool steps
+        string display = isTool ? text : text;
 
         var label = new Label
         {
-            Text = text,
+            Text = display,
             TextColor = textColor,
             FontSize = isTool ? 12 : 14,
             LineBreakMode = LineBreakMode.WordWrap
@@ -175,10 +192,11 @@ public partial class AgentPage : ContentPage
         var border = new Border
         {
             BackgroundColor = background,
-            StrokeThickness = 0,
-            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 12 },
-            Padding = new Thickness(10, 7),
-            MaximumWidthRequest = 360,
+            Stroke = stroke,
+            StrokeThickness = 1,
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 14 },
+            Padding = new Thickness(12, 8),
+            MaximumWidthRequest = 340,
             HorizontalOptions = alignment,
             Content = label
         };
@@ -186,11 +204,8 @@ public partial class AgentPage : ContentPage
         MainThread.BeginInvokeOnMainThread(() =>
         {
             ConversationContainer.Add(border);
-
             Dispatcher.Dispatch(() =>
-            {
-                ConversationScroll.ScrollToAsync(0, ConversationContainer.Height, true);
-            });
+                ConversationScroll.ScrollToAsync(0, ConversationContainer.Height, true));
         });
     }
 

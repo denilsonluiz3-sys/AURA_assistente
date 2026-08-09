@@ -47,8 +47,8 @@ namespace AURA.Mobile
                 ("cells", "Apps", "Rodar programa", run)
             };
 
-            BarBackgroundColor = Color.FromArgb("#101014");
-            BarTextColor = Color.FromArgb("#f2f2f5");
+            BarBackgroundColor = Color.FromArgb("#0c0c12");
+            BarTextColor = Color.FromArgb("#e8e8f0");
 
             AuraLog.Info("MainPage.ctor OK");
         }
