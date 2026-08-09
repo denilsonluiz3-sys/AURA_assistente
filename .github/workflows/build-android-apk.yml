@@ -65,24 +65,35 @@ jobs:
             echo "::warning::Secret AURA_KEYSTORE_B64 ausente; APK será assinado com keystore de debug (instalação por cima falhará)."
           fi
 
-      - name: Build APK (Release, assinado com keystore fixa)
+      - name: Build APK (Release)
         run: |
           SIGN_ARGS=""
           if [ "$KEYSTORE_PRESENT" = "1" ]; then
-            SIGN_ARGS="-p:AndroidSigningKeyStore=keystore/aura-release.jks -p:AndroidSigningKeyAlias=${{ secrets.AURA_KEYSTORE_ALIAS }} -p:AndroidSigningKeyPass=${{ secrets.AURA_KEYSTORE_PASS }} -p:AndroidSigningStorePass=${{ secrets.AURA_KEYSTORE_PASS }} -p:AndroidUseDebugSigning=false"
+            SIGN_ARGS="-p:AndroidSigningKeyStore=keystore/aura-release.jks \
+              -p:AndroidSigningKeyAlias=${{ secrets.AURA_KEYSTORE_ALIAS }} \
+              -p:AndroidSigningKeyPass=${{ secrets.AURA_KEYSTORE_PASS }} \
+              -p:AndroidSigningStorePass=${{ secrets.AURA_KEYSTORE_PASS }} \
+              -p:AndroidUseDebugSigning=false"
           fi
-          dotnet build src/AURA.Mobile/AURA.Mobile.csproj -c Release --no-restore -p:AndroidPackageFormats=apk $SIGN_ARGS
+          dotnet build src/AURA.Mobile/AURA.Mobile.csproj \
+            -c Release --no-restore \
+            -p:AndroidPackageFormats=apk \
+            $SIGN_ARGS
 
-      - name: Upload APK artifact (apenas o assinado)
+      # APK assinado com keystore de release (quando secret presente)
+      - name: Upload APK release (assinado)
+        if: env.KEYSTORE_PRESENT == '1'
         uses: actions/upload-artifact@v4
         with:
-          name: aura-mobile-apk
+          name: aura-mobile-apk-release
           path: src/AURA.Mobile/bin/Release/net10.0-android/*-Signed.apk
-          if-no-files-found: error
+          if-no-files-found: warn
 
-      - name: Upload release bundle (AAB)
-        if: always()
+      # APK de debug (sempre disponível — útil para sideload de teste)
+      - name: Upload APK debug (sem keystore)
         uses: actions/upload-artifact@v4
         with:
-          name: aura-mobile-aab
-          path: src/AURA.Mobile/bin/Release/net10.0-android/*.aab
+          name: aura-mobile-apk-debug
+          path: |
+            src/AURA.Mobile/bin/Release/net10.0-android/*.apk
+          if-no-files-found: error
