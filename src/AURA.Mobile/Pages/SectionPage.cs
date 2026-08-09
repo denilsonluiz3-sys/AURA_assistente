@@ -57,7 +57,6 @@ public sealed class SectionPage : ContentPage
                 {
                     Text = SectionIcons.Get(title) + "  " + title.ToUpperInvariant(),
                     FontSize = 11,
-                    LetterSpacing = 2,
                     TextColor = AccentCol,
                     FontAttributes = FontAttributes.Bold,
                 },
