@@ -1,6 +1,7 @@
 using AURA.AI;
 using AURA.Memory;
 using AURA.Mobile.Diagnostics;
+using AURA.Mobile.Speech;
 
 namespace AURA.Mobile.Pages;
 
@@ -8,13 +9,15 @@ public partial class AgentPage : ContentPage
 {
     private readonly OpenRouterClient _client;
     private readonly MemoryStore _memory;
+    private readonly ISpeechService _speech;
     private AgentSession? _session;
 
-    public AgentPage(OpenRouterClient client, MemoryStore memory)
+    public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech)
     {
         InitializeComponent();
         _client = client;
         _memory = memory;
+        _speech = speech;
     }
 
     protected override void OnAppearing()
@@ -124,6 +127,7 @@ public partial class AgentPage : ContentPage
         {
             string answer = await _session!.RunAsync(text);
             AppendBubble(answer, user: false);
+            await SpeakAsync(answer);
 
             if (ProjectAccessService.IsLinked)
             {
@@ -151,6 +155,40 @@ public partial class AgentPage : ContentPage
         string resultPreview = Shorten(step.Result, 140);
         AppendBubble("◆ " + step.ToolName + " " + argsPreview + "\n" + resultPreview,
             user: false, isTool: true);
+    }
+
+    private async void OnSpeakTestClicked(object sender, EventArgs e)
+    {
+        SpeakTestButton.IsEnabled = false;
+        try
+        {
+            // Teste com frase fixa (sem IA): valida o pipeline Kokoro TTS.
+            await SpeakAsync("Olá! Eu sou a AURA, sua assistente pessoal.");
+        }
+        catch (Exception ex)
+        {
+            AppendBubble("Erro no TTS: " + ex.Message, user: false, isError: true);
+            AuraLog.Exception("AgentPage.OnSpeakTestClicked", ex);
+        }
+        finally
+        {
+            SpeakTestButton.IsEnabled = true;
+        }
+    }
+
+    private async Task SpeakAsync(string text)
+    {
+        try
+        {
+            await _speech.InitializeAsync();
+            await _speech.SpeakAsync(text);
+        }
+        catch (NotSupportedException)
+        {
+            // Fonemizador atual cobre apenas frases de teste; conversação
+            // real (espeak-ng no Android) é o próximo passo. Não quebra o chat.
+            AuraLog.Info("TTS: texto fora do fonemizador de teste, fala pulada.");
+        }
     }
 
     private void AppendBubble(string text, bool user, bool isTool = false, bool isError = false)

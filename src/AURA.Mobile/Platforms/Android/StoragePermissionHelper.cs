@@ -17,6 +17,18 @@ public static class StoragePermissionHelper
             if (await media.CheckStatusAsync() != PermissionStatus.Granted)
                 permissions.Add(media);
         }
+        else if (OperatingSystem.IsAndroidVersionAtLeast(30))
+        {
+            // Android 11+ (API 30+): WRITE_EXTERNAL_STORAGE é ignorada pelo sistema
+            // (armazenamento com escopo) e não está declarada no manifest para esta
+            // API — solicitar via Permissions.StorageWrite só gera o aviso
+            // "You need to declare... WRITE_EXTERNAL_STORAGE". Escrita fora do SAF
+            // não é concedida por permissão; o acesso a projetos é via SAF
+            // (ProjectAccessService). Leitura usa READ_EXTERNAL_STORAGE.
+            var read = new Permissions.StorageRead();
+            if (await read.CheckStatusAsync() != PermissionStatus.Granted)
+                permissions.Add(read);
+        }
         else
         {
             var read = new Permissions.StorageRead();
