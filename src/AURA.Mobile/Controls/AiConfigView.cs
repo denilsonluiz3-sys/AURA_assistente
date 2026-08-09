@@ -1,4 +1,5 @@
 using AURA.AI;
+using AURA.AI.Providers;
 using AURA.Mobile.Diagnostics;
 
 namespace AURA.Mobile.Controls;
@@ -8,9 +9,14 @@ namespace AURA.Mobile.Controls;
 /// entre Chat e Agente. Toda alteração persiste imediatamente em
 /// RuntimeConfig/Preferences e é aplicada no OpenRouterClient — sem depender
 /// do botão "Enviar" de uma aba específica.
+/// Também detecta o provedor pela chave: ao digitar, faz detecção
+/// determinística (formato, sem rede); o botão "Detectar/Testar" faz a
+/// validação real, autorizada explicitamente pelo usuário.
 /// </summary>
 public sealed class AiConfigView : ContentView
 {
+    private readonly IApiKeyProviderResolver _resolver = new ApiKeyProviderResolver();
+
     private readonly Picker _providerPicker = new() { Title = "Provedor" };
     private readonly Picker _modelPicker = new() { Title = "Modelo" };
     private readonly Label _apiKeyLabel = new()
@@ -24,6 +30,17 @@ public sealed class AiConfigView : ContentView
         Placeholder = "sk-or-… (deixe vazio se não precisar)",
         IsPassword = true,
     };
+    private readonly Button _detectButton = new()
+    {
+        Text = "Detectar/Testar provedor",
+        FontSize = 12,
+    };
+    private readonly Label _detectStatus = new()
+    {
+        FontSize = 11,
+        TextColor = Color.FromArgb("#a0a0b8"),
+        LineBreakMode = LineBreakMode.WordWrap,
+    };
 
     private OpenRouterClient? _client;
     private bool _applying;
@@ -32,6 +49,7 @@ public sealed class AiConfigView : ContentView
     {
         _providerPicker.SelectedIndexChanged += OnProviderChanged;
         _apiKeyEntry.TextChanged += OnKeyTextChanged;
+        _detectButton.Clicked += OnDetectClicked;
 
         var providerCol = new VerticalStackLayout
         {
@@ -71,6 +89,12 @@ public sealed class AiConfigView : ContentView
                     Children = { providerCol, modelCol },
                 },
                 apiKeyCol,
+                new HorizontalStackLayout
+                {
+                    Spacing = 10,
+                    Children = { _detectButton },
+                },
+                _detectStatus,
             },
         };
     }
@@ -140,6 +164,120 @@ public sealed class AiConfigView : ContentView
         }
 
         ApplyAndPersist();
+        TryAutoDetect();
+    }
+
+    /// <summary>
+    /// Detecção determinística pelo formato da chave (sem rede). Se um único
+    /// provedor for reconhecido de forma confiável, já seleciona e persiste.
+    /// </summary>
+    private void TryAutoDetect()
+    {
+        string key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(key) || _client == null)
+        {
+            return;
+        }
+
+        var detection = _resolver.Detect(new ProviderCredential(key));
+        if (!detection.IsConclusive || detection.Provider == null)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                _detectStatus.Text = string.Empty;
+            }
+
+            return;
+        }
+
+        ProviderInfo detected = (ProviderInfo)detection.Provider;
+        if (_providerPicker.SelectedItem is ProviderInfo current &&
+            string.Equals(current.Name, detected.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            _detectStatus.Text = "Provedor reconhecido: " + detected.Name + ".";
+            return;
+        }
+
+        _detectStatus.Text = "Provedor reconhecido pela chave: " + detected.Name + ".";
+        SelectProvider(detected.Name);
+    }
+
+    /// <summary>
+    /// Validação real da credencial (autorizada pelo clique do usuário).
+    /// Testa apenas provedores compatíveis quando o formato é ambíguo e
+    /// configura o client com provedor/base/modelo detectados.
+    /// </summary>
+    private async void OnDetectClicked(object sender, EventArgs e)
+    {
+        if (_client == null)
+        {
+            return;
+        }
+
+        string key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            _detectStatus.Text = "Digite uma chave para detectar o provedor.";
+            return;
+        }
+
+        string? preferred = (_providerPicker.SelectedItem as ProviderInfo)?.Name;
+        _detectButton.IsEnabled = false;
+        _detectStatus.Text = "Testando provedor…";
+
+        try
+        {
+            var credential = new ProviderCredential(key, allowProbe: true)
+            {
+                PreferredProviderName = preferred
+            };
+
+            ProviderDetectionResult result = await _resolver.ResolveAsync(credential);
+
+            if (result.Provider != null && result.IsConclusive)
+            {
+                _resolver.ApplyToClient(_client, result);
+                SelectProvider(result.Provider.Name);
+                _detectStatus.Text = result.Message;
+            }
+            else
+            {
+                _detectStatus.Text = result.Message;
+            }
+        }
+        catch (Exception ex)
+        {
+            _detectStatus.Text = "Falha ao testar provedor.";
+            AuraLog.Exception("AiConfigView.OnDetectClicked", ex);
+        }
+        finally
+        {
+            _detectButton.IsEnabled = true;
+        }
+    }
+
+    private void SelectProvider(string providerName)
+    {
+        _applying = true;
+        try
+        {
+            for (int i = 0; i < _providerPicker.ItemsSource.Count; i++)
+            {
+                if (_providerPicker.ItemsSource[i] is ProviderInfo p &&
+                    string.Equals(p.Name, providerName, StringComparison.OrdinalIgnoreCase))
+                {
+                    _providerPicker.SelectedIndex = i;
+                    break;
+                }
+            }
+
+            PopulateModels(null);
+            ApplyAndPersist();
+        }
+        finally
+        {
+            _applying = false;
+        }
     }
 
     private void PopulateModels(string? savedModel)

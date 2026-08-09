@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using AURA.AI.Providers;
 using AURA.Core.Logging;
 using AURA.Memory;
 
@@ -25,6 +26,18 @@ namespace AURA.AI
         public int MaxTokens { get; set; } = 1500;
         public int TimeoutSeconds { get; set; } = 90;
         public string? AppReference { get; set; }
+
+        /// <summary>Header de autenticação (padrão OpenAI: "Authorization").</summary>
+        public string AuthHeaderName { get; set; } = "Authorization";
+
+        /// <summary>Prefixo do esquema (padrão: "Bearer ").</summary>
+        public string AuthScheme { get; set; } = "Bearer ";
+
+        /// <summary>Formato de API do provedor.</summary>
+        public AiApiFormat ApiFormat { get; set; } = AiApiFormat.OpenAICompletions;
+
+        /// <summary>Header anthropic-version quando ApiFormat é AnthropicMessages.</summary>
+        public string AnthropicVersion { get; set; } = "2023-06-01";
     }
 
     /// <summary>
@@ -67,7 +80,7 @@ namespace AURA.AI
 
             string json = JsonSerializer.Serialize(payload);
             var request = new HttpRequestMessage(HttpMethod.Post, Options.BaseUrl);
-            request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + Options.ApiKey);
+            AddAuth(request);
             if (Options.AppReference != null)
             {
                 request.Headers.TryAddWithoutValidation("X-Title", "AURA");
@@ -84,7 +97,9 @@ namespace AURA.AI
             EnsureValidApiKey();
 
             HttpClient client = httpClient ?? ResolveClient();
-            HttpRequestMessage request = BuildRequest(question, systemPrompt);
+            HttpRequestMessage request = Options.ApiFormat == AiApiFormat.AnthropicMessages
+                ? BuildAnthropicRequest(question, systemPrompt)
+                : BuildRequest(question, systemPrompt);
 
             HttpResponseMessage response = await client.SendAsync(request, ct).ConfigureAwait(false);
             string body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -103,20 +118,9 @@ namespace AURA.AI
                         (int)response.StatusCode, response.StatusCode, detail));
             }
 
-            using var document = JsonDocument.Parse(body);
-            JsonElement root = document.RootElement;
-            if (root.TryGetProperty("choices", out JsonElement choices) &&
-                choices.GetArrayLength() > 0)
-            {
-                JsonElement first = choices[0];
-                if (first.TryGetProperty("message", out JsonElement message) &&
-                    message.TryGetProperty("content", out JsonElement content))
-                {
-                    return content.GetString() ?? string.Empty;
-                }
-            }
-
-            return body;
+            return Options.ApiFormat == AiApiFormat.AnthropicMessages
+                ? ParseAnthropicText(body)
+                : ParseOpenAIText(body);
         }
 
         /// <summary>
@@ -231,7 +235,7 @@ namespace AURA.AI
             string json = JsonSerializer.Serialize(payload);
             HttpClient client = httpClient ?? ResolveClient();
             var request = new HttpRequestMessage(HttpMethod.Post, Options.BaseUrl);
-            request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + Options.ApiKey);
+            AddAuth(request);
             if (Options.AppReference != null)
             {
                 request.Headers.TryAddWithoutValidation("X-Title", "AURA");
@@ -325,6 +329,87 @@ namespace AURA.AI
                     "Chave de API inválida (parece conter conteúdo de log). " +
                     "Toque em 'Restaurar padrão' na aba Correções e digite a chave manualmente na aba Assistente.");
             }
+        }
+
+        private void AddAuth(HttpRequestMessage request)
+        {
+            request.Headers.TryAddWithoutValidation(
+                Options.AuthHeaderName, Options.AuthScheme + Options.ApiKey);
+            if (Options.ApiFormat == AiApiFormat.AnthropicMessages)
+            {
+                request.Headers.TryAddWithoutValidation("anthropic-version", Options.AnthropicVersion);
+            }
+        }
+
+        private HttpRequestMessage BuildAnthropicRequest(string question, string? systemPrompt)
+        {
+            var payload = new JsonObject
+            {
+                ["model"] = Options.Model,
+                ["max_tokens"] = Options.MaxTokens
+            };
+
+            var messages = new JsonArray();
+            var user = new JsonObject { ["role"] = "user", ["content"] = question };
+            if (!string.IsNullOrWhiteSpace(systemPrompt))
+            {
+                payload["system"] = systemPrompt;
+            }
+
+            messages.Add(user);
+            payload["messages"] = messages;
+
+            var request = new HttpRequestMessage(HttpMethod.Post, Options.BaseUrl);
+            AddAuth(request);
+            request.Content = new StringContent(
+                JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+            return request;
+        }
+
+        private static string ParseOpenAIText(string body)
+        {
+            using var document = JsonDocument.Parse(body);
+            JsonElement root = document.RootElement;
+            if (root.TryGetProperty("choices", out JsonElement choices) &&
+                choices.GetArrayLength() > 0)
+            {
+                JsonElement first = choices[0];
+                if (first.TryGetProperty("message", out JsonElement message) &&
+                    message.TryGetProperty("content", out JsonElement content) &&
+                    content.ValueKind == JsonValueKind.String)
+                {
+                    return content.GetString() ?? string.Empty;
+                }
+            }
+
+            return body;
+        }
+
+        private static string ParseAnthropicText(string body)
+        {
+            using var document = JsonDocument.Parse(body);
+            JsonElement root = document.RootElement;
+            if (root.TryGetProperty("content", out JsonElement content) &&
+                content.ValueKind == JsonValueKind.Array)
+            {
+                var sb = new StringBuilder();
+                foreach (JsonElement block in content.EnumerateArray())
+                {
+                    if (block.TryGetProperty("type", out JsonElement type) &&
+                        type.GetString() == "text" &&
+                        block.TryGetProperty("text", out JsonElement text))
+                    {
+                        sb.Append(text.GetString());
+                    }
+                }
+
+                if (sb.Length > 0)
+                {
+                    return sb.ToString();
+                }
+            }
+
+            return body;
         }
 
         private HttpClient ResolveClient()
