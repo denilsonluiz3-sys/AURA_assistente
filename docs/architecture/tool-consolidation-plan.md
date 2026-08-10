@@ -1,6 +1,7 @@
 # Tool Consolidation Plan — AURA
 
-**Status:** Decision document (audit approved)  
+**Status:** Implemented (Step 1)  
+**Data de implementação:** 2026-08  
 **Scope:** Eliminate process-execution duplication between the cognitive layer (`AgentTool` / `ShellAgentTool`) and the operational layer (`IToolExecutor` / `ShellExecutor` / `ProcessExecutorBase`) without breaking existing behaviour.  
 **Primary question answered:**
 
@@ -8,9 +9,9 @@
 
 ---
 
-## 1. Current State (verified from code)
+## 1. Current State (verified from code on `main`)
 
-### Cognitive path (LLM-facing)
+### Cognitive path (LLM-facing) — **já consolidado**
 
 ```
 AgentSession
@@ -19,7 +20,10 @@ AgentTool (abstract)
   ├── Definition : AgentToolDefinition
   └── ExecuteAsync(string argumentsJson) → string
         ↓
-ShellAgentTool          (process created here)
+ShellAgentTool          ← adapter (não cria Process)
+  ├── IToolExecutor (injetado)
+  ├── ExecutionRequest
+  └── FormatForLlm(ExecutionResult) → string
 ListDirTool / ReadFileTool / WriteFileTool / EditFileTool
   └── WorkspaceAgentTool (path sandbox)
 ```
@@ -33,36 +37,32 @@ IToolExecutor
   └── ExecuteAsync(ExecutionRequest) → ExecutionResult
         ↓
 ShellExecutor / GitExecutor / PythonExecutor / NodeExecutor
-  └── ProcessExecutorBase.RunAsync(...)   (process created here)
+  └── ProcessExecutorBase.RunAsync(...)   ← único dono da criação de processo
 ```
 
-### Side-by-side comparison (16 points)
+### Side-by-side comparison (estado **antes** da consolidação — histórico)
 
-| # | Aspect | ShellAgentTool (cognitive) | ShellExecutor + ProcessExecutorBase (operational) | Verdict |
-|---|--------|----------------------------|---------------------------------------------------|---------|
-| 1 | Process creation | `new Process { StartInfo = psi }` directly | `ProcessExecutorBase.RunAsync` → same | **Duplicated** |
-| 2 | Arguments / command | Single string `command` passed to `sh -c "..."` with manual quote escaping | `request.Command` + `request.Arguments`; for shell joins into one string then `sh -c` | Similar intent; executor is cleaner |
-| 3 | Working directory | Fixed at construction (`_workspaceRoot`) | Per-request (`request.WorkingDirectory`) | Executor more flexible |
-| 4 | Environment variables | Not supported | `request.EnvironmentVariables` applied to `psi.Environment` | **Only executor supports it** |
-| 5 | Timeout | Hard-coded 30 s via linked CTS | `request.Timeout` (nullable); tested | Executor more flexible |
-| 6 | Cancellation token | Honoured (linked with timeout) | Honoured (linked with timeout) | Equivalent |
-| 7 | stdout | Captured via `OutputDataReceived` → StringBuilder | Same pattern | Equivalent |
-| 8 | stderr | Captured; prefixed with `"stderr: "` in final string | Captured separately in `ExecutionResult.StandardError` | Executor preserves structure |
-| 9 | Exit code | Embedded as text prefix `"exit=N\n..."` | `ExecutionResult.ExitCode` + `Success` | Executor structured |
-| 10 | Exception handling | Catch → return `"ERRO: ..."` string; kill on cancel | Catch → `ExecutionResult.Failed(...)` or timeout message; kill on cancel | Both safe; executor typed |
-| 11 | Output limits | Truncates at 30 000 chars | No truncation | Cognitive-specific (LLM context) |
-| 12 | Security (path) | N/A for shell (command is free-form) | N/A for shell | Path sandbox lives only in `WorkspaceAgentTool` |
-| 13 | Path / workspace | `_workspaceRoot` fixed; shell runs inside it | Caller chooses WorkingDirectory | Different models |
-| 14 | Logging | None inside tool; `AgentSession` logs tool name | None inside executor | Logging stays at session / caller |
-| 15 | Persistence | None; `AgentSession` may append to `MemoryStore` | None | Memory stays at session |
-| 16 | Existing tests | `AgentToolsTests` (file tools + path traversal + definitions). **No direct test of ShellAgentTool process behaviour.** | `ExecutorsTests` (availability, stdout, stderr, env, timeout, non-zero exit, working dir) | Operational path better tested for process semantics |
+| # | Aspect | ShellAgentTool (antes) | ShellExecutor + ProcessExecutorBase | Verdict (antes) |
+|---|--------|------------------------|-------------------------------------|-----------------|
+| 1 | Process creation | `new Process` direto | `ProcessExecutorBase.RunAsync` | **Duplicated** |
+| 2 | Arguments / command | string `command` → `sh -c` | `request.Command` + Arguments | Similar |
+| 3 | Working directory | Fixo (`_workspaceRoot`) | Per-request | Executor mais flexível |
+| 4 | Environment variables | Não suportado | `request.EnvironmentVariables` | Só executor |
+| 5 | Timeout | Hard-coded 30 s | `request.Timeout` | Executor mais flexível |
+| 6 | Cancellation token | Honourado | Honourado | Equivalente |
+| 7–9 | stdout / stderr / exit | Texto formatado | Estruturado em `ExecutionResult` | Executor tipado |
+| 10 | Exception handling | String `ERRO:` | `ExecutionResult.Failed` | Ambos seguros |
+| 11 | Output limits | Truncate 30k | Sem truncamento | Específico cognitivo |
+| 12–15 | Security / path / log / memory | Camada cognitiva | Camada operacional | Separação correta |
+| 16 | Testes | Fracos no path de processo | `ExecutorsTests` cobrem processo | — |
 
-**Key verified facts**
+**Estado atual (após Step 1):**
 
-- Both implementations create a `Process`, redirect stdout/stderr, support cancellation and kill on timeout.
-- `ShellAgentTool` hard-codes timeout, workspace root, output truncation and returns a single string suitable for the LLM.
-- `ProcessExecutorBase` is the richer, more testable process engine and already serves four executors.
-- There is **no** shared adapter today. The two paths are parallel.
+- `ShellAgentTool` **não** cria `Process`. Delega a `IToolExecutor`.
+- `ProcessExecutorBase` é o **único** lugar que cria processo.
+- Testes de adapter existem: `ShellAgentTool_RunsCommand_*`, empty command, unavailable executor, `FormatForLlm`.
+- `AgentPage` injeta `ShellExecutor` no construtor de `ShellAgentTool`.
+- `AURA.AI` referencia `AURA.Abstractions` (não `AURA.Modules`).
 
 ---
 
@@ -84,13 +84,13 @@ ShellExecutor / GitExecutor / PythonExecutor / NodeExecutor
 **Answer to the core question**
 
 > The component that owns the real responsibility of executing a process is **`IToolExecutor` (via `ProcessExecutorBase`)**.  
-> `AgentTool` (specifically process-oriented tools such as `ShellAgentTool`) must become a **thin cognitive adapter**: parse/validate arguments, optionally enforce policy, call `IToolExecutor.ExecuteAsync`, then adapt `ExecutionResult` into the `string` that `AgentSession` already expects.
+> `AgentTool` (specifically process-oriented tools such as `ShellAgentTool`) is a **thin cognitive adapter**: parse/validate arguments, optionally enforce policy, call `IToolExecutor.ExecuteAsync`, then adapt `ExecutionResult` into the `string` that `AgentSession` already expects.
 
 File tools (`ListDirTool`, `ReadFileTool`, …) do **not** go through `IToolExecutor`; they stay pure workspace operations. Only tools that launch external processes should reuse the executor layer.
 
 ---
 
-## 3. Target Flow
+## 3. Target Flow (já em produção no `main`)
 
 ```
 LLM
@@ -114,35 +114,35 @@ AgentSession
 LLM
 ```
 
-### Important constraint (incremental migration)
+### Constraint mantida (migração incremental)
 
-**Do not** change the signature of `AgentTool.ExecuteAsync` from `Task<string>` to `Task<ExecutionResult>` in the first step.
+**Não** mudar a assinatura de `AgentTool.ExecuteAsync` de `Task<string>` para `Task<ExecutionResult>` no Step 1.
 
-Reasons (verified):
+Razões (verificadas):
 
-- `AgentSession.ExecuteToolAsync` and the message protocol expect a string that becomes `AgentMessage.Content` for the `tool` role.
-- All existing call sites and the UI event `AgentStep.Result` are strings.
-- Changing the abstract signature is a breaking change across the cognitive layer.
+- `AgentSession.ExecuteToolAsync` e o protocolo de mensagens esperam string (`AgentMessage.Content` role `tool`).
+- Call sites e UI (`AgentStep.Result`) são strings.
+- Mudar a assinatura abstrata é breaking change na camada cognitiva.
 
-Preferred approach: keep `Task<string>` on `AgentTool` and perform the adaptation **inside** the concrete process tools.
+A adaptação continua **dentro** das tools de processo concretas (`FormatForLlm`).
 
 ---
 
-## 4. Concrete Consolidation Design
+## 4. Concrete Design (implementado)
 
-### 4.1 ShellAgentTool becomes an adapter
+### 4.1 ShellAgentTool como adapter
 
-Current behaviour that must be preserved (compatibility):
+Comportamento preservado:
 
 - Name: `run_shell`
-- Required parameter: `command` (string)
-- Working directory = workspace root supplied at construction
-- Timeout ≈ 30 s (current hard-coded value)
-- Output truncated at ~30 000 characters
-- Result string shape roughly: `exit=N\n<stdout>\nstderr: <stderr>` (or equivalent readable form)
-- On missing shell / empty command / cancel → error string starting with `ERRO`
+- Required: `command` (string)
+- Working directory = workspace root no construtor
+- Timeout ≈ 30 s
+- Truncamento ~30 000 caracteres
+- Formato: `exit=N\n<stdout>\nstderr: <stderr>`
+- Erros → string começando com `ERRO`
 
-New internal behaviour:
+Implementação atual:
 
 ```text
 ShellAgentTool
@@ -155,87 +155,64 @@ ShellAgentTool
   │     Timeout = 30s
   │   }
   ├── result = await executor.ExecuteAsync(request, ct)
-  └── return FormatForLlm(result)   // truncation + exit prefix + stderr label
+  └── return FormatForLlm(result)
 ```
 
-`FormatForLlm` is the only place that keeps cognitive-specific presentation rules.
-
-### 4.2 What stays unchanged
+### 4.2 O que permanece inalterado
 
 - `IToolExecutor`, `ExecutionRequest`, `ExecutionResult`, `ProcessExecutorBase`
-- All existing executors (`ShellExecutor`, `GitExecutor`, `PythonExecutor`, `NodeExecutor`)
-- `AgentSession` loop and message protocol
-- File tools and `WorkspaceAgentTool`
-- Public surface of `AgentTool.ExecuteAsync` → `string`
+- Executores existentes
+- Loop de `AgentSession` e protocolo de mensagens
+- File tools e `WorkspaceAgentTool`
+- Superfície pública `AgentTool.ExecuteAsync` → `string`
 
-### 4.3 Project reference decision
+### 4.3 Referências de projeto
 
-`AURA.AI` currently references only `AURA.Core` and `AURA.Memory`.
+- `AURA.AI` referencia `AURA.Abstractions` (para contratos).
+- **Não** referencia `AURA.Modules` (evita acoplamento cognitivo → executores concretos).
+- Composition root (`AgentPage`) injeta `ShellExecutor`.
 
-For Step 1:
+### 4.4 Follow-ups opcionais (ainda não feitos)
 
-- Add project reference **`AURA.Abstractions`** to `AURA.AI` (for `IToolExecutor`, `ExecutionRequest`, `ExecutionResult`).
-- Do **not** add `AURA.Modules` to `AURA.AI` (avoids coupling cognitive layer to concrete executors).
-- Composition root (`AgentPage` / `MauiProgram`) already has `ShellExecutor` in DI and injects it into `ShellAgentTool`.
-
-### 4.4 Optional follow-ups (not part of the first consolidation)
-
-| Item | When |
-|------|------|
-| `GitAgentTool` / `PythonAgentTool` wrappers | When the agent needs first-class tools instead of going through `run_shell` |
-| Shared `ProcessAgentToolBase` helper | If more than one process tool appears |
-| Soft introduction of structured results | Only after string path is stable and tested |
-| Central tool registry | Only if manual list construction becomes painful |
+| Item | Quando |
+|------|--------|
+| `GitAgentTool` / `PythonAgentTool` | Quando o LLM precisar de schema dedicado |
+| `ProcessAgentToolBase` helper | Se surgir mais de uma process tool |
+| `ToolResult` interno estruturado | Fase B (após string path estável) |
+| `ToolRegistry` central | PR #23 (Fase A) — em andamento |
 
 ---
 
-## 5. Migration Steps (incremental, reversible)
+## 5. Migration Steps
 
-### Step 1 — Adapter only (recommended first PR)
+### Step 1 — Adapter only — **DONE**
 
-1. Add `AURA.Abstractions` reference to `AURA.AI.csproj`.
-2. Change `ShellAgentTool` to accept `IToolExecutor` and delegate process execution.
-3. Implement `FormatForLlm(ExecutionResult)` preserving current string shape.
-4. Update `AgentPage` to pass `ShellExecutor` (from DI or `new ShellExecutor()`).
-5. Add unit tests for the adapter path.
+1. ✅ Referência `AURA.Abstractions` em `AURA.AI`
+2. ✅ `ShellAgentTool` aceita `IToolExecutor` e delega
+3. ✅ `FormatForLlm(ExecutionResult)`
+4. ✅ `AgentPage` passa `ShellExecutor`
+5. ✅ Testes de adapter em `AgentToolsTests`
 
-**Risk:** Low. Behaviour is intentionally preserved; only the process engine moves.
+### Step 2 — Align timeout / env (opcional, pendente)
 
-### Step 2 — Align timeout / env (optional)
+- Timeout configurável no schema
+- Forward de environment variables se a camada cognitiva precisar
 
-- Allow optional timeout override on `ShellAgentTool`.
-- Forward environment variables if the cognitive layer needs them.
+### Step 3 — Documentation — **em andamento**
 
-### Step 3 — Documentation
-
-- Update `docs/ferramentas.md` to state that process tools go through `IToolExecutor`.
-- Keep this file as the architectural decision record.
-
-### Explicit non-goals for the first change
-
-- No change to `AgentTool` abstract signature.
-- No new registry.
-- No new error type hierarchy for tools.
-- No refactor of file tools.
-- No large “tool framework” rewrite.
+- ✅ `docs/ferramentas.md` já descreve o adapter
+- ✅ Este arquivo atualizado para Status: Implemented
 
 ---
 
-## 6. Test Strategy
+## 6. Test Strategy (estado atual)
 
-| Layer | Existing coverage | Required for consolidation |
-|-------|-------------------|----------------------------|
-| Process engine | `ExecutorsTests` | Keep green |
-| File tools + path sandbox | `AgentToolsTests` | Keep green |
-| ShellAgentTool behaviour | Weak / absent for process outcomes | **Add** adapter-path tests |
-| AgentSession loop | Memory + reasoning tests | Keep green; string contract unchanged |
-
-Minimum new tests for Step 1:
-
-1. `run_shell` with a trivial command returns success-shaped string.
-2. Empty command → `ERRO`.
-3. Unavailable executor → `ERRO`.
-4. Truncation still applies when output is large (optional if limit injectable).
+| Layer | Coverage |
+|-------|----------|
+| Process engine | `ExecutorsTests` |
+| File tools + path sandbox | `AgentToolsTests` |
+| ShellAgentTool adapter | `RunsCommand`, empty, unavailable, `FormatForLlm` |
+| AgentSession loop | Memory + reasoning tests |
 
 ---
 
@@ -243,30 +220,30 @@ Minimum new tests for Step 1:
 
 **Canonical process owner:** `IToolExecutor` + `ProcessExecutorBase`.
 
-**Role of `AgentTool` (process tools):** cognitive adapter — schema, validation, policy, and presentation of `ExecutionResult` as the `string` that the existing agent loop already consumes.
+**Role of `AgentTool` (process tools):** cognitive adapter — schema, validation, policy, and presentation of `ExecutionResult` as the `string` that the existing agent loop consumes.
 
 **Role of file tools:** unchanged; they do not need `IToolExecutor`.
 
-**Migration style:** incremental. First change is internal to `ShellAgentTool` + composition root; public contracts stay stable.
+**Migration style:** incremental. Step 1 complete; public contracts stable.
 
-**Rejected alternatives**
+**Rejected alternatives** (ainda válidos)
 
 | Alternative | Why rejected |
 |-------------|--------------|
-| Make `AgentTool.ExecuteAsync` return `ExecutionResult` immediately | Breaks `AgentSession`, message protocol, UI events |
-| Delete `IToolExecutor` and keep only `ShellAgentTool` process code | Throws away the better-tested multi-executor engine |
-| Create a third “ToolRuntime” abstraction | Parallel architecture; violates reuse principles |
-| Big-bang rewrite of both layers | High risk, unnecessary for the verified gap |
+| `ExecuteAsync` → `ExecutionResult` imediatamente | Quebra `AgentSession`, protocolo, UI |
+| Deletar `IToolExecutor` e manter só path cognitivo | Joga fora o engine multi-executor testado |
+| Criar terceiro “ToolRuntime” | Arquitetura paralela; viola reuse |
+| Big-bang rewrite | Risco alto, desnecessário |
 
 ---
 
-## 8. Completion Criteria
+## 8. Completion Criteria — Step 1
 
-This plan is ready for implementation when:
+| Critério | Status |
+|----------|--------|
+| Responsibility split aceito e documentado | ✅ |
+| Step 1 (adapter) no `main` | ✅ |
+| `ExecutorsTests` + `AgentToolsTests` verdes | ✅ (código + testes presentes) |
+| Nenhum `Process` criado fora de `ProcessExecutorBase` para tools de processo | ✅ |
 
-1. The responsibility split above is accepted.
-2. Step 1 (adapter) is the only mandatory first change.
-3. Existing `ExecutorsTests` and `AgentToolsTests` remain the safety net.
-4. No new process-creation code is introduced outside `ProcessExecutorBase`.
-
-Once Step 1 is merged and green, process-execution duplication is eliminated while cognitive characteristics of `AgentTool` are preserved.
+Process-execution duplication eliminada. Características cognitivas de `AgentTool` preservadas.
