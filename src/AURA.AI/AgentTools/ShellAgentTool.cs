@@ -1,16 +1,16 @@
 using System;
-using System.Diagnostics;
-using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using AURA.Abstractions.Execution;
 
 namespace AURA.AI
 {
     /// <summary>
-    /// Executa comandos shell (sh -c) dentro do workspace. Usado para git,
-    /// dotnet, grep e qualquer utilitário disponível no dispositivo.
+    /// Adaptador cognitivo para execução de shell.
+    /// Schema e apresentação ao LLM ficam aqui; a criação real do processo
+    /// fica em <see cref="IToolExecutor"/> (ex.: ShellExecutor / ProcessExecutorBase).
     /// </summary>
     public sealed class ShellAgentTool : AgentTool
     {
@@ -18,12 +18,14 @@ namespace AURA.AI
         private const int MaxOutputChars = 30000;
 
         private readonly string _workspaceRoot;
-        private readonly string _shellPath;
+        private readonly IToolExecutor _executor;
 
-        public ShellAgentTool(string workspaceRoot)
+        /// <param name="workspaceRoot">Diretório de trabalho do shell (workspace do agente).</param>
+        /// <param name="executor">Executor de processo (tipicamente <c>ShellExecutor</c>). Obrigatório.</param>
+        public ShellAgentTool(string workspaceRoot, IToolExecutor executor)
         {
-            _workspaceRoot = workspaceRoot;
-            _shellPath = File.Exists("/system/bin/sh") ? "/system/bin/sh" : "/bin/sh";
+            _workspaceRoot = workspaceRoot ?? throw new ArgumentNullException(nameof(workspaceRoot));
+            _executor = executor ?? throw new ArgumentNullException(nameof(executor));
         }
 
         public override AgentToolDefinition Definition => new AgentToolDefinition
@@ -55,71 +57,68 @@ namespace AURA.AI
                 return "ERRO: comando vazio.";
             }
 
-            if (!File.Exists(_shellPath))
+            if (!_executor.IsAvailable())
             {
-                return "ERRO: shell não encontrado neste dispositivo (" + _shellPath + ").";
+                return "ERRO: shell não encontrado neste dispositivo.";
             }
 
-            var psi = new ProcessStartInfo
+            var request = new ExecutionRequest
             {
-                FileName = _shellPath,
-                Arguments = "-c \"" + command.Replace("\"", "\\\"") + "\"",
+                Command = command,
                 WorkingDirectory = _workspaceRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
+                Timeout = TimeSpan.FromSeconds(DefaultTimeoutSeconds)
             };
 
-            using var process = new Process { StartInfo = psi };
-            var stdout = new StringBuilder();
-            var stderr = new StringBuilder();
-            process.OutputDataReceived += (_, e) => { if (e.Data != null) stdout.AppendLine(e.Data); };
-            process.ErrorDataReceived += (_, e) => { if (e.Data != null) stderr.AppendLine(e.Data); };
+            ExecutionResult result = await _executor.ExecuteAsync(request, ct).ConfigureAwait(false);
+            return FormatForLlm(result);
+        }
 
-            try
+        /// <summary>
+        /// Converte <see cref="ExecutionResult"/> no formato de string esperado pelo
+        /// <see cref="AgentSession"/> e pelo protocolo de mensagens tool.
+        /// </summary>
+        internal static string FormatForLlm(ExecutionResult result)
+        {
+            if (result == null)
             {
-                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                cts.CancelAfter(TimeSpan.FromSeconds(DefaultTimeoutSeconds));
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-                await process.WaitForExitAsync(cts.Token);
+                return "ERRO: resultado de execução nulo.";
             }
-            catch (OperationCanceledException)
+
+            // Timeout / cancelamento do ProcessExecutorBase
+            if (!string.IsNullOrWhiteSpace(result.StandardError) &&
+                result.StandardError.IndexOf("[AURA] Execução cancelada", StringComparison.Ordinal) >= 0)
             {
-                try { process.Kill(entireProcessTree: true); } catch { /* já encerrado */ }
                 return "ERRO: comando cancelado (timeout de " + DefaultTimeoutSeconds + "s).";
             }
-            catch (Exception ex)
+
+            var sb = new StringBuilder();
+            sb.Append("exit=").Append(result.ExitCode).Append('\n');
+
+            if (!string.IsNullOrWhiteSpace(result.StandardOutput))
             {
-                return "ERRO ao iniciar comando: " + ex.Message;
+                sb.AppendLine(result.StandardOutput.TrimEnd());
             }
 
-            var result = new StringBuilder();
-            if (stdout.Length > 0)
+            if (!string.IsNullOrWhiteSpace(result.StandardError))
             {
-                result.AppendLine(stdout.ToString().TrimEnd());
+                sb.Append("stderr: ").AppendLine(result.StandardError.TrimEnd());
             }
 
-            if (stderr.Length > 0)
+            // Só "exit=N\n" sem saída útil
+            string header = "exit=" + result.ExitCode + "\n";
+            if (sb.Length <= header.Length)
             {
-                result.Append("stderr: ").AppendLine(stderr.ToString().TrimEnd());
+                sb.AppendLine("(sem saída)");
             }
 
-            if (result.Length == 0)
-            {
-                result.AppendLine("(sem saída)");
-            }
-
-            string output = result.ToString().TrimEnd();
+            string output = sb.ToString().TrimEnd();
             if (output.Length > MaxOutputChars)
             {
                 output = output.Substring(0, MaxOutputChars) +
-                         "\n... (saída truncada: " + result.Length + " chars)";
+                         "\n... (saída truncada: " + sb.Length + " chars)";
             }
 
-            return "exit=" + process.ExitCode + "\n" + output;
+            return output;
         }
     }
 }

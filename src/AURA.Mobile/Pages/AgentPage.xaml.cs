@@ -2,6 +2,7 @@ using AURA.AI;
 using AURA.Memory;
 using AURA.Mobile.Diagnostics;
 using AURA.Mobile.Speech;
+using AURA.Modules.Executors;
 
 namespace AURA.Mobile.Pages;
 
@@ -11,15 +12,17 @@ public partial class AgentPage : ContentPage
     private readonly MemoryStore _memory;
     private readonly ISpeechService _speech;
     private readonly VoiceAssistantService? _voice;
+    private readonly ShellExecutor _shellExecutor;
     private AgentSession? _session;
 
     public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
-        VoiceAssistantService? voice = null)
+        ShellExecutor shellExecutor, VoiceAssistantService? voice = null)
     {
         InitializeComponent();
         _client = client;
         _memory = memory;
         _speech = speech;
+        _shellExecutor = shellExecutor;
         _voice = voice;
     }
 
@@ -53,7 +56,7 @@ public partial class AgentPage : ContentPage
             new ReadFileTool(root),
             new WriteFileTool(root),
             new EditFileTool(root),
-            new ShellAgentTool(root)
+            new ShellAgentTool(root, _shellExecutor)
         };
 
         string systemPrompt =
@@ -270,7 +273,7 @@ public partial class AgentPage : ContentPage
             {
                 await Clipboard.Default.SetTextAsync(display);
                 string original = copyButton.Text;
-                copyButton.Text = "✓";
+                copyButton.Text = "\u2713";
                 await Task.Delay(1500);
                 copyButton.Text = original;
             };
@@ -306,6 +309,6 @@ public partial class AgentPage : ContentPage
             return oneLine;
         }
 
-        return oneLine.Substring(0, max) + "…";
+        return oneLine.Substring(0, max) + "\u2026";
     }
 }
