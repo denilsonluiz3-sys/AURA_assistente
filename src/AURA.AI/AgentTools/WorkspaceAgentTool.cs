@@ -12,7 +12,7 @@ namespace AURA.AI
     {
         protected WorkspaceAgentTool(string workspaceRoot)
         {
-            WorkspaceRoot = Path.GetFullPath(workspaceRoot);
+            WorkspaceRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(workspaceRoot));
         }
 
         public string WorkspaceRoot { get; }
