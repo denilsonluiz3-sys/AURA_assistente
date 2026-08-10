@@ -184,6 +184,17 @@ namespace AURA.AI
                         mo["tool_calls"] = calls;
                     }
 
+                    // Reenvia os blocos de reasoning tal como recebidos. Gemini
+                    // "thinking" exige isso na mensagem assistant que contém os
+                    // tool_calls correspondentes, senão o provedor rejeita com
+                    // 400 "missing a thought_signature". DeepClone é obrigatório:
+                    // um JsonNode não pode pertencer a duas árvores JSON ao mesmo
+                    // tempo (m.ReasoningDetails pode ser reutilizado em rounds futuros).
+                    if (m.ReasoningDetails is { Count: > 0 })
+                    {
+                        mo["reasoning_details"] = m.ReasoningDetails.DeepClone();
+                    }
+
                     arr.Add(mo);
                 }
             }
@@ -244,8 +255,33 @@ namespace AURA.AI
 
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            HttpResponseMessage response = await client.SendAsync(request, ct).ConfigureAwait(false);
-            string body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            HttpResponseMessage response;
+            string body;
+            try
+            {
+                response = await client.SendAsync(request, ct).ConfigureAwait(false);
+                body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                // O token do chamador não foi cancelado: foi o timeout do
+                // próprio HttpClient (Options.TimeoutSeconds) que estourou.
+                _logger.Error("LLM: timeout após " + Options.TimeoutSeconds + "s");
+                return new AgentChatResponse
+                {
+                    Error = "Timeout ao chamar o LLM após " + Options.TimeoutSeconds + "s.",
+                    ErrorKind = AgentErrorKind.Timeout
+                };
+            }
+            catch (HttpRequestException hex)
+            {
+                _logger.Error("LLM: falha de rede: " + hex.Message);
+                return new AgentChatResponse
+                {
+                    Error = "Falha de rede ao chamar o LLM: " + hex.Message,
+                    ErrorKind = AgentErrorKind.Network
+                };
+            }
 
             if (!response.IsSuccessStatusCode)
             {
@@ -259,7 +295,8 @@ namespace AURA.AI
                 return new AgentChatResponse
                 {
                     Error = string.Format("Falha na chamada LLM ({0} {1}): {2}",
-                        (int)response.StatusCode, response.StatusCode, detail)
+                        (int)response.StatusCode, response.StatusCode, detail),
+                    ErrorKind = ClassifyError(response.StatusCode)
                 };
             }
 
@@ -297,10 +334,21 @@ namespace AURA.AI
                             }
                         }
 
+                        // Captura os blocos de reasoning tal como vieram, sem
+                        // reconstruir campo a campo — a sequência exata importa
+                        // para modelos Gemini (ver comentário em AgentMessage).
+                        JsonArray? reasoningDetails = null;
+                        if (msg.TryGetProperty("reasoning_details", out JsonElement rd) &&
+                            rd.ValueKind == JsonValueKind.Array)
+                        {
+                            reasoningDetails = JsonNode.Parse(rd.GetRawText()) as JsonArray;
+                        }
+
                         return new AgentChatResponse
                         {
                             Content = content,
-                            ToolCalls = calls.Count > 0 ? calls : null
+                            ToolCalls = calls.Count > 0 ? calls : null,
+                            ReasoningDetails = reasoningDetails
                         };
                     }
                 }
@@ -312,6 +360,20 @@ namespace AURA.AI
                 _logger.Error("LLM: resposta inválida: " + jex.Message);
                 return new AgentChatResponse { Error = "Resposta inválida do modelo: " + jex.Message };
             }
+        }
+
+        private static AgentErrorKind ClassifyError(HttpStatusCode status)
+        {
+            int code = (int)status;
+            return status switch
+            {
+                HttpStatusCode.BadRequest => AgentErrorKind.InvalidRequest,
+                HttpStatusCode.Unauthorized => AgentErrorKind.InvalidApiKey,
+                HttpStatusCode.PaymentRequired => AgentErrorKind.PaymentRequired,
+                HttpStatusCode.TooManyRequests => AgentErrorKind.RateLimited,
+                _ when code >= 500 && code < 600 => AgentErrorKind.ProviderError,
+                _ => AgentErrorKind.Unknown
+            };
         }
 
         private void EnsureValidApiKey()
