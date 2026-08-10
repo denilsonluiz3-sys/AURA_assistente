@@ -47,7 +47,7 @@ namespace AURA.Modules.Loja
                 path = string.IsNullOrEmpty(rest) ? userHome : Path.Combine(userHome, rest);
             }
 
-            // expand environment variables like %APPDATA% or $VAR
+            // expand environment variables
             path = Environment.ExpandEnvironmentVariables(path);
 
             try
@@ -96,15 +96,10 @@ namespace AURA.Modules.Loja
             return list;
         }
 
-        /// <summary>
-        /// Install a module from the local loja by id.
-        /// Throws if id is not present in the ModuleCatalog BEFORE copying anything.
-        /// </summary>
         public void InstallFromLoja(string id, bool overwrite = false)
         {
             if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("id required", nameof(id));
 
-            // locate manifest in loja
             string entryDir = Path.Combine(_lojaRoot, id);
             string manifestPath = Path.Combine(entryDir, "manifest.json");
             if (!File.Exists(manifestPath))
@@ -112,14 +107,12 @@ namespace AURA.Modules.Loja
                 throw new InvalidOperationException($"No manifest for id '{id}' in loja.");
             }
 
-            // validate catalog entry first (important: fail before touching files)
             ModuleInfo? info = _getById(id);
             if (info == null)
             {
                 throw new InvalidOperationException($"Module id '{id}' not found in ModuleCatalog.");
             }
 
-            // parse manifest
             string manifestJson = File.ReadAllText(manifestPath);
             LojaEntry manifest = JsonSerializer.Deserialize<LojaEntry>(manifestJson) ?? throw new InvalidOperationException("Invalid manifest");
             if (!string.Equals(manifest.Id, id, StringComparison.OrdinalIgnoreCase))
@@ -132,7 +125,6 @@ namespace AURA.Modules.Loja
                 throw new InvalidOperationException("Manifest has no payloadFiles");
             }
 
-            // validate payload file names
             foreach (string f in manifest.PayloadFiles)
             {
                 if (!SafeName.IsMatch(f))
@@ -141,20 +133,17 @@ namespace AURA.Modules.Loja
                 }
             }
 
-            // ensure packages dir for id
             string packageDirForId = Path.Combine(_packagesDir, id);
             Directory.CreateDirectory(packageDirForId);
 
-            // acquire simple lock file for this id
             string lockPath = Path.Combine(packageDirForId, ".install.lock");
-            using (FileStream? lockFs = TryAcquireLock(lockPath))
+            using (FileStream? lockFs = LockHelper.TryAcquireLock(lockPath, TimeSpan.FromSeconds(5)))
             {
                 if (lockFs == null)
                 {
                     throw new InvalidOperationException("Could not acquire install lock for id: " + id);
                 }
 
-                // ensure payload files exist in loja
                 string payloadRoot = Path.Combine(entryDir, "payload");
                 foreach (string f in manifest.PayloadFiles)
                 {
@@ -165,10 +154,8 @@ namespace AURA.Modules.Loja
                     }
                 }
 
-                // make sure plugins root exists
                 Directory.CreateDirectory(_pluginsRoot);
 
-                // copy to temp dir under pluginsRoot
                 string tmpInstallDir = Path.Combine(_pluginsRoot, ".tmp_install_" + id + "_" + Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(tmpInstallDir);
 
@@ -182,7 +169,6 @@ namespace AURA.Modules.Loja
                         File.Copy(src, tmpDest, overwrite: true);
                     }
 
-                    // move files atomically to pluginsRoot flat
                     foreach (string f in manifest.PayloadFiles)
                     {
                         string tmpSrc = Path.Combine(tmpInstallDir, f);
@@ -204,7 +190,6 @@ namespace AURA.Modules.Loja
                         installed.Add(f);
                     }
 
-                    // write module.json based on ModuleCatalog info (schema real)
                     string moduleJsonTmp = Path.Combine(packageDirForId, "module.json.tmp");
                     var moduleDoc = new
                     {
@@ -222,7 +207,6 @@ namespace AURA.Modules.Loja
                     if (File.Exists(moduleJsonFinal)) File.Delete(moduleJsonFinal);
                     File.Move(moduleJsonTmp, moduleJsonFinal);
 
-                    // write installedFiles.json
                     string installedJsonTmp = Path.Combine(packageDirForId, "installedFiles.json.tmp");
                     string installedJson = JsonSerializer.Serialize(installed, new JsonSerializerOptions { WriteIndented = true });
                     File.WriteAllText(installedJsonTmp, installedJson);
@@ -234,7 +218,6 @@ namespace AURA.Modules.Loja
                 }
                 catch
                 {
-                    // rollback: attempt to delete any tmp files and leave system consistent
                     try
                     {
                         if (Directory.Exists(tmpInstallDir)) Directory.Delete(tmpInstallDir, true);
@@ -245,23 +228,8 @@ namespace AURA.Modules.Loja
                 }
                 finally
                 {
-                    // release lock by disposing lockFs (using block)
+                    // release lock by disposing lockFs
                 }
-            }
-        }
-
-        private static FileStream? TryAcquireLock(string lockPath)
-        {
-            try
-            {
-                var dir = Path.GetDirectoryName(lockPath);
-                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-                // create or open with exclusive lock
-                return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-            }
-            catch
-            {
-                return null;
             }
         }
     }

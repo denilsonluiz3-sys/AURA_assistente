@@ -2,17 +2,23 @@
 
 Status geral
 - F4 (LojaLocalResolver): concluído — implementado, testes, docs; branch feature/loja-local-resolver foi criada e CI verde.
-- F5 (Uninstall & cleanup): em progresso — uninstaller implementado e testes base adicionados na branch feature/loja-local-resolver.
-- F6 (Concorrência/Resiliência): planejado — melhorias no lock e testes de concorrência pendentes.
+- F5 (Uninstall & cleanup): concluído — LojaUninstaller implementado, ModuleManager.Remove usa o uninstaller; testes atualizados.
+- F6 (Concorrência/Resiliência): em progresso — LockHelper implementado com timeout/retry e testes básicos de concorrência adicionados.
 - F7 (CLI/API): planejado — CLI para install/uninstall/dry-run após F5+F6.
 - F8 (E2E/Smoke): planejado — pipeline smoke após F5+F6+F7.
 
+Progresso recente
+- Implementado LockHelper (timeout + exponential backoff) e adaptação do LojaLocalResolver para usar locks com timeout de 5s.
+- Adicionados testes de concorrência (LockHelperTests).
+- Finalizado LojaUninstaller e integração com ModuleManager.Remove.
+- Atualizado roadmap e docs com o estado atual.
+
 Próximos passos imediatos
-1. Completar F5: revisar, adicionar testes adicionais (casos parciais, falta de installedFiles.json), e rodar CI em main.
-2. Iniciar F6: implementar timeout/retry em TryAcquireLock, criar testes de concorrência multi-processo.
-3. Implementar CLI (F7) e integrar com uninstaller e installer, bem como flags --dry-run e --force.
-4. Criar pipeline de smoke (F8) que valide o ciclo Install → Apply → PluginWatcher.
+1. Rodar CI na branch feature/loja-local-resolver e analisar possíveis falhas.
+2. Completar testes do Uninstaller (casos limites) e adicionar dry-run se desejado.
+3. Implementar testes multi-processo para o instalador (Execuções paralelas do InstallFromLoja) e observar comportamento em Windows/Ubuntu.
+4. Após estabilizar, abrir PR para revisão e merge (squash) para main.
 
 Notas
-- Todas as mudanças relacionadas a arquivos e instalações usam installedFiles.json como fonte da verdade para uninstall.
-- Plugins root path agora é passado ao ModuleManager (constructor estendido). Ajuste consumidores se necessário.
+- O fluxo de auto-merge está disponível via workflow .github/workflows/ci-and-auto-merge.yml; para uso do auto-merge configure o segredo COPILOT_PAT com um PAT de curta validade.
+- Recomenda-se rodar os testes em runners Windows e Ubuntu para garantir lock semantics cross-platform.
