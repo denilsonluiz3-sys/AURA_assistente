@@ -25,7 +25,7 @@ trabalho usando as 4 camadas de assistência disponíveis:
 ```
 Quero X ──► opencode (planeja) ──► aichat/termux-ai (executa apoio) ──► git push (valida/CI)
                                         ▲                                      │
-                                        └────────── revisão ◄─────────────────┘
+                                        └────────── revisão ◄──────────────────│
 ```
 
 ## Matriz de delegação por tarefa
@@ -51,43 +51,48 @@ Quero X ──► opencode (planeja) ──► aichat/termux-ai (executa apoio) 
 - **Execução shell**: `aichat -e "liste células em ~/AURA"`.
 - **Sessões**: `aichat -s aura-f3` para manter contexto entre chamadas.
 - **Tools (function calling)**: ao configurar `use_tools`, o aichat pode
-  executar comandos reais (data, fs, web) em vez de "inventar" (como fez a data
-  errada de 2024).
+  executar comandos reais (data, fs, web) em vez de "inventar".
 
 ### termux-ai — o "assistente do celular"
 - Usar quando o aichat não estiver disponível (Termux puro, sem proot).
 - Consultas rápidas e discretas; custo baixo; sem tools.
-- Futuro: virar **célula do AURA** (F3) — `aura run termux-ai --cell chat`.
+- Célula AURA: `aura run termux-ai --cell chat`.
 
 ### GitHub — o "arquivo e o CI"
-- **Repositório**: `denilsonluiz3-sys/AURA_assistente` (privado desejado;
-  hoje público).
-- **Commit**: toda mudança validada local (build 0 erros + smoke-test) antes
-  do push.
-- **Actions**: build + testes em Linux real (resolve o bloqueio do VSTest no
-  proot).
-- **Issues**: roadmap F3–F7 com labels; bugs com reprodução.
-- **Releases**: futuras — distribuição de plugins e binário (alimenta `aura update`).
+- **Repositório**: `denilsonluiz3-sys/AURA_assistente`.
+- **Commit**: mudança validada (build + smoke ou CI) antes do push.
+- **Actions**: build + testes em Linux real.
+- **Issues / Releases**: roadmap e distribuição de plugins.
 
 ## Executores de ferramentas (AURA.Abstractions)
 
-A AURA agora expõe executores padronizados para as ferramentas de ambiente,
-todos no mesmo contrato `IToolExecutor` (em `src/AURA.Abstractions/Execution/`):
+Contrato único de **execução de processo**: `IToolExecutor` em
+`src/AURA.Abstractions/Execution/`.
 
 | Executor | Binário | Uso (request.Command) |
 |---|---|---|
-| `ShellExecutor` | `/bin/sh` | Comando shell completo (roda via `sh -c`) |
-| `GitExecutor` | `git` | Subcomando git (ex.: `status`, `diff`, `commit`) |
-| `PythonExecutor` | `python3`/`python` | Script, módulo ou flag (ex.: `-c`) |
-| `NodeExecutor` | `node` | Script ou flag (ex.: `-e`) |
+| `ShellExecutor` | `/bin/sh` | Comando shell completo (`sh -c`) |
+| `GitExecutor` | `git` | Subcomando git |
+| `PythonExecutor` | `python3`/`python` | Script, módulo ou flag |
+| `NodeExecutor` | `node` | Script ou flag |
 
-- Base compartilhada: `ProcessExecutorBase` (disparo, captura stdout/stderr,
-  timeout, variáveis de ambiente).
-- Se o binário não existir, `IsAvailable()` retorna `false` e `ExecuteAsync`
-  devolve um `ExecutionResult` de erro — não derruba a aplicação.
-- Sem dependências externas (BCL do .NET apenas); compilam no Termux.
+- Base: `ProcessExecutorBase` (stdout/stderr, timeout, env).
+- Sem binário: `IsAvailable() == false` e `ExecutionResult` de erro.
 
-Exemplo:
+### Camada cognitiva (AgentTool)
+
+O agente LLM (`AgentSession`) usa `AgentTool` (schema + string para o modelo).
+Tools de **processo** (ex.: `ShellAgentTool` / `run_shell`) são **adaptadores**:
+
+```
+LLM → AgentSession → ShellAgentTool → IToolExecutor (ShellExecutor)
+                         → FormatForLlm(ExecutionResult) → string
+```
+
+- File tools (`list_dir`, `read_file`, …) não passam por `IToolExecutor`.
+- Decisão arquitetural: `docs/architecture/tool-consolidation-plan.md`.
+
+Exemplo operacional:
 
 ```csharp
 var git = new GitExecutor();
@@ -101,88 +106,23 @@ Console.WriteLine(result.StandardOutput);
 
 ## Espaço de auto-melhoria (workspace)
 
-Para a AURA melhorar a si mesma, existe um clone isolado do repositório em
-`workspace/AURA_assistente`, usado pelas células `opencode`:
-
 ```bash
-bash scripts/aura-workspace.sh clone    # clona/atualiza o workspace
-bash scripts/aura-workspace.sh open     # abre célula opencode no workspace
-bash scripts/aura-workspace.sh status   # estado do workspace
+bash scripts/aura-workspace.sh clone
+bash scripts/aura-workspace.sh open
+bash scripts/aura-workspace.sh status
 ```
-
-- `open` roda a célula `dev` do opencode **dentro do clone**, para que ele
-  possa ler/editar os arquivos da AURA sem tocar no repo principal.
-- O `AgentManager` faz o mesmo em `aura ask --assistente opencode`: o diretório
-  de trabalho da célula vira a raiz do repo AURA (via `AURA_ROOT` ou subida até
-  `AURA.sln`).
-- Se o clone estiver corrompido (sem `HEAD`), o script remove e clona de novo.
-
-## Como adicionar ferramentas úteis ao aichat (llm-functions)
-
-O aichat suporta **tools e agents** via
-[llm-functions](https://github.com/sigoden/llm-functions) (bash/js/python).
-Pré-requisitos: `argc` + `jq` (`jq` já presente; instalar `argc`).
-
-```
-git clone https://github.com/sigoden/llm-functions ~/.config/aichat/functions
-cd ~/.config/aichat/functions
-# tools.txt com os tools desejados (ex.: execute_command.sh, fs_*.sh)
-argc build          # gera functions.json
-argc link-to-aichat # symlink para o functions_dir do aichat
-```
-
-Exemplo de tool própria (bash), que dá ao aichat acesso ao runtime da AURA:
-
-```bash
-#!/usr/bin/env bash
-set -e
-
-# @describe Executa um comando no CLI da AURA.
-# @option --command! O comando AURA (ex.: cells, launchers, run app.py)
-
-main() {
-    printf '%s\n' "$argc_command" |
-        dotnet ~/AURA/src/AURA.CLI/bin/Debug/net10.0/AURA.CLI.dll
-}
-eval "$(argc --argc-eval "$0" "$@")"
-```
-
-## Ferramentas desejáveis a adicionar
-
-1. **`aura-cli` tool** — aichat conversa com o runtime da AURA (células, logs).
-2. **`git-status` / `git-log`** — aichat sabe o estado do repo antes de propor.
-3. **`web-search`** — via Perplexity/Tavily (escolher e linkar `web_search.sh`).
-4. **Agent `aura-dev`** — combina tools + role de review + RAG do `docs/`.
-5. **RAG do projeto** — indexar `docs/` e `src/` para o aichat responder sobre o
-   código com base nos arquivos reais.
 
 ## Fluxo de trabalho recomendado
 
-1. **Iniciar feature**: eu abro Issue no GitHub (ex.: `F3 célula-assistente`).
-2. **Desenvolver**: eu implemento; aichat revisa a cada passo; commit por passo.
-3. **Validar**: `smoke-test.sh` + `dotnet build` locais; CI no GitHub confirma.
-4. **Entregar**: merge; Release quando for F4.
-5. **Iterar**: bugs viram issues; termux-ai relata do celular; eu corrijo.
+1. Issue no GitHub.
+2. Implementar; revisar; commit pequeno.
+3. CI (`build-test` + APK se Mobile).
+4. Próximo item: ver `docs/roadmap-completo.md`.
 
 ## Estabilidade do ambiente (proot/Termux)
 
-**Problema real observado**: o proot desmonta `/data/data/com.termux` no meio
-da sessão. Ferramentas que moram lá (`aichat`, `jq`) somem; `/root` sobrevive.
-
-**Regras para manter o ambiente estável:**
-
-1. **Tudo crítico vive em `/root`** (estável por construção):
-   - `~/bin/argc`, `~/.config/aichat/functions/`, `~/.config/aichat/config.yaml`,
-     `~/.local/share/termux-ai/config.json`.
-2. **Após qualquer remontagem, rode**: `bash scripts/check-env.sh`
-   — reporta exatamente o que sumiu e o comando para restaurar.
-3. **O repo git local pode corromper** (inodes `-?????????`). Sempre que isso
-   ocorrer, use o clone íntegro: `git clone git@github.com:denilsonluiz3-sys/AURA_assistente.git`.
-4. **Builds locais são instáveis** (deps.json incompleto, VSTest ARM64
-   bloqueado). Não dependa deles para decisão — **confie no GitHub Actions**
-   (runner x64 limpo, ~30s) para validar build+tests+smoke.
-5. **Padrão fire-and-forget**: push → CI roda em ~30s → trabalhe noutra coisa →
-   volte e leia o resultado na API.
-
-**Se o mount voltar** (proot reiniciado): copie `aichat` e `jq` para `/root/bin`
-para blindar contra a próxima remontagem.
+1. Crítico em `/root` (`~/bin`, configs).
+2. Após remontagem: `bash scripts/check-env.sh`.
+3. Repo git local corrompido → reclonar do GitHub.
+4. Builds locais instáveis → **confiar no GitHub Actions**.
+5. Fire-and-forget: push → CI ~30s → ler resultado.
