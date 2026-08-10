@@ -31,17 +31,16 @@ mais agregam valor, sem erros ou conflitos. Ordem anti-conflito: nenhum arquivo
 
 **Arquivos:** EventBus.cs, SimulationRuntime.cs, AgentManager.cs, MemoryStore.cs
 
-## Fase 4 — Item 4: Configuração com efeito — **parcial / ainda relevante**
+## Fase 4 — Item 4: Configuração com efeito — **FEITO**
 
-**Solução prevista:**
-- `FirstRunCompleted`: CLI mostra banner de boas-vindas na 1ª execução e grava.
-- `Theme`: mobile aplica `Application.Current.UserAppTheme` de `Settings.Theme`.
-- `ModuleFlags`: só expor (comando `config` no CLI + seção no mobile), sem gate
-  de features (default = tudo false).
+**Solução aplicada (verificada em `main`):**
+- `FirstRunCompleted`: CLI mostra banner de boas-vindas na 1ª execução e grava (`Program.cs:79-82`).
+- `Theme`: mobile aplica `Application.Current.UserAppTheme` de `Settings.Theme` (`App.xaml.cs:20`).
+- `ModuleFlags`: exposto no comando `config` do CLI (`Program.cs:739-746`), sem gate de features.
 
-**Arquivos:** Program.cs (CLI), App.xaml.cs/AppShell (mobile)
+**Arquivos:** Program.cs (CLI), App.xaml.cs (mobile)
 
-> Se ainda incompleto, tratar como item residual no `roadmap-completo.md` (P1.3).
+> As 4 fases deste documento estão concluídas — nada a reimplementar. Fonte de verdade atual: `docs/roadmap-completo.md`.
 
 ## Fase 5 — Integração
 
