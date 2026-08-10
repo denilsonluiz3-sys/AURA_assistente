@@ -19,28 +19,33 @@
 | UI Executores com ExecuteAsync | **Feito** | `ExecutorsPage` executa e publica `ExecutorCompletedEvent` |
 | EventBus defensivo + eventos | **Feito** | `EventBus.Publish` try/catch; `AuraEvents.cs` |
 | F3 AgentManager + ask/run assistentes | **Feito** | `AgentManager`, workspace, prompts |
-| Tool consolidation Step 1 | **Feito** | `ShellAgentTool` → `IToolExecutor`; docs em `architecture/` |
+| Tool consolidation Step 1 | **Implemented** | `ShellAgentTool` → `IToolExecutor`; `docs/architecture/tool-consolidation-plan.md` |
 | Reasoning Gemini / OpenRouter | **Feito** | PR #21 merged |
 | TTS híbrido + FAB voz | **Feito** | PR #22 merged |
 | CI build+test+smoke | **Ativo** | `build-test.yml` on push main |
 | CI APK Android | **Ativo** | `build-android-apk.yml` |
 
-### Parcialmente feito / gaps reais
+### Em andamento
+
+| Item | Status | Notas |
+|------|--------|-------|
+| **PR #23 — ToolRegistry (Fase A)** | Aberto | Registro/lookup central de `AgentTool`; sem mudar `ExecuteAsync → string` |
+
+### Gaps reais restantes
 
 | Gap | Severidade | Notas |
 |-----|------------|-------|
-| `docs/roadmap-4-itens.md` desatualizado | Baixa | Fases 1–3 já implementadas no código |
-| `docs/ferramentas.md` não menciona adapter | Baixa | Atualizar após consolidação |
+| `docs/roadmap-4-itens.md` desatualizado | Baixa | Fases 1–3 já no código; tratar como histórico |
 | `IAgent` ainda stub | Média | Existe em Core; não é usado pelo AgentManager |
 | Loja de módulos (F4) | Alta (produto) | Não implementada |
 | Daemon + API HTTP (F5) | Média | Não implementada |
-| Registry leve de AgentTools | Baixa | Lista manual em `AgentPage` basta por enquanto |
-| CI ainda não validou commits de consolidação neste ambiente | Média | Depende do Actions no push |
+| ToolResult interno / MemoryKind expandido | Média | Fase B cognitiva (após ToolRegistry) |
 
 ### Docs legados a não seguir cegamente
 
 - `roadmap-4-itens.md` — itens 1–3 **já no código**; não reimplementar.
-- `planejamento.md` — útil para histórico; F3 marcado concluído; próximo é F4.
+- `planejamento.md` — útil para histórico; F3 concluído; próximo é F4.
+- Análises baseadas em zips antigos — sempre conferir `main` no GitHub.
 
 ---
 
@@ -56,22 +61,23 @@
 
 ## 3. Roadmap prioritizado (ordem de execução)
 
-### P0 — Estabilizar o que acabou de entrar (agora)
+### P0 — Fechar o que está em voo (agora)
 
 | # | Ação | Critério de pronto |
 |---|------|--------------------|
-| P0.1 | CI `build-and-test` verde no commit do adapter | `dotnet test` + smoke OK |
-| P0.2 | CI APK se paths Mobile mudaram | artifact APK gerado |
-| P0.3 | Atualizar `docs/ferramentas.md` (process tools → IToolExecutor) | Doc alinhado ao código |
-| P0.4 | Marcar `roadmap-4-itens.md` como histórico / feito | Evita retrabalho |
+| P0.1 | CI + merge do **PR #23** (ToolRegistry) | `build-and-test` verde; merged em `main` |
+| P0.2 | Docs de consolidação alinhados | ✅ `tool-consolidation-plan.md` = Implemented |
+| P0.3 | Smoke device: `run_shell` via adapter | Comando real → `exit=0` |
+| P0.4 | Tratar `roadmap-4-itens.md` como histórico | Evita retrabalho |
 
-### P1 — Fechar valor mobile/agente já exposto
+### P1 — Camada cognitiva (após ToolRegistry)
 
 | # | Ação | Por quê |
 |---|------|--------|
-| P1.1 | Smoke manual: AgentPage `run_shell` via `ShellExecutor` | Confirma consolidação no dispositivo |
-| P1.2 | Opcional: `GitAgentTool` / wrappers só se o LLM precisar de schema dedicado | Evitar tools extras sem demanda |
-| P1.3 | Config com efeito (Theme / FirstRun) se ainda incompleto | `roadmap-4-itens` Fase 4 |
+| P1.1 | ToolResult interno (Fase B) | Classificar sucesso/erro sem quebrar string para o LLM |
+| P1.2 | `search_files` (via executor / grep) | RAG local sem filesystem paralelo |
+| P1.3 | Expandir `MemoryKind` (ToolCall, ErrorEvent, ProceduralExperience) | Memória episódica + procedural |
+| P1.4 | Autocrítica leve antes de write/edit | Reviewer antes de mutação |
 
 ### P2 — F4 Loja de módulos (maior próximo marco de produto)
 
@@ -84,21 +90,29 @@
 
 **Não fazer em F4:** novo framework de plugins; segundo ModuleManager.
 
-### P3 — F5 Daemon + API
+### P3 — Diagnóstico + recuperação
+
+| # | Ação |
+|---|------|
+| P3.1 | Classificação de erro (`AgentErrorKind` quando existir) |
+| P3.2 | Recuperação segura (retry com estratégia diferente) |
+| P3.3 | Experiências procedurais verificadas → memória |
+
+### P4 — F5 Daemon + API
 
 | # | Ação | Notas |
 |---|------|-------|
-| P3.1 | Célula dedicada expondo HTTP mínimo | Usa `SimulationRuntime`, não processo especial |
-| P3.2 | Termux: `termux-services`; Linux: `systemd --user` | Conforme README |
-| P3.3 | Auth simples / localhost-first | Segurança antes de expor rede |
+| P4.1 | Célula dedicada expondo HTTP mínimo | Usa `SimulationRuntime` |
+| P4.2 | Termux: `termux-services`; Linux: `systemd --user` | Conforme README |
+| P4.3 | Auth simples / localhost-first | Segurança antes de expor rede |
 
-### P4 — Opcional / estudo
+### P5 — Opcional / estudo
 
 | Item | Quando |
 |------|--------|
 | F6 proot/firejail sob demanda | Só células suspeitas |
 | F7 qcow2/KVM | Linux real com `/dev/kvm` |
-| Registry central de AgentTools | Se a lista em AgentPage ficar difícil de manter |
+| `GitAgentTool` / wrappers | Se o LLM precisar de schema dedicado |
 | `IAgent` de verdade | Se unificar AgentManager + AgentSession |
 
 ---
@@ -107,11 +121,11 @@
 
 | Fase | Arquivos típicos | Conflita com |
 |------|------------------|--------------|
-| P0 docs | `docs/*` | Nada de runtime |
-| P1 mobile UX | `AgentPage`, config mobile | Evitar mexer em Core |
+| P0 ToolRegistry | `ToolRegistry.cs`, `AgentSession`, `AgentPage`, testes | Evitar F4 em paralelo |
+| P1 cognitivo | `AURA.AI`, Memory | Depois do merge do PR #23 |
 | P2 F4 | `ModuleManager`, CLI `update`, loja | Não tocar SimulationRuntime em paralelo |
-| P3 F5 | novo projeto API + scripts serviço | Depois de F4 estável |
-| Tool wrappers | `AURA.AI/AgentTools` | Depois de CI verde do adapter |
+| P3 recovery | AI + Memory | Depois de P1 estável |
+| P4 F5 | novo projeto API + scripts | Depois de F4 estável |
 
 ---
 
@@ -133,24 +147,23 @@ merge / push main
 próximo item do roadmap
 ```
 
-**Regra:** não iniciar F4 enquanto P0.1 (CI do adapter) não estiver verde.
+**Regra:** não iniciar F4 enquanto P0.1 (PR #23 merged + CI verde) não estiver feito.
 
 ---
 
 ## 6. Decisão resumida — melhores opções agora
 
-1. **Não reabrir** CellRoot / ExecutorsPage / EventBus — já feitos.
-2. **Validar CI** dos commits de consolidação de tools.
-3. **Alinhar docs** (ferramentas + roadmap-4-itens histórico).
+1. **Não reabrir** CellRoot / ExecutorsPage / EventBus / tool consolidation Step 1 — já feitos.
+2. **Fechar PR #23** (ToolRegistry) como próximo passo imediato.
+3. **Manter** AgentTool como adapter; não mudar `ExecuteAsync` para `ExecutionResult` ainda.
 4. **Próximo marco de produto = F4 loja local**, reusando ModuleManager + PluginWatcher.
-5. **Manter** AgentTool como adapter; não mudar `ExecuteAsync` para `ExecutionResult` ainda.
-6. **Skills especializadas** (tool-calling / diagnostics / recovery) só depois do P0 estável.
+5. **Camada cognitiva** (ToolResult, search_files, memória) em PRs pequenos após o registry.
 
 ---
 
 ## 7. Critério de sucesso deste roadmap
 
-- CI verde no `main` após consolidação.
+- CI verde no `main` após consolidação e ToolRegistry.
 - Docs não contradizem o código.
 - Próxima feature (F4) tem desenho de reuso claro, sem arquitetura paralela.
 - Mobile e CLI continuam no mesmo Core/Abstractions.
