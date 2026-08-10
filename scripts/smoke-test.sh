@@ -167,6 +167,15 @@ else
   fail "plugins não respondeu"
 fi
 
+# --- P0.3: execução de shell real via executor/adapter ----------------------
+
+EXEC_OUT="$(cli 'exec shell echo AURA_SMOKE_SHELL_OK')"
+if grep -q "AURA_SMOKE_SHELL_OK" <<< "$EXEC_OUT" && grep -q "exit 0" <<< "$EXEC_OUT"; then
+  pass "exec shell (comando real -> exit 0)"
+else
+  fail "exec shell não retornou saída + exit 0: $EXEC_OUT"
+fi
+
 # --- Verdict ----------------------------------------------------------------
 
 if [[ "$FAIL" == "1" ]]; then
