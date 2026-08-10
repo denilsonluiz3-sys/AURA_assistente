@@ -1,0 +1,136 @@
+# CI + optional auto-merge workflow for feature branches / PRs
+# - Runs on pull_request events and manually (workflow_dispatch)
+# - Builds and runs tests (dotnet 10)
+# - Optionally auto-merges the PR when tests pass:
+#     * For pull_request events: auto-merge when the PR has the label "auto-merge"
+#     * For manual runs: pass input auto_merge = "true" and pr_number to auto-merge
+#
+# SECURITY: This workflow supports a PAT stored in repository secret COPILOT_PAT
+# (only required if you want the auto-merge feature). Create it with minimum scopes
+# needed (repo) and a short expiry. If you do not create the secret, the workflow
+# will still run CI but skip the auto-merge step.
+#
+name: CI and Optional Auto-merge
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to operate on (required for manual auto-merge)'
+        required: false
+      auto_merge:
+        description: 'If "true", attempt to auto-merge after successful CI'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+
+jobs:
+  build-and-test:
+    name: Build and Test (.NET 10)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Test
+        run: dotnet test --no-build --verbosity normal
+
+  auto-merge:
+    name: Auto-merge PR (optional)
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: needs.build-and-test.result == 'success'
+    steps:
+      - name: Checkout (to get repo context)
+        uses: actions/checkout@v4
+
+      - name: Ensure gh CLI present
+        run: |
+          if ! command -v gh >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y gh
+          fi
+
+      - name: Determine PR number and whether to merge
+        id: decide
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -e
+          PR_NUM=""
+          SHOULD_MERGE="false"
+
+          if [ "${EVENT_NAME}" = "pull_request" ]; then
+            PR_NUM=${{ github.event.pull_request.number }}
+            echo "Triggered by pull_request event for PR #${PR_NUM}"
+            # check labels for "auto-merge"
+            labels=$(gh pr view "$PR_NUM" --json labels --jq '.labels[].name' || echo "")
+            echo "PR labels: $labels"
+            if echo "$labels" | grep -q -P '\bauto-merge\b'; then
+              SHOULD_MERGE="true"
+            fi
+          else
+            # manual dispatch
+            PR_NUM="${{ github.event.inputs.pr_number }}"
+            if [ -z "$PR_NUM" ]; then
+              echo "No pr_number provided for manual run; skipping merge."
+              echo "should_merge=false" >> $GITHUB_OUTPUT
+              echo "pr_num=" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            echo "Manual run for PR #${PR_NUM}"
+            if [ "${{ github.event.inputs.auto_merge }}" = "true" ]; then
+              SHOULD_MERGE="true"
+            fi
+          fi
+
+          echo "should_merge=$SHOULD_MERGE" >> $GITHUB_OUTPUT
+          echo "pr_num=$PR_NUM" >> $GITHUB_OUTPUT
+
+      - name: Login gh with PAT (if available)
+        if: ${{ steps.decide.outputs.should_merge == 'true' }}
+        env:
+          COPILOT_PAT: ${{ secrets.COPILOT_PAT }}
+        run: |
+          if [ -z "$COPILOT_PAT" ]; then
+            echo "COPILOT_PAT secret not found. Cannot perform auto-merge. Exiting."
+            exit 0
+          fi
+          echo "$COPILOT_PAT" | gh auth login --with-token
+
+      - name: Try auto-merge
+        if: ${{ steps.decide.outputs.should_merge == 'true' }}
+        env:
+          PR: ${{ steps.decide.outputs.pr_num }}
+        run: |
+          set -e
+          echo "Attempting to auto-merge PR #$PR"
+          # show PR author and head repo info for debugging
+          gh pr view "$PR" --json number,title,author,headRefName,headRepositoryOwner,headRepository --jq '{number:.number,author:.author.login,headRef:.headRefName,headRepo:.headRepository.fullName}'
+          # perform squash merge and delete branch
+          gh pr merge "$PR" --squash --delete-branch --subject "feat(loja): LojaLocalResolver — local module resolver (F4)" || {
+            echo "Auto-merge failed (gh returned non-zero). See logs above."
+            exit 1
+          }
+          echo "PR #$PR merged (squash + branch deleted)."
+
+      - name: Skip message when not merging
+        if: ${{ steps.decide.outputs.should_merge != 'true' }}
+        run: echo "Auto-merge not requested or conditions not met; no merge performed."
