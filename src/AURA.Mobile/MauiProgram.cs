@@ -67,9 +67,11 @@ public static class MauiProgram
         }, sp.GetRequiredService<ILogger>()));
         builder.Services.AddSingleton<AiAssistant>();
 
-        // TTS local (Kokoro via ONNX Runtime). Carregado sob demanda na
-        // primeira fala; assets (modelo/voz/vocab) vêm empacotados no APK.
-        builder.Services.AddSingleton<ISpeechService, KokoroSpeechService>();
+        // Voz da AURA: TTS nativo do Android (texto arbitrário, offline, pt-br)
+        // com Kokoro on-device como fallback. O VoiceAssistantService guarda a
+        // última resposta e expõe falar/parar para o botão flutuante.
+        builder.Services.AddSingleton<ISpeechService, HybridSpeechService>();
+        builder.Services.AddSingleton<VoiceAssistantService>();
 
         builder.Services.AddSingleton(sp => new AgentManager(sp.GetRequiredService<ILogger>())
         {

@@ -1,5 +1,6 @@
 using AURA.AI;
 using AURA.Mobile.Diagnostics;
+using AURA.Mobile.Speech;
 
 namespace AURA.Mobile.Pages;
 
@@ -7,12 +8,15 @@ public partial class ChatPage : ContentPage
 {
     private readonly OpenRouterClient _client;
     private readonly AURA.Memory.MemoryStore _memory;
+    private readonly VoiceAssistantService? _voice;
 
-    public ChatPage(OpenRouterClient client, AURA.Memory.MemoryStore memory)
+    public ChatPage(OpenRouterClient client, AURA.Memory.MemoryStore memory,
+        VoiceAssistantService? voice = null)
     {
         InitializeComponent();
         _client = client;
         _memory = memory;
+        _voice = voice;
     }
 
     protected override void OnAppearing()
@@ -79,6 +83,7 @@ public partial class ChatPage : ContentPage
             var assistant = new AiAssistant(_client, _memory);
             string answer = await assistant.AskAsync(question);
             AnswerLabel.Text = answer;
+            _voice?.SetLastUtterance(answer);
         }
         catch (Exception ex)
         {
