@@ -14,8 +14,13 @@ Progresso recente
 - Updated scripts/smoke-test.sh to wait for cell completion (--wait) to improve reliability in CI.
 - Updated roadmap and docs with current status.
 
+CI re-run
+- Action: triggered automated CI re-run from Copilot to validate smoke test fix.
+- Trigger time (UTC): 2026-08-10T23:51:00Z
+- Purpose: ensure smoke-test.sh change resolves intermittent failures; if failures persist Copilot will inspect logs and apply fixes.
+
 Próximos passos imediatos
-1. Trigger CI for branch feature/loja-local-resolver (push already performed). Analyze failures if any and patch.
-2. If smoke tests still fail, add additional logging in CLI to help diagnose; iterate until stable.
+1. Analyze CI runs; if failures occur, diagnose and patch small issues automatically.
+2. If smoke tests still fail, add temporary logging in CLI to help diagnose; iterate until stable.
 3. Implement CLI (F7) and smoke pipeline (F8) after stabilization.
 
