@@ -70,9 +70,21 @@
                         TextColor="White"
                         CornerRadius="8" />
 
-                <Label x:Name="ResultLabel"
-                       FontSize="13"
-                       TextColor="{DynamicResource AuraTextPrimary}" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Label x:Name="ResultLabel"
+                           FontSize="13"
+                           TextColor="{DynamicResource AuraTextPrimary}"
+                           VerticalOptions="Center" />
+                    <Button Grid.Column="1"
+                            x:Name="CopyButton"
+                            Text="Copiar"
+                            Clicked="OnCopyClicked"
+                            BackgroundColor="{DynamicResource AuraSurface}"
+                            TextColor="{DynamicResource AuraAccent}"
+                            Padding="12,4"
+                            CornerRadius="8"
+                            FontSize="12" />
+                </Grid>
 
             </VerticalStackLayout>
         </ScrollView>
