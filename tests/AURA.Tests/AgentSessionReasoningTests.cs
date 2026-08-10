@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.AI;
+using AURA.Modules.Executors;
 using Xunit;
 
 namespace AURA.Tests;
@@ -181,7 +182,7 @@ public class AgentSessionReasoningTests
         {
             var handler = new GeminiReasoningHandler("run_shell", "{\"command\":\"echo oi\"}", "oi");
             OpenRouterClient client = MakeClient(handler, out HttpClient http);
-            var tools = new List<AgentTool> { new ShellAgentTool(workspace) };
+            var tools = new List<AgentTool> { new ShellAgentTool(workspace, new ShellExecutor()) };
             var session = new AgentSession(client, tools, logger: new FakeLogger());
 
             string result = await session.RunAsync("roda echo oi", http);
@@ -259,7 +260,7 @@ public class AgentSessionReasoningTests
             };
             AgentChatResponse first = await client.ChatToolsAsync(
                 messages,
-                new List<AgentToolDefinition> { new ShellAgentTool(workspace).Definition },
+                new List<AgentToolDefinition> { new ShellAgentTool(workspace, new ShellExecutor()).Definition },
                 http);
 
             Assert.NotNull(first.ToolCalls);
@@ -271,7 +272,7 @@ public class AgentSessionReasoningTests
 
             AgentChatResponse second = await client.ChatToolsAsync(
                 messages,
-                new List<AgentToolDefinition> { new ShellAgentTool(workspace).Definition },
+                new List<AgentToolDefinition> { new ShellAgentTool(workspace, new ShellExecutor()).Definition },
                 http);
 
             Assert.Equal(AgentErrorKind.InvalidRequest, second.ErrorKind);

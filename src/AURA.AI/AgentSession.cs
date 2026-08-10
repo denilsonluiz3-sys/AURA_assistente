@@ -23,25 +23,42 @@ namespace AURA.AI
 
         private readonly OpenRouterClient _client;
         private readonly ILogger _logger;
-        private readonly List<AgentTool> _tools;
+        private readonly ToolRegistry _registry;
         private readonly List<AgentMessage> _messages = new();
         private readonly string? _systemPrompt;
         private readonly MemoryStore? _memory;
 
-        public AgentSession(OpenRouterClient client, IEnumerable<AgentTool> tools,
+        /// <summary>
+        /// Construtor preferido: ferramentas já organizadas em <see cref="ToolRegistry"/>.
+        /// </summary>
+        public AgentSession(OpenRouterClient client, ToolRegistry registry,
             string? systemPrompt = null, ILogger? logger = null, MemoryStore? memory = null)
         {
             _client = client ?? throw new ArgumentNullException(nameof(client));
-            _tools = (tools ?? Enumerable.Empty<AgentTool>()).ToList();
+            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _systemPrompt = systemPrompt;
             _logger = logger ?? new ConsoleLogger();
             _memory = memory;
+        }
+
+        /// <summary>
+        /// Compatibilidade: monta um <see cref="ToolRegistry"/> a partir da lista.
+        /// Preferir o construtor que recebe <see cref="ToolRegistry"/> diretamente.
+        /// </summary>
+        public AgentSession(OpenRouterClient client, IEnumerable<AgentTool> tools,
+            string? systemPrompt = null, ILogger? logger = null, MemoryStore? memory = null)
+            : this(client, new ToolRegistry(tools ?? Enumerable.Empty<AgentTool>()),
+                systemPrompt, logger, memory)
+        {
         }
 
         /// <summary>Emitido a cada ferramenta executada (para atualizar a UI).</summary>
         public event Action<AgentStep>? Step;
 
         public IReadOnlyList<AgentMessage> Messages => _messages;
+
+        /// <summary>Registro de ferramentas desta sessão.</summary>
+        public ToolRegistry Registry => _registry;
 
         public async Task<string> RunAsync(string userText,
             HttpClient? httpClient = null, CancellationToken ct = default)
@@ -59,7 +76,7 @@ namespace AURA.AI
             {
                 AgentChatResponse response = await _client.ChatToolsAsync(
                     _messages,
-                    _tools.Select(t => t.Definition).ToList(),
+                    _registry.Definitions().ToList(),
                     httpClient,
                     ct,
                     _systemPrompt).ConfigureAwait(false);
@@ -111,8 +128,7 @@ namespace AURA.AI
 
         private async Task<string> ExecuteToolAsync(AgentToolCall call, CancellationToken ct)
         {
-            AgentTool? tool = _tools.FirstOrDefault(t =>
-                t.Definition.Name == call.Name);
+            AgentTool? tool = _registry.Resolve(call.Name);
             if (tool == null)
             {
                 return "ERRO: ferramenta desconhecida: " + call.Name;
