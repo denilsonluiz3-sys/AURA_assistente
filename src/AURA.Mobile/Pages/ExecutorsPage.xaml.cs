@@ -30,6 +30,21 @@ public partial class ExecutorsPage : ContentPage
         await RefreshAsync();
     }
 
+    private async void OnCopyClicked(object sender, EventArgs e)
+    {
+        string text = ResultEditor.Text ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(text) || text == "Resultado aparecerá aqui.")
+        {
+            return;
+        }
+
+        await Clipboard.Default.SetTextAsync(text);
+        string original = CopyButton.Text;
+        CopyButton.Text = "✓ Copiado";
+        await Task.Delay(1500);
+        CopyButton.Text = original;
+    }
+
     private async void OnRefreshClicked(object sender, EventArgs e)
     {
         await RefreshAsync();

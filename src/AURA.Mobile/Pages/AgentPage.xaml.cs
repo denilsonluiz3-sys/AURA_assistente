@@ -241,6 +241,30 @@ public partial class AgentPage : ContentPage
             Margin = new Thickness(-4, -6)
         };
 
+        View bubbleContent = label;
+        if (!user)
+        {
+            var copyButton = new Button
+            {
+                Text = "Copiar",
+                BackgroundColor = Colors.Transparent,
+                TextColor = Color.FromArgb("#7a7a90"),
+                FontSize = 10,
+                Padding = new Thickness(6, 0),
+                HeightRequest = 24,
+                HorizontalOptions = LayoutOptions.End
+            };
+            copyButton.Clicked += async (_, _) =>
+            {
+                await Clipboard.Default.SetTextAsync(display);
+                string original = copyButton.Text;
+                copyButton.Text = "✓";
+                await Task.Delay(1500);
+                copyButton.Text = original;
+            };
+            bubbleContent = new VerticalStackLayout { label, copyButton };
+        }
+
         var border = new Border
         {
             BackgroundColor = background,
@@ -250,7 +274,7 @@ public partial class AgentPage : ContentPage
             Padding = new Thickness(12, 8),
             MaximumWidthRequest = 340,
             HorizontalOptions = alignment,
-            Content = label
+            Content = bubbleContent
         };
 
         MainThread.BeginInvokeOnMainThread(() =>
