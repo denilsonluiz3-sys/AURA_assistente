@@ -102,15 +102,16 @@ namespace AURA.AI
                     foreach (AgentToolCall call in response.ToolCalls)
                     {
                         ct.ThrowIfCancellationRequested();
-                        string result = await ExecuteToolAsync(call, ct).ConfigureAwait(false);
+                        AgentToolResult result = await ExecuteToolAsync(call, ct).ConfigureAwait(false);
                         _messages.Add(new AgentMessage
                         {
                             Role = "tool",
                             ToolCallId = call.Id,
-                            Content = result
+                            Content = result.Text
                         });
-                        Step?.Invoke(new AgentStep(call.Name, call.ArgumentsJson, result));
-                        _logger.Info("agent: ferramenta='" + call.Name + "'");
+                        Step?.Invoke(new AgentStep(call.Name, call.ArgumentsJson, result.Text, result.Success));
+                        _logger.Info("agent: ferramenta='" + call.Name + "' " +
+                            (result.Success ? "ok" : "erro"));
                     }
 
                     continue;
@@ -126,22 +127,22 @@ namespace AURA.AI
                 "O agente atingiu o limite de " + MaxRounds + " passos de ferramentas.");
         }
 
-        private async Task<string> ExecuteToolAsync(AgentToolCall call, CancellationToken ct)
+        private async Task<AgentToolResult> ExecuteToolAsync(AgentToolCall call, CancellationToken ct)
         {
             AgentTool? tool = _registry.Resolve(call.Name);
             if (tool == null)
             {
-                return "ERRO: ferramenta desconhecida: " + call.Name;
+                return AgentToolResult.Error("ERRO: ferramenta desconhecida: " + call.Name);
             }
 
             try
             {
-                return await tool.ExecuteAsync(call.ArgumentsJson, ct).ConfigureAwait(false);
+                return await tool.ExecuteStructuredAsync(call.ArgumentsJson, ct).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
                 _logger.Error("agent: falha na ferramenta '" + call.Name + "': " + ex.Message);
-                return "ERRO na ferramenta " + call.Name + ": " + ex.Message;
+                return AgentToolResult.Error("ERRO na ferramenta " + call.Name + ": " + ex.Message);
             }
         }
     }

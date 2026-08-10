@@ -35,6 +35,21 @@ namespace AURA.AI
 
         public abstract Task<string> ExecuteAsync(string argumentsJson, CancellationToken ct = default);
 
+        /// <summary>
+        /// Versão estruturada de <see cref="ExecuteAsync"/> (Fase B). A implementação
+        /// padrão delega para <see cref="ExecuteAsync"/> e classifica o texto pela
+        /// convenção "ERRO:"; ferramentas que conhecem a semântica do próprio resultado
+        /// (ex.: exit code de processo) devem fazer override para classificar com precisão.
+        /// O <see cref="AgentToolResult.Text"/> é idêntico ao que <see cref="ExecuteAsync"/>
+        /// devolveria — nada no protocolo de mensagens muda.
+        /// </summary>
+        public virtual async Task<AgentToolResult> ExecuteStructuredAsync(
+            string argumentsJson, CancellationToken ct = default)
+        {
+            string text = await ExecuteAsync(argumentsJson, ct).ConfigureAwait(false);
+            return AgentToolResult.FromText(text);
+        }
+
         /// <summary>Lê um parâmetro string de um JSON de argumentos (ou null).</summary>
         protected static string? ReadString(JsonElement args, string name)
         {
