@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace AURA.AI
 {
-    /// <nsummary>
+    /// <summary>
     /// Registro e resolução de <see cref="AgentTool"/> para o loop agêntico.
     /// Centraliza lookup por nome e exposição de definições ao LLM,
     /// sem alterar o contrato <c>ExecuteAsync → string</c>.
