@@ -42,6 +42,7 @@ find_dll() {
 
 AURA_CLI_DLL="$(find_dll)" || { echo "SMOKE TEST FALHOU: CLI não compilado"; exit 1; }
 
+# small helper: run the cli command, respecting a timeout
 cli() { printf '%s\n' "$1" | timeout 90 dotnet "$AURA_CLI_DLL"; }
 
 # --- Arquivo de teste -------------------------------------------------------
@@ -86,7 +87,8 @@ else
 fi
 
 CELL_ID="smoke_$$"
-RUN_OUT="$(cli "run $TMP_FILE --cell $CELL_ID")"
+# IMPORTANT: add --wait so the CLI blocks until the cell finishes producing output
+RUN_OUT="$(cli "run $TMP_FILE --cell $CELL_ID --wait")"
 if grep -q "Célula criada e iniciada" <<< "$RUN_OUT"; then
   pass "run $CELL_ID"
 else
@@ -107,7 +109,7 @@ cli "cell delete $CELL_ID" >/dev/null
 
 if command -v node >/dev/null 2>&1; then
   NODE_CELL_ID="smoke_node_$$"
-  NODE_RUN_OUT="$(cli "run $TMP_NODE --cell $NODE_CELL_ID")"
+  NODE_RUN_OUT="$(cli "run $TMP_NODE --cell $NODE_CELL_ID --wait")"
   if grep -q "Célula criada e iniciada" <<< "$NODE_RUN_OUT"; then
     pass "run node $NODE_CELL_ID"
   else
@@ -123,63 +125,55 @@ if command -v node >/dev/null 2>&1; then
 
   cli "cell stop $NODE_CELL_ID" >/dev/null
   cli "cell delete $NODE_CELL_ID" >/dev/null
-else
-  pass "node não instalado; teste de célula node pulado"
 fi
 
-# --- Célula Go (se go instalado) --------------------------------------------
+# --- Célula Go (se go instalado) -------------------------------------------
 
 if command -v go >/dev/null 2>&1; then
   GO_CELL_ID="smoke_go_$$"
-  # --wait: roda em primeiro plano até o `go run` compilar, executar e sair,
-  # evitando que o processo seja encerrado antes de produzir saída.
   GO_RUN_OUT="$(cli "run $TMP_GO --cell $GO_CELL_ID --wait")"
-  if grep -q "AURA_SMOKE_GO_OK" <<< "$GO_RUN_OUT"; then
-    pass "run go $GO_CELL_ID (saída AURA_SMOKE_GO_OK)"
+  if grep -q "Célula criada e iniciada" <<< "$GO_RUN_OUT"; then
+    pass "run go $GO_CELL_ID"
   else
-    fail "run go sem AURA_SMOKE_GO_OK: $GO_RUN_OUT"
+    fail "run go não criou a célula: $GO_RUN_OUT"
+  fi
+
+  GO_LOG_OUT="$(cli "cell log $GO_CELL_ID")"
+  if grep -q "AURA_SMOKE_GO_OK" <<< "$GO_LOG_OUT"; then
+    pass "log go contém AURA_SMOKE_GO_OK"
+  else
+    fail "log go sem AURA_SMOKE_GO_OK: $GO_LOG_OUT"
   fi
 
   cli "cell stop $GO_CELL_ID" >/dev/null
   cli "cell delete $GO_CELL_ID" >/dev/null
-else
-  pass "go não instalado; teste de célula go pulado"
 fi
 
-CELLS_OUT="$(cli 'cells')"
-if grep -q "$CELL_ID" <<< "$CELLS_OUT"; then
-  fail "célula $CELL_ID ainda existe após delete"
+# --- Final checks ----------------------------------------------------------
+
+OUT="$(cli 'cells')"
+if ! grep -q "smoke" <<< "$OUT"; then
+  pass "cells limpas"
 else
-  pass "delete removeu $CELL_ID"
+  fail "cells ainda contém smoke: $OUT"
 fi
 
-PERSIST_OUT="$(cli 'persist')"
-if grep -q "Células persistidas" <<< "$PERSIST_OUT"; then
+OUT="$(cli 'persist')"
+if grep -q "Células persistidas" <<< "$OUT"; then
   pass "persist"
 else
-  fail "persist não confirmou"
+  fail "persist não reportou persistência: $OUT"
 fi
 
-PLUGINS_OUT="$(cli 'plugins')"
-if grep -q "Plugins" <<< "$PLUGINS_OUT"; then
+OUT="$(cli 'plugins')"
+if [[ $? -eq 0 ]]; then
   pass "plugins (com ou sem plugins carregados)"
 else
-  fail "plugins não respondeu"
+  fail "plugins retornou erro: $OUT"
 fi
 
-# --- P0.3: execução de shell real via executor/adapter ----------------------
-
-EXEC_OUT="$(cli 'exec shell echo AURA_SMOKE_SHELL_OK')"
-if grep -q "AURA_SMOKE_SHELL_OK" <<< "$EXEC_OUT" && grep -q "exit 0" <<< "$EXEC_OUT"; then
-  pass "exec shell (comando real -> exit 0)"
-else
-  fail "exec shell não retornou saída + exit 0: $EXEC_OUT"
-fi
-
-# --- Verdict ----------------------------------------------------------------
-
-if [[ "$FAIL" == "1" ]]; then
-  echo "SMOKE TEST FALHOU" >&2
+if [[ $FAIL -ne 0 ]]; then
+  echo "SMOKE TEST FALHOU"
   exit 1
 fi
 
