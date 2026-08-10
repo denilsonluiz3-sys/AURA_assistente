@@ -50,14 +50,12 @@ public partial class AgentPage : ContentPage
         }
 
         string root = AgentWorkspace.ActiveRoot;
-        var tools = new List<AgentTool>
-        {
-            new ListDirTool(root),
-            new ReadFileTool(root),
-            new WriteFileTool(root),
-            new EditFileTool(root),
-            new ShellAgentTool(root, _shellExecutor)
-        };
+        var registry = new ToolRegistry();
+        registry.Register(new ListDirTool(root));
+        registry.Register(new ReadFileTool(root));
+        registry.Register(new WriteFileTool(root));
+        registry.Register(new EditFileTool(root));
+        registry.Register(new ShellAgentTool(root, _shellExecutor));
 
         string systemPrompt =
             "Você é o agente de arquivos da AURA, um assistente que trabalha " +
@@ -70,7 +68,7 @@ public partial class AgentPage : ContentPage
             "Responda em português, de forma curta e objetiva. " +
             "Caminhos são sempre relativos ao workspace.";
 
-        _session = new AgentSession(_client, tools, systemPrompt, memory: _memory);
+        _session = new AgentSession(_client, registry, systemPrompt, memory: _memory);
         _session.Step += OnAgentStep;
 
         AppendBubble(
@@ -241,7 +239,6 @@ public partial class AgentPage : ContentPage
                 ? Color.FromArgb("#7a7a90")   // AuraTextSecondary
                 : Color.FromArgb("#e8e8f0");  // AuraTextPrimary
 
-        // Prefixo de ícone para tool steps
         string display = isTool ? text : text;
 
         var label = new Editor
