@@ -10,14 +10,17 @@ public partial class AgentPage : ContentPage
     private readonly OpenRouterClient _client;
     private readonly MemoryStore _memory;
     private readonly ISpeechService _speech;
+    private readonly VoiceAssistantService? _voice;
     private AgentSession? _session;
 
-    public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech)
+    public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
+        VoiceAssistantService? voice = null)
     {
         InitializeComponent();
         _client = client;
         _memory = memory;
         _speech = speech;
+        _voice = voice;
     }
 
     protected override void OnAppearing()
@@ -128,6 +131,7 @@ public partial class AgentPage : ContentPage
         {
             string answer = await _session!.RunAsync(text);
             AppendBubble(answer, user: false);
+            _voice?.SetLastUtterance(answer);
             await SpeakAsync(answer);
 
             if (ProjectAccessService.IsLinked)
@@ -172,8 +176,16 @@ public partial class AgentPage : ContentPage
         SpeakTestButton.IsEnabled = false;
         try
         {
-            // Teste com frase fixa (sem IA): valida o pipeline Kokoro TTS.
-            await SpeakAsync("Olá! Eu sou a AURA, sua assistente pessoal.");
+            // Fala a última resposta do agente (assistente de verdade), não
+            // uma frase fixa de recepção. Sem resposta ainda, usa saudação.
+            string text = _voice?.LastUtterance;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                text = "Estou aqui. Me instrua na conversa e eu respondo por voz.";
+            }
+
+            _voice?.SetLastUtterance(text);
+            await SpeakAsync(text);
         }
         catch (Exception ex)
         {
@@ -195,9 +207,9 @@ public partial class AgentPage : ContentPage
         }
         catch (NotSupportedException)
         {
-            // Fonemizador atual cobre apenas frases de teste; conversação
-            // real (espeak-ng no Android) é o próximo passo. Não quebra o chat.
-            AuraLog.Info("TTS: texto fora do fonemizador de teste, fala pulada.");
+            // Motor atual não cobre este texto (ex.: Kokoro com dicionário
+            // limitado como fallback). Não quebra o chat.
+            AuraLog.Info("TTS: texto fora do alcance do motor atual, fala pulada.");
         }
     }
 
