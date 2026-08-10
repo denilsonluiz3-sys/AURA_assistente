@@ -107,9 +107,9 @@ namespace AURA.AI
                     BaseUrl = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
                     ModelsUrl = "https://generativelanguage.googleapis.com/v1beta/openai/models",
                     NeedsKey = true,
-                    KeyHint = "AIza...",
+                    KeyHint = "AIza... ou AQ....",
                     DefaultModelId = "gemini-3.6-flash",
-                    KeyPrefixes = new List<string> { "AIza" },
+                    KeyPrefixes = new List<string> { "AIza", "AQ." },
                     Models = new List<ProviderModel>
                     {
                         new() { Id = "gemini-3.6-flash", Label = "Gemini 3.6 Flash", Category = "Grátis", IsFree = true },
