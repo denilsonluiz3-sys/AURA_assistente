@@ -7,8 +7,10 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.AI;
+using AURA.Abstractions.Execution;
 using AURA.Core.Logging;
 using AURA.Memory;
+using AURA.Modules.Executors;
 using Xunit;
 
 namespace AURA.Tests;
@@ -152,13 +154,77 @@ public class AgentToolsTests
             Assert.Contains("path", write.Definition.Required);
             Assert.Contains("content", write.Definition.Required);
 
-            var shell = new ShellAgentTool(root);
+            var shell = new ShellAgentTool(root, new ShellExecutor());
+            Assert.Equal("run_shell", shell.Definition.Name);
             Assert.Contains("command", shell.Definition.Required);
         }
         finally
         {
             Directory.Delete(root, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task ShellAgentTool_RunsCommand_ReturnsExitAndOutput()
+    {
+        string root = CreateTempWorkspace();
+        try
+        {
+            var tool = new ShellAgentTool(root, new ShellExecutor());
+            string result = await tool.ExecuteAsync(
+                JsonSerializer.Serialize(new { command = "printf 'ola-shell'" }));
+
+            Assert.Contains("exit=0", result);
+            Assert.Contains("ola-shell", result);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ShellAgentTool_EmptyCommand_ReturnsErro()
+    {
+        var tool = new ShellAgentTool(Path.GetTempPath(), new ShellExecutor());
+        string result = await tool.ExecuteAsync("{\"command\":\"\"}");
+        Assert.Contains("ERRO", result);
+        Assert.Contains("vazio", result);
+    }
+
+    [Fact]
+    public async Task ShellAgentTool_UnavailableExecutor_ReturnsErro()
+    {
+        var tool = new ShellAgentTool(Path.GetTempPath(), new UnavailableExecutor());
+        string result = await tool.ExecuteAsync(
+            JsonSerializer.Serialize(new { command = "echo hi" }));
+        Assert.Contains("ERRO", result);
+        Assert.Contains("shell", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void FormatForLlm_IncludesExitCodeStdoutAndStderr()
+    {
+        var result = new ExecutionResult
+        {
+            Success = false,
+            ExitCode = 7,
+            StandardOutput = "out-line",
+            StandardError = "err-line"
+        };
+
+        string text = ShellAgentTool.FormatForLlm(result);
+        Assert.Contains("exit=7", text);
+        Assert.Contains("out-line", text);
+        Assert.Contains("stderr: err-line", text);
+    }
+
+    private sealed class UnavailableExecutor : IToolExecutor
+    {
+        public string Name => "unavailable";
+        public bool IsAvailable() => false;
+        public Task<ExecutionResult> ExecuteAsync(ExecutionRequest request, CancellationToken cancellationToken = default)
+            => Task.FromResult(ExecutionResult.Failed("should not be called"));
     }
 }
 
