@@ -37,7 +37,7 @@
 |-----|------------|-------|
 | `docs/roadmap-4-itens.md` desatualizado | Baixa | Fases 1–3 já no código; tratar como histórico |
 | `IAgent` ainda stub | Média | Existe em Core; não é usado pelo AgentManager |
-| Loja de módulos (F4) | Alta (produto) | Não implementada |
+| Loja de módulos (F4) | Alta (produto) | Não implementada — especificação v2 feita e validada contra o código (docs/f4-loja-local-spec-1.md) |
 | Daemon + API HTTP (F5) | Média | Não implementada |
 | ToolResult interno / MemoryKind expandido | Média | Fase B cognitiva (após ToolRegistry) |
 
@@ -88,7 +88,47 @@
 | P2.3 | Releases GitHub como fonte de `.dll` | Docs já preveem |
 | P2.4 | Só depois: HTTPS remoto | Não misturar com local |
 
-**Não fazer em F4:** novo framework de plugins; segundo ModuleManager.
+**Decisão detalhada (F4 — Loja local, resumo validado contra código):**
+
+- Fonte de verdade da spec: `docs/f4-loja-local-spec-1.md` (implementação v2 validada contra `PluginWatcher`, `ModuleManager`, `ModuleCatalog`).
+- Reuso obrigatório: ModuleManager (`AURA.Modules`) + PluginWatcher (`AURA.Core`). Não criar framework paralelo nem alterar `SimulationRuntime`.
+
+Principais regras e responsabilidades:
+- LojaLocalResolver (nova peça) apenas: validar id no `ModuleCatalog`, copiar `payload/*.dll` para `~/AURA/plugins/` (pasta flat), e escrever `packagesDir/<id>/module.json` gerado a partir do `ModuleCatalog` (schema real). Não decide habilitação nem discovery.
+- `ModuleManager.Apply(id)` permanece responsável por habilitação (grava flag em `modules.json`) e continua sem tocar arquivos — instalar é duas fases: (1) instalar bytes no pluginsRoot via LojaLocalResolver, (2) ModuleManager.Apply para habilitar.
+- `PluginWatcher` permanece responsável por escanear `~/AURA/plugins/` (flat) e hot-reload via ALC.
+
+Manifesto mínimo (`manifest.json`) na loja local deve conter apenas:
+
+```json
+{
+  "id": "executores-git",
+  "payloadFiles": [
+    "ExecutoresGit.dll",
+    "ExecutoresGit.deps.json"
+  ]
+}
+```
+
+Regras de segurança e validação recomendadas (implementação):
+- Validar `ModuleCatalog.GetById(id)` ANTES de copiar qualquer arquivo; falhar se não existir.
+- Rejeitar `payloadFiles` que contenham path traversal ou separadores (aceitar somente nomes simples, ex: regex ^[A-Za-z0-9._-]+$).
+- Política de colisão em `~/AURA/plugins/`: por padrão FAIL se arquivo destino já existir e pertencer a outro id; oferecer `--force`/overwrite explicitamente. Registrar propriedade (packagesDir/<id>/installedFiles.json) facilita uninstall/cleanup.
+- Cópia atômica: copiar para tmp, validar, mover atomically; escrever `module.json` atomically.
+- Locking por id durante instalação (packagesDir/<id>/.install.lock) para evitar concorrência.
+
+Testes mínimos exigidos (unit + integração):
+- `InstallFromLoja_IdNotInCatalog_ThrowsBeforeCopyingAnything`
+- `InstallFromLoja_CopiesPayloadFilesToPluginsRootFlat`
+- `InstallFromLoja_WritesModuleJsonFromCatalogSchema`
+- `InstallFromLoja_ThenModuleManagerApply_Succeeds` (integração)
+- `InstallFromLoja_ThenPluginWatcherReload_DiscoversDll` (integração)
+- `InstallFromLoja_PayloadFileNameContainsPathTraversal_Throws`
+- Concorrência/rollback tests: instalação paralela, falha no meio da cópia → rollback
+
+**Nota:** Loja local só instala módulos pré-cadastrados no `ModuleCatalog` — não é loja aberta.
+
+---
 
 ### P3 — Diagnóstico + recuperação
 
@@ -102,7 +142,7 @@
 
 | # | Ação | Notas |
 |---|------|-------|
-| P4.1 | Célula dedicada expondo HTTP mínimo | Usa `SimulationRuntime` |
+| P4.1 | Célula dedicada exposando HTTP mínimo | Usa `SimulationRuntime` |
 | P4.2 | Termux: `termux-services`; Linux: `systemd --user` | Conforme README |
 | P4.3 | Auth simples / localhost-first | Segurança antes de expor rede |
 
