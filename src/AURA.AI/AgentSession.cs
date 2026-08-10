@@ -76,7 +76,7 @@ namespace AURA.AI
             {
                 AgentChatResponse response = await _client.ChatToolsAsync(
                     _messages,
-                    _registry.Definitions(),
+                    _registry.Definitions().ToList(),
                     httpClient,
                     ct,
                     _systemPrompt).ConfigureAwait(false);
