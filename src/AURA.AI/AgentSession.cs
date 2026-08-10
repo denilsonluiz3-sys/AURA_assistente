@@ -66,7 +66,7 @@ namespace AURA.AI
 
                 if (!string.IsNullOrEmpty(response.Error))
                 {
-                    throw new InvalidOperationException(response.Error);
+                    throw new AgentLlmException(response.Error, response.ErrorKind);
                 }
 
                 if (response.ToolCalls is { Count: > 0 })
@@ -75,7 +75,11 @@ namespace AURA.AI
                     {
                         Role = "assistant",
                         Content = null,
-                        ToolCalls = response.ToolCalls
+                        ToolCalls = response.ToolCalls,
+                        // Precisa seguir junto com esta mensagem assistant:
+                        // é isto que faltava e causava o 400 "missing a
+                        // thought_signature" nos modelos Gemini 3.x.
+                        ReasoningDetails = response.ReasoningDetails
                     });
 
                     foreach (AgentToolCall call in response.ToolCalls)
