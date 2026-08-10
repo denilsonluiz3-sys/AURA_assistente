@@ -320,6 +320,74 @@ public class AgentToolsTests
         public Task<ExecutionResult> ExecuteAsync(ExecutionRequest request, CancellationToken cancellationToken = default)
             => Task.FromResult(ExecutionResult.Failed("should not be called"));
     }
+
+    [Fact]
+    public void AgentToolResult_FromText_ClassifiesErroPrefixAsFailure()
+    {
+        Assert.True(AgentToolResult.Ok("exit=0").Success);
+        Assert.False(AgentToolResult.Error("ERRO: algo").Success);
+        Assert.False(AgentToolResult.FromText("ERRO: algo").Success);
+        Assert.True(AgentToolResult.FromText("exit=0\nok").Success);
+    }
+
+    [Fact]
+    public async Task ShellAgentTool_StructuredResult_ClassifiesByExitCode()
+    {
+        string root = CreateTempWorkspace();
+        try
+        {
+            var tool = new ShellAgentTool(root, new ShellExecutor());
+            AgentToolResult ok = await tool.ExecuteStructuredAsync(
+                JsonSerializer.Serialize(new { command = "true" }));
+            Assert.True(ok.Success);
+
+            AgentToolResult fail = await tool.ExecuteStructuredAsync(
+                JsonSerializer.Serialize(new { command = "false" }));
+            Assert.False(fail.Success);
+            Assert.StartsWith("exit=", fail.Text);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SearchFiles_StructuredResult_Exit1IsSuccess()
+    {
+        string root = CreateTempWorkspace();
+        try
+        {
+            File.WriteAllText(Path.Combine(root, "a.txt"), "conteudo sem o termo");
+            var tool = new SearchFilesTool(root, new ShellExecutor());
+            AgentToolResult result = await tool.ExecuteStructuredAsync(
+                JsonSerializer.Serialize(new { query = "termo-inexistente-xyz" }));
+            Assert.True(result.Success);
+            Assert.Contains("nenhum resultado", result.Text);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task DefaultStructuredResult_DelegatesToExecuteAsync()
+    {
+        string root = CreateTempWorkspace();
+        try
+        {
+            var tool = new ReadFileTool(root);
+            AgentToolResult missing = await tool.ExecuteStructuredAsync(
+                JsonSerializer.Serialize(new { path = "nao-existe.txt" }));
+            Assert.False(missing.Success);
+            Assert.StartsWith("ERRO", missing.Text);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
 }
 
 public class AgentSessionMemoryTests
