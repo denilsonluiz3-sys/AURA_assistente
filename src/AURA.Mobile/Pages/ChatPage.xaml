@@ -35,11 +35,14 @@
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Padding="16,14" Spacing="0">
                 <Border Style="{StaticResource AuraCard}" Margin="0,0,0,4">
-                    <Label x:Name="AnswerLabel"
-                           Text="Digite sua pergunta abaixo."
-                           FontSize="14"
-                           LineBreakMode="WordWrap"
-                           TextColor="{DynamicResource AuraTextPrimary}" />
+                    <Editor x:Name="AnswerLabel"
+                            Text="Digite sua pergunta abaixo."
+                            IsReadOnly="True"
+                            AutoSize="TextChanges"
+                            MinimumHeightRequest="40"
+                            FontSize="14"
+                            BackgroundColor="Transparent"
+                            TextColor="{DynamicResource AuraTextPrimary}" />
                 </Border>
             </VerticalStackLayout>
         </ScrollView>

@@ -229,12 +229,16 @@ public partial class AgentPage : ContentPage
         // Prefixo de ícone para tool steps
         string display = isTool ? text : text;
 
-        var label = new Label
+        var label = new Editor
         {
             Text = display,
+            IsReadOnly = true,
             TextColor = textColor,
             FontSize = isTool ? 12 : 14,
-            LineBreakMode = LineBreakMode.WordWrap
+            BackgroundColor = Colors.Transparent,
+            AutoSize = Microsoft.Maui.Controls.AutoSizeOption.TextChanges,
+            MinimumHeightRequest = 24,
+            Margin = new Thickness(-4, -6)
         };
 
         var border = new Border
