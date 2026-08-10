@@ -77,7 +77,7 @@ namespace AURA.AI
         /// Converte <see cref="ExecutionResult"/> no formato de string esperado pelo
         /// <see cref="AgentSession"/> e pelo protocolo de mensagens tool.
         /// </summary>
-        internal static string FormatForLlm(ExecutionResult result)
+        public static string FormatForLlm(ExecutionResult result)
         {
             if (result == null)
             {
