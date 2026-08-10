@@ -3,9 +3,10 @@ using Android.App;
 using Android.Graphics;
 using Android.Graphics.Drawables;
 using Android.Views;
-using Android.Widget;
 using AURA.Mobile.Speech;
 using Microsoft.Extensions.DependencyInjection;
+using Button = Android.Widget.Button;
+using Color = Android.Graphics.Color;
 
 namespace AURA.Mobile.Platforms.Android
 {

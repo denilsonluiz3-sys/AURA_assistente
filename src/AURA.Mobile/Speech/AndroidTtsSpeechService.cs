@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using Android.Speech.Tts;
+using TextToSpeech = Android.Speech.Tts.TextToSpeech;
 
 namespace AURA.Mobile.Speech
 {
