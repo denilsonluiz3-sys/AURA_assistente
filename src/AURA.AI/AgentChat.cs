@@ -96,10 +96,16 @@ namespace AURA.AI
     public sealed class AgentStep
     {
         public AgentStep(string toolName, string arguments, string result)
+            : this(toolName, arguments, result, true)
+        {
+        }
+
+        public AgentStep(string toolName, string arguments, string result, bool success)
         {
             ToolName = toolName;
             Arguments = arguments;
             Result = result;
+            Success = success;
         }
 
         public string ToolName { get; }
@@ -107,5 +113,8 @@ namespace AURA.AI
         public string Arguments { get; }
 
         public string Result { get; }
+
+        /// <summary>Classificação de sucesso/erro (Fase B) — true para o construtor legado.</summary>
+        public bool Success { get; }
     }
 }

@@ -105,6 +105,73 @@ namespace AURA.AI
         }
 
         /// <summary>
+        /// Classifica pela semântica do grep: exit 1 = "nenhum resultado" é sucesso
+        /// (resultado válido), apenas cancelamento/timeout é falha. Texto idêntico ao
+        /// de <see cref="ExecuteAsync"/>.
+        /// </summary>
+        public override async Task<AgentToolResult> ExecuteStructuredAsync(
+            string argumentsJson, CancellationToken ct = default)
+        {
+            string query;
+            string path;
+            using (JsonDocument doc = JsonDocument.Parse(argumentsJson))
+            {
+                JsonElement root = doc.RootElement;
+                query = ReadString(root, "query") ?? string.Empty;
+                path = ReadString(root, "path") ?? ".";
+            }
+
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                return AgentToolResult.Error("ERRO: query vazia.");
+            }
+
+            string searchDir;
+            try
+            {
+                searchDir = ResolvePath(path);
+            }
+            catch (Exception ex)
+            {
+                return AgentToolResult.Error("ERRO: " + ex.Message);
+            }
+
+            if (!Directory.Exists(searchDir))
+            {
+                return AgentToolResult.Error("ERRO: diretório não existe: " + path);
+            }
+
+            if (!_executor.IsAvailable())
+            {
+                return AgentToolResult.Error("ERRO: shell não encontrado neste dispositivo.");
+            }
+
+            string command =
+                "grep -r -n -i -F -- " +
+                ShellQuote(query) + " " +
+                ShellQuote(searchDir) +
+                " 2>/dev/null | head -n " + MaxResultLines;
+
+            var request = new ExecutionRequest
+            {
+                Command = command,
+                WorkingDirectory = WorkspaceRoot,
+                Timeout = TimeSpan.FromSeconds(DefaultTimeoutSeconds)
+            };
+
+            ExecutionResult result = await _executor.ExecuteAsync(request, ct).ConfigureAwait(false);
+            bool cancelled = result != null &&
+                !string.IsNullOrWhiteSpace(result.StandardError) &&
+                result.StandardError.IndexOf("[AURA] Execução cancelada", StringComparison.Ordinal) >= 0;
+            if (cancelled)
+            {
+                return AgentToolResult.Error(FormatForLlm(result));
+            }
+
+            return AgentToolResult.Ok(FormatForLlm(result));
+        }
+
+        /// <summary>
         /// Converte <see cref="ExecutionResult"/> no formato de string esperado
         /// pelo <see cref="AgentSession"/>. Trata o exit 1 do grep (nenhuma
         /// ocorrência) como resultado válido — não como erro.

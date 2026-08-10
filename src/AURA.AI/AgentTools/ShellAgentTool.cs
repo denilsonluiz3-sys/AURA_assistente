@@ -74,6 +74,45 @@ namespace AURA.AI
         }
 
         /// <summary>
+        /// Classifica pelo exit code real do processo (não pela convenção "ERRO:"):
+        /// sucesso = exit 0 e sem cancelamento. O texto devolvido é idêntico ao de
+        /// <see cref="ExecuteAsync"/>.
+        /// </summary>
+        public override async Task<AgentToolResult> ExecuteStructuredAsync(
+            string argumentsJson, CancellationToken ct = default)
+        {
+            string command;
+            using (JsonDocument doc = JsonDocument.Parse(argumentsJson))
+            {
+                command = ReadString(doc.RootElement, "command") ?? string.Empty;
+            }
+
+            if (string.IsNullOrWhiteSpace(command))
+            {
+                return AgentToolResult.Error("ERRO: comando vazio.");
+            }
+
+            if (!_executor.IsAvailable())
+            {
+                return AgentToolResult.Error("ERRO: shell não encontrado neste dispositivo.");
+            }
+
+            var request = new ExecutionRequest
+            {
+                Command = command,
+                WorkingDirectory = _workspaceRoot,
+                Timeout = TimeSpan.FromSeconds(DefaultTimeoutSeconds)
+            };
+
+            ExecutionResult result = await _executor.ExecuteAsync(request, ct).ConfigureAwait(false);
+            bool success = result != null && result.Success &&
+                (result.StandardError?.IndexOf("[AURA] Execução cancelada", StringComparison.Ordinal) ?? -1) < 0;
+            return success
+                ? AgentToolResult.Ok(FormatForLlm(result))
+                : AgentToolResult.Error(FormatForLlm(result));
+        }
+
+        /// <summary>
         /// Converte <see cref="ExecutionResult"/> no formato de string esperado pelo
         /// <see cref="AgentSession"/> e pelo protocolo de mensagens tool.
         /// </summary>
