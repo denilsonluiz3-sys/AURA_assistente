@@ -219,6 +219,100 @@ public class AgentToolsTests
         Assert.Contains("stderr: err-line", text);
     }
 
+    [Fact]
+    public async Task SearchFiles_FindsTermInWorkspace()
+    {
+        string root = CreateTempWorkspace();
+        try
+        {
+            File.WriteAllText(Path.Combine(root, "a.cs"), "public void BuscaAqui() { }\n");
+            Directory.CreateDirectory(Path.Combine(root, "src"));
+            File.WriteAllText(Path.Combine(root, "src", "b.cs"), "var x = 1;\n");
+
+            var tool = new SearchFilesTool(root, new ShellExecutor());
+            string result = await tool.ExecuteAsync(
+                JsonSerializer.Serialize(new { query = "BuscaAqui" }));
+
+            Assert.Contains("exit=0", result);
+            Assert.Contains("a.cs:1", result);
+            Assert.Contains("BuscaAqui", result);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SearchFiles_NoMatch_ReturnsGrepExit1()
+    {
+        string root = CreateTempWorkspace();
+        try
+        {
+            File.WriteAllText(Path.Combine(root, "a.txt"), "conteudo sem o termo");
+            var tool = new SearchFilesTool(root, new ShellExecutor());
+
+            string result = await tool.ExecuteAsync(
+                JsonSerializer.Serialize(new { query = "termo-inexistente-xyz" }));
+
+            Assert.Contains("exit=1", result);
+            Assert.Contains("nenhum resultado", result);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SearchFiles_EmptyQuery_ReturnsErro()
+    {
+        var tool = new SearchFilesTool(Path.GetTempPath(), new ShellExecutor());
+        string result = await tool.ExecuteAsync("{\"query\":\"\"}");
+        Assert.Contains("ERRO", result);
+        Assert.Contains("vazia", result);
+    }
+
+    [Fact]
+    public async Task SearchFiles_PathOutsideWorkspace_ReturnsErro()
+    {
+        var tool = new SearchFilesTool(Path.GetTempPath(), new ShellExecutor());
+        string result = await tool.ExecuteAsync(
+            JsonSerializer.Serialize(new { query = "x", path = "../../etc" }));
+        Assert.Contains("ERRO", result);
+        Assert.Contains("workspace", result);
+    }
+
+    [Fact]
+    public async Task SearchFiles_UnavailableExecutor_ReturnsErro()
+    {
+        var tool = new SearchFilesTool(Path.GetTempPath(), new UnavailableExecutor());
+        string result = await tool.ExecuteAsync(
+            JsonSerializer.Serialize(new { query = "x" }));
+        Assert.Contains("ERRO", result);
+        Assert.Contains("shell", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SearchFiles_Definition_ExposesQueryRequired()
+    {
+        var tool = new SearchFilesTool(Path.GetTempPath(), new ShellExecutor());
+        Assert.Equal("search_files", tool.Definition.Name);
+        Assert.Contains("query", tool.Definition.Required);
+        Assert.Contains("path", tool.Definition.Parameters.Keys);
+    }
+
+    [Fact]
+    public void SearchFiles_CanBeRegisteredInToolRegistry()
+    {
+        var tool = new SearchFilesTool(Path.GetTempPath(), new ShellExecutor());
+        var registry = new ToolRegistry();
+        registry.Register(tool);
+
+        Assert.True(registry.Contains("search_files"));
+        Assert.Same(tool, registry.Resolve("search_files"));
+    }
+
     private sealed class UnavailableExecutor : IToolExecutor
     {
         public string Name => "unavailable";
