@@ -3,6 +3,7 @@ using Android.Content;
 using Android.Content.PM;
 using Android.OS;
 using System.Threading.Tasks;
+using AURA.Mobile.Platforms.Android;
 
 namespace AURA.Mobile;
 
@@ -21,6 +22,16 @@ public class MainActivity : MauiAppCompatActivity
         {
             base.OnCreate(savedInstanceState);
             AuraLog.Info("MainActivity.OnCreate OK");
+
+            // Botão flutuante de voz sobre todas as abas (fala a última resposta).
+            try
+            {
+                VoiceFloatingButton.Attach(this);
+            }
+            catch (Exception ex)
+            {
+                AuraLog.Exception("MainActivity.VoiceFloatingButton", ex);
+            }
         }
         catch (Exception ex)
         {
@@ -73,6 +84,7 @@ public class MainActivity : MauiAppCompatActivity
     {
         _projectPicker?.TrySetResult(null);
         _projectPicker = null;
+        VoiceFloatingButton.Detach();
         AuraLog.Info("MainActivity.OnDestroy");
         base.OnDestroy();
     }
