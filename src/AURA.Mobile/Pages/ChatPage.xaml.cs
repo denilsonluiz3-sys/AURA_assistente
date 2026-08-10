@@ -35,6 +35,8 @@ public partial class ChatPage : ContentPage
             return;
         }
 
+        QuestionEditor.Text = string.Empty;
+
         if (!string.IsNullOrWhiteSpace(apiKey) &&
             (apiKey.Length > 200 ||
              apiKey.IndexOfAny(new[] { ' ', '\t', '\r', '\n' }) >= 0))

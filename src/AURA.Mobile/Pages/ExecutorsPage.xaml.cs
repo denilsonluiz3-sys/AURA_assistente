@@ -78,6 +78,8 @@ public partial class ExecutorsPage : ContentPage
 
         ExecButton.IsEnabled = false;
         ResultEditor.Text = "Executando...";
+        CommandEntry.Text = string.Empty;
+        ArgsEntry.Text = string.Empty;
         try
         {
             ExecutionResult result = await executor.ExecuteAsync(request);
