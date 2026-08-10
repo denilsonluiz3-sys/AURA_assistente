@@ -17,6 +17,21 @@ public partial class RunPage : ContentPage
         _runner = runner;
     }
 
+    private async void OnCopyClicked(object sender, EventArgs e)
+    {
+        string text = ResultLabel.Text ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        await Clipboard.Default.SetTextAsync(text);
+        string original = CopyButton.Text;
+        CopyButton.Text = "✓ Copiado";
+        await Task.Delay(1500);
+        CopyButton.Text = original;
+    }
+
     private async void OnPickClicked(object sender, EventArgs e)
     {
         try

@@ -41,10 +41,22 @@
                 StrokeShape="RoundRectangle 12"
                 Padding="12">
             <VerticalStackLayout Spacing="8">
-                <Label Text="Executar"
-                       FontAttributes="Bold"
-                       FontSize="15"
-                       TextColor="{DynamicResource AuraTextPrimary}" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Label Text="Executar"
+                           FontAttributes="Bold"
+                           FontSize="15"
+                           TextColor="{DynamicResource AuraTextPrimary}"
+                           VerticalOptions="Center" />
+                    <Button Grid.Column="1"
+                            x:Name="CopyButton"
+                            Text="Copiar"
+                            Clicked="OnCopyClicked"
+                            BackgroundColor="{DynamicResource AuraSurface2}"
+                            TextColor="{DynamicResource AuraAccent}"
+                            Padding="12,4"
+                            CornerRadius="8"
+                            FontSize="12" />
+                </Grid>
                 <Picker x:Name="ExecutorPicker"
                         Title="Executor" />
                 <Entry x:Name="CommandEntry"

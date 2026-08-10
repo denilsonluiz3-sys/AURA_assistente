@@ -57,6 +57,36 @@ public partial class TerminalPage : ContentPage
         OutputStack.Children.Clear();
     }
 
+    private async void OnCopyClicked(object sender, EventArgs e)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var child in OutputStack.Children)
+        {
+            if (child is Label label && !string.IsNullOrEmpty(label.Text))
+            {
+                sb.AppendLine(label.Text);
+            }
+        }
+
+        string output = sb.ToString();
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return;
+        }
+
+        await Clipboard.Default.SetTextAsync(output.TrimEnd());
+        var button = sender as Button;
+        if (button == null)
+        {
+            return;
+        }
+
+        string original = button.Text;
+        button.Text = "✓";
+        await Task.Delay(1500);
+        button.Text = original;
+    }
+
     private async Task RunCommandAsync(string? input)
     {
         string command = input?.Trim() ?? string.Empty;
