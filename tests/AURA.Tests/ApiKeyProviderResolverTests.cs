@@ -90,6 +90,16 @@ public class ApiKeyProviderResolverTests
     }
 
     [Fact]
+    public void Detect_GeminiNewFormatPrefix_ResolvesGemini()
+    {
+        var resolver = new ApiKeyProviderResolver();
+        ProviderDetectionResult r = resolver.Detect(new ProviderCredential("AQ.Ab8RN6fakekeyforunit-tests00000000000000000"));
+
+        Assert.True(r.IsConclusive);
+        Assert.Equal("Google Gemini", r.Provider!.Name);
+    }
+
+    [Fact]
     public void Detect_UnknownPrefix_IsInconclusive_ButNotRejected()
     {
         // Regra 2: não rejeitar chave só porque o prefixo é desconhecido.

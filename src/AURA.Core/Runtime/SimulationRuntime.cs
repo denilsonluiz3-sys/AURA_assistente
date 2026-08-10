@@ -38,6 +38,9 @@ namespace AURA.Core.Runtime
         private readonly string _cellsRoot;
         private readonly CellStore _store;
         private readonly bool _persist;
+        private readonly object _logLock = new object();
+        private readonly ConcurrentDictionary<string, StreamWriter> _logWriters =
+            new ConcurrentDictionary<string, StreamWriter>(StringComparer.OrdinalIgnoreCase);
 
         public SimulationRuntime(ILogger logger)
             : this(logger, DefaultCellsRoot, new DirectoryCellBackend(), persist: true)
@@ -301,6 +304,7 @@ namespace AURA.Core.Runtime
 
             _backend.Delete(cell);
             _cells.TryRemove(id, out _);
+            CloseLogWriter(cell.Id);
             _logger.Info("Célula excluída: " + id);
 
             if (Events != null)
@@ -593,12 +597,47 @@ namespace AURA.Core.Runtime
 
             try
             {
-                Directory.CreateDirectory(cell.RootDirectory);
-                File.AppendAllText(cell.LogFile, DateTime.Now.ToString("HH:mm:ss") + " " + line + "\n", Encoding.UTF8);
+                lock (_logLock)
+                {
+                    StreamWriter writer = GetLogWriter(cell);
+                    writer.WriteLine(DateTime.Now.ToString("HH:mm:ss") + " " + line);
+                    writer.Flush();
+                }
             }
             catch
             {
                 // Log é best-effort.
+            }
+        }
+
+        private StreamWriter GetLogWriter(Cell cell)
+        {
+            if (_logWriters.TryGetValue(cell.Id, out StreamWriter existing))
+            {
+                return existing;
+            }
+
+            Directory.CreateDirectory(cell.RootDirectory);
+            var writer = new StreamWriter(cell.LogFile, append: true, Encoding.UTF8);
+            _logWriters[cell.Id] = writer;
+            return writer;
+        }
+
+        private void CloseLogWriter(string id)
+        {
+            lock (_logLock)
+            {
+                if (_logWriters.TryRemove(id, out StreamWriter writer))
+                {
+                    try
+                    {
+                        writer.Flush();
+                    }
+                    finally
+                    {
+                        writer.Dispose();
+                    }
+                }
             }
         }
 
@@ -617,13 +656,16 @@ namespace AURA.Core.Runtime
                 return;
             }
 
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-
             int exitCode;
             try
             {
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
                 await process.WaitForExitAsync();
+                // Drena a leitura assíncrona das saídas. Sem isso, linhas ainda
+                // pendentes nos streams podem ser entregues depois do processo
+                // ter sido reportado como terminado.
+                process.WaitForExit();
                 exitCode = process.ExitCode;
             }
             catch (Exception ex)
@@ -644,6 +686,8 @@ namespace AURA.Core.Runtime
             {
                 Recycle(cell);
             }
+
+            CloseLogWriter(cell.Id);
         }
 
         private void Recycle(Cell cell)
@@ -657,6 +701,7 @@ namespace AURA.Core.Runtime
             }
 
             _logger.Warning("Célula '" + cell.Id + "' caiu. Recriando a partir do template...");
+            CloseLogWriter(cell.Id);
             _backend.Delete(cell);
             _backend.Create(cell);
 
@@ -696,6 +741,23 @@ namespace AURA.Core.Runtime
 
             _cells.Clear();
             _processes.Clear();
+
+            lock (_logLock)
+            {
+                foreach (StreamWriter writer in _logWriters.Values)
+                {
+                    try
+                    {
+                        writer.Flush();
+                    }
+                    finally
+                    {
+                        writer.Dispose();
+                    }
+                }
+
+                _logWriters.Clear();
+            }
         }
 
         public static string ExpandUserHome(string path)
