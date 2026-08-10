@@ -13,8 +13,9 @@ namespace AURA.Tests
             root = Path.Combine(Path.GetTempPath(), "aura_mod_" + Path.GetRandomFileName());
             string packagesDir = Path.Combine(root, "modules");
             string modulesPath = Path.Combine(root, "config", "modules.json");
+            string pluginsRoot = Path.Combine(root, "plugins");
 
-            return new ModuleManager(new ConsoleLogger(), packagesDir, modulesPath);
+            return new ModuleManager(new ConsoleLogger(), packagesDir, modulesPath, events: null, httpHandler: null, pluginsRoot: pluginsRoot);
         }
 
         [Fact]
@@ -62,6 +63,15 @@ namespace AURA.Tests
                 Directory.CreateDirectory(Path.GetDirectoryName(packagePath));
                 File.WriteAllText(packagePath, "{\"id\":\"ai\",\"name\":\"IA\"}");
 
+                // simulate installed files for uninstall
+                string pluginsRoot = Path.Combine(root, "plugins");
+                Directory.CreateDirectory(pluginsRoot);
+                string installedFile = Path.Combine(pluginsRoot, "ai.dll");
+                File.WriteAllText(installedFile, "dll content");
+
+                string installedJsonPath = Path.Combine(Path.GetDirectoryName(packagePath), "installedFiles.json");
+                File.WriteAllText(installedJsonPath, "[\"ai.dll\"]");
+
                 Assert.True(manager.IsDownloaded("ai"));
                 Assert.False(manager.IsApplied("ai"));
 
@@ -75,6 +85,7 @@ namespace AURA.Tests
                 manager.Remove("ai");
                 Assert.False(manager.IsApplied("ai"));
                 Assert.False(File.Exists(packagePath));
+                Assert.False(File.Exists(installedFile));
             }
             finally
             {
