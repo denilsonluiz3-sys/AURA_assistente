@@ -29,10 +29,35 @@ namespace AURA.Modules.Loja
             Func<string, ModuleInfo?>? getById = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _lojaRoot = Environment.ExpandEnvironmentVariables(lojaRoot ?? "~/AURA/loja");
-            _packagesDir = Environment.ExpandEnvironmentVariables(packagesDir ?? "~/AURA/packages");
-            _pluginsRoot = Environment.ExpandEnvironmentVariables(pluginsRoot ?? "~/AURA/plugins");
+            _lojaRoot = NormalizePath(lojaRoot ?? "~/AURA/loja");
+            _packagesDir = NormalizePath(packagesDir ?? "~/AURA/packages");
+            _pluginsRoot = NormalizePath(pluginsRoot ?? "~/AURA/plugins");
             _getById = getById ?? ModuleCatalog.GetById;
+        }
+
+        private static string NormalizePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) path = "~/AURA/loja";
+
+            // expand ~ to user profile
+            if (path.StartsWith("~"))
+            {
+                string userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                string rest = path.Length > 1 && (path[1] == '/' || path[1] == '\\') ? path.Substring(2) : path.Substring(1);
+                path = string.IsNullOrEmpty(rest) ? userHome : Path.Combine(userHome, rest);
+            }
+
+            // expand environment variables like %APPDATA% or $VAR
+            path = Environment.ExpandEnvironmentVariables(path);
+
+            try
+            {
+                return Path.GetFullPath(path);
+            }
+            catch
+            {
+                return path;
+            }
         }
 
         public IReadOnlyList<LojaEntry> ListAvailable()
@@ -140,6 +165,9 @@ namespace AURA.Modules.Loja
                     }
                 }
 
+                // make sure plugins root exists
+                Directory.CreateDirectory(_pluginsRoot);
+
                 // copy to temp dir under pluginsRoot
                 string tmpInstallDir = Path.Combine(_pluginsRoot, ".tmp_install_" + id + "_" + Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(tmpInstallDir);
@@ -226,7 +254,8 @@ namespace AURA.Modules.Loja
         {
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(lockPath) ?? "");
+                var dir = Path.GetDirectoryName(lockPath);
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
                 // create or open with exclusive lock
                 return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             }
