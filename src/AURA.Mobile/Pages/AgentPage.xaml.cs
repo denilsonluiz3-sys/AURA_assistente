@@ -236,7 +236,7 @@ public partial class AgentPage : ContentPage
             TextColor = textColor,
             FontSize = isTool ? 12 : 14,
             BackgroundColor = Colors.Transparent,
-            AutoSize = Microsoft.Maui.Controls.AutoSizeOption.TextChanges,
+            AutoSize = Microsoft.Maui.Controls.EditorAutoSizeOption.TextChanges,
             MinimumHeightRequest = 24,
             Margin = new Thickness(-4, -6)
         };
