@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Collections.Generic;
 using AURA.Core.Logging;
 using AURA.Modules;
 using AURA.Modules.Loja;
@@ -52,7 +53,7 @@ namespace AURA.Tests
         [Fact]
         public void InstallFromLoja_CopiesPayloadAndWritesModuleJson()
         {
-            // pick a real id from ModuleCatalog that exists
+            // pick a real id (we'll inject a fake ModuleInfo to decouple from ModuleCatalog)
             string id = "executors";
 
             // arrange loja entry
@@ -64,20 +65,31 @@ namespace AURA.Tests
             var manifest = new LojaEntry { Id = id, PayloadFiles = { "Executors.dll" } };
             File.WriteAllText(Path.Combine(entry, "manifest.json"), JsonSerializer.Serialize(manifest));
 
+            // create a fake ModuleInfo to return from the injected delegate
+            var fakeInfo = new ModuleInfo
+            {
+                Id = id,
+                DisplayName = "Executors",
+                PackageVersion = "1.0.0",
+                ShortDescription = "Executors module",
+                Features = new System.Collections.Generic.List<string> { "Exec" },
+                Includes = new System.Collections.Generic.List<string> { "Executors" }
+            };
+
             var logger = new ConsoleLogger();
-            var resolver = new LojaLocalResolver(logger, _lojaRoot, _packagesDir, _pluginsRoot);
+            var resolver = new LojaLocalResolver(logger, _lojaRoot, _packagesDir, _pluginsRoot, getById: (x) => string.Equals(x, id, StringComparison.OrdinalIgnoreCase) ? fakeInfo : null);
 
             resolver.InstallFromLoja(id);
 
             // assert file copied
             Assert.True(File.Exists(Path.Combine(_pluginsRoot, "Executors.dll")));
 
-            // assert module.json exists in packages dir
+            // assert module.json exists in packages dir and contains expected id
             string moduleJson = Path.Combine(_packagesDir, id, "module.json");
             Assert.True(File.Exists(moduleJson));
             string json = File.ReadAllText(moduleJson);
-            Assert.Contains("id", json);
-            Assert.Contains(id, json);
+            using var doc = JsonDocument.Parse(json);
+            Assert.Equal(id, doc.RootElement.GetProperty("id").GetString(), ignoreCase: true);
         }
 
         public void Dispose()
