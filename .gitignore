@@ -41,3 +41,17 @@ Thumbs.db
 /tmp/
 *.log
 *.tmp
+
+# Local AURA development artifacts
+.aura/backup-*/
+.aura/cleanup-backup/
+.aura/legacy-scripts/
+.aura/diagnostico/
+.aura/memory-fix-*/
+*.bak
+*.bak-*
+*.patch.bak
+
+# Local workspace clone / runtime state
+/AURA_assistente/
+/memory.json
