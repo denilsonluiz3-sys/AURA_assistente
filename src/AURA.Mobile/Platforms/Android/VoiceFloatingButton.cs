@@ -3,6 +3,7 @@ using Android.App;
 using Android.Graphics;
 using Android.Graphics.Drawables;
 using Android.Views;
+using Android.Widget;
 using AURA.Mobile.Speech;
 using Microsoft.Extensions.DependencyInjection;
 using Button = Android.Widget.Button;
@@ -48,7 +49,7 @@ namespace AURA.Mobile.Platforms.Android
                 TextSize = 20
             };
             fab.SetAllCaps(false);
-            fab.SetBackgroundDrawable(CreateCircle(Color.ParseColor("#4f8aff"), Color.White));
+            fab.SetBackgroundDrawable(CreateCircle(activity, Color.ParseColor("#4f8aff"), Color.White));
             fab.SetTextColor(Color.White);
             fab.Gravity = GravityFlags.Center;
 
@@ -112,12 +113,12 @@ namespace AURA.Mobile.Platforms.Android
             }
         }
 
-        private static GradientDrawable CreateCircle(Color stroke, Color fill)
+        private static GradientDrawable CreateCircle(Activity activity, Color stroke, Color fill)
         {
             var d = new GradientDrawable();
             d.SetShape(ShapeType.Oval);
             d.SetColor(fill.ToArgb());
-            d.SetStroke(Dp(1), stroke);
+            d.SetStroke(Dp(activity, 1), stroke);
             return d;
         }
 

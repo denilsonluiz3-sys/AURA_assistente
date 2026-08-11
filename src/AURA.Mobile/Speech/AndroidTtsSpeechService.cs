@@ -120,8 +120,8 @@ namespace AURA.Mobile.Speech
             _pending[utteranceId] = tcs;
 
             tts.SetOnUtteranceProgressListener(new UtteranceListener(
-                id => Complete(id, completed: true),
-                id => Complete(id, completed: false)));
+                (id, _) => Complete(id, completed: true),
+                (id, _) => Complete(id, completed: false)));
 
             using (ct.Register(() => Complete(utteranceId, completed: false)))
             {
