@@ -22,10 +22,11 @@
                            TextColor="{DynamicResource AuraTextSecondary}" />
                 </VerticalStackLayout>
 
-                <!-- ── Orb central (conceito holográfico F1) ── -->
+                <!-- ── Orb central (conceito holográfico F1 + pulse F2) ── -->
                 <Grid HeightRequest="220" HorizontalOptions="Center" VerticalOptions="Center">
                     <!-- Anel externo -->
-                    <Border Stroke="{DynamicResource AuraAccent}"
+                    <Border x:Name="OuterRing"
+                            Stroke="{DynamicResource AuraAccent}"
                             StrokeThickness="1.5"
                             BackgroundColor="Transparent"
                             WidthRequest="200" HeightRequest="200"
@@ -35,7 +36,8 @@
                         </Border.StrokeShape>
                     </Border>
                     <!-- Anel médio -->
-                    <Border Stroke="{DynamicResource AuraCyan}"
+                    <Border x:Name="MiddleRing"
+                            Stroke="{DynamicResource AuraCyan}"
                             StrokeThickness="1"
                             BackgroundColor="Transparent"
                             WidthRequest="150" HeightRequest="150"
@@ -46,7 +48,8 @@
                         </Border.StrokeShape>
                     </Border>
                     <!-- Núcleo -->
-                    <Border BackgroundColor="{DynamicResource AuraAccentDim}"
+                    <Border x:Name="CoreOrb"
+                            BackgroundColor="{DynamicResource AuraAccentDim}"
                             WidthRequest="90" HeightRequest="90"
                             HorizontalOptions="Center" VerticalOptions="Center">
                         <Border.StrokeShape>
@@ -151,7 +154,8 @@
             <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="4">
 
                 <VerticalStackLayout Grid.Column="0" Spacing="2" HorizontalOptions="Center">
-                    <Button Text="🌐"
+                    <Button x:Name="BtnNetwork"
+                            Text="🌐"
                             FontSize="18"
                             BackgroundColor="Transparent"
                             TextColor="{DynamicResource AuraCyan}"
@@ -165,7 +169,8 @@
                 </VerticalStackLayout>
 
                 <VerticalStackLayout Grid.Column="1" Spacing="2" HorizontalOptions="Center">
-                    <Button Text="◎"
+                    <Button x:Name="BtnSensor"
+                            Text="◎"
                             FontSize="18"
                             BackgroundColor="Transparent"
                             TextColor="{DynamicResource AuraTextPrimary}"
@@ -179,7 +184,8 @@
                 </VerticalStackLayout>
 
                 <VerticalStackLayout Grid.Column="2" Spacing="2" HorizontalOptions="Center">
-                    <Button Text="◇"
+                    <Button x:Name="BtnEthereum"
+                            Text="◇"
                             FontSize="18"
                             BackgroundColor="Transparent"
                             TextColor="{DynamicResource AuraTextMuted}"
@@ -193,7 +199,8 @@
                 </VerticalStackLayout>
 
                 <VerticalStackLayout Grid.Column="3" Spacing="2" HorizontalOptions="Center">
-                    <Button Text="⚙"
+                    <Button x:Name="BtnSystem"
+                            Text="⚙"
                             FontSize="18"
                             BackgroundColor="Transparent"
                             TextColor="{DynamicResource AuraAccent}"
@@ -207,7 +214,8 @@
                 </VerticalStackLayout>
 
                 <VerticalStackLayout Grid.Column="4" Spacing="2" HorizontalOptions="Center">
-                    <Button Text="⬡"
+                    <Button x:Name="BtnDevice"
+                            Text="⬡"
                             FontSize="18"
                             BackgroundColor="Transparent"
                             TextColor="{DynamicResource AuraTextPrimary}"
