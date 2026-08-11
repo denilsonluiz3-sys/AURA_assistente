@@ -1,0 +1,150 @@
+{
+  "defaultProvider": "openrouter",
+  "defaultModel": "openrouter/free",
+
+  "providers": [
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "baseUrl": "https://openrouter.ai/api/v1/chat/completions",
+      "needsKey": true,
+      "keyEnv": "OPENROUTER_API_KEY",
+      "keyHint": "OPENROUTER_API_KEY",
+      "models": [
+        {
+          "id": "openrouter/free",
+          "label": "Auto Free",
+          "category": "Grátis",
+          "isFree": true
+        },
+        {
+          "id": "openai/gpt-oss-20b:free",
+          "label": "GPT-OSS 20B",
+          "category": "Grátis",
+          "isFree": true
+        },
+        {
+          "id": "google/gemma-4-26b-a4b-it:free",
+          "label": "Gemma 4 26B",
+          "category": "Grátis",
+          "isFree": true
+        },
+        {
+          "id": "nvidia/nemotron-3-nano-30b-a3b:free",
+          "label": "Nemotron Nano 30B",
+          "category": "Grátis",
+          "isFree": true
+        }
+      ]
+    },
+
+    {
+      "id": "groq",
+      "name": "Groq",
+      "baseUrl": "https://api.groq.com/openai/v1/chat/completions",
+      "needsKey": true,
+      "keyEnv": "GROQ_API_KEY",
+      "keyHint": "GROQ_API_KEY",
+      "models": [
+        {
+          "id": "llama-3.3-70b-versatile",
+          "label": "Llama 3.3 70B",
+          "category": "Grátis",
+          "isFree": true
+        },
+        {
+          "id": "llama-3.1-8b-instant",
+          "label": "Llama 3.1 8B",
+          "category": "Grátis",
+          "isFree": true
+        }
+      ]
+    },
+
+    {
+      "id": "cerebras",
+      "name": "Cerebras",
+      "baseUrl": "https://api.cerebras.ai/v1/chat/completions",
+      "needsKey": true,
+      "keyEnv": "CEREBRAS_API_KEY",
+      "keyHint": "CEREBRAS_API_KEY",
+      "models": [
+        {
+          "id": "llama-3.3-70b",
+          "label": "Llama 3.3 70B",
+          "category": "Grátis",
+          "isFree": true
+        },
+        {
+          "id": "llama-3.1-8b",
+          "label": "Llama 3.1 8B",
+          "category": "Grátis",
+          "isFree": true
+        }
+      ]
+    },
+
+    {
+      "id": "gemini",
+      "name": "Google Gemini",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      "needsKey": true,
+      "keyEnv": "GEMINI_API_KEY",
+      "keyHint": "GEMINI_API_KEY",
+      "models": [
+        {
+          "id": "gemini-2.5-flash",
+          "label": "Gemini 2.5 Flash",
+          "category": "Grátis",
+          "isFree": true
+        }
+      ]
+    },
+
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "baseUrl": "https://api.openai.com/v1/chat/completions",
+      "needsKey": true,
+      "keyEnv": "OPENAI_API_KEY",
+      "keyHint": "OPENAI_API_KEY",
+      "models": [
+        {
+          "id": "gpt-5-mini",
+          "label": "GPT-5 Mini",
+          "category": "Pago",
+          "isFree": false
+        },
+        {
+          "id": "gpt-5",
+          "label": "GPT-5",
+          "category": "Pago",
+          "isFree": false
+        }
+      ]
+    },
+
+    {
+      "id": "ollama",
+      "name": "Ollama (local/futuro)",
+      "baseUrl": "http://127.0.0.1:11434/v1/chat/completions",
+      "needsKey": false,
+      "keyEnv": "",
+      "keyHint": "não necessária",
+      "models": [
+        {
+          "id": "qwen2.5-coder:1.5b",
+          "label": "Qwen 2.5 Coder",
+          "category": "Local",
+          "isFree": true
+        },
+        {
+          "id": "llama3.2",
+          "label": "Llama 3.2",
+          "category": "Local",
+          "isFree": true
+        }
+      ]
+    }
+  ]
+}
