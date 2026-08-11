@@ -40,6 +40,17 @@
     <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <!--
+    Pacotes (manifestos) dos módulos embarcados no APK. O repositório é privado,
+    então raw.githubusercontent.com devolve 404 para o HttpClient anônimo do app;
+    estes assets são o fallback usado pelo ModuleManager quando o download
+    remoto falha, para que "Baixar/Aplicar" funcione offline e sem auth.
+  -->
+  <ItemGroup>
+    <MauiAsset Include="..\..\modules\packages\**\module.json"
+               LogicalName="modulepkgs/%(RecursiveDir)module.json" />
+  </ItemGroup>
+
   <!-- Referencia o Core/Abstractions/Agents/Memória/AI/rede/diagnóstico do repo GitHub. -->
   <ItemGroup>
     <ProjectReference Include="..\AURA.Abstractions\AURA.Abstractions.csproj" />

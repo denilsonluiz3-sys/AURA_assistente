@@ -135,5 +135,84 @@ namespace AURA.Tests
         {
             return manager.IsApplied(moduleId);
         }
+
+        /// <summary>
+        /// Repositório privado: o raw.githubusercontent.com responde 404 ao
+        /// HttpClient anônimo do app. O download deve cair no pacote embarcado
+        /// (MauiAsset no APK) em vez de falhar.
+        /// </summary>
+        [Fact]
+        public async Task DownloadAsync_WhenRemoteReturns404_FallsBackToEmbeddedPackage()
+        {
+            string repo = Assert.IsType<string>(RepoRoot());
+            ModuleInfo info = ModuleCatalog.GetById("executors");
+            Assert.NotNull(info);
+            string packagePath = Path.Combine(repo, "modules", "packages", "executors", "module.json");
+
+            string root = Path.Combine(Path.GetTempPath(), "aura_fb_" + Path.GetRandomFileName());
+            string packagesDir = Path.Combine(root, "modules");
+            string modulesPath = Path.Combine(root, "config", "modules.json");
+
+            // URL diferente da do catálogo => handler responde 404 (repo privado).
+            var handler = new PackageHandler(packagePath, "https://example.invalid/nope.json");
+            string embedded = File.ReadAllText(packagePath);
+
+            var manager = new ModuleManager(
+                new ConsoleLogger(), packagesDir, modulesPath, new EventBus(), handler,
+                localPackageProvider: _ => Task.FromResult(embedded));
+
+            try
+            {
+                await manager.DownloadAsync("executors");
+
+                Assert.True(manager.IsDownloaded("executors"));
+                Assert.Contains("\"id\": \"executors\"", File.ReadAllText(manager.GetPackagePath("executors")));
+
+                // O manifesto embarcado também aplica normalmente.
+                manager.Apply("executors");
+                Assert.True(manager.IsApplied("executors"));
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        }
+
+        /// <summary>Sem remoto e sem pacote embarcado, o erro é explícito.</summary>
+        [Fact]
+        public async Task DownloadAsync_WhenRemoteAndEmbeddedFail_ThrowsInvalidOperation()
+        {
+            string repo = Assert.IsType<string>(RepoRoot());
+            string packagePath = Path.Combine(repo, "modules", "packages", "executors", "module.json");
+
+            string root = Path.Combine(Path.GetTempPath(), "aura_fb_" + Path.GetRandomFileName());
+            var handler = new PackageHandler(packagePath, "https://example.invalid/nope.json");
+
+            var manager = new ModuleManager(
+                new ConsoleLogger(),
+                Path.Combine(root, "modules"),
+                Path.Combine(root, "config", "modules.json"),
+                new EventBus(),
+                handler,
+                localPackageProvider: _ => Task.FromResult<string>(null!));
+
+            try
+            {
+                var ex = await Assert.ThrowsAsync<System.InvalidOperationException>(
+                    () => manager.DownloadAsync("executors"));
+                Assert.Contains("executors", ex.Message);
+                Assert.False(manager.IsDownloaded("executors"));
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        }
     }
 }
