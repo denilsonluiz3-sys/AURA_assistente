@@ -1,0 +1,746 @@
+==========================================
+ COLETA PARA ANÁLISE - AURA
+ Data: Sun Aug  9 04:20:44 -03 2026
+==========================================
+
+===== 1. AgentSession.cs (arquivo do agente) =====
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Text.Json;
+using AURA.Core.Logging;
+using AURA.Memory;
+
+namespace AURA.AI
+{
+    /// <summary>
+    /// Loop agêntico sobre o OpenRouterClient: envia a conversa com as
+    /// ferramentas registradas, executa as chamadas de ferramenta solicitadas
+    /// pelo modelo, anexa os resultados e repete até o modelo responder texto
+    /// final (estilo opencode/agentes de terminal).
+    /// </summary>
+    public sealed class AgentSession
+    {
+        private const int MaxRounds = 20;
+
+        private readonly OpenRouterClient _client;
+        private readonly ILogger _logger;
+        private readonly List<AgentTool> _tools;
+        private readonly List<AgentMessage> _messages = new();
+        private readonly string? _systemPrompt;
+        private readonly SolutionStore _solutionStore;
+
+        public AgentSession(OpenRouterClient client, IEnumerable<AgentTool> tools,
+            string? systemPrompt = null, ILogger? logger = null)
+        {
+            _client = client ?? throw new ArgumentNullException(nameof(client));
+            _tools = (tools ?? Enumerable.Empty<AgentTool>()).ToList();
+            _systemPrompt = systemPrompt;
+            _logger = logger ?? new ConsoleLogger();
+            _solutionStore = new SolutionStore();
+        }
+
+        /// <summary>Emitido a cada ferramenta executada (para atualizar a UI).</summary>
+        public event Action<AgentStep>? Step;
+
+        public IReadOnlyList<AgentMessage> Messages => _messages;
+
+        public async Task<string> RunAsync(string userText,
+            HttpClient? httpClient = null, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(userText))
+            {
+                throw new ArgumentException("A instrução não pode ser vazia.", nameof(userText));
+            }
+
+            _messages.Add(new AgentMessage { Role = "user", Content = userText });
+
+            int round = 0;
+            while (round++ < MaxRounds)
+            {
+                AgentChatResponse response = await _client.ChatToolsAsync(
+                    _messages,
+                    _tools.Select(t => t.Definition).ToList(),
+                    httpClient,
+                    ct,
+                    _systemPrompt).ConfigureAwait(false);
+
+                if (!string.IsNullOrEmpty(response.Error))
+                {
+                    throw new InvalidOperationException(response.Error);
+                }
+
+                if (response.ToolCalls is { Count: > 0 })
+                {
+                    _messages.Add(new AgentMessage
+                    {
+                        Role = "assistant",
+                        Content = null,
+                        ToolCalls = response.ToolCalls
+                    });
+
+                    foreach (AgentToolCall call in response.ToolCalls)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        string result = await ExecuteToolAsync(call, ct).ConfigureAwait(false);
+                        _messages.Add(new AgentMessage
+                        {
+                            Role = "tool",
+                            ToolCallId = call.Id,
+                            Content = result
+                        });
+                        Step?.Invoke(new AgentStep(call.Name, call.ArgumentsJson, result));
+                        _logger.Info("agent: ferramenta='" + call.Name + "'");
+                    }
+
+                    continue;
+                }
+
+                string final = response.Content ?? "(resposta vazia)";
+                _messages.Add(new AgentMessage { Role = "assistant", Content = final });
+                return final;
+            }
+
+            throw new InvalidOperationException(
+                "O agente atingiu o limite de " + MaxRounds + " passos de ferramentas.");
+        }
+
+        /// <summary>
+        /// Consulta somente soluções que já foram validadas.
+        /// A consulta não executa a solução e não substitui a IA.
+        /// </summary>
+        private SolutionRule? TryGetKnownSolution(
+            RequestContext request)
+        {
+            if (request == null)
+            {
+                return null;
+            }
+
+            return _solutionStore.Find(
+                request.Intent,
+                request.Target,
+                request.Goal);
+        }
+
+        private async Task<string> ExecuteToolAsync(
+            AgentToolCall call,
+            CancellationToken ct)
+        {
+            AgentTool? tool = _tools.FirstOrDefault(
+                t => t.Definition.Name == call.Name);
+
+            if (tool == null)
+            {
+                return "ERRO: ferramenta desconhecida: " +
+                       call.Name;
+            }
+
+            try
+            {
+                string normalized =
+                    NormalizeToolArguments(
+                        call.Name,
+                        call.ArgumentsJson);
+
+                _logger.Info(
+                    "agent: argumentos normalizados='" +
+                    normalized + "'");
+
+                return await tool.ExecuteAsync(
+                    normalized,
+                    ct).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(
+                    "agent: falha na ferramenta '" +
+                    call.Name +
+                    "': " +
+                    ex.Message);
+
+                return "ERRO na ferramenta " +
+                       call.Name +
+                       ": " +
+                       ex.Message;
+            }
+        }
+
+        private static string NormalizeToolArguments(
+            string toolName,
+            string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return DefaultToolArguments(toolName);
+            }
+
+            string json = raw.Trim();
+
+            // Remove markdown ```json ... ```
+            if (json.StartsWith("```"))
+            {
+                int nl = json.IndexOf('\n');
+
+                if (nl >= 0)
+                {
+                    json = json.Substring(nl + 1);
+                }
+
+                int fence = json.LastIndexOf("```");
+
+                if (fence >= 0)
+                {
+                    json = json.Substring(0, fence);
+                }
+
+                json = json.Trim();
+            }
+
+            try
+            {
+                using JsonDocument doc =
+                    JsonDocument.Parse(json);
+
+                JsonElement root = doc.RootElement;
+
+                // Qwen às vezes devolve:
+                // [{"path":"teste.txt"}]
+                if (root.ValueKind ==
+                    JsonValueKind.Array &&
+                    root.GetArrayLength() > 0)
+                {
+                    root = root[0];
+                }
+
+                if (root.ValueKind !=
+                    JsonValueKind.Object)
+                {
+                    return DefaultToolArguments(toolName);
+                }
+
+                var output =
+                    new Dictionary<string, object?>(
+                        StringComparer.OrdinalIgnoreCase);
+
+                foreach (JsonProperty property
+                    in root.EnumerateObject())
+                {
+                    JsonElement value =
+                        property.Value;
+
+                    if (value.ValueKind ==
+                        JsonValueKind.String)
+                    {
+                        output[property.Name] =
+                            value.GetString();
+
+                        continue;
+                    }
+
+                    if (value.ValueKind ==
+                        JsonValueKind.Number)
+                    {
+                        output[property.Name] =
+                            value.ToString();
+
+                        continue;
+                    }
+
+                    if (value.ValueKind ==
+                            JsonValueKind.True ||
+                        value.ValueKind ==
+                            JsonValueKind.False)
+                    {
+                        output[property.Name] =
+                            value.GetBoolean();
+
+                        continue;
+                    }
+
+                    // Corrige:
+                    //
+                    // "path": {
+                    //   "type": "string",
+                    //   "description": "."
+                    // }
+                    //
+                    if (value.ValueKind ==
+                        JsonValueKind.Object)
+                    {
+                        if (value.TryGetProperty(
+                                "value",
+                                out JsonElement val) &&
+                            val.ValueKind ==
+                                JsonValueKind.String)
+                        {
+                            output[property.Name] =
+                                val.GetString();
+
+                            continue;
+                        }
+
+                        if (value.TryGetProperty(
+                                "description",
+                                out JsonElement desc) &&
+                            desc.ValueKind ==
+                                JsonValueKind.String)
+                        {
+                            // O modelo pode devolver o schema da
+                            // propriedade em vez do argumento real.
+                            //
+                            // Exemplo:
+                            // "path": {
+                            //   "type": "string",
+                            //   "description": "Caminho relativo..."
+                            // }
+                            //
+                            // A descrição NÃO deve virar o valor
+                            // do argumento.
+
+                            if (value.TryGetProperty(
+                                    "type",
+                                    out JsonElement type) &&
+                                type.ValueKind ==
+                                    JsonValueKind.String)
+                            {
+                                string typeName =
+                                    type.GetString() ?? "";
+
+                                if (typeName.Equals(
+                                        "string",
+                                        StringComparison.OrdinalIgnoreCase))
+                                {
+                                    // list_dir sem valor real =
+                                    // raiz do workspace.
+                                    if (property.Name.Equals(
+                                            "path",
+                                            StringComparison.OrdinalIgnoreCase) &&
+                                        toolName.Equals(
+                                            "list_dir",
+                                            StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        output[property.Name] = ".";
+                                    }
+                                    else
+                                    {
+                                        output[property.Name] = "";
+                                    }
+
+                                    continue;
+                                }
+                            }
+
+                            // Não usar a descrição de um schema
+                            // como argumento da ferramenta.
+                            output[property.Name] = "";
+                            continue;
+                        }
+
+                        if (value.TryGetProperty(
+                                "default",
+                                out JsonElement def) &&
+                            def.ValueKind ==
+                                JsonValueKind.String)
+                        {
+                            output[property.Name] =
+                                def.GetString();
+
+                            continue;
+                        }
+
+                        output[property.Name] = "";
+                        continue;
+                    }
+                }
+
+                // list_dir
+                if (toolName.Equals(
+                        "list_dir",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!output.TryGetValue(
+                            "path",
+                            out object? path) ||
+                        string.IsNullOrWhiteSpace(
+                            Convert.ToString(path)))
+                    {
+                        output["path"] = ".";
+                    }
+                }
+
+                // read_file
+                if (toolName.Equals(
+                        "read_file",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!output.ContainsKey("path"))
+                    {
+                        output["path"] = "";
+                    }
+                }
+
+                // run_shell
+                if (toolName.Equals(
+                        "run_shell",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    if (output.TryGetValue(
+                            "command",
+                            out object? command))
+                    {
+                        string cmd =
+                            Convert.ToString(command) ??
+                            "";
+
+                        output["command"] =
+                            CleanModelValue(cmd);
+                    }
+                }
+
+                // write_file
+                if (toolName.Equals(
+                        "write_file",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!output.ContainsKey("path"))
+                    {
+                        output["path"] = "";
+                    }
+
+                    if (!output.ContainsKey("content"))
+                    {
+                        output["content"] = "";
+                    }
+                }
+
+                // edit_file
+                if (toolName.Equals(
+                        "edit_file",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!output.ContainsKey("path"))
+                    {
+                        output["path"] = "";
+                    }
+
+                    if (!output.ContainsKey("old_text"))
+                    {
+                        output["old_text"] = "";
+                    }
+
+                    if (!output.ContainsKey("new_text"))
+                    {
+                        output["new_text"] = "";
+                    }
+                }
+
+                return JsonSerializer.Serialize(output);
+            }
+            catch (JsonException)
+            {
+                // Tenta extrair JSON escondido em texto.
+                int begin =
+                    json.IndexOf('{');
+
+                int finish =
+                    json.LastIndexOf('}');
+
+                if (begin >= 0 &&
+                    finish > begin)
+                {
+                    string extracted =
+                        json.Substring(
+                            begin,
+                            finish - begin + 1);
+
+                    return NormalizeToolArguments(
+                        toolName,
+                        extracted);
+                }
+
+                return DefaultToolArguments(toolName);
+            }
+        }
+
+        private static string DefaultToolArguments(
+            string toolName)
+        {
+            if (toolName.Equals(
+                    "list_dir",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return "{\"path\":\".\"}";
+            }
+
+            if (toolName.Equals(
+                    "read_file",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return "{\"path\":\"\"}";
+            }
+
+            if (toolName.Equals(
+                    "run_shell",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return "{\"command\":\"\"}";
+            }
+
+            if (toolName.Equals(
+                    "write_file",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return "{\"path\":\"\",\"content\":\"\"}";
+            }
+
+            if (toolName.Equals(
+                    "edit_file",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return "{\"path\":\"\",\"old_text\":\"\",\"new_text\":\"\"}";
+            }
+
+            return "{}";
+        }
+
+        private static string CleanModelValue(
+            string value)
+        {
+            string result =
+                value.Trim();
+
+            if (result.Length >= 2)
+            {
+                char first =
+                    result[0];
+
+                char last =
+                    result[result.Length - 1];
+
+                if ((first == '\'' &&
+                     last == '\'') ||
+                    (first == '"' &&
+                     last == '"'))
+                {
+                    result =
+                        result.Substring(
+                            1,
+                            result.Length - 2);
+                }
+            }
+
+            return result.Trim();
+        }
+
+    }
+}
+
+===== 2. Últimas 30 mensagens do git log =====
+2969a70 feat: conecta AgentSession ao conhecimento validado
+489ff66 feat: adiciona memória de soluções validadas
+05b398a Atualiza estado atual do AURA
+64c5955 fix(agent): improve Ollama tool argument handling
+8363fcc fix(mobile): disambiguate      Android Uri
+c6d42fc fix(mobile): disambiguate Android Uri
+606081a feat(mobile): add Android project access
+8dcba58 feat(installer): Etapa 4 - instalação de dependências (dry-run por padrão) (#6)
+320e273 feat(installer): Etapa 3 - escolha do ambiente reusando SystemAnalyzer (#5)
+1c8a02e refactor(sln): registra AURA.Installer via dotnet sln add / dotnet add reference (#4)
+9b4be7c feat(installer): pipeline Instalador Inteligente Etapas 1+2 (identificação + dependências) (#3)
+17b0058 fix(ci): CodeQL csharp builda AURA.sln e remove análise de actions (SARIF flaky) (#2)
+cd146ed fix(go): run --wait roda em primeiro plano e corrige smoke test Go (#1)
+f075d19 fix(tests): não falha no cleanup quando o dir temporário não existe
+730a62f fix(runtime): corrige Select do method group e null assignment no workdir
+8018fc1 feat(runtime): Runtime/Installer inteligente (blueprint C#)
+71a59dc Navegador: barra inferior, bloqueador de anúncios, bloqueio de captura de tela, célula isolada e anti-identificação (UA limpo + máscara de WebView)
+4c41e30 Navegador: opções consolidadas no menu, botão voltar volta na página e busca de imagem por toque longo
+c4d6b1d Navegador completo: abas múltiplas, barra de ferramentas, busca na página e configurações; renomeia launchers por extensão (DllLauncher/JarLauncher)
+6170dac fix: VpnHelper CS0234/CS0104 (sombreamento Android.App/Provider) + build-mobile.sh valida C# via -t:Compile (falso positivo ARM64)
+dab4b8d fix: incluir manifests cells e logs (gitignore cells/ e logs/ os suprimia)
+548569b Módulos opcionais: download/aplicar/remover via ModuleManager + gating de abas (core = navegador + central)
+63551c6 Navegador: buscador multi-servidor, imagem reversa, VPN e suporte a Tor (.onion)
+1587495 ci: build-mobile.sh em Release (XamlC) para pegar todos os erros XAML de uma vez
+b2fb043 fix: ItemsSource do Picker no code-behind (XamlC) + DisplayAlertAsync
+e10fe70 fix: Border.StrokeShape no ExecutorsPage (XamlC) + ResourceLimits anulável
+b15c3e8 ci: instalar API 36 no SDK do Codemagic antes do publish
+bd66605 ci: instalar versão exata do SDK fixada no global.json no Codemagic
+5cbf7bc ci: adicionar codemagic.yaml para build do APK Android (MAUI)
+eecee1a feat: status real dos módulos (implementado vs planejado) + documentação/script do build mobile
+
+===== 3. Status do git (mudanças não commitadas) =====
+?? .aura/auditoria/
+?? .aura/backup-agent-solution-20260808-162923/
+?? .aura/backup-agent-solution-v2-20260808-163705/
+?? .aura/backup-solutions-20260808-161907/
+?? CLAUDE.md
+?? coleta_analise.txt
+?? coleta_para_analise.sh
+?? scripts/auditoria-completa.sh
+?? scripts/auditoria-fluxo-real.sh
+?? scripts/instalar-memoria-solucoes.sh
+?? scripts/integrar-solutionstore-agent-v2.sh
+?? scripts/integrar-solutionstore-agent.sh
+?? scripts/mapear-capacidades-aura.sh
+
+===== 4. Estrutura de AURA.AI / AURA.Agents =====
+/data/data/com.termux/files/home/AURA/src/AURA.AI
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AgentTools
+/data/data/com.termux/files/home/AURA/src/AURA.Agents
+
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AgentSession.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AiAssistant.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/OpenRouterClient.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AgentChat.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/ProviderCatalog.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AiAssistantService.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AgentTool.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AgentTools/ShellAgentTool.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AgentTools/FileTools.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AgentTools/WorkspaceAgentTool.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Abstractions/IAgent.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Agents/AgentManager.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Pages/AgentPage.xaml.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Diagnostics/AgentWorkspace.cs
+
+===== 5. Arquivos alterados nos últimos 3 dias =====
+/data/data/com.termux/files/home/AURA/src/AURA.SystemInfo/SystemDiagnosticsResult.cs
+/data/data/com.termux/files/home/AURA/src/AURA.SystemInfo/SystemAnalyzer.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AgentSession.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AiAssistant.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/OpenRouterClient.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AgentChat.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/ProviderCatalog.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AiAssistantService.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AgentTool.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AgentTools/ShellAgentTool.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AgentTools/FileTools.cs
+/data/data/com.termux/files/home/AURA/src/AURA.AI/AgentTools/WorkspaceAgentTool.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/ArtifactType.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/IEnvironmentSelector.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/IFileIdentifier.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/IDependencyAnalyzer.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/IInstaller.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/PythonInstaller.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/DependencyReport.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/EnvironmentSelectionService.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/EnvironmentSelectionResult.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/ArtifactAnalysisService.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/ArtifactIdentification.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/PythonDependencyAnalyzer.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/PythonEnvironmentSelector.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/PythonStdlibModules.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/FileIdentifier.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/InstallationResult.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Installer/InstallationService.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Memory/SolutionRule.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Memory/RequestContext.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Memory/MemoryEntry.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Memory/MemoryStore.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Memory/SolutionStore.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Configuration/ModulesConfiguration.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Configuration/ConfigLoader.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Configuration/AuraConfiguration.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Bootstrap/AuraBootstrap.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/DependencyInjection/ServiceContainer.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Logging/FileLogger.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Logging/ILogger.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Logging/ConsoleLogger.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Launchers/Runner.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Launchers/NodeLauncher.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Launchers/CellCommand.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Launchers/DllLauncher.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Launchers/PythonLauncher.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Launchers/GoLauncher.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Launchers/JarLauncher.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Launchers/ILauncher.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/VersionInfo.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Runtime/PluginWatcher.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Runtime/CellState.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Runtime/SimulationRuntime.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Runtime/CellStore.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Runtime/Cell.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Runtime/DirectoryCellBackend.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Runtime/ICellBackend.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Runtime/ResourceLimits.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Abstractions/IModule.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Abstractions/ICommand.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Abstractions/IPlugin.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Abstractions/IAgent.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Abstractions/IService.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Events/EventBus.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Events/AuraEvents.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Core/Events/IEvent.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Network/NetworkManager.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Network/NetworkStatus.cs
+/data/data/com.termux/files/home/AURA/src/AURA.CLI/Program.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Agents/AgentManager.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/MainPage.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Pages/ImageSearchPage.xaml.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Pages/LogsPage.xaml.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Pages/BrowserSettingsPage.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Pages/TerminalPage.xaml.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Pages/MemoryPage.xaml.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Pages/AgentPage.xaml.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Pages/RunPage.xaml.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Pages/ExecutorsPage.xaml.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Pages/SectionPage.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Pages/ModulesPage.xaml.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Pages/ChatPage.xaml.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Pages/BrowserPage.xaml.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Pages/HomePage.xaml.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Pages/CellsPage.xaml.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Pages/FixesPage.xaml.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Diagnostics/RuntimeConfig.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Diagnostics/FixProposal.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Diagnostics/AgentWorkspace.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Diagnostics/SearchCatalog.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Diagnostics/ProjectAccessService.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/ViewModels/ModuleRow.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Platforms/Android/StoragePermissionHelper.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Platforms/Android/MainApplication.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Platforms/Android/AuraLog.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Platforms/Android/VpnHelper.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Platforms/Android/WebView/AuraLongClickListener.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Platforms/Android/WebView/AuraTouchListener.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Platforms/Android/WebView/AuraDownloadListener.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Platforms/Android/WebView/AuraWebViewHandler.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/Platforms/Android/MainActivity.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/MauiProgram.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Mobile/App.xaml.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Abstractions/Execution/ExecutionRequest.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Abstractions/Execution/IToolExecutor.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Abstractions/Execution/ExecutionResult.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Abstractions/Runtime/RuntimeModels.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Abstractions/Runtime/RuntimeInterfaces.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/Executors/PythonExecutor.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/Executors/NodeExecutor.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/Executors/GitExecutor.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/Executors/ProcessExecutorBase.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/Executors/ShellExecutor.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/ModuleManager.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/ModuleCatalog.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/ModuleInfo.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/ModuleDifficulty.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/ModuleStatus.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/Runtime/LanguageDetector.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/Runtime/BinaryPath.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/Runtime/SyntaxValidator.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/Runtime/Installer.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/Runtime/RuntimeProcessExecutor.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/Runtime/DependencyAnalyzer.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/Runtime/RuntimeCatalog.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/Runtime/RuntimeManager.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/Runtime/CompatibilityChecker.cs
+/data/data/com.termux/files/home/AURA/src/AURA.Modules/Runtime/RuntimeResolver.cs
+
+===== 6. Se auditoria_memoria_AURA.txt existir, incluir =====
+[Ainda não foi gerado - rode ./auditoria_memoria.sh primeiro]
+
+===== 7. Se existir backup da correção aplicada =====
+/data/data/com.termux/files/home/AURA/.aura/memory-fix-20260808-151647
+
+===== FIM DA COLETA =====

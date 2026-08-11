@@ -1,0 +1,1228 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+###############################################################################
+
+# AURA — GitHub Agents Bootstrap / Build / Commit / Push
+# 
+# O que este script faz:
+# 
+# 1. Detecta o repositório AURA
+# 
+# 2. Cria .github/copilot-instructions.md
+# 
+# 3. Cria os 7 agentes especializados
+# 
+# 4. Valida a estrutura
+# 
+# 5. Detecta alterações locais
+# 
+# 6. Executa build/test
+
+7. Detecta conflitos
+
+8. Atualiza a branch com segurança
+
+9. Cria commit
+
+10. Faz push
+
+Segurança:
+
+- NÃO usa git reset --hard
+
+- NÃO usa git clean -fd
+
+- NÃO usa git push --force
+
+- NÃO sobrescreve alterações locais sem confirmação
+
+- Interrompe em caso de conflito
+
+###############################################################################
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+
+if [[ -z "$ROOT" ]]; then
+echo "[ERRO] Execute este script dentro do repositório AURA."
+exit 1
+fi
+
+cd "$ROOT"
+
+PROJECT_NAME="AURA"
+AGENTS_DIR=".github/agents"
+INSTRUCTIONS_FILE=".github/copilot-instructions.md"
+
+DEFAULT_BRANCH="main"
+COMMIT_MESSAGE="chore: add AURA specialized GitHub agents"
+
+AUTO_PUSH="${AURA_AUTO_PUSH:-0}"
+AUTO_SYNC="${AURA_AUTO_SYNC:-1}"
+RUN_BUILD="${AURA_RUN_BUILD:-1}"
+RUN_TESTS="${AURA_RUN_TESTS:-1}"
+
+###############################################################################
+
+CORES / LOG
+
+###############################################################################
+
+info() {
+echo
+echo "[INFO] $*"
+}
+
+ok() {
+echo "[PASS] $*"
+}
+
+warn() {
+echo "[WARN] $*"
+}
+
+error() {
+echo "[ERRO] $*" >&2
+}
+
+die() {
+error "$*"
+exit 1
+}
+
+###############################################################################
+
+TRAP
+
+###############################################################################
+
+on_error() {
+local code=$?
+echo
+error "Script interrompido."
+error "Código: $code"
+echo
+echo "Verifique:"
+echo "  git status"
+echo "  git diff"
+echo "  git diff --cached"
+exit "$code"
+}
+
+trap on_error ERR
+
+###############################################################################
+
+DEPENDÊNCIAS
+
+###############################################################################
+
+command -v git >/dev/null 2>&1 || die "Git não encontrado."
+
+###############################################################################
+
+IDENTIFICAÇÃO
+
+###############################################################################
+
+info "Repositório: $ROOT"
+
+CURRENT_BRANCH="$(git branch --show-current)"
+
+if [[ -z "$CURRENT_BRANCH" ]]; then
+die "Não foi possível determinar a branch atual."
+fi
+
+info "Branch atual: $CURRENT_BRANCH"
+
+REMOTE_URL="$(git remote get-url origin 2>/dev/null || true)"
+
+if [[ -n "$REMOTE_URL" ]]; then
+info "Remote origin: $REMOTE_URL"
+else
+warn "Remote origin não configurado."
+fi
+
+###############################################################################
+
+DETECTAR ALTERAÇÕES LOCAIS
+
+###############################################################################
+
+info "Verificando alterações locais..."
+
+if ! git diff --quiet || ! git diff --cached --quiet; then
+warn "Existem alterações locais."
+
+git status --short
+
+echo
+read -r -p "Continuar preservando essas alterações? [s/N] " ANSWER
+
+if [[ ! "$ANSWER" =~ ^[sS]$ ]]; then
+    die "Abortado para preservar alterações locais."
+fi
+
+fi
+
+###############################################################################
+
+CRIAR DIRETÓRIOS
+
+###############################################################################
+
+mkdir -p "$AGENTS_DIR"
+
+###############################################################################
+
+COPILOT GLOBAL INSTRUCTIONS
+
+###############################################################################
+
+info "Criando instruções globais do AURA..."
+
+cat > "$INSTRUCTIONS_FILE" <<'EOF'
+
+AURA — Global Engineering Instructions
+
+Regra fundamental
+
+PESQUISAR ANTES DE IMPLEMENTAR.
+
+Nunca criar uma implementação nova antes de pesquisar o
+repositório inteiro em busca de código existente.
+
+Implementar uma vez
+
+Antes de criar qualquer:
+
+- interface
+- classe
+- serviço
+- executor
+- provider
+- parser
+- sistema de logging
+- sistema de configuração
+
+procurar primeiro por uma implementação existente.
+
+Se uma implementação puder ser generalizada para atender múltiplas
+necessidades, preferir sua evolução à duplicação.
+
+Causa raiz
+
+Não mascarar sintomas com:
+
+- delays arbitrários;
+- retries cegos;
+- código duplicado;
+- hacks;
+- workarounds permanentes.
+
+Determinar a causa raiz antes da correção.
+
+Arquitetura
+
+Preservar a separação:
+
+Application
+→ Core
+→ Agent Engine
+→ Provider
+→ Tools
+→ Platform
+
+UI não deve conter lógica do agente.
+
+Provider não deve executar ferramentas.
+
+Android não deve contaminar o Core sem necessidade.
+
+Segurança
+
+Nunca colocar secrets em:
+
+- código;
+- logs;
+- testes;
+- commits;
+- mensagens;
+- exceptions.
+
+Android
+
+Android não deve ser tratado como desktop.
+
+Considerar:
+
+- sandbox;
+- permissões;
+- lifecycle;
+- filesystem;
+- processos;
+- runtime;
+- background execution.
+
+Validação
+
+Toda alteração relevante deve ser validada por:
+
+- build;
+- testes;
+- integração quando aplicável;
+- análise de regressão.
+
+Fluxo obrigatório
+
+REQUEST
+→ DISCOVERY
+→ AUDIT
+→ ARCHITECTURE
+→ IMPLEMENT
+→ BUILD
+→ TEST
+→ SECURITY
+→ VERIFY
+→ COMMIT
+→ PUSH
+
+Regra de Git
+
+Nunca usar automaticamente:
+
+git reset --hard
+git clean -fd
+git push --force
+
+Em conflito, preservar o trabalho existente e parar para análise.
+EOF
+
+###############################################################################
+
+AGENT 1 — ARCHITECT
+
+###############################################################################
+
+info "Criando AURA Architect..."
+
+cat > "$AGENTS_DIR/aura-architect.agent.md" <<'EOF'
+
+name: AURA Architect
+description: Arquiteto principal do AURA. Coordena arquitetura, pesquisa implementações existentes e impede duplicação.
+tools:
+
+- read
+- search
+- edit
+- terminal
+
+---
+
+AURA Architect
+
+Você é o arquiteto principal do AURA.
+
+Regra fundamental
+
+NUNCA comece implementando.
+
+Primeiro:
+
+1. Entenda o problema.
+2. Mapeie a arquitetura.
+3. Pesquise o repositório inteiro.
+4. Localize interfaces.
+5. Localize classes.
+6. Localize métodos.
+7. Localize consumidores.
+8. Procure implementações equivalentes.
+9. Procure duplicações.
+10. Só então escolha a solução.
+
+Implementar uma vez
+
+Antes de criar uma nova abstração:
+
+- procure serviços existentes;
+- procure executores;
+- procure providers;
+- procure pipelines;
+- procure eventos;
+- procure configuração;
+- procure persistência;
+- procure logging;
+- procure testes.
+
+Prefira reutilizar ou generalizar.
+
+Processo
+
+PROBLEMA
+→ ARQUITETURA
+→ IMPLEMENTAÇÕES EXISTENTES
+→ DUPLICAÇÕES
+→ CONTRATOS
+→ DEPENDÊNCIAS
+→ OPÇÕES
+→ DECISÃO
+→ IMPLEMENTAÇÃO
+→ TESTES
+→ VERIFICAÇÃO
+
+Não faça
+
+Não crie arquitetura paralela.
+
+Não duplique lógica.
+
+Não altere contratos sem verificar consumidores.
+
+Não declare sucesso sem validação.
+
+Relatório
+
+Informe:
+
+- causa raiz;
+- arquivos;
+- classes;
+- métodos;
+- implementação reutilizada;
+- alterações;
+- riscos;
+- testes;
+- problemas restantes.
+  EOF
+
+###############################################################################
+
+AGENT 2 — CODE AUDITOR
+
+###############################################################################
+
+info "Criando AURA Code Auditor..."
+
+cat > "$AGENTS_DIR/aura-code-auditor.agent.md" <<'EOF'
+
+name: AURA Code Auditor
+description: Auditor que pesquisa todo o AURA antes de qualquer implementação para localizar código existente e duplicações.
+tools:
+
+- read
+- search
+- terminal
+
+---
+
+AURA Code Auditor
+
+Sua missão é responder:
+
+"Isso já existe?"
+
+Antes de qualquer implementação.
+
+Investigue
+
+Pesquise:
+
+- nomes;
+- interfaces;
+- classes;
+- métodos;
+- chamadas;
+- DI;
+- configurações;
+- testes;
+- módulos;
+- implementações semanticamente equivalentes.
+
+Detecte
+
+- código duplicado;
+- serviços equivalentes;
+- executores duplicados;
+- providers duplicados;
+- parsers duplicados;
+- abstrações sobrepostas;
+- código morto;
+- adapters desnecessários.
+
+Classificação
+
+Cada descoberta deve ser classificada como:
+
+[REUTILIZAR]
+[GENERALIZAR]
+[INTEGRAR]
+[SUBSTITUIR]
+[REMOVER]
+[NOVA IMPLEMENTAÇÃO]
+
+Nunca recomendar nova implementação sem demonstrar que o existente não atende.
+
+Saída
+
+Arquivo
+→ Classe
+→ Método
+→ Responsabilidade
+→ Consumidores
+→ O que resolve
+→ O que falta
+→ Recomendação
+EOF
+
+###############################################################################
+
+AGENT 3 — ANDROID
+
+###############################################################################
+
+info "Criando AURA Android MAUI..."
+
+cat > "$AGENTS_DIR/aura-android.agent.md" <<'EOF'
+
+name: AURA Android MAUI
+description: Especialista em AURA.Mobile, .NET MAUI Android, filesystem, processos, permissões, runtime e módulos.
+tools:
+
+- read
+- search
+- edit
+- terminal
+
+---
+
+AURA Android MAUI
+
+Especialista em:
+
+- AURA.Mobile
+- .NET MAUI
+- Android
+- Activity
+- Services
+- permissions
+- filesystem
+- Process
+- runtime
+- assemblies
+- módulos
+- lifecycle
+- threading
+
+Regra
+
+Nunca tratar Android como desktop.
+
+Antes de implementar:
+
+1. identificar API;
+2. verificar permissões;
+3. verificar sandbox;
+4. verificar lifecycle;
+5. verificar runtime;
+6. pesquisar código existente;
+7. verificar compatibilidade MAUI.
+
+Executor
+
+Investigue:
+
+- stdout;
+- stderr;
+- concorrência;
+- locks;
+- timeout;
+- cancellation;
+- exit code;
+- descarte;
+- perda de saída.
+
+Não criar segundo executor se já existir um central.
+
+Módulos
+
+Verifique:
+
+- descoberta;
+- carregamento;
+- versionamento;
+- dependências;
+- assinatura;
+- integridade;
+- Reflection;
+- trimming/linker.
+
+Relatório
+
+Informe API, permissões, limitações Android, implementação existente,
+alterações, testes e riscos.
+EOF
+
+###############################################################################
+
+AGENT 4 — AI PROVIDER
+
+###############################################################################
+
+info "Criando AURA AI Provider..."
+
+cat > "$AGENTS_DIR/aura-ai-provider.agent.md" <<'EOF'
+
+name: AURA AI Provider
+description: Especialista em ILLMProvider, ProviderRegistry, OpenAI, OpenRouter, Anthropic, Gemini, Ollama, tool calling e respostas normalizadas.
+tools:
+
+- read
+- search
+- edit
+- terminal
+
+---
+
+AURA AI Provider
+
+Especialista em:
+
+- ILLMProvider
+- ProviderRegistry
+- OpenAI
+- OpenRouter
+- Anthropic
+- Gemini
+- Ollama
+- API keys
+- modelos
+- streaming
+- tool calls
+- reasoning
+- capabilities
+- erros
+- retries
+
+Arquitetura
+
+Application
+→ ILLMProvider
+→ ProviderRegistry
+→ Provider específico
+→ ProviderResponse
+
+Chaves
+
+Ao receber uma chave:
+
+1. detectar formato;
+2. identificar provider provável;
+3. validar configuração;
+4. nunca registrar segredo;
+5. nunca expor segredo.
+
+ProviderResponse
+
+Verifique:
+
+- Content;
+- ToolCalls;
+- Reasoning;
+- Usage;
+- FinishReason;
+- Errors;
+- metadata.
+
+Não espalhar diferenças específicas dos providers pelo AgentEngine.
+
+Tool calling
+
+Verificar:
+
+- schema;
+- argumentos;
+- múltiplas chamadas;
+- chamadas paralelas;
+- resultados;
+- erros;
+- continuação.
+
+Regra
+
+Antes de modificar ILLMProvider, localizar todos os consumidores e providers.
+EOF
+
+###############################################################################
+
+AGENT 5 — AGENT ENGINE
+
+###############################################################################
+
+info "Criando AURA Agent Engine..."
+
+cat > "$AGENTS_DIR/aura-agent-engine.agent.md" <<'EOF'
+
+name: AURA Agent Engine
+description: Especialista no ciclo de execução de agentes, AgentSession, ferramentas, contexto, memória e estado.
+tools:
+
+- read
+- search
+- edit
+- terminal
+
+---
+
+AURA Agent Engine
+
+Especialista em:
+
+- AgentSession;
+- execution loop;
+- planning;
+- tool calling;
+- tool results;
+- context;
+- memory;
+- state;
+- retries;
+- cancellation;
+- observability.
+
+Ciclo
+
+LLM
+↓
+decisão
+↓
+ToolCall
+↓
+Tool Executor
+↓
+ToolResult
+↓
+Agent State
+↓
+LLM
+
+Provider não executa ferramentas.
+
+Investigar
+
+1. criação da sessão;
+2. contexto;
+3. mensagem;
+4. LLM;
+5. interpretação;
+6. tools;
+7. execução;
+8. resultados;
+9. estado;
+10. continuação;
+11. conclusão;
+12. persistência.
+
+Falhas
+
+Tratar:
+
+- timeout;
+- cancelamento;
+- provider failure;
+- tool failure;
+- argumentos inválidos;
+- loop infinito;
+- chamadas repetidas;
+- contexto excessivo;
+- estado inconsistente.
+
+Memória
+
+Distinguir:
+
+- contexto temporário;
+- histórico;
+- memória persistente;
+- estado de execução.
+
+Não misturar os conceitos.
+EOF
+
+###############################################################################
+
+AGENT 6 — TESTING
+
+###############################################################################
+
+info "Criando AURA Testing..."
+
+cat > "$AGENTS_DIR/aura-testing.agent.md" <<'EOF'
+
+name: AURA Testing
+description: Especialista em testes, regressão, concorrência, integração, build e validação do AURA.
+tools:
+
+- read
+- search
+- edit
+- terminal
+
+---
+
+AURA Testing
+
+Sua missão é provar que alterações funcionam.
+
+"Compilou" não significa "funciona".
+
+Para cada mudança
+
+1. identificar comportamento esperado;
+2. identificar comportamento atual;
+3. localizar/criar teste;
+4. reproduzir;
+5. corrigir;
+6. executar regressão;
+7. executar build;
+8. validar integração.
+
+Prioridade
+
+- unit;
+- integration;
+- providers;
+- AgentSession;
+- tool calling;
+- executor;
+- concurrency;
+- filesystem;
+- modules;
+- Android;
+- persistence.
+
+Concorrência
+
+Investigue especialmente:
+
+- race conditions;
+- stdout/stderr;
+- File.AppendAllText;
+- locks;
+- Tasks;
+- cancellation;
+- shared state;
+- events.
+
+Comportamentos intermitentes devem ser reproduzidos múltiplas vezes.
+
+Resultado
+
+TESTE
+→ EXPECTATIVA
+→ RESULTADO
+→ FALHA
+→ CAUSA
+→ CORREÇÃO
+→ REGRESSÃO
+→ BUILD
+
+Não declarar sucesso sem evidência.
+EOF
+
+###############################################################################
+
+AGENT 7 — SECURITY
+
+###############################################################################
+
+info "Criando AURA Security..."
+
+cat > "$AGENTS_DIR/aura-security.agent.md" <<'EOF'
+
+name: AURA Security
+description: Especialista em segurança, secrets, execução de comandos, módulos, permissões Android e supply chain do AURA.
+tools:
+
+- read
+- search
+- edit
+- terminal
+
+---
+
+AURA Security
+
+Analise:
+
+- API keys;
+- secrets;
+- logs;
+- filesystem;
+- processos;
+- comandos;
+- terminal;
+- módulos;
+- assemblies;
+- Reflection;
+- downloads;
+- catálogo remoto;
+- assinaturas;
+- permissões Android;
+- tool calls;
+- entrada de usuário.
+
+Secrets
+
+Nunca permitir:
+
+- hardcode;
+- logging;
+- exceptions contendo secrets;
+- UI expondo secrets;
+- commits contendo secrets.
+
+Execução
+
+Verifique:
+
+- command injection;
+- argumentos;
+- quoting;
+- paths;
+- permissions;
+- working directory;
+- timeout;
+- privilege escalation;
+- stdout/stderr.
+
+Módulos
+
+Verifique:
+
+- origem;
+- integridade;
+- assinatura;
+- versão;
+- dependências;
+- confiança;
+- rollback;
+- atualização.
+
+Classificação
+
+CRÍTICO
+ALTO
+MÉDIO
+BAIXO
+INFORMATIVO
+
+Nunca expor secrets encontrados durante auditoria.
+EOF
+
+###############################################################################
+
+VALIDAÇÃO DOS ARQUIVOS
+
+###############################################################################
+
+info "Validando estrutura..."
+
+EXPECTED_FILES=(
+"$INSTRUCTIONS_FILE"
+"$AGENTS_DIR/aura-architect.agent.md"
+"$AGENTS_DIR/aura-code-auditor.agent.md"
+"$AGENTS_DIR/aura-android.agent.md"
+"$AGENTS_DIR/aura-ai-provider.agent.md"
+"$AGENTS_DIR/aura-agent-engine.agent.md"
+"$AGENTS_DIR/aura-testing.agent.md"
+"$AGENTS_DIR/aura-security.agent.md"
+)
+
+for FILE in "${EXPECTED_FILES[@]}"; do
+if [[ ! -s "$FILE" ]]; then
+die "Arquivo ausente ou vazio: $FILE"
+fi
+
+ok "$FILE"
+
+done
+
+###############################################################################
+
+GIT DIFF
+
+###############################################################################
+
+info "Alterações geradas:"
+
+git status --short
+
+echo
+git diff --stat
+
+###############################################################################
+
+BUILD
+
+###############################################################################
+
+find_solution_or_project() {
+find . 
+-type f 
+-name ".sln" -o -name ".slnx" -o -name ".csproj" 
+-not -path "./.git/" 
+| sort 
+| head -1
+}
+
+if [[ "$RUN_BUILD" == "1" ]]; then
+
+BUILD_TARGET="$(find_solution_or_project || true)"
+
+if [[ -n "$BUILD_TARGET" ]]; then
+
+    info "Projeto detectado: $BUILD_TARGET"
+
+    if [[ "$BUILD_TARGET" == *.sln || "$BUILD_TARGET" == *.slnx ]]; then
+        info "Executando dotnet build..."
+        dotnet build "$BUILD_TARGET" --nologo
+    else
+        info "Executando dotnet build..."
+        dotnet build "$BUILD_TARGET" --nologo
+    fi
+
+    ok "Build concluído."
+else
+    warn "Nenhuma solution/project .NET encontrada."
+fi
+
+fi
+
+###############################################################################
+
+TESTES
+
+###############################################################################
+
+if [[ "$RUN_TESTS" == "1" ]]; then
+
+TEST_PROJECTS="$(find . \
+    -type f \
+    -name "*Tests.csproj" -o -name "*Test.csproj" \
+    -not -path "./.git/*" \
+    | sort)"
+
+if [[ -n "$TEST_PROJECTS" ]]; then
+
+    info "Projetos de teste encontrados."
+
+    while IFS= read -r TEST_PROJECT; do
+        [[ -z "$TEST_PROJECT" ]] && continue
+
+        info "Executando: $TEST_PROJECT"
+
+        dotnet test "$TEST_PROJECT" \
+            --no-restore \
+            --nologo
+    done <<< "$TEST_PROJECTS"
+
+    ok "Testes concluídos."
+else
+    warn "Nenhum projeto de testes encontrado."
+fi
+
+fi
+
+###############################################################################
+
+VERIFICAR CONFLITOS EXISTENTES
+
+###############################################################################
+
+info "Verificando conflitos Git..."
+
+if git ls-files -u | grep -q .; then
+error "Existem conflitos de merge/rebase pendentes."
+
+git status
+
+echo
+echo "Resolva os conflitos antes de continuar."
+echo
+echo "Comandos úteis:"
+echo "  git diff"
+echo "  git status"
+echo "  git add <arquivo>"
+echo "  git rebase --continue"
+echo "  git merge --continue"
+
+exit 2
+
+fi
+
+###############################################################################
+
+SINCRONIZAÇÃO COM ORIGIN
+
+###############################################################################
+
+if [[ "$AUTO_SYNC" == "1" && -n "$REMOTE_URL" ]]; then
+
+info "Atualizando referências remotas..."
+
+git fetch origin --prune
+
+if git show-ref --verify --quiet "refs/remotes/origin/$CURRENT_BRANCH"; then
+
+    AHEAD="$(git rev-list --count "origin/$CURRENT_BRANCH..$CURRENT_BRANCH")"
+    BEHIND="$(git rev-list --count "$CURRENT_BRANCH..origin/$CURRENT_BRANCH")"
+
+    info "Ahead: $AHEAD"
+    info "Behind: $BEHIND"
+
+    if [[ "$BEHIND" -gt 0 ]]; then
+
+        warn "A branch remota possui commits que não estão localmente."
+
+        echo
+        echo "Será usado:"
+        echo "  git pull --rebase"
+
+        echo
+        read -r -p "Continuar com rebase? [s/N] " ANSWER
+
+        if [[ "$ANSWER" =~ ^[sS]$ ]]; then
+
+            if ! git pull --rebase origin "$CURRENT_BRANCH"; then
+
+                error "Conflito durante rebase."
+
+                echo
+                git status
+
+                echo
+                echo "Resolva manualmente e execute:"
+                echo "  git add <arquivos>"
+                echo "  git rebase --continue"
+
+                echo
+                echo "Para cancelar:"
+                echo "  git rebase --abort"
+
+                exit 3
+            fi
+
+            ok "Rebase concluído."
+        else
+            die "Sincronização recusada."
+        fi
+    fi
+fi
+
+fi
+
+###############################################################################
+
+CONFERIR SE HÁ ALTERAÇÕES
+
+###############################################################################
+
+if git diff --quiet && git diff --cached --quiet; then
+info "Nenhuma alteração para commit."
+exit 0
+fi
+
+###############################################################################
+
+STAGE
+
+###############################################################################
+
+info "Adicionando arquivos dos agentes..."
+
+git add "$INSTRUCTIONS_FILE" "$AGENTS_DIR"
+
+###############################################################################
+
+VERIFICAR STAGED
+
+###################################################################
+VERIFICAR STAGED
+
+###############################################################################
+
+info "Arquivos preparados para commit:"
+
+git status --short
+
+echogit diff --cached --stat
+
+###############################################################################
+
+COMMIT
+
+###############################################################################
+
+echoread -r -p "Criar commit '$COMMIT_MESSAGE'? [S/n] " COMMIT_ANSWER
+
+if [[ -z "$COMMIT_ANSWER" || "$COMMIT_ANSWER" =~ ^[sSyY]$ ]]; then
+
+git commit -m "$COMMIT_MESSAGE"
+
+ok "Commit criado."
+
+else
+
+warn "Commit cancelado."
+exit 0
+
+fi
+
+###############################################################################
+
+PUSH
+
+###############################################################################
+
+if [[ -z "$REMOTE_URL" ]]; thenwarn "Remote origin não configurado. Push não executado."exit 0fi
+
+echoread -r -p "Fazer push para origin/$CURRENT_BRANCH? [S/n] " PUSH_ANSWER
+
+if [[ -z "$PUSH_ANSWER" || "$PUSH_ANSWER" =~ ^[sSyY]$ ]]; then
+
+info "Executando push..."
+
+if ! git push -u origin "$CURRENT_BRANCH"; then
+
+    error "Push rejeitado."
+
+    echo
+    echo "Possíveis causas:"
+    echo "  - branch remota avançou"
+    echo "  - proteção da branch"
+    echo "  - conflito"
+    echo "  - autenticação"
+    echo "  - permissão"
+
+    echo
+    echo "Estado atual:"
+    git status
+
+    echo
+    echo "IMPORTANTE:"
+    echo "Não será executado push --force automaticamente."
+
+    exit 4
+fi
+
+ok "Push concluído."
+
+elsewarn "Push cancelado pelo usuário."fi
+
+###############################################################################
+
+FINAL
+
+###############################################################################
+
+echoecho "============================================================"echo " AURA AGENTS — CONCLUÍDO"echo "============================================================"echoecho "Branch:"echo "  $CURRENT_BRANCH"echoecho "Agentes:"echo "  aura-architect"echo "  aura-code-auditor"echo "  aura-android"echo "  aura-ai-provider"echo "  aura-agent-engine"echo "  aura-testing"echo "  aura-security"echoecho "Instruções:"echo "  $INSTRUCTIONS_FILE"echoecho "Git:"git status --shortechoecho "============================================================"EOFchmod +x scripts/setup-aura-agents.sh

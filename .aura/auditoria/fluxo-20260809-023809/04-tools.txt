@@ -1,0 +1,63 @@
+src/AURA.AI/AgentSession.cs:25:        private readonly List<AgentTool> _tools;
+src/AURA.AI/AgentSession.cs:30:        public AgentSession(OpenRouterClient client, IEnumerable<AgentTool> tools,
+src/AURA.AI/AgentSession.cs:34:            _tools = (tools ?? Enumerable.Empty<AgentTool>()).ToList();
+src/AURA.AI/AgentSession.cs:79:                    foreach (AgentToolCall call in response.ToolCalls)
+src/AURA.AI/AgentSession.cs:124:            AgentToolCall call,
+src/AURA.AI/AgentSession.cs:127:            AgentTool? tool = _tools.FirstOrDefault(
+src/AURA.AI/AgentSession.cs:311:                                    // list_dir sem valor real =
+src/AURA.AI/AgentSession.cs:317:                                            "list_dir",
+src/AURA.AI/AgentSession.cs:354:                // list_dir
+src/AURA.AI/AgentSession.cs:356:                        "list_dir",
+src/AURA.AI/AgentSession.cs:369:                // read_file
+src/AURA.AI/AgentSession.cs:371:                        "read_file",
+src/AURA.AI/AgentSession.cs:380:                // run_shell
+src/AURA.AI/AgentSession.cs:382:                        "run_shell",
+src/AURA.AI/AgentSession.cs:398:                // write_file
+src/AURA.AI/AgentSession.cs:400:                        "write_file",
+src/AURA.AI/AgentSession.cs:467:                    "list_dir",
+src/AURA.AI/AgentSession.cs:474:                    "read_file",
+src/AURA.AI/AgentSession.cs:481:                    "run_shell",
+src/AURA.AI/AgentSession.cs:488:                    "write_file",
+src/AURA.AI/OpenRouterClient.cs:137:            List<AgentToolDefinition>? tools = null,
+src/AURA.AI/OpenRouterClient.cs:174:                        foreach (AgentToolCall tc in m.ToolCalls)
+src/AURA.AI/OpenRouterClient.cs:200:                foreach (AgentToolDefinition t in tools)
+src/AURA.AI/OpenRouterClient.cs:203:                    foreach (KeyValuePair<string, AgentToolParameter> p in t.Parameters)
+src/AURA.AI/OpenRouterClient.cs:281:                        var calls = new List<AgentToolCall>();
+src/AURA.AI/OpenRouterClient.cs:295:                                calls.Add(new AgentToolCall
+src/AURA.AI/OpenRouterClient.cs:308:                            List<AgentToolCall>? textCalls = TryParseTextToolCall(content);
+src/AURA.AI/OpenRouterClient.cs:374:        private static List<AgentToolCall>? TryParseTextToolCall(string? content)
+src/AURA.AI/OpenRouterClient.cs:426:                return new List<AgentToolCall>
+src/AURA.AI/OpenRouterClient.cs:428:                    new AgentToolCall
+src/AURA.AI/AgentChat.cs:18:        public List<AgentToolCall>? ToolCalls { get; set; }
+src/AURA.AI/AgentChat.cs:22:    public sealed class AgentToolCall
+src/AURA.AI/AgentChat.cs:39:        public List<AgentToolCall>? ToolCalls { get; set; }
+src/AURA.AI/AgentTool.cs:9:    public sealed class AgentToolParameter
+src/AURA.AI/AgentTool.cs:17:    public sealed class AgentToolDefinition
+src/AURA.AI/AgentTool.cs:23:        public Dictionary<string, AgentToolParameter> Parameters { get; } = new();
+src/AURA.AI/AgentTool.cs:32:    public abstract class AgentTool
+src/AURA.AI/AgentTool.cs:34:        public abstract AgentToolDefinition Definition { get; }
+src/AURA.AI/AgentTools/ShellAgentTool.cs:15:    public sealed class ShellAgentTool : AgentTool
+src/AURA.AI/AgentTools/ShellAgentTool.cs:23:        public ShellAgentTool(string workspaceRoot)
+src/AURA.AI/AgentTools/ShellAgentTool.cs:29:        public override AgentToolDefinition Definition => new AgentToolDefinition
+src/AURA.AI/AgentTools/ShellAgentTool.cs:31:            Name = "run_shell",
+src/AURA.AI/AgentTools/ShellAgentTool.cs:36:                ["command"] = new AgentToolParameter
+src/AURA.AI/AgentTools/FileTools.cs:11:    public sealed class ListDirTool : WorkspaceAgentTool
+src/AURA.AI/AgentTools/FileTools.cs:17:        public override AgentToolDefinition Definition => new AgentToolDefinition
+src/AURA.AI/AgentTools/FileTools.cs:19:            Name = "list_dir",
+src/AURA.AI/AgentTools/FileTools.cs:23:                ["path"] = new AgentToolParameter
+src/AURA.AI/AgentTools/FileTools.cs:71:    public sealed class ReadFileTool : WorkspaceAgentTool
+src/AURA.AI/AgentTools/FileTools.cs:77:        public override AgentToolDefinition Definition => new AgentToolDefinition
+src/AURA.AI/AgentTools/FileTools.cs:79:            Name = "read_file",
+src/AURA.AI/AgentTools/FileTools.cs:83:                ["path"] = new AgentToolParameter
+src/AURA.AI/AgentTools/FileTools.cs:112:    public sealed class WriteFileTool : WorkspaceAgentTool
+src/AURA.AI/AgentTools/FileTools.cs:118:        public override AgentToolDefinition Definition => new AgentToolDefinition
+src/AURA.AI/AgentTools/FileTools.cs:120:            Name = "write_file",
+src/AURA.AI/AgentTools/FileTools.cs:124:                ["path"] = new AgentToolParameter
+src/AURA.AI/AgentTools/FileTools.cs:129:                ["content"] = new AgentToolParameter
+src/AURA.AI/AgentTools/FileTools.cs:157:    public sealed class EditFileTool : WorkspaceAgentTool
+src/AURA.AI/AgentTools/FileTools.cs:163:        public override AgentToolDefinition Definition => new AgentToolDefinition
+src/AURA.AI/AgentTools/FileTools.cs:169:                ["path"] = new AgentToolParameter
+src/AURA.AI/AgentTools/FileTools.cs:174:                ["old_text"] = new AgentToolParameter
+src/AURA.AI/AgentTools/FileTools.cs:179:                ["new_text"] = new AgentToolParameter
+src/AURA.AI/AgentTools/WorkspaceAgentTool.cs:11:    public abstract class WorkspaceAgentTool : AgentTool
+src/AURA.AI/AgentTools/WorkspaceAgentTool.cs:13:        protected WorkspaceAgentTool(string workspaceRoot)
