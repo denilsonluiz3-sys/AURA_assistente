@@ -1,0 +1,747 @@
+==========================================
+ AURA - DIAGNOSTICO COMPLETO
+ Data: Sun Aug  9 04:59:27 -03 2026
+==========================================
+
+===== GIT =====
+ M src/AURA.AI/AgentSession.cs
+?? .aura/auditoria/
+?? .aura/backup-agent-solution-20260808-162923/
+?? .aura/backup-agent-solution-v2-20260808-163705/
+?? .aura/backup-solutions-20260808-161907/
+?? .aura/memory-fix-v2-20260809-043306/
+?? .aura/memory-fix-v2-20260809-045621/
+?? CLAUDE.md
+?? aura-diagnostico.txt
+?? coleta_analise.txt
+?? coleta_para_analise.sh
+?? fix-agent-memory-v2.sh
+?? scripts/auditoria-completa.sh
+?? scripts/auditoria-fluxo-real.sh
+?? scripts/instalar-memoria-solucoes.sh
+?? scripts/integrar-solutionstore-agent-v2.sh
+?? scripts/integrar-solutionstore-agent.sh
+?? scripts/mapear-capacidades-aura.sh
+feat/project-access
+2969a70 feat: conecta AgentSession ao conhecimento validado
+489ff66 feat: adiciona memória de soluções validadas
+05b398a Atualiza estado atual do AURA
+64c5955 fix(agent): improve Ollama tool argument handling
+8363fcc fix(mobile): disambiguate      Android Uri
+c6d42fc fix(mobile): disambiguate Android Uri
+606081a feat(mobile): add Android project access
+8dcba58 feat(installer): Etapa 4 - instalação de dependências (dry-run por padrão) (#6)
+
+===== SOLUTION STORE =====
+src/AURA.AI/AgentSession.cs:41:            _solutionStore = new SolutionStore();
+src/AURA.Memory/SolutionRule.cs:12:    public sealed class SolutionRule
+src/AURA.Memory/SolutionStore.cs:17:    public sealed class SolutionStore
+src/AURA.Memory/SolutionStore.cs:31:        public SolutionStore(
+
+===== AGENT SESSION =====
+21:        private const int MaxRounds = 8;
+24:        private readonly ILogger _logger;
+26:        private readonly List<AgentMessage> _messages = new();
+32:        private readonly SolutionStore _solutionStore;
+35:            string? systemPrompt = null, ILogger? logger = null)
+41:            _solutionStore = new SolutionStore();
+45:        public event Action<AgentStep>? Step;
+47:        public IReadOnlyList<AgentMessage> Messages => _messages;
+51:            if (_messages.Count <= MaxHistoryMessages)
+54:            AgentMessage? system = _messages
+58:            var recent = _messages
+63:            _messages.Clear();
+66:                _messages.Add(system);
+68:            _messages.AddRange(recent);
+70:            _logger.Info("agent: histórico podado para " + _messages.Count + " mensagens");
+73:        public async Task<string> RunAsync(string userText,
+81:            _messages.Add(new AgentMessage { Role = "user", Content = userText });
+84:            while (round++ < MaxRounds)
+88:                AgentChatResponse response = await _client.ChatToolsAsync(
+89:                    _messages,
+100:                _logger.Info("agent: round=" + round + " toolCalls=" + (response.ToolCalls?.Count ?? 0) + " hasContent=" + !string.IsNullOrEmpty(response.Content));
+102:                if (response.ToolCalls is { Count: > 0 })
+104:                    _messages.Add(new AgentMessage
+108:                        ToolCalls = response.ToolCalls
+111:                    foreach (AgentToolCall call in response.ToolCalls)
+114:                        string result = await ExecuteToolAsync(call, ct).ConfigureAwait(false);
+115:                        _messages.Add(new AgentMessage
+121:                        Step?.Invoke(new AgentStep(call.Name, call.ArgumentsJson, result));
+129:                _messages.Add(new AgentMessage { Role = "assistant", Content = final });
+134:                "O agente atingiu o limite de " + MaxRounds + " passos de ferramentas.");
+155:        private async Task<string> ExecuteToolAsync(
+171:                    NormalizeToolArguments(
+198:        private static string NormalizeToolArguments(
+486:                    return NormalizeToolArguments(
+
+===== LOGGER =====
+using System;
+using System.IO;
+
+namespace AURA.Core.Logging
+{
+    /// <summary>
+    /// Appends log messages to a rolling text file, used mainly by the GUI
+    /// where there is no console output visible to the user.
+    /// </summary>
+    public sealed class FileLogger : ILogger
+    {
+        private readonly string _filePath;
+        private readonly object _sync = new object();
+
+        public FileLogger(string filePath)
+        {
+            _filePath = filePath;
+
+            string directory = Path.GetDirectoryName(_filePath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+        }
+
+        public void Info(string message)
+        {
+            Append("INFO", message);
+        }
+
+        public void Warning(string message)
+        {
+            Append("WARN", message);
+        }
+
+        public void Error(string message)
+        {
+            Append("ERROR", message);
+        }
+
+        private void Append(string level, string message)
+        {
+            string line = string.Format("{0:yyyy-MM-dd HH:mm:ss} [{1}] {2}", DateTime.Now, level, message);
+
+            lock (_sync)
+            {
+                try
+                {
+                    File.AppendAllText(_filePath, line + Environment.NewLine);
+                }
+                catch
+                {
+                    // Logging must never crash the application.
+                }
+            }
+        }
+    }
+}
+namespace AURA.Core.Logging
+{
+    /// <summary>
+    /// Minimal logging abstraction used across all AURA modules.
+    /// </summary>
+    public interface ILogger
+    {
+        void Info(string message);
+
+        void Warning(string message);
+
+        void Error(string message);
+    }
+}
+
+===== AGENT TOOL =====
+using System.Collections.Generic;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace AURA.AI
+{
+    /// <summary>Parâmetro de um esquema JSON-Schema simples de ferramenta.</summary>
+    public sealed class AgentToolParameter
+    {
+        public string Type { get; set; } = "string";
+
+        public string Description { get; set; } = string.Empty;
+    }
+
+    /// <summary>Definição de ferramenta enviada ao modelo no campo "tools".</summary>
+    public sealed class AgentToolDefinition
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+
+        public Dictionary<string, AgentToolParameter> Parameters { get; } = new();
+
+        public List<string> Required { get; } = new();
+    }
+
+    /// <summary>
+    /// Uma ferramenta que o agente pode invocar. Recebe os argumentos como JSON
+    /// e devolve um texto que será enviado de volta ao modelo.
+    /// </summary>
+    public abstract class AgentTool
+    {
+        public abstract AgentToolDefinition Definition { get; }
+
+        public abstract Task<string> ExecuteAsync(string argumentsJson, CancellationToken ct = default);
+
+        /// <summary>Lê um parâmetro string de um JSON de argumentos (ou null).</summary>
+        protected static string? ReadString(JsonElement args, string name)
+        {
+            if (args.ValueKind == JsonValueKind.Object &&
+                args.TryGetProperty(name, out JsonElement value) &&
+                value.ValueKind == JsonValueKind.String)
+            {
+                return value.GetString();
+            }
+
+            return null;
+        }
+    }
+}
+
+===== FILE TOOLS =====
+using System;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace AURA.AI
+{
+    public sealed class ListDirTool : WorkspaceAgentTool
+    {
+        public ListDirTool(string workspaceRoot) : base(workspaceRoot)
+        {
+        }
+
+        public override AgentToolDefinition Definition => new AgentToolDefinition
+        {
+            Name = "list_dir",
+            Description = "Lista o conteúdo de um diretório do workspace (pastas e arquivos com tamanho).",
+            Parameters =
+            {
+                ["path"] = new AgentToolParameter
+                {
+                    Type = "string",
+                    Description = "Caminho relativo ao workspace (vazio ou '.' = raiz)."
+                }
+            }
+        };
+
+        public override Task<string> ExecuteAsync(string argumentsJson, CancellationToken ct = default)
+        {
+            string path;
+            using (JsonDocument doc = JsonDocument.Parse(argumentsJson))
+            {
+                path = ReadString(doc.RootElement, "path") ?? ".";
+            }
+
+            string dir = ResolvePath(path);
+            if (!Directory.Exists(dir))
+            {
+                return Task.FromResult("ERRO: diretório não existe: " + path);
+            }
+
+            var sb = new StringBuilder();
+            foreach (string entry in Directory.GetFileSystemEntries(dir)
+                         .OrderBy(e => e, StringComparer.OrdinalIgnoreCase))
+            {
+                ct.ThrowIfCancellationRequested();
+                string name = Path.GetFileName(entry);
+                if (Directory.Exists(entry))
+                {
+                    sb.AppendLine(name + "/");
+                }
+                else
+                {
+                    var fi = new FileInfo(entry);
+                    sb.AppendLine(name + " (" + fi.Length + " bytes)");
+                }
+            }
+
+            if (sb.Length == 0)
+            {
+                sb.AppendLine("(vazio)");
+            }
+
+            return Task.FromResult(sb.ToString().TrimEnd());
+        }
+    }
+
+    public sealed class ReadFileTool : WorkspaceAgentTool
+    {
+        public ReadFileTool(string workspaceRoot) : base(workspaceRoot)
+        {
+        }
+
+        public override AgentToolDefinition Definition => new AgentToolDefinition
+        {
+            Name = "read_file",
+            Description = "Lê o conteúdo textual de um arquivo do workspace (máx. 40.000 caracteres).",
+            Parameters =
+            {
+                ["path"] = new AgentToolParameter
+                {
+                    Type = "string",
+                    Description = "Caminho relativo ao workspace."
+                }
+            },
+            Required = { "path" }
+        };
+
+        public override Task<string> ExecuteAsync(string argumentsJson, CancellationToken ct = default)
+        {
+            string path;
+            using (JsonDocument doc = JsonDocument.Parse(argumentsJson))
+            {
+                path = ReadString(doc.RootElement, "path") ?? string.Empty;
+            }
+
+            string file = ResolvePath(path);
+            if (!File.Exists(file))
+            {
+                return Task.FromResult("ERRO: arquivo não existe: " + path);
+            }
+
+            ct.ThrowIfCancellationRequested();
+            string content = File.ReadAllText(file);
+            return Task.FromResult(Truncate(content));
+        }
+    }
+
+    public sealed class WriteFileTool : WorkspaceAgentTool
+    {
+        public WriteFileTool(string workspaceRoot) : base(workspaceRoot)
+        {
+        }
+
+        public override AgentToolDefinition Definition => new AgentToolDefinition
+        {
+            Name = "write_file",
+            Description = "Cria ou sobrescreve um arquivo do workspace com o conteúdo informado.",
+            Parameters =
+            {
+                ["path"] = new AgentToolParameter
+                {
+                    Type = "string",
+                    Description = "Caminho relativo ao workspace."
+                },
+                ["content"] = new AgentToolParameter
+                {
+                    Type = "string",
+                    Description = "Conteúdo completo a gravar no arquivo."
+                }
+            },
+            Required = { "path", "content" }
+        };
+
+        public override Task<string> ExecuteAsync(string argumentsJson, CancellationToken ct = default)
+        {
+            string path;
+            string content;
+            using (JsonDocument doc = JsonDocument.Parse(argumentsJson))
+            {
+                JsonElement root = doc.RootElement;
+                path = ReadString(root, "path") ?? string.Empty;
+                content = ReadString(root, "content") ?? string.Empty;
+            }
+
+            string file = ResolvePath(path);
+            Directory.CreateDirectory(Path.GetDirectoryName(file) ?? WorkspaceRoot);
+            ct.ThrowIfCancellationRequested();
+            File.WriteAllText(file, content);
+            return Task.FromResult("OK: arquivo gravado (" + content.Length + " chars): " + path);
+        }
+    }
+
+    public sealed class EditFileTool : WorkspaceAgentTool
+    {
+        public EditFileTool(string workspaceRoot) : base(workspaceRoot)
+        {
+        }
+
+        public override AgentToolDefinition Definition => new AgentToolDefinition
+        {
+            Name = "edit_file",
+            Description = "Substitui a primeira ocorrência de um trecho exato em um arquivo do workspace.",
+            Parameters =
+            {
+                ["path"] = new AgentToolParameter
+                {
+                    Type = "string",
+                    Description = "Caminho relativo ao workspace."
+                },
+                ["old_text"] = new AgentToolParameter
+                {
+                    Type = "string",
+                    Description = "Trecho exato a ser substituído."
+                },
+                ["new_text"] = new AgentToolParameter
+                {
+                    Type = "string",
+                    Description = "Novo trecho que substitui old_text."
+                }
+            },
+            Required = { "path", "old_text", "new_text" }
+        };
+
+        public override Task<string> ExecuteAsync(string argumentsJson, CancellationToken ct = default)
+        {
+            string path;
+            string oldText;
+            string newText;
+            using (JsonDocument doc = JsonDocument.Parse(argumentsJson))
+            {
+                JsonElement root = doc.RootElement;
+                path = ReadString(root, "path") ?? string.Empty;
+                oldText = ReadString(root, "old_text") ?? string.Empty;
+                newText = ReadString(root, "new_text") ?? string.Empty;
+            }
+
+            if (string.IsNullOrEmpty(oldText))
+            {
+                return Task.FromResult("ERRO: old_text não pode ser vazio.");
+            }
+
+            string file = ResolvePath(path);
+            if (!File.Exists(file))
+            {
+                return Task.FromResult("ERRO: arquivo não existe: " + path);
+            }
+
+            ct.ThrowIfCancellationRequested();
+            string current = File.ReadAllText(file);
+            int index = current.IndexOf(oldText, StringComparison.Ordinal);
+            if (index < 0)
+            {
+                return Task.FromResult("ERRO: old_text não encontrado no arquivo: " + path);
+            }
+
+            string updated = current.Substring(0, index) + newText +
+                             current.Substring(index + oldText.Length);
+            File.WriteAllText(file, updated);
+            return Task.FromResult("OK: substituída 1 ocorrência em " + path +
+                " (" + newText.Length + " chars no lugar de " + oldText.Length + ").");
+        }
+    }
+}
+
+===== SHELL TOOL =====
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace AURA.AI
+{
+    /// <summary>
+    /// Executa comandos shell (sh -c) dentro do workspace. Usado para git,
+    /// dotnet, grep e qualquer utilitário disponível no dispositivo.
+    /// </summary>
+    public sealed class ShellAgentTool : AgentTool
+    {
+        private const int DefaultTimeoutSeconds = 30;
+        private const int MaxOutputChars = 30000;
+
+        private readonly string _workspaceRoot;
+        private readonly string _shellPath;
+
+        public ShellAgentTool(string workspaceRoot)
+        {
+            _workspaceRoot = workspaceRoot;
+            _shellPath = File.Exists("/system/bin/sh") ? "/system/bin/sh" : "/bin/sh";
+        }
+
+        public override AgentToolDefinition Definition => new AgentToolDefinition
+        {
+            Name = "run_shell",
+            Description = "Executa um comando shell (sh -c) no diretório do workspace. " +
+                "Use para git status/add/commit, dotnet build, grep, ls, etc. Timeout de 30s.",
+            Parameters =
+            {
+                ["command"] = new AgentToolParameter
+                {
+                    Type = "string",
+                    Description = "Comando shell completo (ex.: 'git status --short')."
+                }
+            },
+            Required = { "command" }
+        };
+
+        public override async Task<string> ExecuteAsync(string argumentsJson, CancellationToken ct = default)
+        {
+            string command;
+            using (JsonDocument doc = JsonDocument.Parse(argumentsJson))
+            {
+                command = ReadString(doc.RootElement, "command") ?? string.Empty;
+            }
+
+            if (string.IsNullOrWhiteSpace(command))
+            {
+                return "ERRO: comando vazio.";
+            }
+
+            if (!File.Exists(_shellPath))
+            {
+                return "ERRO: shell não encontrado neste dispositivo (" + _shellPath + ").";
+            }
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = _shellPath,
+                Arguments = "-c \"" + command.Replace("\"", "\\\"") + "\"",
+                WorkingDirectory = _workspaceRoot,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = new Process { StartInfo = psi };
+            var stdout = new StringBuilder();
+            var stderr = new StringBuilder();
+            process.OutputDataReceived += (_, e) => { if (e.Data != null) stdout.AppendLine(e.Data); };
+            process.ErrorDataReceived += (_, e) => { if (e.Data != null) stderr.AppendLine(e.Data); };
+
+            try
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                cts.CancelAfter(TimeSpan.FromSeconds(DefaultTimeoutSeconds));
+                process.Start();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+                await process.WaitForExitAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                try { process.Kill(entireProcessTree: true); } catch { /* já encerrado */ }
+                return "ERRO: comando cancelado (timeout de " + DefaultTimeoutSeconds + "s).";
+            }
+            catch (Exception ex)
+            {
+                return "ERRO ao iniciar comando: " + ex.Message;
+            }
+
+            var result = new StringBuilder();
+            if (stdout.Length > 0)
+            {
+                result.AppendLine(stdout.ToString().TrimEnd());
+            }
+
+            if (stderr.Length > 0)
+            {
+                result.Append("stderr: ").AppendLine(stderr.ToString().TrimEnd());
+            }
+
+            if (result.Length == 0)
+            {
+                result.AppendLine("(sem saída)");
+            }
+
+            string output = result.ToString().TrimEnd();
+            if (output.Length > MaxOutputChars)
+            {
+                output = output.Substring(0, MaxOutputChars) +
+                         "\n... (saída truncada: " + result.Length + " chars)";
+            }
+
+            return "exit=" + process.ExitCode + "\n" + output;
+        }
+    }
+}
+
+===== WORKSPACE TOOL =====
+using System;
+using System.IO;
+
+namespace AURA.AI
+{
+    /// <summary>
+    /// Base para ferramentas que operam em arquivos: garante que todo caminho
+    /// resolvido permaneça dentro do workspace (evita escrita fora da pasta
+    /// controlada pelo app).
+    /// </summary>
+    public abstract class WorkspaceAgentTool : AgentTool
+    {
+        protected WorkspaceAgentTool(string workspaceRoot)
+        {
+            WorkspaceRoot = Path.GetFullPath(workspaceRoot);
+        }
+
+        public string WorkspaceRoot { get; }
+
+        protected string ResolvePath(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                throw new ArgumentException("Caminho vazio.");
+            }
+
+            string full = Path.GetFullPath(Path.Combine(WorkspaceRoot, raw.Replace('\\', '/')));
+            if (!IsInsideWorkspace(full))
+            {
+                throw new InvalidOperationException("Caminho fora do workspace: " + raw);
+            }
+
+            return full;
+        }
+
+        protected bool IsInsideWorkspace(string full)
+        {
+            string rootPrefix = WorkspaceRoot.TrimEnd(Path.DirectorySeparatorChar) +
+                                 Path.DirectorySeparatorChar;
+            return string.Equals(full, WorkspaceRoot, StringComparison.OrdinalIgnoreCase) ||
+                   full.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase);
+        }
+
+        protected static string Truncate(string text, int max = 40000)
+        {
+            if (text is null)
+            {
+                return string.Empty;
+            }
+
+            if (text.Length <= max)
+            {
+                return text;
+            }
+
+            return text.Substring(0, max) + "\n... (truncado: " + text.Length + " chars)";
+        }
+    }
+}
+
+===== OPENROUTER =====
+37:        private readonly ILogger _logger;
+41:        public OpenRouterClient(OpenRouterOptions options, ILogger? logger = null)
+44:            _logger = logger ?? new ConsoleLogger();
+54:            var messages = new List<object>();
+57:                messages.Add(new { role = "system", content = systemPrompt });
+60:            messages.Add(new { role = "user", content = question });
+66:                messages
+97:            HttpResponseMessage response = await client.SendAsync(request, ct).ConfigureAwait(false);
+98:            string body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+100:            if (!response.IsSuccessStatusCode)
+108:                _logger.Error("LLM: " + response.StatusCode + " " + detail);
+111:                        (int)response.StatusCode, response.StatusCode, detail));
+135:        public async Task<AgentChatResponse> ChatToolsAsync(
+136:            List<AgentMessage> messages,
+137:            List<AgentToolDefinition>? tools = null,
+156:            if (messages != null)
+158:                foreach (AgentMessage m in messages)
+188:                        mo["tool_calls"] = calls;
+195:            payload["messages"] = arr;
+197:            if (tools is { Count: > 0 })
+199:                var toolsArray = new JsonArray();
+200:                foreach (AgentToolDefinition t in tools)
+224:                    toolsArray.Add(new JsonObject
+236:                payload["tools"] = toolsArray;
+251:            HttpResponseMessage response = await client.SendAsync(request, ct).ConfigureAwait(false);
+252:            string body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+254:            if (!response.IsSuccessStatusCode)
+262:                _logger.Error("LLM: " + response.StatusCode + " " + detail);
+265:                    Error = string.Format("Falha na chamada LLM ({0} {1}): {2}",
+266:                        (int)response.StatusCode, response.StatusCode, detail)
+282:                        if (msg.TryGetProperty("tool_calls", out JsonElement toolCalls))
+305:                        // como JSON no campo content, em vez de usar tool_calls.
+332:                _logger.Error("LLM: resposta inválida: " + jex.Message);
+333:                return new AgentChatResponse { Error = "Resposta inválida do modelo: " + jex.Message };
+
+===== TESTES =====
+tests/AURA.Tests/bin/Debug/net10.0/AURA.Agents.dll
+tests/AURA.Tests/bin/Debug/net10.0/AURA.Memory.pdb
+tests/AURA.Tests/bin/Debug/net10.0/AURA.Agents.pdb
+tests/AURA.Tests/bin/Debug/net10.0/AURA.Memory.dll
+tests/AURA.Tests/AgentManagerTests.cs
+tests/AURA.Tests/AgentToolsTests.cs
+scripts/tests/agent_tool_arguments_test.py
+scripts/auditoria-completa.sh
+scripts/auditoria-fluxo-real.sh
+scripts/integrar-solutionstore-agent-v2.sh
+scripts/fix-ollama-agent.sh
+scripts/integrar-solutionstore-agent.sh
+scripts/fix-agent-tools-v2.sh
+scripts/corrigir-ollama-tools.sh
+scripts/fix-agent-tools.sh
+
+===== LOGS =====
+.aura/solutions-install-20260808-161907.log
+.aura/repair.log
+.aura/memory-fix-v2-20260809-043306/build-output.log
+.aura/memory-fix-v2-20260809-043306/build-clean.log
+.aura/backup-solutions-20260808-161907/status.txt
+.aura/backup-20260808-150631/context-audit.txt
+.aura/auditoria/fluxo-20260809-023809/05-project-references.txt
+.aura/auditoria/fluxo-20260809-023809/04-tools.txt
+.aura/auditoria/fluxo-20260809-023809/03-memory.txt
+.aura/auditoria/fluxo-20260809-023809/02-solutionstore.txt
+.aura/auditoria/fluxo-20260809-023809/01-agentsession.txt
+.aura/auditoria/capacidades-20260809-030626/csharp-files.txt
+.aura/agent-solution-v2-20260808-163705.log
+.aura/agent-solution-20260808-162923.log
+./coleta_analise.txt
+./cells/teste_loop-a7e544/cell.log
+./cells/teste_aura-a30978/cell.log
+./aura-diagnostico.txt
+./.aura/solutions-install-20260808-161907.log
+./.aura/repair.log
+./.aura/memory-fix-v2-20260809-043306/build-output.log
+./.aura/memory-fix-v2-20260809-043306/build-clean.log
+./.aura/backup-solutions-20260808-161907/status.txt
+./.aura/backup-20260808-150631/context-audit.txt
+./.aura/auditoria/fluxo-20260809-023809/05-project-references.txt
+./.aura/auditoria/fluxo-20260809-023809/04-tools.txt
+./.aura/auditoria/fluxo-20260809-023809/03-memory.txt
+./.aura/auditoria/fluxo-20260809-023809/02-solutionstore.txt
+./.aura/auditoria/fluxo-20260809-023809/01-agentsession.txt
+./.aura/auditoria/capacidades-20260809-030626/csharp-files.txt
+./.aura/agent-solution-v2-20260808-163705.log
+./.aura/agent-solution-20260808-162923.log
+
+===== CELLS =====
+{
+  "Cells": [
+    {
+      "Id": "teste_aura-a30978",
+      "AppPath": "/data/data/com.termux/files/usr/bin/python3",
+      "Args": "\u0022teste_aura.py\u0022 ",
+      "WorkingDirectory": "",
+      "State": 3,
+      "CreatedAtUtc": "2026-08-08T10:58:42.2520262Z",
+      "LastStartedUtc": "2026-08-08T10:58:42.6374897Z",
+      "ProcessId": 6188,
+      "RestartCount": 1,
+      "TemplatePath": null,
+      "Limits": {
+        "MemoryLimitMb": null,
+        "CpuLimitSeconds": null,
+        "MaxFiles": null,
+        "MaxProcesses": null
+      }
+    },
+    {
+      "Id": "teste_loop-a7e544",
+      "AppPath": "/data/data/com.termux/files/usr/bin/python3",
+      "Args": "\u0022teste_loop.py\u0022 ",
+      "WorkingDirectory": "",
+      "State": 4,
+      "CreatedAtUtc": "2026-08-08T11:09:27.5470509Z",
+      "LastStartedUtc": "2026-08-08T12:18:14.4765809Z",
+      "ProcessId": 15679,
+      "RestartCount": 5,
+      "TemplatePath": null,
+      "Limits": null
+    }
+  ],
+  "SavedAtUtc": "2026-08-09T07:48:49.4731914Z"
+}
+==========================================
+ FIM DO DIAGNOSTICO
+==========================================
