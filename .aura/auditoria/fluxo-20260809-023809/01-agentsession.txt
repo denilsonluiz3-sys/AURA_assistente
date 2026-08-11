@@ -1,0 +1,3 @@
+src/AURA.AI/AgentSession.cs:30:        public AgentSession(OpenRouterClient client, IEnumerable<AgentTool> tools,
+src/AURA.CLI/Program.cs:432:            var session = new AgentSession(client, tools, systemPrompt);
+src/AURA.Mobile/Pages/AgentPage.xaml.cs:60:        _session = new AgentSession(_client, tools, systemPrompt);
