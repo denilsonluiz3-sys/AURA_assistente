@@ -15,8 +15,8 @@ Conceito de referência: vídeos Gemini (lua/sol + anéis + aurora + menu inferi
 |------|-----------|--------|
 | **UI-Holo F0** | Análise + escolha de abordagem (MAUI puro sem SkiaSharp nesta fase) | **FEITO** 2026-08-11 |
 | **UI-Holo F1** | Dashboard HomePage: orb central + bottom bar mapeada a capacidades reais | **FEITO** 2026-08-11 (main e20e726, CI verde build-android-apk #70 + build-and-test #141) |
-| **UI-Holo F2** | Animações leves (pulse/glow) + navegação dos 5 botões | **EM ANDAMENTO** (branch `feature/ui-holo-f2`) |
-| **UI-Holo F3** | SkiaSharp/SKGLView ou WebView para efeitos holográficos avançados | planejado (só após F1/F2 estáveis no CI) |
+| **UI-Holo F2** | Animações leves (pulse/glow) + navegação dos 5 botões | **FEITO** 2026-08-11 (main 44c221d, PR #37, build-and-test #142 verde) |
+| **UI-Holo F3** | SkiaSharp/SKGLView ou WebView para efeitos holográficos avançados | planejado (só após F1/F2 estáveis no CI + validação em dispositivo) |
 | **UI-Holo F4** | Shell + TabBar customizado substituindo TabbedPage (opcional) | futuro |
 
 ### Mapeamento visual → AURA (F1)
@@ -35,10 +35,11 @@ Conceito de referência: vídeos Gemini (lua/sol + anéis + aurora + menu inferi
 - **Rejeitado por agora:** SkiaSharp / DrawnUI / WebView Three.js — aumenta superfície de falha e tempo de CI; entra só em F3 se F1/F2 validarem no dispositivo.
 - Local de implementação: `src/AURA.Mobile/Pages/HomePage.*` (reuso da página Início existente).
 
-### F2 — Animações (em andamento)
+### F2 — Animações (concluído)
 
 - Pulse contínuo no núcleo (`CoreOrb`) via `ScaleTo` + `FadeTo` em loop (Easing.SinInOut).
 - Feedback tátil/visual nos botões da bottom bar (ScaleTo 0.85 → 1.0).
+- Loop interrompido em `OnDisappearing` via `AbortAnimation`.
 - Sem NuGet extra; usa apenas APIs nativas do MAUI.
 
 Progresso recente
@@ -48,7 +49,7 @@ Progresso recente
 - Updated scripts/smoke-test.sh to wait for cell completion (--wait) to improve reliability in CI.
 - Updated roadmap and docs with current status.
 - **2026-08-11:** UI-Holo F1 mergeada em main (PR #36, squash e20e726). CI mobile verde.
-- **2026-08-11:** iniciada UI-Holo F2 (pulse + feedback) na branch feature/ui-holo-f2.
+- **2026-08-11:** UI-Holo F2 mergeada em main (PR #37, squash 44c221d). build-and-test #142 verde; falhas em workflows secundários são flaky VSTest conhecido (não relacionado ao código F2).
 
 CI re-run
 - Action: triggered automated CI re-run from Copilot to validate smoke test fix.
@@ -56,7 +57,7 @@ CI re-run
 - Purpose: ensure smoke-test.sh change resolves intermittent failures; if failures persist Copilot will inspect logs and apply fixes.
 
 Próximos passos imediatos
-1. Merge UI-Holo F2 após CI mobile verde; validar pulse visual no APK de debug.
-2. UI-Holo F3 só se F2 estiver estável e houver necessidade real de efeitos avançados.
+1. Validar pulse visual + feedback de botões no APK de debug em dispositivo real.
+2. UI-Holo F3 só se F2 estiver estável no dispositivo e houver necessidade real de efeitos avançados (SkiaSharp/WebView).
 3. Analyze CI runs; if failures occur, diagnose and patch small issues automatically.
 4. Implement CLI (F7) and smoke pipeline (F8) after stabilization.
