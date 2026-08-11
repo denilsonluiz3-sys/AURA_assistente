@@ -203,14 +203,16 @@ public partial class AgentPage : ContentPage
     {
         try
         {
-            await _speech.InitializeAsync();
             await _speech.SpeakAsync(text);
         }
-        catch (NotSupportedException)
+        catch (OperationCanceledException)
         {
-            // Motor atual não cobre este texto (ex.: Kokoro com dicionário
-            // limitado como fallback). Não quebra o chat.
-            AuraLog.Info("TTS: texto fora do alcance do motor atual, fala pulada.");
+            // Usuário cancelou a fala: sem ação.
+        }
+        catch (Exception ex)
+        {
+            // Falha de TTS NUNCA derruba o Agent Loop: registra e segue.
+            AuraLog.Warning("TTS: fala pulada (" + ex.GetType().Name + ": " + ex.Message + ")");
         }
     }
 
