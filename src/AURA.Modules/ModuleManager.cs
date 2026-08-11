@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using AURA.Core.Configuration;
 using AURA.Core.Events;
 using AURA.Core.Logging;
+using AURA.Modules.Loja;
 
 namespace AURA.Modules
 {
@@ -20,15 +21,17 @@ namespace AURA.Modules
         private readonly ILogger _logger;
         private readonly string _packagesDir;
         private readonly string _modulesPath;
+        private readonly string _pluginsRoot;
         private readonly ConfigLoader _configLoader;
         private readonly HttpClient _http;
         private readonly EventBus _events;
 
-        public ModuleManager(ILogger logger, string packagesDir, string modulesPath, EventBus events = null, HttpMessageHandler httpHandler = null)
+        public ModuleManager(ILogger logger, string packagesDir, string modulesPath, EventBus events = null, HttpMessageHandler httpHandler = null, string pluginsRoot = null)
         {
             _logger = logger;
             _packagesDir = packagesDir;
             _modulesPath = modulesPath;
+            _pluginsRoot = pluginsRoot ?? Path.Combine(Path.GetTempPath(), "aura_plugins");
             _configLoader = new ConfigLoader(logger);
             _events = events;
             _http = httpHandler != null
@@ -134,11 +137,9 @@ namespace AURA.Modules
             config.Modules.SetEnabled(id, false);
             SaveModules(config);
 
-            string dir = Path.GetDirectoryName(GetPackagePath(id));
-            if (Directory.Exists(dir))
-            {
-                Directory.Delete(dir, recursive: true);
-            }
+            // use LojaUninstaller to remove installed files safely
+            var uninstaller = new LojaUninstaller(_logger, _packagesDir, _pluginsRoot);
+            uninstaller.Uninstall(id);
 
             _logger.Info("Módulo removido: " + id);
             _events?.Publish(new ModuleStateChangedEvent { ModuleId = id, Applied = false });
