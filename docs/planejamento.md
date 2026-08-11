@@ -121,3 +121,41 @@ toca `~/bin/*`, nunca `src/`.
 2. **Em paralelo:** se o mount voltar, rodar `migrar-ferramentas.sh` e testar
    o function calling do aichat.
 3. **Quando F3 passar no CI:** abrir issue F4 no GitHub e iniciar a loja local.
+
+## REPO-CLEANUP — Auditoria e higienização
+
+**Estado:** em execução  
+**Objetivo:** separar código-fonte real de backups, artefatos locais e estado de runtime sem apagar código produtivo.
+
+### Processo
+
+1. Inventário dos arquivos tracked/untracked.
+2. Classificação: PRESERVAR / REVISAR / IGNORAR / ARQUIVAR.
+3. Atualização das regras `.gitignore`.
+4. Nenhuma remoção destrutiva automática.
+5. Build obrigatório.
+6. Testes obrigatórios.
+7. Revisão do diff staged.
+8. Commit separado de limpeza.
+9. Push sem force.
+10. Validação pelo GitHub Actions.
+
+### Decisões atuais
+
+- `src/`, `tests/`, `.github/` e `docs/`: preservar.
+- Scripts: revisar individualmente; não usar `git add .`.
+- `config/`: revisar antes de versionar.
+- `reports/`: revisar antes de versionar.
+- `.aura/auditoria/`: preservar somente documentação deliberada.
+- `.aura/backup-*`: não versionar.
+- `*.bak*`: não versionar.
+- `memory.json`: estado local; não versionar.
+- `/AURA_assistente/`: clone/workspace local; não versionar.
+
+### Validação
+
+Build/test devem passar antes do commit.
+
+### Próxima referência
+
+Após o CI verde, retomar o roadmap funcional na próxima fase pendente, sem reimplementar funcionalidades já existentes.
