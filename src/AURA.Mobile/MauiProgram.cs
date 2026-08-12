@@ -100,6 +100,7 @@ public static class MauiProgram
         // Páginas
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<HomePage>();
+        builder.Services.AddSingleton<DiagnosticoPage>();
         builder.Services.AddSingleton<ChatPage>();
         builder.Services.AddSingleton<AgentPage>();
         builder.Services.AddSingleton<MemoryPage>();

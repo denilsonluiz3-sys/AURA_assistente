@@ -22,6 +22,8 @@ public partial class HomePage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        App.ThemeChanged += OnThemeChanged;
+        UpdateThemeIcon();
         await RefreshAsync();
         StartOrbPulse();
     }
@@ -29,15 +31,32 @@ public partial class HomePage : ContentPage
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        App.ThemeChanged -= OnThemeChanged;
         StopOrbPulse();
+    }
+
+    private void OnThemeChanged()
+    {
+        MainThread.BeginInvokeOnMainThread(UpdateThemeIcon);
+    }
+
+    private void UpdateThemeIcon()
+    {
+        var icon = App.IsSolar ? "☀️" : "🌙";
+        ThemeIcon.Text = icon;
+        FabIcon.Text = icon;
+    }
+
+    private async void OnThemeToggled(object? sender, EventArgs e)
+    {
+        App.ToggleTheme();
+        await PlayButtonFeedbackAsync(FabTheme);
     }
 
     private async void OnRefreshClicked(object? sender, EventArgs e)
     {
         await RefreshAsync();
     }
-
-    // ── Pulse holográfico (F2 — MAUI nativo, zero NuGet) ───────────
 
     private void StartOrbPulse()
     {
@@ -58,7 +77,6 @@ public partial class HomePage : ContentPage
 
     private async Task RunPulseLoopAsync()
     {
-        // Loop suave: escala 1.0 ↔ 1.08 + leve variação de opacidade no anel médio.
         while (_pulseRunning)
         {
             try
@@ -74,7 +92,6 @@ public partial class HomePage : ContentPage
             }
             catch
             {
-                // Página pode ter sido descarregada; encerra o loop.
                 break;
             }
         }
@@ -88,62 +105,8 @@ public partial class HomePage : ContentPage
             await button.ScaleTo(0.85, 80, Easing.CubicOut);
             await button.ScaleTo(1.0, 120, Easing.CubicIn);
         }
-        catch
-        {
-            // ignore
-        }
+        catch { }
     }
-
-    // ── Bottom bar (conceito holográfico) ──────────────────────────
-
-    private async void OnNetworkClicked(object? sender, EventArgs e)
-    {
-        await PlayButtonFeedbackAsync(BtnNetwork);
-        await RefreshNetworkOnlyAsync();
-        await DisplayAlert("Network", "Status de rede atualizado.", "OK");
-    }
-
-    private async void OnSensorClicked(object? sender, EventArgs e)
-    {
-        await PlayButtonFeedbackAsync(BtnSensor);
-        await RefreshSystemOnlyAsync();
-        await DisplayAlert("Sensor", "Diagnóstico de sistema atualizado.", "OK");
-    }
-
-    private async void OnEthereumClicked(object? sender, EventArgs e)
-    {
-        await PlayButtonFeedbackAsync(BtnEthereum);
-        await DisplayAlert("Ethereum", "Módulo reservado para integração futura.", "OK");
-    }
-
-    private async void OnSystemClicked(object? sender, EventArgs e)
-    {
-        await PlayButtonFeedbackAsync(BtnSystem);
-        await RefreshAsync();
-        await DisplayAlert("System", "Painel de sistema atualizado.", "OK");
-    }
-
-    private async void OnDeviceClicked(object? sender, EventArgs e)
-    {
-        await PlayButtonFeedbackAsync(BtnDevice);
-
-        // Navega para a seção Apps (Células) se existir no TabbedPage pai.
-        if (Parent is NavigationPage nav && nav.Parent is TabbedPage tabs)
-        {
-            foreach (var child in tabs.Children)
-            {
-                if (child is NavigationPage np && np.Title == "Apps")
-                {
-                    tabs.CurrentPage = child;
-                    return;
-                }
-            }
-        }
-
-        await DisplayAlert("Device", "Abra a seção Apps → Células para gerenciar o dispositivo.", "OK");
-    }
-
-    // ── Refresh ────────────────────────────────────────────────────
 
     private async Task RefreshAsync()
     {

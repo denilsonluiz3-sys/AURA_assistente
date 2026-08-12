@@ -35,6 +35,11 @@
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.28.0" />
   </ItemGroup>
 
+  <!-- Fontes Lovable: Barlow Condensed (headings) + IBM Plex Sans (body) -->
+  <ItemGroup>
+    <MauiFont Include="Resources\Fonts\*" />
+  </ItemGroup>
+
   <!-- Modelo Kokoro TTS + voz pf_dora (pt-br) + vocab. Assets empacotados no APK. -->
   <ItemGroup>
     <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />

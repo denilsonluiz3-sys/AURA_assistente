@@ -14,6 +14,7 @@ namespace AURA.Mobile
             EventBus events,
             ModuleManager manager,
             HomePage home,
+            DiagnosticoPage diagnostico,
             ChatPage chat,
             AgentPage agent,
             MemoryPage memory,
@@ -34,6 +35,7 @@ namespace AURA.Mobile
             _entries = new List<(string?, string, string, Page)>
             {
                 ("system", "Sistema", "Início", home),
+                ("system", "Sistema", "Diagnóstico", diagnostico),
                 ("logs", "Sistema", "Logs", logs),
                 ("logs", "Sistema", "Correções", fixes),
                 ("ai", "Assistente", "Chat", chat),
