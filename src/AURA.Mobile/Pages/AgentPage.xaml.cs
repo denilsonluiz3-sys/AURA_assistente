@@ -1,6 +1,7 @@
 using AURA.AI;
 using AURA.Memory;
 using AURA.Mobile.Diagnostics;
+using AURA.Mobile.Speech;
 
 namespace AURA.Mobile.Pages;
 
@@ -8,19 +9,25 @@ public partial class AgentPage : ContentPage
 {
     private readonly OpenRouterClient _client;
     private readonly MemoryStore _memory;
+    private readonly ISpeechService _speech;
+    private readonly VoiceAssistantService? _voice;
     private AgentSession? _session;
 
-    public AgentPage(OpenRouterClient client, MemoryStore memory)
+    public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
+        VoiceAssistantService? voice = null)
     {
         InitializeComponent();
         _client = client;
         _memory = memory;
+        _speech = speech;
+        _voice = voice;
     }
 
     protected override void OnAppearing()
     {
         base.OnAppearing();
         RuntimeConfig.Apply(_client);
+        AiConfig.Load(_client);
 
         string workspace = AgentWorkspace.EnsureCreated();
         string activeRoot = AgentWorkspace.ActiveRoot;
@@ -124,6 +131,8 @@ public partial class AgentPage : ContentPage
         {
             string answer = await _session!.RunAsync(text);
             AppendBubble(answer, user: false);
+            _voice?.SetLastUtterance(answer);
+            await SpeakAsync(answer);
 
             if (ProjectAccessService.IsLinked)
             {
@@ -153,8 +162,6 @@ public partial class AgentPage : ContentPage
             user: false, isTool: true);
     }
 
-<<<<<<< HEAD
-=======
     private void OnToggleConfigClicked(object sender, EventArgs e)
     {
         ConfigPanel.IsVisible = !ConfigPanel.IsVisible;
@@ -195,20 +202,17 @@ public partial class AgentPage : ContentPage
     {
         try
         {
+            await _speech.InitializeAsync();
             await _speech.SpeakAsync(text);
         }
-        catch (OperationCanceledException)
+        catch (NotSupportedException)
         {
-            // Usuário cancelou a fala: sem ação.
-        }
-        catch (Exception ex)
-        {
-            // Falha de TTS NUNCA derruba o Agent Loop: registra e segue.
-            AuraLog.Warning("TTS: fala pulada (" + ex.GetType().Name + ": " + ex.Message + ")");
+            // Motor atual não cobre este texto (ex.: Kokoro com dicionário
+            // limitado como fallback). Não quebra o chat.
+            AuraLog.Info("TTS: texto fora do alcance do motor atual, fala pulada.");
         }
     }
 
->>>>>>> origin/fix/module-download-embedded-fallback
     private void AppendBubble(string text, bool user, bool isTool = false, bool isError = false)
     {
         // Cores alinhadas à nova paleta de App.xaml
@@ -237,13 +241,41 @@ public partial class AgentPage : ContentPage
         // Prefixo de ícone para tool steps
         string display = isTool ? text : text;
 
-        var label = new Label
+        var label = new Editor
         {
             Text = display,
+            IsReadOnly = true,
             TextColor = textColor,
             FontSize = isTool ? 12 : 14,
-            LineBreakMode = LineBreakMode.WordWrap
+            BackgroundColor = Colors.Transparent,
+            AutoSize = Microsoft.Maui.Controls.EditorAutoSizeOption.TextChanges,
+            MinimumHeightRequest = 24,
+            Margin = new Thickness(-4, -6)
         };
+
+        View bubbleContent = label;
+        if (!user)
+        {
+            var copyButton = new Button
+            {
+                Text = "Copiar",
+                BackgroundColor = Colors.Transparent,
+                TextColor = Color.FromArgb("#7a7a90"),
+                FontSize = 10,
+                Padding = new Thickness(6, 0),
+                HeightRequest = 24,
+                HorizontalOptions = LayoutOptions.End
+            };
+            copyButton.Clicked += async (_, _) =>
+            {
+                await Clipboard.Default.SetTextAsync(display);
+                string original = copyButton.Text;
+                copyButton.Text = "✓";
+                await Task.Delay(1500);
+                copyButton.Text = original;
+            };
+            bubbleContent = new VerticalStackLayout { label, copyButton };
+        }
 
         var border = new Border
         {
@@ -254,7 +286,7 @@ public partial class AgentPage : ContentPage
             Padding = new Thickness(12, 8),
             MaximumWidthRequest = 340,
             HorizontalOptions = alignment,
-            Content = label
+            Content = bubbleContent
         };
 
         MainThread.BeginInvokeOnMainThread(() =>

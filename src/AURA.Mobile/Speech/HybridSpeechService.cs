@@ -48,34 +48,23 @@ namespace AURA.Mobile.Speech
                 await _android.SpeakAsync(text, ct).ConfigureAwait(false);
                 return;
             }
+            catch (NotSupportedException)
+            {
+                // Motor nativo indisponível ou recusou o texto: cai para o Kokoro.
+            }
+            catch (InvalidOperationException)
+            {
+                // Sem Activity ainda: idem.
+            }
             catch (OperationCanceledException)
             {
                 throw;
-            }
-            catch (Exception ex)
-            {
-                // Qualquer falha do motor nativo (incluindo inesperada) cai para o
-                // Kokoro. Nunca propaga erro cru para o Agent Loop.
-                AuraLog.Warning("TTS nativo indisponível, usando Kokoro: " + ex.Message);
             }
 
             // Fallback: Kokoro on-device. Textos fora do dicionário do
             // fonemizador lançam NotSupportedException — o chamador decide.
-            try
-            {
-                await _kokoro.InitializeAsync(ct).ConfigureAwait(false);
-                await _kokoro.SpeakAsync(text, ct).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                // O Kokoro também falhou: registra e retorna — a resposta textual
-                // e o Agent Loop continuam normalmente (fala é opcional).
-                AuraLog.Warning("TTS indisponível (Kokoro): " + ex.Message);
-            }
+            await _kokoro.InitializeAsync(ct).ConfigureAwait(false);
+            await _kokoro.SpeakAsync(text, ct).ConfigureAwait(false);
         }
 
         public Task StopAsync()
