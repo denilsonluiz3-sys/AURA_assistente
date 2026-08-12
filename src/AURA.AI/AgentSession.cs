@@ -4,7 +4,6 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Text.Json;
 using AURA.Core.Logging;
 using AURA.Memory;
 
@@ -15,30 +14,42 @@ namespace AURA.AI
     /// ferramentas registradas, executa as chamadas de ferramenta solicitadas
     /// pelo modelo, anexa os resultados e repete até o modelo responder texto
     /// final (estilo opencode/agentes de terminal).
+    /// Quando um MemoryStore é fornecido, cada turno user/assistant é persistido
+    /// em ~/AURA/memory.json, garantindo continuidade de contexto entre sessões.
     /// </summary>
     public sealed class AgentSession
     {
-        private const int MaxRounds = 8;
+        private const int MaxRounds = 20;
 
         private readonly OpenRouterClient _client;
         private readonly ILogger _logger;
-        private readonly List<AgentTool> _tools;
+        private readonly ToolRegistry _registry;
         private readonly List<AgentMessage> _messages = new();
-
-        // Limite de segurança para impedir crescimento indefinido
-        // do contexto enviado ao modelo.
-        private const int MaxHistoryMessages = 16;
         private readonly string? _systemPrompt;
-        private readonly SolutionStore _solutionStore;
+        private readonly MemoryStore? _memory;
 
-        public AgentSession(OpenRouterClient client, IEnumerable<AgentTool> tools,
-            string? systemPrompt = null, ILogger? logger = null)
+        /// <summary>
+        /// Construtor preferido: ferramentas já organizadas em <see cref="ToolRegistry"/>.
+        /// </summary>
+        public AgentSession(OpenRouterClient client, ToolRegistry registry,
+            string? systemPrompt = null, ILogger? logger = null, MemoryStore? memory = null)
         {
             _client = client ?? throw new ArgumentNullException(nameof(client));
-            _tools = (tools ?? Enumerable.Empty<AgentTool>()).ToList();
+            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _systemPrompt = systemPrompt;
             _logger = logger ?? new ConsoleLogger();
-            _solutionStore = new SolutionStore();
+            _memory = memory;
+        }
+
+        /// <summary>
+        /// Compatibilidade: monta um <see cref="ToolRegistry"/> a partir da lista.
+        /// Preferir o construtor que recebe <see cref="ToolRegistry"/> diretamente.
+        /// </summary>
+        public AgentSession(OpenRouterClient client, IEnumerable<AgentTool> tools,
+            string? systemPrompt = null, ILogger? logger = null, MemoryStore? memory = null)
+            : this(client, new ToolRegistry(tools ?? Enumerable.Empty<AgentTool>()),
+                systemPrompt, logger, memory)
+        {
         }
 
         /// <summary>Emitido a cada ferramenta executada (para atualizar a UI).</summary>
@@ -46,29 +57,8 @@ namespace AURA.AI
 
         public IReadOnlyList<AgentMessage> Messages => _messages;
 
-        private void TrimHistory()
-        {
-            if (_messages.Count <= MaxHistoryMessages)
-                return;
-
-            AgentMessage? system = _messages
-                .FirstOrDefault(m =>
-                    string.Equals(m.Role, "system", StringComparison.OrdinalIgnoreCase));
-
-            var recent = _messages
-                .Where(m => !string.Equals(m.Role, "system", StringComparison.OrdinalIgnoreCase))
-                .TakeLast(MaxHistoryMessages - (system != null ? 1 : 0))
-                .ToList();
-
-            _messages.Clear();
-
-            if (system != null)
-                _messages.Add(system);
-
-            _messages.AddRange(recent);
-
-            _logger.Info("agent: histórico podado para " + _messages.Count + " mensagens");
-        }
+        /// <summary>Registro de ferramentas desta sessão.</summary>
+        public ToolRegistry Registry => _registry;
 
         public async Task<string> RunAsync(string userText,
             HttpClient? httpClient = null, CancellationToken ct = default)
@@ -79,25 +69,22 @@ namespace AURA.AI
             }
 
             _messages.Add(new AgentMessage { Role = "user", Content = userText });
+            _memory?.Append(MemoryEntry.Question(userText));
 
             int round = 0;
             while (round++ < MaxRounds)
             {
-                TrimHistory();
-
                 AgentChatResponse response = await _client.ChatToolsAsync(
                     _messages,
-                    _tools.Select(t => t.Definition).ToList(),
+                    _registry.Definitions().ToList(),
                     httpClient,
                     ct,
                     _systemPrompt).ConfigureAwait(false);
 
                 if (!string.IsNullOrEmpty(response.Error))
                 {
-                    throw new InvalidOperationException(response.Error);
+                    throw new AgentLlmException(response.Error, response.ErrorKind);
                 }
-
-                _logger.Info("agent: round=" + round + " toolCalls=" + (response.ToolCalls?.Count ?? 0) + " hasContent=" + !string.IsNullOrEmpty(response.Content));
 
                 if (response.ToolCalls is { Count: > 0 })
                 {
@@ -105,7 +92,11 @@ namespace AURA.AI
                     {
                         Role = "assistant",
                         Content = null,
-                        ToolCalls = response.ToolCalls
+                        ToolCalls = response.ToolCalls,
+                        // Precisa seguir junto com esta mensagem assistant:
+                        // é isto que faltava e causava o 400 "missing a
+                        // thought_signature" nos modelos Gemini 3.x.
+                        ReasoningDetails = response.ReasoningDetails
                     });
 
                     foreach (AgentToolCall call in response.ToolCalls)
@@ -127,6 +118,7 @@ namespace AURA.AI
 
                 string final = response.Content ?? "(resposta vazia)";
                 _messages.Add(new AgentMessage { Role = "assistant", Content = final });
+                _memory?.Append(MemoryEntry.Answer(final));
                 return final;
             }
 
@@ -134,433 +126,23 @@ namespace AURA.AI
                 "O agente atingiu o limite de " + MaxRounds + " passos de ferramentas.");
         }
 
-        /// <summary>
-        /// Consulta somente soluções que já foram validadas.
-        /// A consulta não executa a solução e não substitui a IA.
-        /// </summary>
-        private SolutionRule? TryGetKnownSolution(
-            RequestContext request)
+        private async Task<string> ExecuteToolAsync(AgentToolCall call, CancellationToken ct)
         {
-            if (request == null)
-            {
-                return null;
-            }
-
-            return _solutionStore.Find(
-                request.Intent,
-                request.Target,
-                request.Goal);
-        }
-
-        private async Task<string> ExecuteToolAsync(
-            AgentToolCall call,
-            CancellationToken ct)
-        {
-            AgentTool? tool = _tools.FirstOrDefault(
-                t => t.Definition.Name == call.Name);
-
+            AgentTool? tool = _registry.Resolve(call.Name);
             if (tool == null)
             {
-                return "ERRO: ferramenta desconhecida: " +
-                       call.Name;
+                return "ERRO: ferramenta desconhecida: " + call.Name;
             }
 
             try
             {
-                string normalized =
-                    NormalizeToolArguments(
-                        call.Name,
-                        call.ArgumentsJson);
-
-                _logger.Info(
-                    "agent: argumentos normalizados='" +
-                    normalized + "'");
-
-                return await tool.ExecuteAsync(
-                    normalized,
-                    ct).ConfigureAwait(false);
+                return await tool.ExecuteAsync(call.ArgumentsJson, ct).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                _logger.Error(
-                    "agent: falha na ferramenta '" +
-                    call.Name +
-                    "': " +
-                    ex.Message);
-
-                return "ERRO na ferramenta " +
-                       call.Name +
-                       ": " +
-                       ex.Message;
+                _logger.Error("agent: falha na ferramenta '" + call.Name + "': " + ex.Message);
+                return "ERRO na ferramenta " + call.Name + ": " + ex.Message;
             }
         }
-
-        private static string NormalizeToolArguments(
-            string toolName,
-            string? raw)
-        {
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                return DefaultToolArguments(toolName);
-            }
-
-            string json = raw.Trim();
-
-            // Remove markdown ```json ... ```
-            if (json.StartsWith("```"))
-            {
-                int nl = json.IndexOf('\n');
-
-                if (nl >= 0)
-                {
-                    json = json.Substring(nl + 1);
-                }
-
-                int fence = json.LastIndexOf("```");
-
-                if (fence >= 0)
-                {
-                    json = json.Substring(0, fence);
-                }
-
-                json = json.Trim();
-            }
-
-            try
-            {
-                using JsonDocument doc =
-                    JsonDocument.Parse(json);
-
-                JsonElement root = doc.RootElement;
-
-                // Qwen às vezes devolve:
-                // [{"path":"teste.txt"}]
-                if (root.ValueKind ==
-                    JsonValueKind.Array &&
-                    root.GetArrayLength() > 0)
-                {
-                    root = root[0];
-                }
-
-                if (root.ValueKind !=
-                    JsonValueKind.Object)
-                {
-                    return DefaultToolArguments(toolName);
-                }
-
-                var output =
-                    new Dictionary<string, object?>(
-                        StringComparer.OrdinalIgnoreCase);
-
-                foreach (JsonProperty property
-                    in root.EnumerateObject())
-                {
-                    JsonElement value =
-                        property.Value;
-
-                    if (value.ValueKind ==
-                        JsonValueKind.String)
-                    {
-                        output[property.Name] =
-                            value.GetString();
-
-                        continue;
-                    }
-
-                    if (value.ValueKind ==
-                        JsonValueKind.Number)
-                    {
-                        output[property.Name] =
-                            value.ToString();
-
-                        continue;
-                    }
-
-                    if (value.ValueKind ==
-                            JsonValueKind.True ||
-                        value.ValueKind ==
-                            JsonValueKind.False)
-                    {
-                        output[property.Name] =
-                            value.GetBoolean();
-
-                        continue;
-                    }
-
-                    // Corrige:
-                    //
-                    // "path": {
-                    //   "type": "string",
-                    //   "description": "."
-                    // }
-                    //
-                    if (value.ValueKind ==
-                        JsonValueKind.Object)
-                    {
-                        if (value.TryGetProperty(
-                                "value",
-                                out JsonElement val) &&
-                            val.ValueKind ==
-                                JsonValueKind.String)
-                        {
-                            output[property.Name] =
-                                val.GetString();
-
-                            continue;
-                        }
-
-                        if (value.TryGetProperty(
-                                "description",
-                                out JsonElement desc) &&
-                            desc.ValueKind ==
-                                JsonValueKind.String)
-                        {
-                            // O modelo pode devolver o schema da
-                            // propriedade em vez do argumento real.
-                            //
-                            // Exemplo:
-                            // "path": {
-                            //   "type": "string",
-                            //   "description": "Caminho relativo..."
-                            // }
-                            //
-                            // A descrição NÃO deve virar o valor
-                            // do argumento.
-
-                            if (value.TryGetProperty(
-                                    "type",
-                                    out JsonElement type) &&
-                                type.ValueKind ==
-                                    JsonValueKind.String)
-                            {
-                                string typeName =
-                                    type.GetString() ?? "";
-
-                                if (typeName.Equals(
-                                        "string",
-                                        StringComparison.OrdinalIgnoreCase))
-                                {
-                                    // list_dir sem valor real =
-                                    // raiz do workspace.
-                                    if (property.Name.Equals(
-                                            "path",
-                                            StringComparison.OrdinalIgnoreCase) &&
-                                        toolName.Equals(
-                                            "list_dir",
-                                            StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        output[property.Name] = ".";
-                                    }
-                                    else
-                                    {
-                                        output[property.Name] = "";
-                                    }
-
-                                    continue;
-                                }
-                            }
-
-                            // Não usar a descrição de um schema
-                            // como argumento da ferramenta.
-                            output[property.Name] = "";
-                            continue;
-                        }
-
-                        if (value.TryGetProperty(
-                                "default",
-                                out JsonElement def) &&
-                            def.ValueKind ==
-                                JsonValueKind.String)
-                        {
-                            output[property.Name] =
-                                def.GetString();
-
-                            continue;
-                        }
-
-                        output[property.Name] = "";
-                        continue;
-                    }
-                }
-
-                // list_dir
-                if (toolName.Equals(
-                        "list_dir",
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    if (!output.TryGetValue(
-                            "path",
-                            out object? path) ||
-                        string.IsNullOrWhiteSpace(
-                            Convert.ToString(path)))
-                    {
-                        output["path"] = ".";
-                    }
-                }
-
-                // read_file
-                if (toolName.Equals(
-                        "read_file",
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    if (!output.ContainsKey("path"))
-                    {
-                        output["path"] = "";
-                    }
-                }
-
-                // run_shell
-                if (toolName.Equals(
-                        "run_shell",
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    if (output.TryGetValue(
-                            "command",
-                            out object? command))
-                    {
-                        string cmd =
-                            Convert.ToString(command) ??
-                            "";
-
-                        output["command"] =
-                            CleanModelValue(cmd);
-                    }
-                }
-
-                // write_file
-                if (toolName.Equals(
-                        "write_file",
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    if (!output.ContainsKey("path"))
-                    {
-                        output["path"] = "";
-                    }
-
-                    if (!output.ContainsKey("content"))
-                    {
-                        output["content"] = "";
-                    }
-                }
-
-                // edit_file
-                if (toolName.Equals(
-                        "edit_file",
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    if (!output.ContainsKey("path"))
-                    {
-                        output["path"] = "";
-                    }
-
-                    if (!output.ContainsKey("old_text"))
-                    {
-                        output["old_text"] = "";
-                    }
-
-                    if (!output.ContainsKey("new_text"))
-                    {
-                        output["new_text"] = "";
-                    }
-                }
-
-                return JsonSerializer.Serialize(output);
-            }
-            catch (JsonException)
-            {
-                // Tenta extrair JSON escondido em texto.
-                int begin =
-                    json.IndexOf('{');
-
-                int finish =
-                    json.LastIndexOf('}');
-
-                if (begin >= 0 &&
-                    finish > begin)
-                {
-                    string extracted =
-                        json.Substring(
-                            begin,
-                            finish - begin + 1);
-
-                    return NormalizeToolArguments(
-                        toolName,
-                        extracted);
-                }
-
-                return DefaultToolArguments(toolName);
-            }
-        }
-
-        private static string DefaultToolArguments(
-            string toolName)
-        {
-            if (toolName.Equals(
-                    "list_dir",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return "{\"path\":\".\"}";
-            }
-
-            if (toolName.Equals(
-                    "read_file",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return "{\"path\":\"\"}";
-            }
-
-            if (toolName.Equals(
-                    "run_shell",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return "{\"command\":\"\"}";
-            }
-
-            if (toolName.Equals(
-                    "write_file",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return "{\"path\":\"\",\"content\":\"\"}";
-            }
-
-            if (toolName.Equals(
-                    "edit_file",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return "{\"path\":\"\",\"old_text\":\"\",\"new_text\":\"\"}";
-            }
-
-            return "{}";
-        }
-
-        private static string CleanModelValue(
-            string value)
-        {
-            string result =
-                value.Trim();
-
-            if (result.Length >= 2)
-            {
-                char first =
-                    result[0];
-
-                char last =
-                    result[result.Length - 1];
-
-                if ((first == '\'' &&
-                     last == '\'') ||
-                    (first == '"' &&
-                     last == '"'))
-                {
-                    result =
-                        result.Substring(
-                            1,
-                            result.Length - 2);
-                }
-            }
-
-            return result.Trim();
-        }
-
     }
 }

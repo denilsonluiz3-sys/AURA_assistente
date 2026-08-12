@@ -427,7 +427,7 @@ private static void AuraCommand(string[] parts)
                 new ReadFileTool(workspace),
                 new WriteFileTool(workspace),
                 new EditFileTool(workspace),
-                new ShellAgentTool(workspace)
+                new ShellAgentTool(workspace, Shell)
             };
 
             string systemPrompt = LoadAuraMasterPrompt()
