@@ -1,4 +1,4 @@
-# Roadmap Completo — estado atualizado 2026-08-12
+# Roadmap Completo — estado atualizado 2026-08-12 (18h30)
 
 ## Status por fase (Core / CLI)
 
@@ -59,24 +59,30 @@ Conceito de referência: vídeos Gemini (lua/sol + anéis + aurora + menu inferi
 - **2026-08-12:** `MemoryAgent` — consulta memória local sem rede; `AutomationAgent` — executa shell determinístico; `AIAgent` — wrapper IAgent sobre AgentManager (aichat/termux-ai/opencode).
 - **2026-08-12:** F7 implementado — CLI: `aura install <id>`, `aura remove <id>`, `aura update [--dry-run]`; suporte a `--dry-run` no install.
 - **2026-08-12:** `ConcreteAgentsTests` — 8 novos testes (MemoryAgent/AutomationAgent/AIAgent). Build: 0 erros; 135/138 testes passando (3 falhos pré-existentes de executor Git/Python sem binário no CI).
+- **2026-08-12 (18h):** PR #8 (`feat/project-access`) fechada como obsoleta — 10 commits de 2026-08-08~11 revertiam Loja, TTS, ONNX e removiam testes; main já avançou além.
+- **2026-08-12 (18h):** Issues #27 (duplicata de #28), #28 (FEITO), #32 (sem título) fechadas.
+- **2026-08-12 (18h40):** Refatorado `ProcessExecutorBase.RunAsync` — extraído `RunProcessAsync` com Exited event + TCS + ReadToEndAsync; fallback bash -c para shared library error.
+- **2026-08-12 (18h40):** 127/127 testes CAN passando no Termux (0 falhas) — lógica pura .NET sem processo externo.
+- **2026-08-12 (18h40):** `docs/analise-completa-codebase.md` criado — arquitetura completa, código morto, redundâncias, cobertura.
+- **2026-08-12 (18h40):** `docs/contexto-sessao.json` criado — estado persistente entre sessões, evita reanálise.
+- **2026-08-12 (18h40):** `scripts/salvar-contexto.sh` criado — script para atualizar timestamp do contexto.
 
 ## PRs e Issues
 
 | # | Tipo | Status | Descrição |
 |---|------|--------|-----------|
 | [#33](https://github.com/denilsonluiz3-sys/AURA_assistente/pull/33) | PR | ✅ Fechado | fix(go): run --wait + smoke test Go — conteúdo integrado em main |
-| [#8](https://github.com/denilsonluiz3-sys/AURA_assistente/pull/8) | PR | 🔲 Aberto | Feat/project access — aguarda revisão/decisão |
-| [#28](https://github.com/denilsonluiz3-sys/AURA_assistente/issues/28) | Issue | 🔲 Aberta | P4.1 — IAgent concretos (MemoryAgent, AutomationAgent, AIAgent wrapper) |
-| [#27](https://github.com/denilsonluiz3-sys/AURA_assistente/issues/27) | Issue | 🔲 Aberta | P4.1 — IAgent concretos (duplicata de #28 — fechar) |
-| [#32](https://github.com/denilsonluiz3-sys/AURA_assistente/issues/32) | Issue | 🔲 Aberta | (sem título — investigar e fechar ou detalhar) |
+| [#8](https://github.com/denilsonluiz3-sys/AURA_assistente/pull/8) | PR | ❌ Fechado | Feat/project access — fechado como obsoleto (main avançou além) |
+| [#28](https://github.com/denilsonluiz3-sys/AURA_assistente/issues/28) | Issue | ✅ Fechado | P4.1 — IAgent concretos (MemoryAgent, AutomationAgent, AIAgent wrapper) — implementado |
+| [#27](https://github.com/denilsonluiz3-sys/AURA_assistente/issues/27) | Issue | ✅ Fechado | Duplicata de #28 |
+| [#32](https://github.com/denilsonluiz3-sys/AURA_assistente/issues/32) | Issue | ✅ Fechado | Sem título — fechado sem ação
 
 ## Próximos passos (ordem de prioridade)
 
 1. **[mobile]** Validar UI-Holo F2 (pulse + feedback) no APK de debug em dispositivo real.
-2. ~~**[issue #28]** Implementar `IAgent` concretos~~ ✅ FEITO (MemoryAgent, AutomationAgent, AIAgent).
-3. ~~**[F7]** CLI de loja~~ ✅ FEITO (`aura install/remove/update --dry-run`).
-4. **[F8]** Finalizar smoke test E2E — cobrir cenários Go e módulos no CI; corrigir 3 testes executor.
-5. **[PR #8]** Revisar e decidir sobre `feat/project-access` (aceitar, descartar ou adaptar).
-6. **[issues #27/#32]** Triagem: fechar #27 como duplicata; fechar #32 (sem título).
-7. **[UI-Holo F3]** Avaliar SkiaSharp só após F2 estável no dispositivo.
-8. **[F9]** Daemon + API HTTP (pós F8 estável).
+2. **[F8]** Finalizar smoke test E2E — cobrir cenários Go e módulos no CI; corrigir 3 testes executor (Git/Python ausentes).
+3. **[mobile]** Corrigir warnings de nullability no build do APK (158 warnings atuais).
+4. **[UI-Holo F3]** Avaliar SkiaSharp só após F2 estável no dispositivo.
+5. **[F9]** Daemon + API HTTP (pós F8 estável).
+6. **[F10]** Isolamento forte com proot/firejail.
+7. **[F11]** Estudo KVM/qcow2.

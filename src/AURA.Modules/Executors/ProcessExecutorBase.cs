@@ -4,20 +4,48 @@ using AURA.Abstractions.Execution;
 
 namespace AURA.Modules.Executors;
 
-/// <summary>
-/// Base compartilhada por todos os executores que rodam um processo externo
-/// (Shell, Git, Dotnet, Python, Node, Cargo, Java). Centraliza a lógica de
-/// disparo do processo, captura de stdout/stderr e timeout, para que cada
-/// executor concreto só precise resolver o binário e montar os argumentos.
-/// </summary>
 public abstract class ProcessExecutorBase : IToolExecutor
 {
     public abstract string Name { get; }
     public abstract bool IsAvailable();
     public abstract Task<ExecutionResult> ExecuteAsync(ExecutionRequest request, CancellationToken cancellationToken = default);
 
-    /// <summary>Executa um processo já resolvido (fileName + argumentos) e devolve o resultado padronizado.</summary>
     protected static async Task<ExecutionResult> RunAsync(
+        string fileName,
+        IEnumerable<string> arguments,
+        ExecutionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await RunProcessAsync(fileName, arguments, request, cancellationToken);
+
+        if (result.ExitCode == 127 && result.StandardError.Contains("shared library", StringComparison.OrdinalIgnoreCase))
+        {
+            var shellArgs = BuildShellCommand(fileName, arguments);
+            var fallbackRequest = new ExecutionRequest
+            {
+                Command = request.Command,
+                Arguments = request.Arguments,
+                WorkingDirectory = request.WorkingDirectory ?? Directory.GetCurrentDirectory(),
+                EnvironmentVariables = request.EnvironmentVariables,
+                Timeout = request.Timeout
+            };
+            result = await RunProcessAsync(
+                "/data/data/com.termux/files/usr/bin/bash",
+                shellArgs,
+                fallbackRequest,
+                cancellationToken);
+        }
+
+        return result;
+    }
+
+    private static List<string> BuildShellCommand(string fileName, IEnumerable<string> arguments)
+    {
+        var escapedArgs = string.Join(" ", arguments.Select(a => a.Contains(' ') ? $"'{a}'" : a));
+        return ["-c", $"{fileName} {escapedArgs}"];
+    }
+
+    private static async Task<ExecutionResult> RunProcessAsync(
         string fileName,
         IEnumerable<string> arguments,
         ExecutionRequest request,
@@ -43,39 +71,11 @@ public abstract class ProcessExecutorBase : IToolExecutor
         }
 
         using var process = new Process { StartInfo = psi };
-        var stdout = new StringBuilder();
-        var stderr = new StringBuilder();
-
-        process.OutputDataReceived += (_, e) => { if (e.Data is not null) stdout.AppendLine(e.Data); };
-        process.ErrorDataReceived += (_, e) => { if (e.Data is not null) stderr.AppendLine(e.Data); };
-
         var stopwatch = Stopwatch.StartNew();
 
         try
         {
             process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-
-            using var cts = request.Timeout is not null
-                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
-                : null;
-            cts?.CancelAfter(request.Timeout!.Value);
-
-            await process.WaitForExitAsync(cts?.Token ?? cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            try { process.Kill(entireProcessTree: true); } catch { /* processo já encerrado */ }
-            stopwatch.Stop();
-            return new ExecutionResult
-            {
-                Success = false,
-                ExitCode = -1,
-                StandardOutput = stdout.ToString(),
-                StandardError = stderr + "\n[AURA] Execução cancelada por timeout.",
-                Duration = stopwatch.Elapsed
-            };
         }
         catch (Exception ex)
         {
@@ -83,14 +83,33 @@ public abstract class ProcessExecutorBase : IToolExecutor
             return ExecutionResult.Failed($"[AURA] Falha ao iniciar '{fileName}': {ex.Message}");
         }
 
+        var tcs = new TaskCompletionSource<bool>();
+        process.Exited += (_, _) => tcs.TrySetResult(true);
+        process.EnableRaisingEvents = true;
+
+        using var cts = request.Timeout is not null
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+            : null;
+        cts?.CancelAfter(request.Timeout!.Value);
+
+        using var _ = cts?.Token.Register(() =>
+        {
+            try { process.Kill(entireProcessTree: true); } catch { }
+            tcs.TrySetResult(false);
+        });
+
+        await tcs.Task;
         stopwatch.Stop();
+
+        var stdout = await process.StandardOutput.ReadToEndAsync();
+        var stderr = await process.StandardError.ReadToEndAsync();
 
         return new ExecutionResult
         {
             Success = process.ExitCode == 0,
             ExitCode = process.ExitCode,
-            StandardOutput = stdout.ToString(),
-            StandardError = stderr.ToString(),
+            StandardOutput = stdout,
+            StandardError = stderr,
             Duration = stopwatch.Elapsed
         };
     }
@@ -105,8 +124,9 @@ public abstract class ProcessExecutorBase : IToolExecutor
         {
             foreach (var dir in dirs)
             {
-                if (File.Exists(Path.Combine(dir, candidate)))
-                    return candidate;
+                var fullPath = Path.Combine(dir, candidate);
+                if (File.Exists(fullPath))
+                    return fullPath;
             }
         }
 
