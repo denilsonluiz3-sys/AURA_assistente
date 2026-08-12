@@ -1,255 +1,356 @@
 #!/usr/bin/env bash
-set -euo pipefail
 
-REPO="/root/AURA_assistente"
+set -u
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+
+if [ -z "$REPO_ROOT" ]; then
+    echo "❌ Este diretório não é um repositório Git."
+    exit 1
+fi
+
+cd "$REPO_ROOT" || exit 1
+
 REMOTE="origin"
-MAIN="main"
-APK_DIR="$REPO/aura-mobile-apk-release"
-APK_DEST="/storage/emulated/0/objetivo"
-
-cd "$REPO"
-
-echo "=============================================="
-echo " AURA - PUBLICAÇÃO E VALIDAÇÃO"
-echo "=============================================="
-
-# ------------------------------------------------
-# 1. Ambiente
-# ------------------------------------------------
-
-echo
-echo "[1/8] Verificando ambiente..."
-
-command -v git >/dev/null || {
-    echo "❌ git não encontrado."
-    exit 1
-}
-
-command -v gh >/dev/null || {
-    echo "❌ gh não encontrado."
-    exit 1
-}
-
-if ! gh auth status >/dev/null 2>&1; then
-    echo "❌ GitHub CLI não está autenticado."
-    echo "Execute: gh auth login"
-    exit 1
-fi
-
-echo "✅ Git"
-echo "✅ GitHub CLI"
-
-# ------------------------------------------------
-# 2. Estado Git
-# ------------------------------------------------
-
-echo
-echo "[2/8] Verificando Git..."
-
 BRANCH="$(git branch --show-current)"
-HEAD="$(git rev-parse --short HEAD)"
 
-echo "Branch: $BRANCH"
-echo "HEAD:   $HEAD"
-
-if [ "$BRANCH" != "$MAIN" ]; then
-    echo "⚠️ Branch atual não é main."
-    echo "O script não fará merge automático."
+if [ -z "$BRANCH" ]; then
+    echo "❌ Não foi possível identificar a branch atual."
     exit 1
 fi
 
-git fetch "$REMOTE" "$MAIN"
+MAX_SIZE=$((100 * 1024 * 1024))
 
-LOCAL="$(git rev-parse HEAD)"
-REMOTE_HEAD="$(git rev-parse "$REMOTE/$MAIN")"
+pause() {
+    echo
+    read -r -p "Pressione ENTER para continuar..." _
+}
 
-echo "Local:  ${LOCAL:0:12}"
-echo "Remote: ${REMOTE_HEAD:0:12}"
+header() {
+    clear 2>/dev/null || true
+    echo "=============================================="
+    echo "        AURA GitHub Manager"
+    echo "=============================================="
+    echo "Repositório: $(basename "$REPO_ROOT")"
+    echo "Branch:      $BRANCH"
+    echo "=============================================="
+    echo
+}
 
-# ------------------------------------------------
-# 3. Arquivos
-# ------------------------------------------------
+show_status() {
+    header
 
-echo
-echo "[3/8] Arquivos modificados..."
+    echo "=== STATUS ==="
+    git status
 
-STATUS="$(git status --short)"
+    echo
+    echo "=== REMOTO ==="
+    git remote -v
 
-if [ -z "$STATUS" ]; then
-    echo "Nenhuma alteração local."
-else
-    echo "$STATUS"
-fi
+    echo
+    echo "=== ÚLTIMOS COMMITS ==="
+    git log --oneline --decorate -8
 
-# ------------------------------------------------
-# 4. Validação básica
-# ------------------------------------------------
+    pause
+}
 
-echo
-echo "[4/8] Validando estrutura..."
+show_commits() {
+    header
 
-if [ ! -f "AURA.sln" ] && [ ! -f "*.sln" ]; then
-    echo "⚠️ Solution não encontrada no diretório esperado."
-fi
+    echo "=== ÚLTIMOS 20 COMMITS ==="
+    git log --oneline --decorate --graph -20
 
-if [ -f "scripts/salvar-contexto.sh" ]; then
-    echo "Atualizando contexto..."
-    ./scripts/salvar-contexto.sh
-else
-    echo "⚠️ salvar-contexto.sh não encontrado."
-fi
+    pause
+}
 
-# ------------------------------------------------
-# 5. Commit
-# ------------------------------------------------
+check_large_files() {
+    header
 
-echo
-echo "[5/8] Commit..."
+    echo "=== VERIFICANDO ARQUIVOS GRANDES ==="
+    echo
 
-STATUS="$(git status --short)"
+    found=0
 
-if [ -n "$STATUS" ]; then
+    while IFS= read -r file; do
+        [ -f "$file" ] || continue
 
-    echo "$STATUS"
+        size=$(wc -c < "$file")
+
+        if [ "$size" -gt "$MAX_SIZE" ]; then
+            mb=$((size / 1024 / 1024))
+            echo "⚠️  ${mb} MB  $file"
+            found=1
+        fi
+    done < <(git ls-files)
+
+    if [ "$found" -eq 0 ]; then
+        echo "✅ Nenhum arquivo rastreado ultrapassa 100 MB."
+    else
+        echo
+        echo "❌ Existem arquivos acima do limite do GitHub."
+        echo "Eles precisam ser removidos do Git antes do push."
+    fi
+
+    pause
+}
+
+ignore_generated_apks() {
+    echo "=== PROTEÇÃO DE APKs GERADOS ==="
+
+    if ! grep -qxF '/aura-mobile-apk-debug/*.apk' .gitignore 2>/dev/null; then
+        printf '\n# APKs gerados localmente\n/aura-mobile-apk-debug/*.apk\n' >> .gitignore
+        echo "✅ Regra adicionada ao .gitignore."
+    else
+        echo "✅ APKs já estão no .gitignore."
+    fi
+}
+
+remove_tracked_apks() {
+    echo "=== REMOVENDO APKs DO GIT ==="
+
+    found=0
+
+    while IFS= read -r file; do
+        [ -n "$file" ] || continue
+
+        if git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
+            git rm --cached -- "$file"
+            found=1
+        fi
+    done < <(find aura-mobile-apk-debug -type f -name '*.apk' 2>/dev/null)
+
+    if [ "$found" -eq 0 ]; then
+        echo "✅ Nenhum APK rastreado pelo Git."
+    else
+        echo "✅ APKs removidos do índice."
+        echo "   Os arquivos locais não foram apagados."
+    fi
+}
+
+prepare_generated_files() {
+    echo "=== PREPARANDO ARQUIVOS GERADOS ==="
+
+    ignore_generated_apks
+    remove_tracked_apks
+
+    echo
+}
+
+update_remote() {
+    echo "=== ATUALIZANDO REFERÊNCIAS DO GITHUB ==="
+
+    if ! git fetch "$REMOTE" --prune; then
+        echo "❌ Falha ao atualizar informações do remoto."
+        return 1
+    fi
+
+    echo "✅ Informações do GitHub atualizadas."
+}
+
+check_sync() {
+    echo
+    echo "=== SINCRONIZAÇÃO ==="
+
+    git fetch "$REMOTE" --prune >/dev/null 2>&1 || true
+
+    LOCAL=$(git rev-parse HEAD)
+    REMOTE_HEAD=$(git rev-parse "$REMOTE/$BRANCH" 2>/dev/null || true)
+
+    if [ -z "$REMOTE_HEAD" ]; then
+        echo "ℹ️ Branch remota ainda não encontrada."
+        return 0
+    fi
+
+    if [ "$LOCAL" = "$REMOTE_HEAD" ]; then
+        echo "✅ Local e GitHub estão sincronizados."
+    else
+        AHEAD=$(git rev-list --count "$REMOTE/$BRANCH..HEAD")
+        BEHIND=$(git rev-list --count "HEAD..$REMOTE/$BRANCH")
+
+        echo "Local à frente: $AHEAD commit(s)"
+        echo "Local atrás:    $BEHIND commit(s)"
+    fi
+}
+
+commit_and_push() {
+    header
+
+    echo "=== PREPARAÇÃO ==="
+    prepare_generated_files
+
+    echo
+    echo "=== ARQUIVOS MODIFICADOS ==="
+    git status --short
+
+    echo
+    if git diff --quiet && git diff --cached --quiet; then
+        echo "ℹ️ Nenhuma alteração para commit."
+        pause
+        return 0
+    fi
+
+    echo "=== VERIFICAÇÃO DE ARQUIVOS GRANDES ==="
+
+    large=0
+
+    while IFS= read -r file; do
+        [ -f "$file" ] || continue
+
+        size=$(wc -c < "$file")
+
+        if [ "$size" -gt "$MAX_SIZE" ]; then
+            mb=$((size / 1024 / 1024))
+            echo "❌ ${mb} MB  $file"
+            large=1
+        fi
+    done < <(git ls-files)
+
+    if [ "$large" -eq 1 ]; then
+        echo
+        echo "❌ Push cancelado."
+        echo "Existem arquivos acima de 100 MB."
+        echo "Nenhum force push será executado."
+        pause
+        return 1
+    fi
+
+    echo
+    read -r -p "Mensagem do commit: " MESSAGE
+
+    if [ -z "$MESSAGE" ]; then
+        MESSAGE="chore: synchronize AURA project state"
+    fi
 
     git add -A
 
-    echo
-    echo "Arquivos preparados:"
-    git status --short
-
-    MSG="${1:-chore: synchronize AURA project state}"
-
-    git commit -m "$MSG"
-
-    echo "✅ Commit criado."
-
-else
-    echo "Nenhuma alteração para commit."
-fi
-
-# ------------------------------------------------
-# 6. Push
-# ------------------------------------------------
-
-echo
-echo "[6/8] Push para main..."
-
-LOCAL="$(git rev-parse HEAD)"
-REMOTE_HEAD="$(git rev-parse "$REMOTE/$MAIN")"
-
-if [ "$LOCAL" != "$REMOTE_HEAD" ]; then
-
-    # Segurança: nunca force push.
-    if git push "$REMOTE" "$MAIN"; then
-        echo "✅ Push concluído."
-    else
-        echo
-        echo "❌ Push recusado."
-        echo "O repositório pode exigir Pull Request."
-        echo "Nenhuma alteração foi forçada."
-        exit 1
+    if git diff --cached --quiet; then
+        echo "ℹ️ Nenhuma alteração para commit."
+        pause
+        return 0
     fi
 
-else
-    echo "✅ main já está sincronizada."
-fi
+    echo
+    echo "=== CRIANDO COMMIT ==="
 
-# ------------------------------------------------
-# 7. CI
-# ------------------------------------------------
+    if ! git commit -m "$MESSAGE"; then
+        echo "❌ Commit falhou."
+        pause
+        return 1
+    fi
 
-echo
-echo "[7/8] Verificando GitHub Actions..."
+    echo
+    echo "=== PUSH ==="
 
-sleep 3
-
-RUN_ID="$(
-    gh run list \
-        --branch "$MAIN" \
-        --limit 1 \
-        --json databaseId \
-        --jq '.[0].databaseId' 2>/dev/null || true
-)"
-
-if [ -n "$RUN_ID" ]; then
-
-    echo "Última execução: $RUN_ID"
-
-    gh run watch "$RUN_ID" --exit-status || {
+    if git push "$REMOTE" "$BRANCH"; then
         echo
-        echo "❌ GitHub Actions terminou com falha."
+        echo "=============================================="
+        echo "✅ PUSH CONCLUÍDO"
+        echo "=============================================="
+        git status --short
         echo
-        gh run view "$RUN_ID" --log-failed || true
-        exit 1
-    }
+        git log -1 --oneline
+    else
+        echo
+        echo "=============================================="
+        echo "❌ PUSH RECUSADO"
+        echo "=============================================="
+        echo
+        echo "Nenhum force push será executado."
+        echo "O commit local foi preservado."
+        echo
+        echo "Diagnóstico:"
+        git status
+        return 1
+    fi
 
-    echo "✅ GitHub Actions OK."
+    pause
+}
 
-else
-    echo "⚠️ Nenhuma execução encontrada."
-fi
+full_sync() {
+    header
 
-# ------------------------------------------------
-# 8. APK
-# ------------------------------------------------
-
-echo
-echo "[8/8] Procurando APK..."
-
-mkdir -p "$APK_DIR"
-
-APK="$(
-    find "$APK_DIR" \
-        -type f \
-        -name "*-Signed.apk" \
-        -print \
-        | head -n 1
-)"
-
-if [ -z "$APK" ]; then
-    echo "⚠️ APK Release não encontrado localmente."
+    echo "=== SINCRONIZAÇÃO COMPLETA DA AURA ==="
     echo
-    echo "O código foi publicado e o CI foi validado."
-    echo "Nenhum APK será inventado ou criado artificialmente."
-    exit 0
-fi
 
-echo "APK:"
-echo "$APK"
-
-if [ -d "/storage/emulated/0" ]; then
-
-    mkdir -p "$APK_DEST"
-
-    cp "$APK" "$APK_DEST/"
+    if ! update_remote; then
+        pause
+        return 1
+    fi
 
     echo
-    echo "✅ APK copiado para:"
-    echo "$APK_DEST/$(basename "$APK")"
+    check_sync
 
-else
     echo
-    echo "⚠️ Armazenamento Android não disponível."
-    echo "APK permanece em:"
-    echo "$APK"
-fi
+    echo "=== STATUS ATUAL ==="
+    git status --short
 
-echo
-echo "=============================================="
-echo " AURA PUBLICADA COM SUCESSO"
-echo "=============================================="
-echo
-echo "Commit:"
-git log -1 --oneline
+    echo
+    echo "=== ARQUIVOS GERADOS ==="
+    prepare_generated_files
 
-echo
-echo "Branch:"
-git branch --show-current
+    echo
+    echo "=== STATUS FINAL DA PREPARAÇÃO ==="
+    git status --short
 
-echo
-echo "APK:"
-if [ -n "$APK" ]; then
-    echo "$APK"
-fi
+    echo
+    echo "A sincronização está pronta."
+    echo "Use 'Commit e Push' para publicar alterações."
 
+    pause
+}
+
+menu() {
+    while true; do
+        header
+
+        echo "1) Status"
+        echo "2) Atualizar do GitHub"
+        echo "3) Commit e Push"
+        echo "4) Ver commits"
+        echo "5) Ver arquivos grandes"
+        echo "6) Preparar APKs / .gitignore"
+        echo "7) Sincronização completa"
+        echo "0) Sair"
+        echo
+
+        read -r -p "Escolha: " OPTION
+
+        case "$OPTION" in
+            1)
+                show_status
+                ;;
+            2)
+                update_remote
+                pause
+                ;;
+            3)
+                commit_and_push
+                ;;
+            4)
+                show_commits
+                ;;
+            5)
+                check_large_files
+                ;;
+            6)
+                header
+                prepare_generated_files
+                git status --short
+                pause
+                ;;
+            7)
+                full_sync
+                ;;
+            0)
+                echo "Saindo."
+                exit 0
+                ;;
+            *)
+                echo "❌ Opção inválida."
+                sleep 1
+                ;;
+        esac
+    done
+}
+
+menu
