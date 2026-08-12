@@ -9,7 +9,6 @@ public partial class HomePage : ContentPage
     private readonly SystemAnalyzer _systemAnalyzer;
     private readonly NetworkManager _networkManager;
     private readonly AgentManager _agentManager;
-    private bool _pulseRunning;
 
     public HomePage(SystemAnalyzer systemAnalyzer, NetworkManager networkManager, AgentManager agentManager)
     {
@@ -22,35 +21,7 @@ public partial class HomePage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        App.ThemeChanged += OnThemeChanged;
-        UpdateThemeIcon();
         await RefreshAsync();
-        StartOrbPulse();
-    }
-
-    protected override void OnDisappearing()
-    {
-        base.OnDisappearing();
-        App.ThemeChanged -= OnThemeChanged;
-        StopOrbPulse();
-    }
-
-    private void OnThemeChanged()
-    {
-        MainThread.BeginInvokeOnMainThread(UpdateThemeIcon);
-    }
-
-    private void UpdateThemeIcon()
-    {
-        var icon = App.IsSolar ? "☀️" : "🌙";
-        ThemeIcon.Text = icon;
-        FabIcon.Text = icon;
-    }
-
-    private async void OnThemeToggled(object? sender, EventArgs e)
-    {
-        App.ToggleTheme();
-        await PlayButtonFeedbackAsync(FabTheme);
     }
 
     private async void OnRefreshClicked(object? sender, EventArgs e)
@@ -58,55 +29,50 @@ public partial class HomePage : ContentPage
         await RefreshAsync();
     }
 
-    private void StartOrbPulse()
-    {
-        if (_pulseRunning || CoreOrb is null)
-            return;
+    // ── Bottom bar (conceito holográfico) ──────────────────────────
 
-        _pulseRunning = true;
-        _ = RunPulseLoopAsync();
+    private async void OnNetworkClicked(object? sender, EventArgs e)
+    {
+        await RefreshNetworkOnlyAsync();
+        await DisplayAlert("Network", "Status de rede atualizado.", "OK");
     }
 
-    private void StopOrbPulse()
+    private async void OnSensorClicked(object? sender, EventArgs e)
     {
-        _pulseRunning = false;
-        CoreOrb?.AbortAnimation("OrbPulse");
-        MiddleRing?.AbortAnimation("RingPulse");
-        OuterRing?.AbortAnimation("OuterPulse");
+        await RefreshSystemOnlyAsync();
+        await DisplayAlert("Sensor", "Diagnóstico de sistema atualizado.", "OK");
     }
 
-    private async Task RunPulseLoopAsync()
+    private async void OnEthereumClicked(object? sender, EventArgs e)
     {
-        while (_pulseRunning)
+        await DisplayAlert("Ethereum", "Módulo reservado para integração futura.", "OK");
+    }
+
+    private async void OnSystemClicked(object? sender, EventArgs e)
+    {
+        await RefreshAsync();
+        await DisplayAlert("System", "Painel de sistema atualizado.", "OK");
+    }
+
+    private async void OnDeviceClicked(object? sender, EventArgs e)
+    {
+        // Navega para a seção Apps (Células) se existir no TabbedPage pai.
+        if (Parent is NavigationPage nav && nav.Parent is TabbedPage tabs)
         {
-            try
+            foreach (var child in tabs.Children)
             {
-                var scaleUp = CoreOrb.ScaleTo(1.08, 900, Easing.SinInOut);
-                var fadeOut = MiddleRing.FadeTo(0.45, 900, Easing.SinInOut);
-                await Task.WhenAll(scaleUp, fadeOut);
-                if (!_pulseRunning) break;
-
-                var scaleDown = CoreOrb.ScaleTo(1.0, 900, Easing.SinInOut);
-                var fadeIn = MiddleRing.FadeTo(0.7, 900, Easing.SinInOut);
-                await Task.WhenAll(scaleDown, fadeIn);
-            }
-            catch
-            {
-                break;
+                if (child is NavigationPage np && np.Title == "Apps")
+                {
+                    tabs.CurrentPage = child;
+                    return;
+                }
             }
         }
+
+        await DisplayAlert("Device", "Abra a seção Apps → Células para gerenciar o dispositivo.", "OK");
     }
 
-    private static async Task PlayButtonFeedbackAsync(View? button)
-    {
-        if (button is null) return;
-        try
-        {
-            await button.ScaleTo(0.85, 80, Easing.CubicOut);
-            await button.ScaleTo(1.0, 120, Easing.CubicIn);
-        }
-        catch { }
-    }
+    // ── Refresh ────────────────────────────────────────────────────
 
     private async Task RefreshAsync()
     {
