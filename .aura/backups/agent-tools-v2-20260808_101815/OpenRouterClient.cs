@@ -19,10 +19,10 @@ namespace AURA.AI
     /// </summary>
     public sealed class OpenRouterOptions
     {
-        public string Provider { get; set; } = "openai";
+        public string Provider { get; set; } = "openrouter";
         public string ApiKey { get; set; } = string.Empty;
-        public string BaseUrl { get; set; } = "https://api.openai.com/v1/chat/completions";
-        public string Model { get; set; } = "gpt-5-mini";
+        public string BaseUrl { get; set; } = "http://127.0.0.1:11434/v1/chat/completions";
+        public string Model { get; set; } = "qwen2.5-coder:1.5b";
         public int MaxTokens { get; set; } = 1500;
         public int TimeoutSeconds { get; set; } = 90;
         public string? AppReference { get; set; }
@@ -370,7 +370,7 @@ namespace AURA.AI
             };
         }
 
-
+        
         private static List<AgentToolCall>? TryParseTextToolCall(string? content)
         {
             if (string.IsNullOrWhiteSpace(content))

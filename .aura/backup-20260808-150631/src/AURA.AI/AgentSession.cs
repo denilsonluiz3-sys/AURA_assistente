@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Text.Json;
 using AURA.Core.Logging;
-using AURA.Memory;
 
 namespace AURA.AI
 {
@@ -18,18 +17,13 @@ namespace AURA.AI
     /// </summary>
     public sealed class AgentSession
     {
-        private const int MaxRounds = 8;
+        private const int MaxRounds = 20;
 
         private readonly OpenRouterClient _client;
         private readonly ILogger _logger;
         private readonly List<AgentTool> _tools;
         private readonly List<AgentMessage> _messages = new();
-
-        // Limite de segurança para impedir crescimento indefinido
-        // do contexto enviado ao modelo.
-        private const int MaxHistoryMessages = 16;
         private readonly string? _systemPrompt;
-        private readonly SolutionStore _solutionStore;
 
         public AgentSession(OpenRouterClient client, IEnumerable<AgentTool> tools,
             string? systemPrompt = null, ILogger? logger = null)
@@ -38,37 +32,12 @@ namespace AURA.AI
             _tools = (tools ?? Enumerable.Empty<AgentTool>()).ToList();
             _systemPrompt = systemPrompt;
             _logger = logger ?? new ConsoleLogger();
-            _solutionStore = new SolutionStore();
         }
 
         /// <summary>Emitido a cada ferramenta executada (para atualizar a UI).</summary>
         public event Action<AgentStep>? Step;
 
         public IReadOnlyList<AgentMessage> Messages => _messages;
-
-        private void TrimHistory()
-        {
-            if (_messages.Count <= MaxHistoryMessages)
-                return;
-
-            AgentMessage? system = _messages
-                .FirstOrDefault(m =>
-                    string.Equals(m.Role, "system", StringComparison.OrdinalIgnoreCase));
-
-            var recent = _messages
-                .Where(m => !string.Equals(m.Role, "system", StringComparison.OrdinalIgnoreCase))
-                .TakeLast(MaxHistoryMessages - (system != null ? 1 : 0))
-                .ToList();
-
-            _messages.Clear();
-
-            if (system != null)
-                _messages.Add(system);
-
-            _messages.AddRange(recent);
-
-            _logger.Info("agent: histórico podado para " + _messages.Count + " mensagens");
-        }
 
         public async Task<string> RunAsync(string userText,
             HttpClient? httpClient = null, CancellationToken ct = default)
@@ -83,8 +52,6 @@ namespace AURA.AI
             int round = 0;
             while (round++ < MaxRounds)
             {
-                TrimHistory();
-
                 AgentChatResponse response = await _client.ChatToolsAsync(
                     _messages,
                     _tools.Select(t => t.Definition).ToList(),
@@ -96,8 +63,6 @@ namespace AURA.AI
                 {
                     throw new InvalidOperationException(response.Error);
                 }
-
-                _logger.Info("agent: round=" + round + " toolCalls=" + (response.ToolCalls?.Count ?? 0) + " hasContent=" + !string.IsNullOrEmpty(response.Content));
 
                 if (response.ToolCalls is { Count: > 0 })
                 {
@@ -132,24 +97,6 @@ namespace AURA.AI
 
             throw new InvalidOperationException(
                 "O agente atingiu o limite de " + MaxRounds + " passos de ferramentas.");
-        }
-
-        /// <summary>
-        /// Consulta somente soluções que já foram validadas.
-        /// A consulta não executa a solução e não substitui a IA.
-        /// </summary>
-        private SolutionRule? TryGetKnownSolution(
-            RequestContext request)
-        {
-            if (request == null)
-            {
-                return null;
-            }
-
-            return _solutionStore.Find(
-                request.Intent,
-                request.Target,
-                request.Goal);
         }
 
         private async Task<string> ExecuteToolAsync(

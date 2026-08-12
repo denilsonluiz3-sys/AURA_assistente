@@ -19,10 +19,9 @@ namespace AURA.AI
     /// </summary>
     public sealed class OpenRouterOptions
     {
-        public string Provider { get; set; } = "openai";
-        public string ApiKey { get; set; } = string.Empty;
-        public string BaseUrl { get; set; } = "https://api.openai.com/v1/chat/completions";
-        public string Model { get; set; } = "gpt-5-mini";
+        public string ApiKey { get; set; }
+        public string BaseUrl { get; set; } = "https://openrouter.ai/api/v1/chat/completions";
+        public string Model { get; set; } = "qwen/qwen-plus";
         public int MaxTokens { get; set; } = 1500;
         public int TimeoutSeconds { get; set; } = 90;
         public string? AppReference { get; set; }
@@ -68,18 +67,11 @@ namespace AURA.AI
 
             string json = JsonSerializer.Serialize(payload);
             var request = new HttpRequestMessage(HttpMethod.Post, Options.BaseUrl);
-
-            if (!string.Equals(Options.Provider, "ollama", StringComparison.OrdinalIgnoreCase))
+            request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + Options.ApiKey);
+            if (Options.AppReference != null)
             {
-                request.Headers.TryAddWithoutValidation(
-                    "Authorization",
-                    "Bearer " + Options.ApiKey);
-
-                if (Options.AppReference != null)
-                {
-                    request.Headers.TryAddWithoutValidation("X-Title", "AURA");
-                    request.Headers.TryAddWithoutValidation("X-URL", Options.AppReference);
-                }
+                request.Headers.TryAddWithoutValidation("X-Title", "AURA");
+                request.Headers.TryAddWithoutValidation("X-URL", Options.AppReference);
             }
 
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -301,22 +293,6 @@ namespace AURA.AI
                             }
                         }
 
-                        // Ollama/Qwen pequeno pode retornar a chamada de ferramenta
-                        // como JSON no campo content, em vez de usar tool_calls.
-                        if (calls.Count == 0)
-                        {
-                            List<AgentToolCall>? textCalls = TryParseTextToolCall(content);
-
-                            if (textCalls is { Count: > 0 })
-                            {
-                                return new AgentChatResponse
-                                {
-                                    Content = null,
-                                    ToolCalls = textCalls
-                                };
-                            }
-                        }
-
                         return new AgentChatResponse
                         {
                             Content = content,
@@ -336,17 +312,6 @@ namespace AURA.AI
 
         private void EnsureValidApiKey()
         {
-            if (string.Equals(Options.Provider, "ollama", StringComparison.OrdinalIgnoreCase))
-            {
-                if (string.IsNullOrWhiteSpace(Options.BaseUrl))
-                {
-                    throw new InvalidOperationException(
-                        "Endpoint do Ollama não configurado.");
-                }
-
-                return;
-            }
-
             if (string.IsNullOrWhiteSpace(Options.ApiKey))
             {
                 throw new InvalidOperationException(
@@ -368,75 +333,6 @@ namespace AURA.AI
             {
                 Timeout = TimeSpan.FromSeconds(Options.TimeoutSeconds > 0 ? Options.TimeoutSeconds : 90)
             };
-        }
-
-
-        private static List<AgentToolCall>? TryParseTextToolCall(string? content)
-        {
-            if (string.IsNullOrWhiteSpace(content))
-                return null;
-
-            string text = content.Trim();
-
-            // Remove bloco Markdown ```json ... ```
-            if (text.StartsWith("```"))
-            {
-                int firstNewline = text.IndexOf('\n');
-                int lastFence = text.LastIndexOf("```");
-
-                if (firstNewline >= 0 && lastFence > firstNewline)
-                    text = text.Substring(firstNewline + 1, lastFence - firstNewline - 1).Trim();
-            }
-
-            try
-            {
-                using var doc = JsonDocument.Parse(text);
-                JsonElement root = doc.RootElement;
-
-                if (root.ValueKind != JsonValueKind.Object)
-                    return null;
-
-                if (!root.TryGetProperty("name", out JsonElement nameEl))
-                    return null;
-
-                if (nameEl.ValueKind != JsonValueKind.String)
-                    return null;
-
-                string? name = nameEl.GetString();
-
-                if (string.IsNullOrWhiteSpace(name))
-                    return null;
-
-                string arguments = "{}";
-
-                if (root.TryGetProperty("arguments", out JsonElement argsEl))
-                {
-                    arguments = argsEl.GetRawText();
-
-                    // Alguns modelos retornam arguments como string JSON.
-                    if (argsEl.ValueKind == JsonValueKind.String)
-                    {
-                        string? str = argsEl.GetString();
-
-                        if (!string.IsNullOrWhiteSpace(str))
-                            arguments = str;
-                    }
-                }
-
-                return new List<AgentToolCall>
-                {
-                    new AgentToolCall
-                    {
-                        Id = "ollama-tool-" + Guid.NewGuid().ToString("N"),
-                        Name = name,
-                        ArgumentsJson = arguments
-                    }
-                };
-            }
-            catch (JsonException)
-            {
-                return null;
-            }
         }
 
         private static string? GetProp(JsonElement el, string name)

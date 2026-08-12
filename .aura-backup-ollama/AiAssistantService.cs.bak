@@ -19,9 +19,9 @@ namespace AURA.AI
     {
         public static readonly OpenRouterOptions DefaultOptions = new OpenRouterOptions
         {
-            ApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? string.Empty,
-            BaseUrl = "https://api.openai.com/v1/chat/completions",
-            Model = "gpt-5-mini"
+            ApiKey = Environment.GetEnvironmentVariable("AURA_OPENROUTER_KEY") ?? string.Empty,
+            BaseUrl = "https://openrouter.ai/api/v1/chat/completions",
+            Model = "qwen/qwen-plus"
         };
 
         /// <summary>Thread-safe entry point for asking the AI anything.</summary>

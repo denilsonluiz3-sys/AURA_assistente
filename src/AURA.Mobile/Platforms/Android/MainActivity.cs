@@ -1,9 +1,9 @@
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
+using AndroidUri = Android.Net.Uri;
 using Android.OS;
 using System.Threading.Tasks;
-using AURA.Mobile.Platforms.Android;
 
 namespace AURA.Mobile;
 
@@ -13,7 +13,7 @@ namespace AURA.Mobile;
 public class MainActivity : MauiAppCompatActivity
 {
     private const int PickProjectTreeRequest = 4107;
-    private TaskCompletionSource<Android.Net.Uri?>? _projectPicker;
+    private TaskCompletionSource<AndroidUri?>? _projectPicker;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -22,16 +22,6 @@ public class MainActivity : MauiAppCompatActivity
         {
             base.OnCreate(savedInstanceState);
             AuraLog.Info("MainActivity.OnCreate OK");
-
-            // Botão flutuante de voz sobre todas as abas (fala a última resposta).
-            try
-            {
-                VoiceFloatingButton.Attach(this);
-            }
-            catch (Exception ex)
-            {
-                AuraLog.Exception("MainActivity.VoiceFloatingButton", ex);
-            }
         }
         catch (Exception ex)
         {
@@ -46,12 +36,12 @@ public class MainActivity : MauiAppCompatActivity
         AuraLog.Info("MainActivity.OnResume OK");
     }
 
-    public Task<Android.Net.Uri?> PickProjectDirectoryAsync(CancellationToken cancellationToken = default)
+    public Task<AndroidUri?> PickProjectDirectoryAsync(CancellationToken cancellationToken = default)
     {
         if (_projectPicker != null)
             throw new InvalidOperationException("O seletor de projeto já está aberto.");
 
-        _projectPicker = new TaskCompletionSource<Android.Net.Uri?>(
+        _projectPicker = new TaskCompletionSource<AndroidUri?>(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
         cancellationToken.Register(() =>
@@ -75,7 +65,7 @@ public class MainActivity : MauiAppCompatActivity
         if (requestCode != PickProjectTreeRequest)
             return;
 
-        Android.Net.Uri? uri = resultCode == Result.Ok ? data?.Data : null;
+        Uri? uri = resultCode == Result.Ok ? data?.Data : null;
         _projectPicker?.TrySetResult(uri);
         _projectPicker = null;
     }
@@ -84,7 +74,6 @@ public class MainActivity : MauiAppCompatActivity
     {
         _projectPicker?.TrySetResult(null);
         _projectPicker = null;
-        VoiceFloatingButton.Detach();
         AuraLog.Info("MainActivity.OnDestroy");
         base.OnDestroy();
     }

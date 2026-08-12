@@ -1,158 +1,74 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Text.Json;
-using AURA.Core.Logging;
-using AURA.Memory;
+#!/data/data/com.termux/files/usr/bin/bash
 
-namespace AURA.AI
-{
-    /// <summary>
-    /// Loop agêntico sobre o OpenRouterClient: envia a conversa com as
-    /// ferramentas registradas, executa as chamadas de ferramenta solicitadas
-    /// pelo modelo, anexa os resultados e repete até o modelo responder texto
-    /// final (estilo opencode/agentes de terminal).
-    /// </summary>
-    public sealed class AgentSession
-    {
-        private const int MaxRounds = 8;
+set -e
 
-        private readonly OpenRouterClient _client;
-        private readonly ILogger _logger;
-        private readonly List<AgentTool> _tools;
-        private readonly List<AgentMessage> _messages = new();
+cd ~/AURA
 
-        // Limite de segurança para impedir crescimento indefinido
-        // do contexto enviado ao modelo.
-        private const int MaxHistoryMessages = 16;
-        private readonly string? _systemPrompt;
-        private readonly SolutionStore _solutionStore;
+FILE="src/AURA.AI/AgentSession.cs"
+BACKUP="${FILE}.bak-tools-$(date +%Y%m%d-%H%M%S)"
 
-        public AgentSession(OpenRouterClient client, IEnumerable<AgentTool> tools,
-            string? systemPrompt = null, ILogger? logger = null)
-        {
-            _client = client ?? throw new ArgumentNullException(nameof(client));
-            _tools = (tools ?? Enumerable.Empty<AgentTool>()).ToList();
-            _systemPrompt = systemPrompt;
-            _logger = logger ?? new ConsoleLogger();
-            _solutionStore = new SolutionStore();
-        }
+echo "=========================================="
+echo " AURA - FIX AGENT TOOLS / OLLAMA"
+echo "=========================================="
 
-        /// <summary>Emitido a cada ferramenta executada (para atualizar a UI).</summary>
-        public event Action<AgentStep>? Step;
+if [ ! -f "$FILE" ]; then
+    echo "ERRO: arquivo não encontrado:"
+    echo "$FILE"
+    exit 1
+fi
 
-        public IReadOnlyList<AgentMessage> Messages => _messages;
+echo
+echo "[1/6] Backup..."
+cp "$FILE" "$BACKUP"
+echo "OK: $BACKUP"
 
-        private void TrimHistory()
-        {
-            if (_messages.Count <= MaxHistoryMessages)
-                return;
+echo
+echo "[2/6] Aplicando normalizador de argumentos..."
 
-            AgentMessage? system = _messages
-                .FirstOrDefault(m =>
-                    string.Equals(m.Role, "system", StringComparison.OrdinalIgnoreCase));
+python3 <<'PY'
+from pathlib import Path
 
-            var recent = _messages
-                .Where(m => !string.Equals(m.Role, "system", StringComparison.OrdinalIgnoreCase))
-                .TakeLast(MaxHistoryMessages - (system != null ? 1 : 0))
-                .ToList();
+file = Path("src/AURA.AI/AgentSession.cs")
+text = file.read_text()
 
-            _messages.Clear();
+if "NormalizeToolArguments" in text:
+    print("Normalizador já existe.")
+    raise SystemExit(0)
 
-            if (system != null)
-                _messages.Add(system);
+start = text.find("        private async Task<string> ExecuteToolAsync(")
 
-            _messages.AddRange(recent);
+if start < 0:
+    raise SystemExit(
+        "ERRO: ExecuteToolAsync não encontrado."
+    )
 
-            _logger.Info("agent: histórico podado para " + _messages.Count + " mensagens");
-        }
+# Encontrar o fechamento do método usando contagem de chaves.
+brace_start = text.find("{", start)
 
-        public async Task<string> RunAsync(string userText,
-            HttpClient? httpClient = null, CancellationToken ct = default)
-        {
-            if (string.IsNullOrWhiteSpace(userText))
-            {
-                throw new ArgumentException("A instrução não pode ser vazia.", nameof(userText));
-            }
+if brace_start < 0:
+    raise SystemExit(
+        "ERRO: abertura de ExecuteToolAsync não encontrada."
+    )
 
-            _messages.Add(new AgentMessage { Role = "user", Content = userText });
+depth = 0
+end = -1
 
-            int round = 0;
-            while (round++ < MaxRounds)
-            {
-                TrimHistory();
+for i in range(brace_start, len(text)):
+    if text[i] == "{":
+        depth += 1
+    elif text[i] == "}":
+        depth -= 1
 
-                AgentChatResponse response = await _client.ChatToolsAsync(
-                    _messages,
-                    _tools.Select(t => t.Definition).ToList(),
-                    httpClient,
-                    ct,
-                    _systemPrompt).ConfigureAwait(false);
+        if depth == 0:
+            end = i + 1
+            break
 
-                if (!string.IsNullOrEmpty(response.Error))
-                {
-                    throw new InvalidOperationException(response.Error);
-                }
+if end < 0:
+    raise SystemExit(
+        "ERRO: fechamento de ExecuteToolAsync não encontrado."
+    )
 
-                _logger.Info("agent: round=" + round + " toolCalls=" + (response.ToolCalls?.Count ?? 0) + " hasContent=" + !string.IsNullOrEmpty(response.Content));
-
-                if (response.ToolCalls is { Count: > 0 })
-                {
-                    _messages.Add(new AgentMessage
-                    {
-                        Role = "assistant",
-                        Content = null,
-                        ToolCalls = response.ToolCalls
-                    });
-
-                    foreach (AgentToolCall call in response.ToolCalls)
-                    {
-                        ct.ThrowIfCancellationRequested();
-                        string result = await ExecuteToolAsync(call, ct).ConfigureAwait(false);
-                        _messages.Add(new AgentMessage
-                        {
-                            Role = "tool",
-                            ToolCallId = call.Id,
-                            Content = result
-                        });
-                        Step?.Invoke(new AgentStep(call.Name, call.ArgumentsJson, result));
-                        _logger.Info("agent: ferramenta='" + call.Name + "'");
-                    }
-
-                    continue;
-                }
-
-                string final = response.Content ?? "(resposta vazia)";
-                _messages.Add(new AgentMessage { Role = "assistant", Content = final });
-                return final;
-            }
-
-            throw new InvalidOperationException(
-                "O agente atingiu o limite de " + MaxRounds + " passos de ferramentas.");
-        }
-
-        /// <summary>
-        /// Consulta somente soluções que já foram validadas.
-        /// A consulta não executa a solução e não substitui a IA.
-        /// </summary>
-        private SolutionRule? TryGetKnownSolution(
-            RequestContext request)
-        {
-            if (request == null)
-            {
-                return null;
-            }
-
-            return _solutionStore.Find(
-                request.Intent,
-                request.Target,
-                request.Goal);
-        }
-
-        private async Task<string> ExecuteToolAsync(
+method = r'''        private async Task<string> ExecuteToolAsync(
             AgentToolCall call,
             CancellationToken ct)
         {
@@ -315,54 +231,11 @@ namespace AURA.AI
                             desc.ValueKind ==
                                 JsonValueKind.String)
                         {
-                            // O modelo pode devolver o schema da
-                            // propriedade em vez do argumento real.
-                            //
-                            // Exemplo:
-                            // "path": {
-                            //   "type": "string",
-                            //   "description": "Caminho relativo..."
-                            // }
-                            //
-                            // A descrição NÃO deve virar o valor
-                            // do argumento.
+                            output[property.Name] =
+                                CleanModelValue(
+                                    desc.GetString() ??
+                                    "");
 
-                            if (value.TryGetProperty(
-                                    "type",
-                                    out JsonElement type) &&
-                                type.ValueKind ==
-                                    JsonValueKind.String)
-                            {
-                                string typeName =
-                                    type.GetString() ?? "";
-
-                                if (typeName.Equals(
-                                        "string",
-                                        StringComparison.OrdinalIgnoreCase))
-                                {
-                                    // list_dir sem valor real =
-                                    // raiz do workspace.
-                                    if (property.Name.Equals(
-                                            "path",
-                                            StringComparison.OrdinalIgnoreCase) &&
-                                        toolName.Equals(
-                                            "list_dir",
-                                            StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        output[property.Name] = ".";
-                                    }
-                                    else
-                                    {
-                                        output[property.Name] = "";
-                                    }
-
-                                    continue;
-                                }
-                            }
-
-                            // Não usar a descrição de um schema
-                            // como argumento da ferramenta.
-                            output[property.Name] = "";
                             continue;
                         }
 
@@ -561,6 +434,65 @@ namespace AURA.AI
 
             return result.Trim();
         }
+'''
 
-    }
-}
+text = text[:start] + method + text[end:]
+
+file.write_text(text)
+
+print("OK: AgentSession.cs atualizado.")
+PY
+
+echo
+echo "[3/6] Verificando código..."
+
+grep -n "NormalizeToolArguments" \
+    src/AURA.AI/AgentSession.cs
+
+echo
+echo "[4/6] Compilando AURA.AI..."
+
+dotnet build \
+    src/AURA.AI/AURA.AI.csproj \
+    --no-restore \
+    -v:minimal
+
+echo
+echo "[5/6] Compilando AURA.CLI..."
+
+dotnet build \
+    src/AURA.CLI/AURA.CLI.csproj \
+    --no-restore \
+    -v:minimal
+
+echo
+echo "[6/6] TESTE RÁPIDO..."
+
+echo
+echo "=========================================="
+echo " CORREÇÃO CONCLUÍDA"
+echo "=========================================="
+echo
+echo "Backup:"
+echo "$BACKUP"
+echo
+echo "Agora execute:"
+echo
+echo "cd ~/AURA"
+echo "dotnet run --project src/AURA.CLI"
+echo
+echo "E teste nesta ordem:"
+echo
+echo 'agent "Liste os arquivos do workspace usando list_dir."'
+echo
+echo 'agent "Use run_shell para executar pwd."'
+echo
+echo 'agent "Crie teste_tools.txt contendo exatamente: AURA TOOL OK"'
+echo
+echo 'agent "Leia teste_tools.txt usando read_file."'
+echo
+echo 'agent "Altere teste_tools.txt de AURA TOOL OK para AURA TOOL EDIT OK usando edit_file."'
+echo
+echo 'agent "Leia teste_tools.txt usando read_file."'
+echo
+echo "=========================================="
