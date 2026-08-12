@@ -84,6 +84,14 @@ public partial class ChatPage : ContentPage
             string answer = await assistant.AskAsync(question);
             AnswerLabel.Text = answer;
             _voice?.SetLastUtterance(answer);
+
+            // Assistente de verdade: fala a resposta real da IA assim que ela
+            // chega. Fire-and-forget para não bloquear o botão Enviar — o
+            // VoiceAssistantService já trata cancelamento e falhas de TTS.
+            if (_voice != null)
+            {
+                _ = _voice.SpeakAsync(answer);
+            }
         }
         catch (Exception ex)
         {

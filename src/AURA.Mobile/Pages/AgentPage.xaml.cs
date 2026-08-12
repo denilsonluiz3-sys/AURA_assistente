@@ -153,6 +153,62 @@ public partial class AgentPage : ContentPage
             user: false, isTool: true);
     }
 
+<<<<<<< HEAD
+=======
+    private void OnToggleConfigClicked(object sender, EventArgs e)
+    {
+        ConfigPanel.IsVisible = !ConfigPanel.IsVisible;
+        if (ConfigPanel.IsVisible)
+        {
+            AiConfig.Load(_client);
+        }
+    }
+
+    private async void OnSpeakTestClicked(object sender, EventArgs e)
+    {
+        SpeakTestButton.IsEnabled = false;
+        try
+        {
+            // Fala a última resposta do agente (assistente de verdade), não
+            // uma frase fixa de recepção. Sem resposta ainda, usa saudação.
+            string text = _voice?.LastUtterance;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                text = "Estou aqui. Me instrua na conversa e eu respondo por voz.";
+            }
+
+            _voice?.SetLastUtterance(text);
+            await SpeakAsync(text);
+        }
+        catch (Exception ex)
+        {
+            AppendBubble("Erro no TTS: " + ex.Message, user: false, isError: true);
+            AuraLog.Exception("AgentPage.OnSpeakTestClicked", ex);
+        }
+        finally
+        {
+            SpeakTestButton.IsEnabled = true;
+        }
+    }
+
+    private async Task SpeakAsync(string text)
+    {
+        try
+        {
+            await _speech.SpeakAsync(text);
+        }
+        catch (OperationCanceledException)
+        {
+            // Usuário cancelou a fala: sem ação.
+        }
+        catch (Exception ex)
+        {
+            // Falha de TTS NUNCA derruba o Agent Loop: registra e segue.
+            AuraLog.Warning("TTS: fala pulada (" + ex.GetType().Name + ": " + ex.Message + ")");
+        }
+    }
+
+>>>>>>> origin/fix/module-download-embedded-fallback
     private void AppendBubble(string text, bool user, bool isTool = false, bool isError = false)
     {
         // Cores alinhadas à nova paleta de App.xaml

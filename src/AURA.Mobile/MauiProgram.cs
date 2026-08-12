@@ -46,11 +46,15 @@ public static class MauiProgram
 
         // Gestor de módulos opcionais: baixa o pacote, aplica (ativa em
         // modules.json) e remove (desativa + limpa dados locais).
+        // O repositório é privado, então o raw.githubusercontent.com devolve 404
+        // para o HttpClient anônimo: passamos o leitor dos pacotes embarcados no
+        // APK como fallback para "Baixar" funcionar sempre (inclusive offline).
         builder.Services.AddSingleton(sp => new ModuleManager(
             sp.GetRequiredService<ILogger>(),
             Path.Combine(FileSystem.AppDataDirectory, "modules"),
             Path.Combine(configDir, "modules.json"),
-            sp.GetRequiredService<EventBus>()));
+            sp.GetRequiredService<EventBus>(),
+            localPackageProvider: ReadEmbeddedModulePackageAsync));
 
         // Memória persistente do app: pasta privada do Android (sem permissão extra).
         builder.Services.AddSingleton(sp => new MemoryStore(
@@ -133,5 +137,49 @@ public static class MauiProgram
 
         AuraLog.Info("MauiProgram.CreateMauiApp OK");
         return app;
+    }
+
+    /// <summary>
+    /// Lê o manifesto (module.json) embarcado no APK como MauiAsset. Usado como
+    /// fallback pelo ModuleManager quando o download remoto falha — o
+    /// repositório é privado e o raw.githubusercontent.com responde 404 a
+    /// requisições sem autenticação.
+    /// </summary>
+    private static async Task<string?> ReadEmbeddedModulePackageAsync(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return null;
+        }
+
+        // O LogicalName usa a pasta do módulo; em builds Windows o RecursiveDir
+        // pode vir com '\', por isso tentamos as duas variações.
+        string[] candidates =
+        {
+            $"modulepkgs/{id}/module.json",
+            $"modulepkgs\\{id}\\module.json"
+        };
+
+        foreach (string path in candidates)
+        {
+            try
+            {
+                using Stream stream = await FileSystem.OpenAppPackageFileAsync(path);
+                using var reader = new StreamReader(stream);
+                string json = await reader.ReadToEndAsync();
+                if (!string.IsNullOrWhiteSpace(json))
+                {
+                    AuraLog.Info($"Pacote embarcado lido para o módulo '{id}' ({path}).");
+                    return json;
+                }
+            }
+            catch (Exception ex)
+            {
+                AuraLog.Info($"Asset '{path}' indisponível ({ex.GetType().Name}).");
+            }
+        }
+
+        AuraLog.Warning($"Nenhum pacote embarcado encontrado para o módulo '{id}'.");
+        return null;
     }
 }
