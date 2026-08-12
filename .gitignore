@@ -55,3 +55,6 @@ Thumbs.db
 # Local workspace clone / runtime state
 /AURA_assistente/
 /memory.json
+
+# APKs gerados localmente
+/aura-mobile-apk-debug/*.apk
