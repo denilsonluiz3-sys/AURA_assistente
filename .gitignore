@@ -58,3 +58,5 @@ Thumbs.db
 
 # APKs gerados localmente
 /aura-mobile-apk-debug/*.apk
+aura-mobile-apk-debug/*.apk
+aura-mobile-apk-debug/*.aab
