@@ -14,6 +14,7 @@ using AURA.Core.Runtime;
 using AURA.Memory;
 using AURA.Modules;
 using AURA.Modules.Executors;
+using AURA.Modules.Loja;
 using AURA.Network;
 using AURA.SystemInfo;
 
@@ -160,6 +161,15 @@ namespace AURA.CLI
                     case "ask":
                         Ask(parts);
                         break;
+                    case "install":
+                        LojaInstall(parts);
+                        break;
+                    case "remove":
+                        LojaRemove(parts);
+                        break;
+                    case "update":
+                        LojaUpdate(parts);
+                        break;
                     case "chat":
                         ChatCommand(parts);
                         break;
@@ -291,6 +301,146 @@ namespace AURA.CLI
             Console.WriteLine("  id     : " + cell.Id);
             Console.WriteLine("  app    : " + cell.AppPath);
             Console.WriteLine("  log    : " + cell.LogFile);
+        }
+
+        private static ModuleManager BuildModuleManager()
+        {
+            string auraDir = UserAuraDir();
+            string packagesDir = Path.Combine(auraDir, "packages");
+            string modulesPath = Path.Combine(auraDir, "modules.json");
+            string pluginsRoot = Path.Combine(auraDir, "plugins");
+            return new ModuleManager(_logger, packagesDir, modulesPath, _bootstrap.Events,
+                pluginsRoot: pluginsRoot);
+        }
+
+        private static void LojaInstall(string[] parts)
+        {
+            if (parts.Length < 2)
+            {
+                Console.WriteLine("Uso: install <id-do-módulo>   [--dry-run]");
+                Console.WriteLine("     Exemplo: install aura.memory");
+                return;
+            }
+
+            string id = parts[1];
+            bool dryRun = Array.Exists(parts, p => p == "--dry-run");
+
+            ModuleInfo info = ModuleCatalog.GetById(id);
+            if (info == null)
+            {
+                Console.WriteLine("Módulo desconhecido: " + id);
+                Console.WriteLine("Use 'modulos' para listar os disponíveis.");
+                return;
+            }
+
+            if (dryRun)
+            {
+                Console.WriteLine("[dry-run] Instalaria: " + info.DisplayName + " (" + id + ")");
+                Console.WriteLine("  URL: " + (info.PackageUrl ?? "(embutido)"));
+                return;
+            }
+
+            ModuleManager mm = BuildModuleManager();
+
+            if (mm.IsApplied(id))
+            {
+                Console.WriteLine("Módulo já instalado: " + id);
+                return;
+            }
+
+            Console.WriteLine("Instalando: " + info.DisplayName + "...");
+            try
+            {
+                if (!mm.IsDownloaded(id) && !string.IsNullOrWhiteSpace(info.PackageUrl))
+                {
+                    Console.WriteLine("  Baixando pacote...");
+                    mm.DownloadAsync(id).GetAwaiter().GetResult();
+                }
+
+                mm.Apply(id);
+                Console.WriteLine("Módulo instalado com sucesso: " + id);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Erro ao instalar '" + id + "': " + ex.Message);
+                _logger.Error(ex.ToString());
+            }
+        }
+
+        private static void LojaRemove(string[] parts)
+        {
+            if (parts.Length < 2)
+            {
+                Console.WriteLine("Uso: remove <id-do-módulo>");
+                return;
+            }
+
+            string id = parts[1];
+            ModuleManager mm = BuildModuleManager();
+
+            if (!mm.IsApplied(id))
+            {
+                Console.WriteLine("Módulo não está instalado: " + id);
+                return;
+            }
+
+            Console.WriteLine("Removendo: " + id + "...");
+            try
+            {
+                mm.Remove(id);
+                Console.WriteLine("Módulo removido: " + id);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Erro ao remover '" + id + "': " + ex.Message);
+                _logger.Error(ex.ToString());
+            }
+        }
+
+        private static void LojaUpdate(string[] parts)
+        {
+            bool dryRun = Array.Exists(parts, p => p == "--dry-run");
+            Console.WriteLine("Verificando atualizações de módulos instalados...");
+
+            ModuleManager mm = BuildModuleManager();
+            ModuleInfo[] all = ModuleCatalog.GetAll().ToArray();
+            int updated = 0;
+
+            foreach (ModuleInfo info in all)
+            {
+                if (!mm.IsApplied(info.Id) || string.IsNullOrWhiteSpace(info.PackageUrl))
+                {
+                    continue;
+                }
+
+                if (dryRun)
+                {
+                    Console.WriteLine("  [dry-run] Atualizaria: " + info.DisplayName);
+                    updated++;
+                    continue;
+                }
+
+                try
+                {
+                    mm.DownloadAsync(info.Id).GetAwaiter().GetResult();
+                    mm.Apply(info.Id);
+                    Console.WriteLine("  Atualizado: " + info.DisplayName);
+                    updated++;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("  Aviso: falha ao atualizar '" + info.Id + "': " + ex.Message);
+                }
+            }
+
+            if (updated == 0)
+            {
+                Console.WriteLine("Nenhum módulo instalável com pacote remoto encontrado.");
+            }
+            else
+            {
+                Console.WriteLine(updated + " módulo(s) processado(s).");
+            }
         }
 
         private static void PrintAgents()
@@ -776,12 +926,15 @@ namespace AURA.CLI
             Console.WriteLine("  aichave <sk-or-...>      Salva a chave da IA em ~/.aura/ai_key.txt");
             Console.WriteLine("  exec <shell|git|python|node> <cmd> [args]   Executa via executor");
             Console.WriteLine("  run aichat --cell chat  Inicia assistente como célula");
-            Console.WriteLine("  modulos                 Lista módulos disponíveis");
-            Console.WriteLine("  config                  Mostra configuração (settings + módulos)");
-            Console.WriteLine("  launchers               Lista resolutores de extensão");
-            Console.WriteLine("  plugins                 Lista plugins carregados");
-            Console.WriteLine("  ajuda                   Mostra esta ajuda");
-            Console.WriteLine("  exit                    Sai");
+            Console.WriteLine("  install <id> [--dry-run]  Instala um módulo da loja");
+            Console.WriteLine("  remove <id>               Remove um módulo instalado");
+            Console.WriteLine("  update [--dry-run]        Atualiza módulos instalados");
+            Console.WriteLine("  modulos                   Lista módulos disponíveis");
+            Console.WriteLine("  config                    Mostra configuração (settings + módulos)");
+            Console.WriteLine("  launchers                 Lista resolutores de extensão");
+            Console.WriteLine("  plugins                   Lista plugins carregados");
+            Console.WriteLine("  ajuda                     Mostra esta ajuda");
+            Console.WriteLine("  exit                      Sai");
             Console.WriteLine();
         }
     }

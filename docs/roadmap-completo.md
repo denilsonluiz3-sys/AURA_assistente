@@ -11,7 +11,7 @@
 | **F4 — Loja local** | `LojaLocalResolver`, `LojaUninstaller`, `LockHelper` (timeout + backoff), concurrency tests; `ModuleManager.Remove` integrado | ✅ FEITO |
 | **F5 — Uninstall/cleanup** | `LojaUninstaller` finalizado, integrado ao `ModuleManager.Remove`, testes atualizados | ✅ FEITO |
 | **F6 — Concorrência/Resiliência** | `LockHelper` com timeout/retry; `LojaLocalResolver` com lock 5s; `InstallerConcurrencyTests` | ✅ FEITO |
-| **F7 — CLI loja** | CLI para install/uninstall/dry-run (`aura update`, `aura install`, `aura remove`) | 🔲 PLANEJADO |
+| **F7 — CLI loja** | CLI para install/uninstall/dry-run (`aura install`, `aura remove`, `aura update`) | ✅ FEITO 2026-08-12 |
 | **F8 — Smoke E2E** | `smoke-test.sh` robusto com `--wait`; redução de falsos negativos no CI | 🔄 EM PROGRESSO |
 | **F9 — Daemon + API HTTP** | Termux: `termux-services` (runit); Linux: `systemd --user`; API via célula dedicada | 🔲 PLANEJADO |
 | **F10 — Isolamento forte** | `proot`/firejail sob demanda para células suspeitas (`.jar` da internet) | 🔲 OPCIONAL |
@@ -55,6 +55,10 @@ Conceito de referência: vídeos Gemini (lua/sol + anéis + aurora + menu inferi
 - **2026-08-11:** `.well-known` (Brave Creators verification) adicionado em main (1d4e6a6).
 - **2026-08-12:** PR #33 (`fix/run-wait-go-smoke`) fechado — conteúdo já integrado em main via rebase.
 - **2026-08-12:** main sincronizado localmente. Build: 0 erros, 158 warnings (nullability + xUnit).
+- **2026-08-12:** `IAgent` expandido com `Description` + `AskAsync` — contrato completo.
+- **2026-08-12:** `MemoryAgent` — consulta memória local sem rede; `AutomationAgent` — executa shell determinístico; `AIAgent` — wrapper IAgent sobre AgentManager (aichat/termux-ai/opencode).
+- **2026-08-12:** F7 implementado — CLI: `aura install <id>`, `aura remove <id>`, `aura update [--dry-run]`; suporte a `--dry-run` no install.
+- **2026-08-12:** `ConcreteAgentsTests` — 8 novos testes (MemoryAgent/AutomationAgent/AIAgent). Build: 0 erros; 135/138 testes passando (3 falhos pré-existentes de executor Git/Python sem binário no CI).
 
 ## PRs e Issues
 
@@ -69,10 +73,10 @@ Conceito de referência: vídeos Gemini (lua/sol + anéis + aurora + menu inferi
 ## Próximos passos (ordem de prioridade)
 
 1. **[mobile]** Validar UI-Holo F2 (pulse + feedback) no APK de debug em dispositivo real.
-2. **[issue #28]** Implementar `IAgent` concretos mínimos (`MemoryAgent`, `AutomationAgent`, `AIAgent` wrapper) — fecha F3 completamente.
-3. **[F7]** CLI de loja: `aura install <módulo>`, `aura remove <módulo>`, `aura update` (dry-run).
-4. **[F8]** Finalizar smoke test E2E — cobrir cenários Go e módulos no CI.
+2. ~~**[issue #28]** Implementar `IAgent` concretos~~ ✅ FEITO (MemoryAgent, AutomationAgent, AIAgent).
+3. ~~**[F7]** CLI de loja~~ ✅ FEITO (`aura install/remove/update --dry-run`).
+4. **[F8]** Finalizar smoke test E2E — cobrir cenários Go e módulos no CI; corrigir 3 testes executor.
 5. **[PR #8]** Revisar e decidir sobre `feat/project-access` (aceitar, descartar ou adaptar).
-6. **[issues #27/#32]** Triagem: fechar #27 como duplicata; detalhar ou fechar #32.
+6. **[issues #27/#32]** Triagem: fechar #27 como duplicata; fechar #32 (sem título).
 7. **[UI-Holo F3]** Avaliar SkiaSharp só após F2 estável no dispositivo.
-8. **[F9]** Daemon + API HTTP (pós F7/F8 estáveis).
+8. **[F9]** Daemon + API HTTP (pós F8 estável).
