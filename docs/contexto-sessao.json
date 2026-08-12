@@ -1,12 +1,11 @@
 {
-  "ultima_atualizacao": "2026-08-12T14:45:00-03:00",
-  "ultima_acao": "CI: 138/138 testes passando. builds verde. CodeQL irrelevante.",
+  "ultima_atualizacao": "2026-08-12T17:27:06-03:00",
+  "ultima_acao": "535c77d ci: add MAUI Mobile APK build step",
   "projeto": "AURA_assistente",
   "repositorio": "github.com/denilsonluiz3-sys/AURA_assistente.git",
   "branch": "main",
   "framework": "net10.0",
   "destino": "MAUI Android (Termux)",
-
   "build": {
     "status": "OK (138/138 testes)",
     "warnings": 139,
@@ -30,9 +29,11 @@
       "AURA.SystemInfo",
       "AURA.Tests"
     ],
-    "projetos_nao_compilados_no_sln": ["AURA.Mobile", "AURA.Windows"]
+    "projetos_nao_compilados_no_sln": [
+      "AURA.Mobile",
+      "AURA.Windows"
+    ]
   },
-
   "testes": {
     "rodados_em": "Termux (Android) + GitHub Actions (Linux)",
     "total_metodos": 138,
@@ -116,7 +117,6 @@
       "ModuleFlowTests.ExecutorsModule_FullFlow_FromRemoteManifestToGatingToRemove (precisa repo root)"
     ]
   },
-
   "problemas_conhecidos": [
     {
       "id": "PROCESS_START_TERMUX",
@@ -144,7 +144,6 @@
       "workaround": "Idem acima - rodar apenas em GitHub Actions."
     }
   ],
-
   "decisoes_arquiteturais": [
     {
       "data": "2026-08-12",
@@ -167,7 +166,6 @@
       "motivo": "Limpeza de issues obsoletas."
     }
   ],
-
   "proximos_passos": [
     "1. Corrigir warnings de nullability (139 atuais) para build mais limpo",
     "2. Finalizar smoke test E2E (F8) — cobrir cenários Go e módulos no CI",
@@ -175,13 +173,11 @@
     "4. Avaliar SkiaSharp (UI-Holo F3) após F2 estável",
     "5. Implementar Daemon + API HTTP (F9)"
   ],
-
   "commits_ultima_sessao": [
     "69b96f7 feat(agents+cli): IAgent concretos + F7 CLI da loja",
     "5b561f5 refactor(executors): RunProcessAsync com Exited/TCS + fallback bash -c",
     "a80af94 fix(executors): adiciona marcador 'cancelada' no stderr quando timeout ocorre"
   ],
-
   "arquivos_modificados_ultima_sessao": [
     {
       "caminho": "src/AURA.Modules/Executors/ProcessExecutorBase.cs",
@@ -204,7 +200,6 @@
       "mudanca": "Criado — script para atualizar timestamp do contexto"
     }
   ],
-
   "contexto_ambiente": {
     "os": "Linux (Termux on Android)",
     "dotnet_sdk": "10.0.110",
