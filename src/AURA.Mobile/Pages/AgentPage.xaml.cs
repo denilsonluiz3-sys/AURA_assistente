@@ -1,8 +1,6 @@
 using AURA.AI;
 using AURA.Memory;
 using AURA.Mobile.Diagnostics;
-using AURA.Mobile.Speech;
-using AURA.Modules.Executors;
 
 namespace AURA.Mobile.Pages;
 
@@ -10,27 +8,19 @@ public partial class AgentPage : ContentPage
 {
     private readonly OpenRouterClient _client;
     private readonly MemoryStore _memory;
-    private readonly ISpeechService _speech;
-    private readonly VoiceAssistantService? _voice;
-    private readonly ShellExecutor _shellExecutor;
     private AgentSession? _session;
 
-    public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
-        ShellExecutor shellExecutor, VoiceAssistantService? voice = null)
+    public AgentPage(OpenRouterClient client, MemoryStore memory)
     {
         InitializeComponent();
         _client = client;
         _memory = memory;
-        _speech = speech;
-        _shellExecutor = shellExecutor;
-        _voice = voice;
     }
 
     protected override void OnAppearing()
     {
         base.OnAppearing();
         RuntimeConfig.Apply(_client);
-        AiConfig.Load(_client);
 
         string workspace = AgentWorkspace.EnsureCreated();
         string activeRoot = AgentWorkspace.ActiveRoot;
@@ -50,12 +40,14 @@ public partial class AgentPage : ContentPage
         }
 
         string root = AgentWorkspace.ActiveRoot;
-        var registry = new ToolRegistry();
-        registry.Register(new ListDirTool(root));
-        registry.Register(new ReadFileTool(root));
-        registry.Register(new WriteFileTool(root));
-        registry.Register(new EditFileTool(root));
-        registry.Register(new ShellAgentTool(root, _shellExecutor));
+        var tools = new List<AgentTool>
+        {
+            new ListDirTool(root),
+            new ReadFileTool(root),
+            new WriteFileTool(root),
+            new EditFileTool(root),
+            new ShellAgentTool(root)
+        };
 
         string systemPrompt =
             "Você é o agente de arquivos da AURA, um assistente que trabalha " +
@@ -68,7 +60,7 @@ public partial class AgentPage : ContentPage
             "Responda em português, de forma curta e objetiva. " +
             "Caminhos são sempre relativos ao workspace.";
 
-        _session = new AgentSession(_client, registry, systemPrompt, memory: _memory);
+        _session = new AgentSession(_client, tools, systemPrompt, memory: _memory);
         _session.Step += OnAgentStep;
 
         AppendBubble(
@@ -132,8 +124,6 @@ public partial class AgentPage : ContentPage
         {
             string answer = await _session!.RunAsync(text);
             AppendBubble(answer, user: false);
-            _voice?.SetLastUtterance(answer);
-            await SpeakAsync(answer);
 
             if (ProjectAccessService.IsLinked)
             {
@@ -163,57 +153,6 @@ public partial class AgentPage : ContentPage
             user: false, isTool: true);
     }
 
-    private void OnToggleConfigClicked(object sender, EventArgs e)
-    {
-        ConfigPanel.IsVisible = !ConfigPanel.IsVisible;
-        if (ConfigPanel.IsVisible)
-        {
-            AiConfig.Load(_client);
-        }
-    }
-
-    private async void OnSpeakTestClicked(object sender, EventArgs e)
-    {
-        SpeakTestButton.IsEnabled = false;
-        try
-        {
-            // Fala a última resposta do agente (assistente de verdade), não
-            // uma frase fixa de recepção. Sem resposta ainda, usa saudação.
-            string text = _voice?.LastUtterance;
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                text = "Estou aqui. Me instrua na conversa e eu respondo por voz.";
-            }
-
-            _voice?.SetLastUtterance(text);
-            await SpeakAsync(text);
-        }
-        catch (Exception ex)
-        {
-            AppendBubble("Erro no TTS: " + ex.Message, user: false, isError: true);
-            AuraLog.Exception("AgentPage.OnSpeakTestClicked", ex);
-        }
-        finally
-        {
-            SpeakTestButton.IsEnabled = true;
-        }
-    }
-
-    private async Task SpeakAsync(string text)
-    {
-        try
-        {
-            await _speech.InitializeAsync();
-            await _speech.SpeakAsync(text);
-        }
-        catch (NotSupportedException)
-        {
-            // Motor atual não cobre este texto (ex.: Kokoro com dicionário
-            // limitado como fallback). Não quebra o chat.
-            AuraLog.Info("TTS: texto fora do alcance do motor atual, fala pulada.");
-        }
-    }
-
     private void AppendBubble(string text, bool user, bool isTool = false, bool isError = false)
     {
         // Cores alinhadas à nova paleta de App.xaml
@@ -239,43 +178,16 @@ public partial class AgentPage : ContentPage
                 ? Color.FromArgb("#7a7a90")   // AuraTextSecondary
                 : Color.FromArgb("#e8e8f0");  // AuraTextPrimary
 
+        // Prefixo de ícone para tool steps
         string display = isTool ? text : text;
 
-        var label = new Editor
+        var label = new Label
         {
             Text = display,
-            IsReadOnly = true,
             TextColor = textColor,
             FontSize = isTool ? 12 : 14,
-            BackgroundColor = Colors.Transparent,
-            AutoSize = Microsoft.Maui.Controls.EditorAutoSizeOption.TextChanges,
-            MinimumHeightRequest = 24,
-            Margin = new Thickness(-4, -6)
+            LineBreakMode = LineBreakMode.WordWrap
         };
-
-        View bubbleContent = label;
-        if (!user)
-        {
-            var copyButton = new Button
-            {
-                Text = "Copiar",
-                BackgroundColor = Colors.Transparent,
-                TextColor = Color.FromArgb("#7a7a90"),
-                FontSize = 10,
-                Padding = new Thickness(6, 0),
-                HeightRequest = 24,
-                HorizontalOptions = LayoutOptions.End
-            };
-            copyButton.Clicked += async (_, _) =>
-            {
-                await Clipboard.Default.SetTextAsync(display);
-                string original = copyButton.Text;
-                copyButton.Text = "\u2713";
-                await Task.Delay(1500);
-                copyButton.Text = original;
-            };
-            bubbleContent = new VerticalStackLayout { label, copyButton };
-        }
 
         var border = new Border
         {
@@ -286,7 +198,7 @@ public partial class AgentPage : ContentPage
             Padding = new Thickness(12, 8),
             MaximumWidthRequest = 340,
             HorizontalOptions = alignment,
-            Content = bubbleContent
+            Content = label
         };
 
         MainThread.BeginInvokeOnMainThread(() =>
@@ -306,6 +218,6 @@ public partial class AgentPage : ContentPage
             return oneLine;
         }
 
-        return oneLine.Substring(0, max) + "\u2026";
+        return oneLine.Substring(0, max) + "…";
     }
 }
