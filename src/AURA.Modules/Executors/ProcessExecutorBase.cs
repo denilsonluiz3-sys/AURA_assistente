@@ -84,6 +84,7 @@ public abstract class ProcessExecutorBase : IToolExecutor
         }
 
         var tcs = new TaskCompletionSource<bool>();
+        var timedOut = false;
         process.Exited += (_, _) => tcs.TrySetResult(true);
         process.EnableRaisingEvents = true;
 
@@ -94,6 +95,7 @@ public abstract class ProcessExecutorBase : IToolExecutor
 
         using var _ = cts?.Token.Register(() =>
         {
+            timedOut = true;
             try { process.Kill(entireProcessTree: true); } catch { }
             tcs.TrySetResult(false);
         });
@@ -101,8 +103,9 @@ public abstract class ProcessExecutorBase : IToolExecutor
         await tcs.Task;
         stopwatch.Stop();
 
-        var stdout = await process.StandardOutput.ReadToEndAsync();
-        var stderr = await process.StandardError.ReadToEndAsync();
+        var stdout = timedOut ? string.Empty : await process.StandardOutput.ReadToEndAsync();
+        var stderr = timedOut ? "[AURA] Execução cancelada por timeout.\n" + await process.StandardError.ReadToEndAsync()
+                             : await process.StandardError.ReadToEndAsync();
 
         return new ExecutionResult
         {
