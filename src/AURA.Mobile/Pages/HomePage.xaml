@@ -1,17 +1,29 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:Class="AURA.Mobile.Pages.HomePage"
              Title="Início"
              BackgroundColor="{DynamicResource AuraBackground}">
 
     <Grid RowDefinitions="*,Auto" Padding="0">
 
+        <!-- Fundo de vídeo opcional (atrás de tudo). Só visível/toca quando Preference aura_video_bg=true. -->
+        <toolkit:MediaElement x:Name="BgVideo"
+                              Grid.RowSpan="2"
+                              Aspect="AspectFill"
+                              ShouldAutoPlay="False"
+                              ShouldLoop="True"
+                              IsVisible="False"
+                              Volume="0"
+                              HorizontalOptions="Fill"
+                              VerticalOptions="Fill" />
+
         <!-- ── Conteúdo principal ─────────────────────────── -->
         <ScrollView Grid.Row="0">
             <VerticalStackLayout Padding="20,24,20,16" Spacing="20">
 
-                <!-- Header + toggle Solar/Lunar -->
+                <!-- Header + toggle Solar/Lunar (+ long-press = vídeo on/off) -->
                 <Grid ColumnDefinitions="*,Auto">
                     <VerticalStackLayout Grid.Column="0" Spacing="2">
                         <Label Text="A U R A"
