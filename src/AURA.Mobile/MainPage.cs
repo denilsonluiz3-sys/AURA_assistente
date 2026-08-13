@@ -34,7 +34,7 @@ namespace AURA.Mobile
                 MainThread.BeginInvokeOnMainThread(RebuildTabs));
             _entries = new List<(string?, string, string, Page)>
             {
-                ("system", "Sistema", "Início", home),
+                (null, "Sistema", "Início", home),
                 ("system", "Sistema", "Diagnóstico", diagnostico),
                 ("logs", "Sistema", "Logs", logs),
                 ("logs", "Sistema", "Correções", fixes),
