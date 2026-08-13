@@ -1,5 +1,5 @@
 # CI + optional auto-merge workflow for feature branches / PRs
-# - Runs on pull_request events and manually (workflow_dispatch)
+# - Runs on push, pull_request events and manually (workflow_dispatch)
 # - Builds and runs tests (dotnet 10)
 # - Optionally auto-merges the PR when tests pass:
 #     * For pull_request events: auto-merge when the PR has the label "auto-merge"
@@ -13,6 +13,8 @@
 name: CI and Optional Auto-merge
 
 on:
+  push:
+    branches: [ '**' ]  # Run on all branches
   pull_request:
     types: [opened, reopened, synchronize, labeled]
   workflow_dispatch:
@@ -87,18 +89,11 @@ jobs:
               SHOULD_MERGE="true"
             fi
           else
-            # manual dispatch
-            PR_NUM="${{ github.event.inputs.pr_number }}"
-            if [ -z "$PR_NUM" ]; then
-              echo "No pr_number provided for manual run; skipping merge."
-              echo "should_merge=false" >> $GITHUB_OUTPUT
-              echo "pr_num=" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-            echo "Manual run for PR #${PR_NUM}"
-            if [ "${{ github.event.inputs.auto_merge }}" = "true" ]; then
-              SHOULD_MERGE="true"
-            fi
+            # For push or workflow_dispatch events, we don't auto-merge
+            echo "Event is ${EVENT_NAME}, not a pull_request. Skipping auto-merge."
+            echo "should_merge=false" >> $GITHUB_OUTPUT
+            echo "pr_num=" >> $GITHUB_OUTPUT
+            exit 0
           fi
 
           echo "should_merge=$SHOULD_MERGE" >> $GITHUB_OUTPUT
