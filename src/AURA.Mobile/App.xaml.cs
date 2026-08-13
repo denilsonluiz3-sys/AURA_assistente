@@ -18,10 +18,11 @@ public partial class App : Application
         {
             InitializeComponent();
             AuraLog.Info("App.ctor InitializeComponent OK");
+            // false = Lunar (padrão), true = Solar
             IsSolar = Preferences.Default.Get(ThemePrefKey, false);
             ApplyColors();
             MainPage = _services.GetRequiredService<MainPage>();
-            AuraLog.Info("App.ctor MainPage set OK");
+            AuraLog.Info("App.ctor MainPage set OK (tema=" + (IsSolar ? "Solar" : "Lunar") + ")");
         }
         catch (Exception ex)
         {
@@ -39,6 +40,7 @@ public partial class App : Application
         Preferences.Default.Set(ThemePrefKey, IsSolar);
         ApplyColors();
         ThemeChanged?.Invoke();
+        AuraLog.Info("Tema alterado para " + (IsSolar ? "Solar" : "Lunar"));
     }
 
     private static void ApplyColors()
@@ -48,6 +50,7 @@ public partial class App : Application
 
         if (IsSolar)
         {
+            // Solar — ciano / teal sobre fundo escuro (conceito holográfico diurno)
             SetColor(r, "AuraBackground", "#1c1a2e");
             SetColor(r, "AuraSurface", "#12101f");
             SetColor(r, "AuraSurface2", "#26233a");
@@ -68,9 +71,12 @@ public partial class App : Application
             SetColor(r, "AuraUserBubble", "#1e3854");
             SetColor(r, "AuraAgentBubble", "#12101f");
             SetColor(r, "AuraToolBubble", "#0f1420");
+            SetColor(r, "AuraGlass", "#9912101f");
+            SetColor(r, "AuraGlassBorder", "#33ffffff");
         }
         else
         {
+            // Lunar — azul frio / prata / violeta (padrão)
             SetColor(r, "AuraBackground", "#12141f");
             SetColor(r, "AuraSurface", "#0d0f18");
             SetColor(r, "AuraSurface2", "#1e2130");
@@ -91,6 +97,8 @@ public partial class App : Application
             SetColor(r, "AuraUserBubble", "#1e2d54");
             SetColor(r, "AuraAgentBubble", "#0d0f18");
             SetColor(r, "AuraToolBubble", "#0f1420");
+            SetColor(r, "AuraGlass", "#990d0f18");
+            SetColor(r, "AuraGlassBorder", "#33ffffff");
         }
     }
 
