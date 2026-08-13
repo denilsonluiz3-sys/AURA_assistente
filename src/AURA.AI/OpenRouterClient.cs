@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AURA.Core.Logging;
 using AURA.Memory;
+using AURA.AI.Providers;
 
 namespace AURA.AI
 {
@@ -26,6 +27,12 @@ namespace AURA.AI
         public int MaxTokens { get; set; } = 1500;
         public int TimeoutSeconds { get; set; } = 90;
         public string? AppReference { get; set; }
+
+        // Usados por ApiKeyProviderResolver.ApplyToClient
+        public string AuthHeaderName { get; set; } = "Authorization";
+        public string AuthScheme { get; set; } = "Bearer ";
+        public AiApiFormat ApiFormat { get; set; } = AiApiFormat.OpenAICompletions;
+        public string AnthropicVersion { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -71,14 +78,22 @@ namespace AURA.AI
 
             if (!string.Equals(Options.Provider, "ollama", StringComparison.OrdinalIgnoreCase))
             {
-                request.Headers.TryAddWithoutValidation(
-                    "Authorization",
-                    "Bearer " + Options.ApiKey);
+                string header = string.IsNullOrWhiteSpace(Options.AuthHeaderName)
+                    ? "Authorization"
+                    : Options.AuthHeaderName;
+                string scheme = Options.AuthScheme ?? "Bearer ";
+                request.Headers.TryAddWithoutValidation(header, scheme + Options.ApiKey);
 
                 if (Options.AppReference != null)
                 {
                     request.Headers.TryAddWithoutValidation("X-Title", "AURA");
                     request.Headers.TryAddWithoutValidation("X-URL", Options.AppReference);
+                }
+
+                if (Options.ApiFormat == AiApiFormat.AnthropicMessages &&
+                    !string.IsNullOrWhiteSpace(Options.AnthropicVersion))
+                {
+                    request.Headers.TryAddWithoutValidation("anthropic-version", Options.AnthropicVersion);
                 }
             }
 
@@ -239,11 +254,23 @@ namespace AURA.AI
             string json = JsonSerializer.Serialize(payload);
             HttpClient client = httpClient ?? ResolveClient();
             var request = new HttpRequestMessage(HttpMethod.Post, Options.BaseUrl);
-            request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + Options.ApiKey);
+
+            string header = string.IsNullOrWhiteSpace(Options.AuthHeaderName)
+                ? "Authorization"
+                : Options.AuthHeaderName;
+            string scheme = Options.AuthScheme ?? "Bearer ";
+            request.Headers.TryAddWithoutValidation(header, scheme + Options.ApiKey);
+
             if (Options.AppReference != null)
             {
                 request.Headers.TryAddWithoutValidation("X-Title", "AURA");
                 request.Headers.TryAddWithoutValidation("X-URL", Options.AppReference);
+            }
+
+            if (Options.ApiFormat == AiApiFormat.AnthropicMessages &&
+                !string.IsNullOrWhiteSpace(Options.AnthropicVersion))
+            {
+                request.Headers.TryAddWithoutValidation("anthropic-version", Options.AnthropicVersion);
             }
 
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");

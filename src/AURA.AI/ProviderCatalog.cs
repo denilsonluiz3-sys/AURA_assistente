@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using AURA.AI.Providers;
 
 namespace AURA.AI
 {
@@ -11,21 +12,39 @@ namespace AURA.AI
         public string Id { get; set; } = string.Empty;
         public string Label { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;
-        public bool IsFree { get; init; }
+        public bool IsFree { get; set; }
 
         public override string ToString() =>
             IsFree ? $"{Label} (grátis)" : Label;
     }
 
-    public sealed class ProviderInfo
+    /// <summary>
+    /// Descrição de um provedor LLM. Implementa <see cref="IAiProvider"/>
+    /// para ser usado pelo <see cref="ApiKeyProviderResolver"/>.
+    /// </summary>
+    public sealed class ProviderInfo : IAiProvider
     {
         public string Id { get; set; } = string.Empty;
-        public string Name { get; init; } = string.Empty;
-        public string BaseUrl { get; init; } = string.Empty;
-        public bool NeedsKey { get; init; } = true;
-        public string KeyHint { get; init; } = string.Empty;
-        public string KeyEnv { get; init; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string BaseUrl { get; set; } = string.Empty;
+        public bool NeedsKey { get; set; } = true;
+        public string KeyHint { get; set; } = string.Empty;
+        public string KeyEnv { get; set; } = string.Empty;
         public List<ProviderModel> Models { get; set; } = new();
+
+        // ── IAiProvider ──────────────────────────────────────────────
+        public string ModelsUrl { get; set; } = string.Empty;
+        public string DefaultModelId { get; set; } = string.Empty;
+        public string AuthHeaderName { get; set; } = "Authorization";
+        public string AuthScheme { get; set; } = "Bearer ";
+        public AiApiFormat ApiFormat { get; set; } = AiApiFormat.OpenAICompletions;
+        public string AnthropicVersion { get; set; } = string.Empty;
+        public List<string> KeyPrefixesList { get; set; } = new();
+
+        IReadOnlyList<string> IAiProvider.KeyPrefixes => KeyPrefixesList;
+
+        /// <summary>Atalho para código que não usa a interface.</summary>
+        public IReadOnlyList<string> KeyPrefixes => KeyPrefixesList;
     }
 
     public static class ProviderCatalog
@@ -45,6 +64,17 @@ namespace AURA.AI
             {
                 ProvidersList.Add(provider);
             }
+        }
+
+        /// <summary>
+        /// Provedores que exigem chave e podem ser testados via probe (GET models).
+        /// </summary>
+        public static IReadOnlyList<IAiProvider> KeyedProbeCandidates()
+        {
+            return ProvidersList
+                .Where(p => p.NeedsKey)
+                .Cast<IAiProvider>()
+                .ToList();
         }
 
         private static List<ProviderInfo> Load()
@@ -149,6 +179,35 @@ namespace AURA.AI
                     provider.Models = new List<ProviderModel>();
                 }
 
+                if (string.IsNullOrWhiteSpace(provider.DefaultModelId) &&
+                    provider.Models.Count > 0)
+                {
+                    provider.DefaultModelId = provider.Models[0].Id;
+                }
+
+                if (string.IsNullOrWhiteSpace(provider.ModelsUrl))
+                {
+                    // Heurística: /chat/completions → /models
+                    provider.ModelsUrl = provider.BaseUrl
+                        .Replace("/chat/completions", "/models", StringComparison.OrdinalIgnoreCase)
+                        .Replace("/v1/messages", "/v1/models", StringComparison.OrdinalIgnoreCase);
+                }
+
+                if (string.IsNullOrWhiteSpace(provider.AuthHeaderName))
+                {
+                    provider.AuthHeaderName = "Authorization";
+                }
+
+                if (string.IsNullOrWhiteSpace(provider.AuthScheme))
+                {
+                    provider.AuthScheme = "Bearer ";
+                }
+
+                if (provider.KeyPrefixesList == null)
+                {
+                    provider.KeyPrefixesList = new List<string>();
+                }
+
                 foreach (ProviderModel model in provider.Models)
                 {
                     if (string.IsNullOrWhiteSpace(model.Label))
@@ -236,9 +295,16 @@ namespace AURA.AI
                     Name = "OpenAI",
                     BaseUrl =
                         "https://api.openai.com/v1/chat/completions",
+                    ModelsUrl =
+                        "https://api.openai.com/v1/models",
                     NeedsKey = true,
                     KeyEnv = "OPENAI_API_KEY",
                     KeyHint = "OPENAI_API_KEY",
+                    DefaultModelId = "gpt-5-mini",
+                    AuthHeaderName = "Authorization",
+                    AuthScheme = "Bearer ",
+                    ApiFormat = AiApiFormat.OpenAICompletions,
+                    KeyPrefixesList = new List<string> { "sk-" },
                     Models = new List<ProviderModel>
                     {
                         new ProviderModel
@@ -262,9 +328,16 @@ namespace AURA.AI
                     Name = "OpenRouter",
                     BaseUrl =
                         "https://openrouter.ai/api/v1/chat/completions",
+                    ModelsUrl =
+                        "https://openrouter.ai/api/v1/models",
                     NeedsKey = true,
                     KeyEnv = "OPENROUTER_API_KEY",
                     KeyHint = "OPENROUTER_API_KEY",
+                    DefaultModelId = "qwen/qwen-plus",
+                    AuthHeaderName = "Authorization",
+                    AuthScheme = "Bearer ",
+                    ApiFormat = AiApiFormat.OpenAICompletions,
+                    KeyPrefixesList = new List<string> { "sk-or-" },
                     Models = new List<ProviderModel>
                     {
                         new ProviderModel
@@ -289,7 +362,13 @@ namespace AURA.AI
                     Name = "Ollama (local)",
                     BaseUrl =
                         "http://127.0.0.1:11434/v1/chat/completions",
+                    ModelsUrl =
+                        "http://127.0.0.1:11434/v1/models",
                     NeedsKey = false,
+                    DefaultModelId = "qwen2.5-coder:1.5b",
+                    AuthHeaderName = "Authorization",
+                    AuthScheme = "Bearer ",
+                    ApiFormat = AiApiFormat.OpenAICompletions,
                     Models = new List<ProviderModel>
                     {
                         new ProviderModel
