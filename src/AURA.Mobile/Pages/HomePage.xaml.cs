@@ -17,11 +17,14 @@ public partial class HomePage : ContentPage
         _systemAnalyzer = systemAnalyzer;
         _networkManager = networkManager;
         _agentManager = agentManager;
+        App.ThemeChanged += OnThemeChanged;
+        UpdateThemeIcon();
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        UpdateThemeIcon();
         await RefreshAsync();
         StartOrbPulse();
     }
@@ -35,6 +38,26 @@ public partial class HomePage : ContentPage
     private async void OnRefreshClicked(object? sender, EventArgs e)
     {
         await RefreshAsync();
+    }
+
+    // ── Tema Solar / Lunar ─────────────────────────────────────────
+
+    private void OnThemeToggleClicked(object? sender, EventArgs e)
+    {
+        App.ToggleTheme();
+        // Icon is refreshed via ThemeChanged subscription.
+    }
+
+    private void OnThemeChanged()
+    {
+        MainThread.BeginInvokeOnMainThread(UpdateThemeIcon);
+    }
+
+    private void UpdateThemeIcon()
+    {
+        if (BtnTheme is null) return;
+        // Solar → mostra lua (próximo estado = Lunar); Lunar → mostra sol
+        BtnTheme.Text = App.IsSolar ? "☾" : "☀";
     }
 
     // ── Pulse holográfico (F2 — MAUI nativo, zero NuGet) ───────────
@@ -129,7 +152,7 @@ public partial class HomePage : ContentPage
     }
 
     /// <summary>
-    /// Troca a aba do TabbedPage para a seção e, se possível, faz PushAsync da página com o label dado.
+    /// Troca a aba do TabbedPage para a seção correspondente.
     /// </summary>
     private async Task NavigateToSectionAndPageAsync(string sectionTitle, string pageLabel)
     {
@@ -137,26 +160,6 @@ public partial class HomePage : ContentPage
         {
             await DisplayAlert(pageLabel, $"Seção \"{sectionTitle}\" ainda não está ativa (módulo não aplicado).", "OK");
             return;
-        }
-
-        // Após trocar a aba, tenta empurrar a página alvo a partir da SectionPage.
-        try
-        {
-            if (Parent is NavigationPage nav && nav.Parent is TabbedPage tabs
-                && tabs.CurrentPage is NavigationPage sectionNav
-                && sectionNav.CurrentPage is SectionPage)
-            {
-                // SectionPage já está no topo da NavigationPage da seção.
-                // Percorre os itens conhecidos via Reflection não é ideal;
-                // em vez disso, o usuário vê a grade da seção e toca no card.
-                // Para UX imediata: se a página alvo estiver registrada no MainPage,
-                // tentamos localizar via Children do SectionPage (não exposto).
-                // Fallback seguro: apenas muda a aba — a SectionPage mostra os cards.
-            }
-        }
-        catch (Exception ex)
-        {
-            AuraLog.Info("NavigateToSectionAndPage: " + ex.Message);
         }
     }
 
