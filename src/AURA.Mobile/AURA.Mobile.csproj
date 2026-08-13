@@ -29,7 +29,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+    <!-- Pin 10.0.60+: exigido por CommunityToolkit.Maui.MediaElement 10.0.0 (NU1605 se $(MauiVersion) for 10.0.20). -->
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.60" />
     <!-- ONNX Runtime: TFM net9.0-android (consumido pelo net10.0-android do app).
          Traz a runtime nativa (.so) do Android para inferência CPU local do Kokoro TTS. -->
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.28.0" />
