@@ -1,6 +1,4 @@
 using System;
-using System.IO;
-using System.Text.Json;
 
 namespace AURA.AI
 {
@@ -93,7 +91,6 @@ namespace AURA.AI
             return Load();
         }
 
-
         public OpenRouterOptions CreateOptions()
         {
             return new OpenRouterOptions
@@ -104,7 +101,11 @@ namespace AURA.AI
                 Model = Model.Id,
                 MaxTokens = 1500,
                 TimeoutSeconds = 120,
-                AppReference = "AURA"
+                AppReference = "AURA",
+                AuthHeaderName = Provider.AuthHeaderName,
+                AuthScheme = Provider.AuthScheme,
+                ApiFormat = Provider.ApiFormat,
+                AnthropicVersion = Provider.AnthropicVersion
             };
         }
 
