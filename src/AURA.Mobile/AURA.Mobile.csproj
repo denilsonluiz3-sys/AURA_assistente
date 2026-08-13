@@ -33,6 +33,8 @@
     <!-- ONNX Runtime: TFM net9.0-android (consumido pelo net10.0-android do app).
          Traz a runtime nativa (.so) do Android para inferência CPU local do Kokoro TTS. -->
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.28.0" />
+    <!-- MediaElement para fundo de vídeo opcional (Solar/Lunar). Só toca quando Preference aura_video_bg=true. -->
+    <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="10.0.0" />
   </ItemGroup>
 
   <!-- Fontes Lovable: Barlow Condensed (headings) + IBM Plex Sans (body) -->
@@ -41,6 +43,7 @@
   </ItemGroup>
 
   <!-- Modelo Kokoro TTS + voz pf_dora (pt-br) + vocab. Assets empacotados no APK. -->
+  <!-- Vídeos de fundo opcionais (lunar_bg.mp4 / solar_bg.mp4) também em Raw. -->
   <ItemGroup>
     <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>

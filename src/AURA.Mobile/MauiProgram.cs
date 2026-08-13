@@ -12,6 +12,7 @@ using AURA.Modules.Executors;
 using AURA.Network;
 using AURA.SystemInfo;
 using AURA.Mobile.Speech;
+using CommunityToolkit.Maui;
 
 namespace AURA.Mobile;
 
@@ -22,7 +23,10 @@ public static class MauiProgram
         AuraLog.Info("MauiProgram.CreateMauiApp BEGIN");
         var builder = MauiApp.CreateBuilder();
         builder
-            .UseMauiApp<App>();
+            .UseMauiApp<App>()
+            // MediaElement: fundo de vídeo opcional. enableForegroundService=false —
+            // só reproduz enquanto a página está visível (não em background).
+            .UseMauiCommunityToolkitMediaElement(enableForegroundService: false);
 
 #if ANDROID
         // Handler Android do WebView: mantém o comportamento do MAUI e corrige
@@ -153,7 +157,7 @@ public static class MauiProgram
         }
 
         // O LogicalName usa a pasta do módulo; em builds Windows o RecursiveDir
-        // pode vir com '\', por isso tentamos as duas variações.
+        // pode vir com '\\', por isso tentamos as duas variações.
         string[] candidates =
         {
             $"modulepkgs/{id}/module.json",
