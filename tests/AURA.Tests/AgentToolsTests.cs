@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using AURA.AI;
 using AURA.Core.Logging;
 using AURA.Memory;
+using AURA.Modules.Executors;
 using Xunit;
 
 namespace AURA.Tests;
@@ -152,7 +153,7 @@ public class AgentToolsTests
             Assert.Contains("path", write.Definition.Required);
             Assert.Contains("content", write.Definition.Required);
 
-            var shell = new ShellAgentTool(root);
+            var shell = new ShellAgentTool(root, new ShellExecutor());
             Assert.Contains("command", shell.Definition.Required);
         }
         finally
