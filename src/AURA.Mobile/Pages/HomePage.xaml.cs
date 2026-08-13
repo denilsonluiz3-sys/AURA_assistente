@@ -94,53 +94,86 @@ public partial class HomePage : ContentPage
         }
     }
 
-    // ── Bottom bar (conceito holográfico) ──────────────────────────
+    // ── Bottom bar alinhada à referência (Início | Diagnóstico | Módulos | Agentes | Config) ──
 
-    private async void OnNetworkClicked(object? sender, EventArgs e)
+    private async void OnInicioClicked(object? sender, EventArgs e)
     {
-        await PlayButtonFeedbackAsync(BtnNetwork);
-        await RefreshNetworkOnlyAsync();
-        await DisplayAlert("Network", "Status de rede atualizado.", "OK");
-    }
-
-    private async void OnSensorClicked(object? sender, EventArgs e)
-    {
-        await PlayButtonFeedbackAsync(BtnSensor);
-        await RefreshSystemOnlyAsync();
-        await DisplayAlert("Sensor", "Diagnóstico de sistema atualizado.", "OK");
-    }
-
-    private async void OnEthereumClicked(object? sender, EventArgs e)
-    {
-        await PlayButtonFeedbackAsync(BtnEthereum);
-        await DisplayAlert("Ethereum", "Módulo reservado para integração futura.", "OK");
-    }
-
-    private async void OnSystemClicked(object? sender, EventArgs e)
-    {
-        await PlayButtonFeedbackAsync(BtnSystem);
+        await PlayButtonFeedbackAsync(BtnInicio);
         await RefreshAsync();
-        await DisplayAlert("System", "Painel de sistema atualizado.", "OK");
     }
 
-    private async void OnDeviceClicked(object? sender, EventArgs e)
+    private async void OnDiagnosticoClicked(object? sender, EventArgs e)
     {
-        await PlayButtonFeedbackAsync(BtnDevice);
+        await PlayButtonFeedbackAsync(BtnDiagnostico);
+        await NavigateToSectionAndPageAsync("Sistema", "Diagnóstico");
+    }
 
-        // Navega para a seção Apps (Células) se existir no TabbedPage pai.
-        if (Parent is NavigationPage nav && nav.Parent is TabbedPage tabs)
+    private async void OnModulosClicked(object? sender, EventArgs e)
+    {
+        await PlayButtonFeedbackAsync(BtnModulos);
+        await NavigateToSectionAndPageAsync("Ferramentas", "Módulos");
+    }
+
+    private async void OnAgentesClicked(object? sender, EventArgs e)
+    {
+        await PlayButtonFeedbackAsync(BtnAgentes);
+        await NavigateToSectionAndPageAsync("Assistente", "Agente");
+    }
+
+    private async void OnConfigClicked(object? sender, EventArgs e)
+    {
+        await PlayButtonFeedbackAsync(BtnConfig);
+        // Ainda não existe página Config dedicada. Leva à seção Sistema (Início/Diagnóstico/Logs).
+        if (!TrySwitchToSection("Sistema"))
+            await DisplayAlert("Config", "Seção Sistema não disponível no momento.", "OK");
+    }
+
+    /// <summary>
+    /// Troca a aba do TabbedPage para a seção e, se possível, faz PushAsync da página com o label dado.
+    /// </summary>
+    private async Task NavigateToSectionAndPageAsync(string sectionTitle, string pageLabel)
+    {
+        if (!TrySwitchToSection(sectionTitle))
         {
-            foreach (var child in tabs.Children)
-            {
-                if (child is NavigationPage np && np.Title == "Apps")
-                {
-                    tabs.CurrentPage = child;
-                    return;
-                }
-            }
+            await DisplayAlert(pageLabel, $"Seção \"{sectionTitle}\" ainda não está ativa (módulo não aplicado).", "OK");
+            return;
         }
 
-        await DisplayAlert("Device", "Abra a seção Apps → Células para gerenciar o dispositivo.", "OK");
+        // Após trocar a aba, tenta empurrar a página alvo a partir da SectionPage.
+        try
+        {
+            if (Parent is NavigationPage nav && nav.Parent is TabbedPage tabs
+                && tabs.CurrentPage is NavigationPage sectionNav
+                && sectionNav.CurrentPage is SectionPage)
+            {
+                // SectionPage já está no topo da NavigationPage da seção.
+                // Percorre os itens conhecidos via Reflection não é ideal;
+                // em vez disso, o usuário vê a grade da seção e toca no card.
+                // Para UX imediata: se a página alvo estiver registrada no MainPage,
+                // tentamos localizar via Children do SectionPage (não exposto).
+                // Fallback seguro: apenas muda a aba — a SectionPage mostra os cards.
+            }
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Info("NavigateToSectionAndPage: " + ex.Message);
+        }
+    }
+
+    private bool TrySwitchToSection(string sectionTitle)
+    {
+        if (Parent is not NavigationPage nav || nav.Parent is not TabbedPage tabs)
+            return false;
+
+        foreach (var child in tabs.Children)
+        {
+            if (child is NavigationPage np && string.Equals(np.Title, sectionTitle, StringComparison.OrdinalIgnoreCase))
+            {
+                tabs.CurrentPage = child;
+                return true;
+            }
+        }
+        return false;
     }
 
     // ── Refresh ────────────────────────────────────────────────────
