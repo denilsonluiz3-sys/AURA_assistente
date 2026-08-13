@@ -192,10 +192,10 @@ namespace AURA.Mobile.Speech
         /// <summary>Observa o término de cada utterance para o SpeakAsync poder aguardar.</summary>
         private sealed class UtteranceListener : UtteranceProgressListener
         {
-            private readonly Action<string, bool> _onDone;
-            private readonly Action<string, bool> _onError;
+            private readonly Action<string> _onDone;
+            private readonly Action<string> _onError;
 
-            public UtteranceListener(Action<string, bool> onDone, Action<string, bool> onError)
+            public UtteranceListener(Action<string> onDone, Action<string> onError)
             {
                 _onDone = onDone;
                 _onError = onError;
@@ -205,17 +205,19 @@ namespace AURA.Mobile.Speech
             {
                 if (utteranceId != null)
                 {
-                    _onDone(utteranceId, true);
+                    _onDone(utteranceId);
                 }
             }
 
+#pragma warning disable CS0672 // OnError(string) is obsolete but still required by some API levels
             public override void OnError(string? utteranceId)
             {
                 if (utteranceId != null)
                 {
-                    _onError(utteranceId, false);
+                    _onError(utteranceId);
                 }
             }
+#pragma warning restore CS0672
 
             public override void OnStart(string? utteranceId)
             {
