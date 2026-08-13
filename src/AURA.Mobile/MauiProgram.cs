@@ -24,9 +24,9 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
-            // MediaElement: fundo de vídeo opcional. enableForegroundService=false —
-            // só reproduz enquanto a página está visível (não em background).
-            .UseMauiCommunityToolkitMediaElement(enableForegroundService: false);
+            // MediaElement v10: parâmetro isAndroidForegroundServiceEnabled (não enableForegroundService).
+            // false = sem serviço em background; só toca com a página visível.
+            .UseMauiCommunityToolkitMediaElement(isAndroidForegroundServiceEnabled: false);
 
 #if ANDROID
         // Handler Android do WebView: mantém o comportamento do MAUI e corrige

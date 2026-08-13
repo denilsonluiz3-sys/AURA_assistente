@@ -3,6 +3,7 @@ using Android.App;
 using Android.Graphics;
 using Android.Graphics.Drawables;
 using Android.Views;
+using Android.Widget;
 using AURA.Mobile.Speech;
 using Microsoft.Extensions.DependencyInjection;
 using Button = Android.Widget.Button;
@@ -22,6 +23,7 @@ namespace AURA.Mobile.Platforms.Android
     {
         private static Button? _fab;
         private static bool _attached;
+        private static float _density = 1f;
 
         /// <summary>
         /// Cria o FAB sobre o conteúdo da Activity, no canto inferior direito,
@@ -41,6 +43,8 @@ namespace AURA.Mobile.Platforms.Android
                 return;
             }
 
+            _density = activity.Resources?.DisplayMetrics?.Density ?? 1f;
+
             // FAB circular com o padrão visual da AURA (accent #4f8aff).
             var fab = new Button(activity)
             {
@@ -52,9 +56,9 @@ namespace AURA.Mobile.Platforms.Android
             fab.SetTextColor(Color.White);
             fab.Gravity = GravityFlags.Center;
 
-            int size = Dp(activity, 56);
-            int marginEnd = Dp(activity, 18);
-            int marginBottom = Dp(activity, 76); // acima da barra de abas
+            int size = Dp(56);
+            int marginEnd = Dp(18);
+            int marginBottom = Dp(76); // acima da barra de abas
 
             var lp = new FrameLayout.LayoutParams(size, size)
             {
@@ -121,9 +125,9 @@ namespace AURA.Mobile.Platforms.Android
             return d;
         }
 
-        private static int Dp(Activity activity, float value)
+        private static int Dp(float value)
         {
-            return (int)(value * activity.Resources!.DisplayMetrics!.Density);
+            return (int)(value * _density);
         }
     }
 }

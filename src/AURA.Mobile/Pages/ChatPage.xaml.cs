@@ -22,29 +22,36 @@ public partial class ChatPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        AiConfig.Load(_client);
-    }
-
-    private async void OnCopyClicked(object sender, EventArgs e)
-    {
-        string text = AnswerLabel.Text ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(text))
+        RuntimeConfig.Apply(_client);
+        // Sync UI pickers com o que está em RuntimeConfig (se os controles existirem).
+        try
         {
-            return;
+            if (ProviderPicker != null && ModelPicker != null)
+            {
+                // Os handlers de picker podem ser ligados no futuro; por ora
+                // a config efetiva vem de RuntimeConfig / Preferences.
+            }
         }
-
-        await Clipboard.Default.SetTextAsync(text);
-        string original = CopyButton.Text;
-        CopyButton.Text = "✓ Copiado";
-        await Task.Delay(1500);
-        CopyButton.Text = original;
+        catch
+        {
+            // ignore
+        }
     }
 
     private async void OnSendClicked(object sender, EventArgs e)
     {
-        // O painel AiConfig persiste a chave/provedor/modelo a cada alteração;
-        // aqui só reforça no client antes de chamar a IA.
-        AiConfig.ApplyToClient();
+        // Garante que o client está alinhado com Preferences/RuntimeConfig.
+        RuntimeConfig.Apply(_client);
+
+        // Se o usuário digitou chave no Entry da própria página, usa-a.
+        string entryKey = ApiKeyEntry?.Text?.Trim() ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(entryKey))
+        {
+            _client.Options.ApiKey = entryKey;
+            Preferences.Default.Set("ai_api_key", entryKey);
+            RuntimeConfig.ApiKey = entryKey;
+        }
+
         string apiKey = _client.Options.ApiKey ?? string.Empty;
         string question = QuestionEditor.Text?.Trim() ?? string.Empty;
 
@@ -96,5 +103,12 @@ public partial class ChatPage : ContentPage
             BusyIndicator.IsRunning = false;
             BusyIndicator.IsVisible = false;
         }
+    }
+
+    // Handlers referenciados pelo XAML (ProviderPicker).
+    private void OnProviderChanged(object? sender, EventArgs e)
+    {
+        // Persistência completa via RuntimeConfig fica para evolução futura;
+        // o envio já aplica RuntimeConfig.Apply no client.
     }
 }

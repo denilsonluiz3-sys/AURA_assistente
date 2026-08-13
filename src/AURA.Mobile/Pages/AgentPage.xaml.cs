@@ -2,6 +2,7 @@ using AURA.AI;
 using AURA.Memory;
 using AURA.Mobile.Diagnostics;
 using AURA.Mobile.Speech;
+using AURA.Modules.Executors;
 
 namespace AURA.Mobile.Pages;
 
@@ -11,15 +12,17 @@ public partial class AgentPage : ContentPage
     private readonly MemoryStore _memory;
     private readonly ISpeechService _speech;
     private readonly VoiceAssistantService? _voice;
+    private readonly ShellExecutor _shell;
     private AgentSession? _session;
 
     public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
-        VoiceAssistantService? voice = null)
+        ShellExecutor shell, VoiceAssistantService? voice = null)
     {
         InitializeComponent();
         _client = client;
         _memory = memory;
         _speech = speech;
+        _shell = shell;
         _voice = voice;
     }
 
@@ -27,7 +30,6 @@ public partial class AgentPage : ContentPage
     {
         base.OnAppearing();
         RuntimeConfig.Apply(_client);
-        AiConfig.Load(_client);
 
         string workspace = AgentWorkspace.EnsureCreated();
         string activeRoot = AgentWorkspace.ActiveRoot;
@@ -53,7 +55,7 @@ public partial class AgentPage : ContentPage
             new ReadFileTool(root),
             new WriteFileTool(root),
             new EditFileTool(root),
-            new ShellAgentTool(root)
+            new ShellAgentTool(root, _shell)
         };
 
         string systemPrompt =
@@ -162,42 +164,6 @@ public partial class AgentPage : ContentPage
             user: false, isTool: true);
     }
 
-    private void OnToggleConfigClicked(object sender, EventArgs e)
-    {
-        ConfigPanel.IsVisible = !ConfigPanel.IsVisible;
-        if (ConfigPanel.IsVisible)
-        {
-            AiConfig.Load(_client);
-        }
-    }
-
-    private async void OnSpeakTestClicked(object sender, EventArgs e)
-    {
-        SpeakTestButton.IsEnabled = false;
-        try
-        {
-            // Fala a última resposta do agente (assistente de verdade), não
-            // uma frase fixa de recepção. Sem resposta ainda, usa saudação.
-            string text = _voice?.LastUtterance;
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                text = "Estou aqui. Me instrua na conversa e eu respondo por voz.";
-            }
-
-            _voice?.SetLastUtterance(text);
-            await SpeakAsync(text);
-        }
-        catch (Exception ex)
-        {
-            AppendBubble("Erro no TTS: " + ex.Message, user: false, isError: true);
-            AuraLog.Exception("AgentPage.OnSpeakTestClicked", ex);
-        }
-        finally
-        {
-            SpeakTestButton.IsEnabled = true;
-        }
-    }
-
     private async Task SpeakAsync(string text)
     {
         try
@@ -215,31 +181,29 @@ public partial class AgentPage : ContentPage
 
     private void AppendBubble(string text, bool user, bool isTool = false, bool isError = false)
     {
-        // Cores alinhadas à nova paleta de App.xaml
         Color background = user
-            ? Color.FromArgb("#1e2d54")   // AuraUserBubble
+            ? Color.FromArgb("#1e2d54")
             : isError
                 ? Color.FromArgb("#2a0f12")
                 : isTool
-                    ? Color.FromArgb("#0f1420")   // AuraToolBubble
-                    : Color.FromArgb("#13131d");  // AuraAgentBubble
+                    ? Color.FromArgb("#0f1420")
+                    : Color.FromArgb("#13131d");
 
         Color stroke = user
-            ? Color.FromArgb("#2a3a6a")   // AuraBorderAccent
+            ? Color.FromArgb("#2a3a6a")
             : isError
                 ? Color.FromArgb("#5a1f24")
-                : Color.FromArgb("#242438");  // AuraBorder
+                : Color.FromArgb("#242438");
 
         LayoutOptions alignment = user ? LayoutOptions.End : LayoutOptions.Start;
 
         Color textColor = isError
             ? Color.FromArgb("#e05560")
             : isTool
-                ? Color.FromArgb("#7a7a90")   // AuraTextSecondary
-                : Color.FromArgb("#e8e8f0");  // AuraTextPrimary
+                ? Color.FromArgb("#7a7a90")
+                : Color.FromArgb("#e8e8f0");
 
-        // Prefixo de ícone para tool steps
-        string display = isTool ? text : text;
+        string display = text;
 
         var label = new Editor
         {
