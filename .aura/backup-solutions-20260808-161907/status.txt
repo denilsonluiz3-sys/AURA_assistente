@@ -1,2 +1,0 @@
-?? .aura/backup-solutions-20260808-161907/
-?? scripts/instalar-memoria-solucoes.sh
