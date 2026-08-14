@@ -19,12 +19,16 @@ namespace AURA.AI
     /// </summary>
     public sealed class AgentSession
     {
-        private const int MaxRounds = 20;
+        private const int MaxRounds = 8;
 
         private readonly OpenRouterClient _client;
         private readonly ILogger _logger;
         private readonly List<AgentTool> _tools;
         private readonly List<AgentMessage> _messages = new();
+
+        // Limite de segurança para impedir crescimento indefinido
+        // do contexto enviado ao modelo.
+        private const int MaxHistoryMessages = 16;
         private readonly string? _systemPrompt;
         private readonly MemoryStore? _memory;
 
@@ -57,6 +61,8 @@ namespace AURA.AI
             int round = 0;
             while (round++ < MaxRounds)
             {
+                TrimHistory();
+
                 AgentChatResponse response = await _client.ChatToolsAsync(
                     _messages,
                     _tools.Select(t => t.Definition).ToList(),
