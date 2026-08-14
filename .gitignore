@@ -42,6 +42,9 @@ Thumbs.db
 *.log
 *.tmp
 
+# Audit reports
+auditoria_memoria_AURA.txt
+
 # Local AURA development artifacts
 .aura/backup-*/
 .aura/cleanup-backup/
