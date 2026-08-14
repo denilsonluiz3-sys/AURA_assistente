@@ -43,9 +43,10 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          api-level: 34
+          api-level: 36
           ndk-version: r26d
           emulator: false
+          api36: true
 
       - name: Set Android SDK env vars
         run: |
