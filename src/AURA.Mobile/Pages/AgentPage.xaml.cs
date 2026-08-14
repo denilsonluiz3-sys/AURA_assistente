@@ -55,7 +55,8 @@ public partial class AgentPage : ContentPage
             new ReadFileTool(root),
             new WriteFileTool(root),
             new EditFileTool(root),
-            new ShellAgentTool(root, _shell)
+            new ShellAgentTool(root, _shell),
+            new WebFetchTool()
         };
 
         string systemPrompt =
