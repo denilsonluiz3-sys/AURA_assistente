@@ -64,14 +64,22 @@
                 <Setter Property="FontSize" Value="14" />
             </Style>
 
-            <!-- Botão fantasma (ghost) -->
-            <Style x:Key="BtnGhost" TargetType="Button">
-                <Setter Property="BackgroundColor" Value="{DynamicResource AuraSurface2}" />
-                <Setter Property="TextColor" Value="{DynamicResource AuraAccent}" />
-                <Setter Property="CornerRadius" Value="10" />
-                <Setter Property="Padding" Value="14,8" />
-                <Setter Property="FontSize" Value="13" />
-            </Style>
+             <!-- Botão fantasma (ghost) -->
+             <Style x:Key="BtnGhost" TargetType="Button">
+                 <Setter Property="BackgroundColor" Value="{DynamicResource AuraSurface2}" />
+                 <Setter Property="TextColor" Value="{DynamicResource AuraAccent}" />
+                 <Setter Property="CornerRadius" Value="10" />
+                 <Setter Property="Padding" Value="14,8" />
+                 <Setter Property="FontSize" Value="13" />
+             </Style>
+
+             <!-- Estilo de cabeçalho -->
+             <Style x:Key="Heading" TargetType="Label">
+                 <Setter Property="TextColor" Value="{DynamicResource AuraTextPrimary}" />
+                 <Setter Property="FontSize" Value="24" />
+                 <Setter Property="FontAttributes" Value="Bold" />
+                 <Setter Property="FontFamily" Value="IBMPlexSans" />
+             </Style>
 
             <!-- Botão destrutivo -->
             <Style x:Key="BtnDanger" TargetType="Button">
