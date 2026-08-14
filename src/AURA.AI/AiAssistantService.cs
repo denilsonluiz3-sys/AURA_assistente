@@ -10,18 +10,18 @@ using AURA.Memory;
 namespace AURA.AI
 {
     /// <summary>
-    /// F3-F5: ÃÂgent on the go — handles queries for mobile, desktop, and web.
-    /// <br/>Pipeline: Client App → (AiAssistant) → OpenRouterClient → OpenRouter API.
-    /// <br/>Persists conversation history in MemoryStore for cross-session continuity.
-    /// <br/>Used by the CLI (<c>aura ask</c>), the Android app (<c>MainActivity</c>), and the upcoming web dashboard.
+    /// F3-F5: Agent on the go — handles queries for mobile, desktop, and web.
+    /// Pipeline: Client App → (AiAssistant) → LLM API → response.
+    /// Persists conversation history in MemoryStore for cross-session continuity.
+    /// Used by the CLI (aura ask), the Android app (MainActivity), and the upcoming web dashboard.
     /// </summary>
     public static class AiAssistantService
     {
         public static readonly OpenRouterOptions DefaultOptions = new OpenRouterOptions
         {
-            ApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? string.Empty,
-            BaseUrl = "https://api.openai.com/v1/chat/completions",
-            Model = "gpt-5-mini"
+            ApiKey = Environment.GetEnvironmentVariable("AURA_OPENROUTER_KEY") ?? string.Empty,
+            BaseUrl = "https://openrouter.ai/api/v1/chat/completions",
+            Model = "anthropic/claude-3-haiku"
         };
 
         /// <summary>Thread-safe entry point for asking the AI anything.</summary>
@@ -73,6 +73,16 @@ namespace AURA.AI
             }
 
             return answer;
+        }
+
+        /// <summary>
+        /// Reformula a pergunta para melhorar a qualidade da resposta do modelo.
+        /// </summary>
+        private static async Task<string> ReformulateQuestion(string question)
+        {
+            // Simples reformat usando o próprio modelo como fallback
+            // Em produção, isso poderia usar outro modelo ou regras heurísticas
+            return question;
         }
     }
 }

@@ -42,6 +42,14 @@ namespace AURA.AI
             _memory = memory;
         }
 
+        private void TrimHistory()
+        {
+            if (_messages.Count <= MaxHistoryMessages)
+                return;
+
+            _messages.RemoveRange(0, _messages.Count - MaxHistoryMessages);
+        }
+
         /// <summary>Emitido a cada ferramenta executada (para atualizar a UI).</summary>
         public event Action<AgentStep>? Step;
 

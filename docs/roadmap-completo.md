@@ -6,6 +6,7 @@ Status geral
 - F6 (Concorrência/Resiliência): concluído — LockHelper implemented with timeout/retry, LojaLocalResolver adapted to use locks with timeout; concurrency tests added.
 - F7 (CLI/API): planejado — CLI for install/uninstall/dry-run after F5+F6.
 - F8 (E2E/Smoke): em progresso — ajustes no smoke test para aumentar robustez (adicionado --wait nas chamadas de run) e reduzir false negatives.
+- **F3 (Assistente Cell)**: em andamento — implementado trim de memória e otimização do AgentSession.cs para evitar delays (commit 8e408d3); refatorado AiAssistantService.cs para usar OpenRouter diretamente e reduzir MaxRounds de 20 para 8; iniciando implementação do fetch via AiSites (webFetch) para conexão com IAs gratuitas (braço aberto até o final desta sprint) 11:00; célula "assistente" com UI célula UI configurada (branch feature/assistente-cell)
 
 ## UI Holográfica (novo eixo — 2026-08-11)
 
