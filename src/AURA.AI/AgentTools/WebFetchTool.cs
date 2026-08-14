@@ -1,5 +1,6 @@
 using System;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -14,9 +15,8 @@ namespace AURA.AI
 
         public override AgentToolDefinition Definition => new AgentToolDefinition
         {
-            Name = "web_fetch",
-            Description = "Busca conteúdo em sites de IA gratuitas via HTTP GET. 
-                          Usa endpoints pré-definidos ou URLs fornecidos"
+             Name = "web_fetch",
+            Description = "Busca conteúdo em sites de IA gratuitas via HTTP GET. Usa endpoints pre-definidos ou URLs fornecidos"
         };
 
         public override async Task<string> ExecuteAsync(string argumentsJson, CancellationToken ct = default)
