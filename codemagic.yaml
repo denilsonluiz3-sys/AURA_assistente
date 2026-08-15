@@ -13,6 +13,7 @@ workflows:
         #   3) Passe -p:AndroidKeyStore=True e os -p:AndroidSigning* (CM_KEYSTORE_PATH,
         #      CM_KEY_ALIAS, CM_KEY_PASSWORD, CM_KEYSTORE_PASSWORD).
         # Sem isso, o APK sai assinado com a keystore de debug (instala por sideload).
+    scripts:
       - name: Instalar .NET SDK 10
         script: |
           wget https://dot.net/v1/dotnet-install.sh
@@ -28,7 +29,7 @@ workflows:
           $DOTNET_BIN build src/AURA.Mobile/AURA.Mobile.csproj \
             -t:InstallAndroidDependencies \
             -f net10.0-android \
-            -p:AndroidSdkDirectory=/usr/local/android-sdk \
+            -p:AndroidSdkDirectory=/usr/local/share/android-sdk \
             -p:AcceptAndroidSDKLicenses=True
       - name: Publicar APK (Release)
         script: |
