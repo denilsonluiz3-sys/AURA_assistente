@@ -52,24 +52,37 @@ public partial class ChatPage : ContentPage
 
         QuestionEditor.Text = string.Empty;
 
-        // Mesma regra do Agent: Apply + fallback sem chave (Ollama / NeedsKey=false).
-        string? readyError = RuntimeConfig.EnsureReadyForRequest(_client);
-        if (readyError != null)
-        {
-            AnswerLabel.Text = readyError;
-            return;
-        }
+        RuntimeConfig.Apply(_client);
+        string apiKey = (ApiKeyEntry?.Text?.Trim() ?? RuntimeConfig.ApiKey ?? string.Empty).Trim();
+        if (!string.IsNullOrWhiteSpace(apiKey))
+            RuntimeConfig.ApiKey = apiKey;
 
         SendButton.IsEnabled = false;
-
         BusyIndicator.IsRunning = true;
         BusyIndicator.IsVisible = true;
         AnswerLabel.Text = "Pensando...";
 
         try
         {
-            var assistant = new AiAssistant(_client, _memory);
-            string answer = await assistant.AskAsync(question);
+            string answer;
+            // Sem chave: busca web (Bing), como o fluxo que já funcionava no app.
+            if (string.IsNullOrWhiteSpace(RuntimeConfig.ApiKey) &&
+                string.IsNullOrWhiteSpace(_client.Options.ApiKey))
+            {
+                AnswerLabel.Text = "Buscando na web (Bing)...";
+                answer = await WebSearchAnswer.SearchAsync(question);
+            }
+            else
+            {
+                string? readyError = RuntimeConfig.EnsureReadyForRequest(_client);
+                if (readyError != null)
+                {
+                    AnswerLabel.Text = readyError;
+                    return;
+                }
+                var assistant = new AiAssistant(_client, _memory);
+                answer = await assistant.AskAsync(question);
+            }
             AnswerLabel.Text = answer;
             _voice?.SetLastUtterance(answer);
         }
