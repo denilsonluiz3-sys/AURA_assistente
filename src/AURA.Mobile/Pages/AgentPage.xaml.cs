@@ -128,15 +128,7 @@ public partial class AgentPage : ContentPage
             return;
         }
 
-        string? readyError = RuntimeConfig.EnsureReadyForRequest(_client);
-        if (readyError != null)
-        {
-            AppendBubble(readyError, user: false, isError: true);
-            return;
-        }
-
-        _session = null;
-        EnsureSession();
+        RuntimeConfig.Apply(_client);
         AppendBubble(text, user: true);
         CommandEditor.Text = string.Empty;
 
@@ -146,7 +138,25 @@ public partial class AgentPage : ContentPage
 
         try
         {
-            string answer = await _session!.RunAsync(text);
+            string answer;
+            if (string.IsNullOrWhiteSpace(RuntimeConfig.ApiKey) &&
+                string.IsNullOrWhiteSpace(_client.Options.ApiKey))
+            {
+                AppendBubble("Buscando na web (Bing)...", user: false, isTool: true);
+                answer = await WebSearchAnswer.SearchAsync(text);
+            }
+            else
+            {
+                string? readyError = RuntimeConfig.EnsureReadyForRequest(_client);
+                if (readyError != null)
+                {
+                    AppendBubble(readyError, user: false, isError: true);
+                    return;
+                }
+                _session = null;
+                EnsureSession();
+                answer = await _session!.RunAsync(text);
+            }
             AppendBubble(answer, user: false);
             _voice?.SetLastUtterance(answer);
             await SpeakAsync(answer);
