@@ -3,6 +3,7 @@ using AURA.Memory;
 using AURA.Mobile.Diagnostics;
 using AURA.Mobile.Speech;
 using AURA.Modules.Executors;
+using AURA.Mobile.Controls;
 
 namespace AURA.Mobile.Pages;
 
@@ -30,6 +31,13 @@ public partial class AgentPage : ContentPage
     {
         base.OnAppearing();
         RuntimeConfig.Apply(_client);
+
+        if (ConfigHost.Content is not AiConfigView cfg)
+        {
+            cfg = new AiConfigView();
+            ConfigHost.Content = cfg;
+        }
+        cfg.Load(_client);
 
         string workspace = AgentWorkspace.EnsureCreated();
         string activeRoot = AgentWorkspace.ActiveRoot;
@@ -87,8 +95,6 @@ public partial class AgentPage : ContentPage
             if (!linked)
                 return;
 
-            // As ferramentas guardam a raiz no momento da criação da sessão.
-            // Ao trocar o projeto, recriamos a sessão para apontar para a nova raiz.
             _session = null;
             WorkspaceLabel.Text = ProjectAccessService.StatusText + "\n" +
                 "Workspace: " + AgentWorkspace.ActiveRoot +
@@ -174,8 +180,6 @@ public partial class AgentPage : ContentPage
         }
         catch (NotSupportedException)
         {
-            // Motor atual não cobre este texto (ex.: Kokoro com dicionário
-            // limitado como fallback). Não quebra o chat.
             AuraLog.Info("TTS: texto fora do alcance do motor atual, fala pulada.");
         }
     }
