@@ -8,12 +8,7 @@ using TextToSpeech = Android.Speech.Tts.TextToSpeech;
 namespace AURA.Mobile.Speech
 {
     /// <summary>
-    /// Sintetizador de voz usando o TTS nativo do Android (TextToSpeech).
-    /// É o motor preferido da AURA para conversação porque fonemiza texto
-    /// arbitrário em pt-br (e qualquer idioma instalado) offline, cobrindo
-    /// as respostas reais da IA — que o Kokoro on-device não consegue.
-    ///
-    /// A sessão é criada sob demanda na primeira fala e reutilizada.
+    /// TTS nativo Android. Preferido para texto arbitrário em pt-BR.
     /// </summary>
     public sealed class AndroidTtsSpeechService : ISpeechService, IDisposable
     {
@@ -25,13 +20,7 @@ namespace AURA.Mobile.Speech
 
         public bool IsReady
         {
-            get
-            {
-                lock (_lock)
-                {
-                    return _tts != null;
-                }
-            }
+            get { lock (_lock) return _tts != null; }
         }
 
         public Task InitializeAsync(CancellationToken ct = default)
@@ -39,14 +28,10 @@ namespace AURA.Mobile.Speech
             lock (_lock)
             {
                 if (_tts != null)
-                {
                     return Task.CompletedTask;
-                }
 
                 if (_initFailed)
                 {
-                    // Já sabemos que o motor nativo não está disponível:
-                    // deixa o fallback (Kokoro) assumir.
                     return Task.FromException(new NotSupportedException(
                         "TTS nativo do Android indisponível neste dispositivo."));
                 }
@@ -59,39 +44,62 @@ namespace AURA.Mobile.Speech
                 }
 
                 var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                TextToSpeech tts = default!;
-                tts = new TextToSpeech(activity, new OnInitListener(status =>
-                    OnInitCompleted(tts, status, tcs)));
+
+                // Não captura variável local antes do new — usa campo só no callback
+                TextToSpeech? created = null;
+                created = new TextToSpeech(activity, new OnInitListener(status =>
+                    OnInitCompleted(created, status, tcs)));
+
                 return tcs.Task;
             }
         }
 
-        /// <summary>Chamado pelo TextToSpeech quando o motor termina de inicializar.</summary>
-        private void OnInitCompleted(TextToSpeech tts, OperationResult status, TaskCompletionSource<bool> tcs)
+        private void OnInitCompleted(TextToSpeech? tts, OperationResult status, TaskCompletionSource<bool> tcs)
         {
             lock (_lock)
             {
-                if (status == OperationResult.Success)
+                if (status == OperationResult.Success && tts != null)
                 {
+                    try
+                    {
+                        // Volume / tom estáveis (evita “só volume” estranho)
+                        tts.SetSpeechRate(1.0f);
+                        tts.SetPitch(1.0f);
+                    }
+                    catch { /* alguns aparelhos ignoram */ }
+
                     _tts = tts;
                     tcs.TrySetResult(true);
+                    return;
                 }
-                else
-                {
-                    _initFailed = true;
+
+                _initFailed = true;
+                SafeDispose(tts);
+                tcs.TrySetException(new NotSupportedException(
+                    "Falha ao inicializar o TTS nativo do Android (status " + status + ")."));
+            }
+        }
+
+        private static void SafeDispose(TextToSpeech? tts)
+        {
+            if (tts == null) return;
+            try { tts.Stop(); } catch { }
+            try
+            {
+                // Só Dispose se o peer Java existir (evita ArgumentNullException no JniValueManager)
+                if (tts.Handle != IntPtr.Zero)
                     tts.Dispose();
-                    tcs.TrySetException(new NotSupportedException(
-                        "Falha ao inicializar o TTS nativo do Android (status " + status + ")."));
-                }
+            }
+            catch (Exception)
+            {
+                // peer já invalidado pelo runtime
             }
         }
 
         public async Task SpeakAsync(string text, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(text))
-            {
                 return;
-            }
 
             await InitializeAsync(ct).ConfigureAwait(false);
 
@@ -99,19 +107,13 @@ namespace AURA.Mobile.Speech
             lock (_lock)
             {
                 if (_tts == null)
-                {
                     throw new NotSupportedException("TTS nativo do Android não inicializado.");
-                }
-
                 tts = _tts;
             }
 
-            // Escolhe português do Brasil se estiver disponível; senão o padrão.
             var lang = new Java.Util.Locale("pt", "BR");
             if (tts.IsLanguageAvailable(lang) < LanguageAvailableResult.Available)
-            {
                 lang = Java.Util.Locale.Default;
-            }
 
             tts.SetLanguage(lang);
 
@@ -134,109 +136,62 @@ namespace AURA.Mobile.Speech
 
                 await tcs.Task.ConfigureAwait(false);
             }
+        }
 
-            void Complete(string id, bool completed)
-            {
-                if (_pending.TryRemove(id, out var pending))
-                {
-                    pending.TrySetResult(completed);
-                }
-            }
+        private void Complete(string utteranceId, bool completed)
+        {
+            if (_pending.TryRemove(utteranceId, out var tcs))
+                tcs.TrySetResult(completed);
         }
 
         public Task StopAsync()
         {
             TextToSpeech? tts;
-            lock (_lock)
-            {
-                tts = _tts;
-            }
-
-            if (tts != null)
-            {
-                try
-                {
-                    tts.Stop();
-                }
-                catch (Exception)
-                {
-                    // ignora: motor parou com a Activity
-                }
-            }
-
+            lock (_lock) { tts = _tts; }
+            try { tts?.Stop(); } catch { }
             foreach (var tcs in _pending.Values)
-            {
                 tcs.TrySetResult(false);
-            }
-
             _pending.Clear();
             return Task.CompletedTask;
         }
 
-        /// <summary>Implementação de OnInitListener (callback de inicialização).</summary>
         private sealed class OnInitListener : Java.Lang.Object, TextToSpeech.IOnInitListener
         {
             private readonly Action<OperationResult> _onInit;
-
-            public OnInitListener(Action<OperationResult> onInit)
-            {
-                _onInit = onInit;
-            }
-
-            public void OnInit(OperationResult status)
-            {
-                _onInit(status);
-            }
+            public OnInitListener(Action<OperationResult> onInit) => _onInit = onInit;
+            public void OnInit(OperationResult status) => _onInit(status);
         }
 
-        /// <summary>Observa o término de cada utterance para o SpeakAsync poder aguardar.</summary>
         private sealed class UtteranceListener : UtteranceProgressListener
         {
             private readonly Action<string> _onDone;
             private readonly Action<string> _onError;
-
             public UtteranceListener(Action<string> onDone, Action<string> onError)
             {
                 _onDone = onDone;
                 _onError = onError;
             }
-
             public override void OnDone(string? utteranceId)
             {
-                if (utteranceId != null)
-                {
-                    _onDone(utteranceId);
-                }
+                if (utteranceId != null) _onDone(utteranceId);
             }
-
-#pragma warning disable CS0672 // OnError(string) is obsolete but still required by some API levels
+#pragma warning disable CS0672
             public override void OnError(string? utteranceId)
             {
-                if (utteranceId != null)
-                {
-                    _onError(utteranceId);
-                }
+                if (utteranceId != null) _onError(utteranceId);
             }
 #pragma warning restore CS0672
-
-            public override void OnStart(string? utteranceId)
-            {
-                // nada a fazer
-            }
+            public override void OnStart(string? utteranceId) { }
         }
 
         public void Dispose()
         {
-            if (_disposed)
-            {
-                return;
-            }
-
+            if (_disposed) return;
             _disposed = true;
-            StopAsync().GetAwaiter().GetResult();
+            try { StopAsync().GetAwaiter().GetResult(); } catch { }
             lock (_lock)
             {
-                _tts?.Dispose();
+                SafeDispose(_tts);
                 _tts = null;
             }
         }

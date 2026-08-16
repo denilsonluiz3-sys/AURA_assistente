@@ -5,13 +5,9 @@ using System.Threading.Tasks;
 namespace AURA.Mobile.Speech
 {
     /// <summary>
-    /// Motor de voz híbrido da AURA:
-    ///  1. TTS nativo do Android (fala texto arbitrário, offline, pt-br) — o
-    ///     motor padrão para as respostas da IA na conversação.
-    ///  2. Kokoro on-device (ONNX) como fallback quando o TTS nativo não
-    ///     existe ou falha no dispositivo.
-    ///
-    /// A UI chama apenas este serviço; a seleção do motor é transparente.
+    /// 1) TTS Android nativo (texto livre).
+    /// 2) Kokoro só como último recurso — frases fora do dicionário NÃO disparam
+    ///    excessão ruidosa: apenas logam e seguem em silêncio (evita “só volume”).
     /// </summary>
     public sealed class HybridSpeechService : ISpeechService
     {
@@ -26,51 +22,48 @@ namespace AURA.Mobile.Speech
             {
                 await _android.InitializeAsync(ct).ConfigureAwait(false);
             }
-            catch (NotSupportedException)
-            {
-                // TTS nativo indisponível: o Kokoro assume (carregado sob demanda).
-            }
-            catch (InvalidOperationException)
-            {
-                // Sem Activity (ex.: início do app): idem.
-            }
+            catch (NotSupportedException) { }
+            catch (InvalidOperationException) { }
         }
 
         public async Task SpeakAsync(string text, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(text))
-            {
                 return;
-            }
 
             try
             {
                 await _android.SpeakAsync(text, ct).ConfigureAwait(false);
                 return;
             }
-            catch (NotSupportedException)
+            catch (NotSupportedException) { }
+            catch (InvalidOperationException) { }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
             {
-                // Motor nativo indisponível ou recusou o texto: cai para o Kokoro.
-            }
-            catch (InvalidOperationException)
-            {
-                // Sem Activity ainda: idem.
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
+                AuraLog.Exception("HybridSpeechService.AndroidTts", ex);
             }
 
-            // Fallback: Kokoro on-device. Textos fora do dicionário do
-            // fonemizador lançam NotSupportedException — o chamador decide.
-            await _kokoro.InitializeAsync(ct).ConfigureAwait(false);
-            await _kokoro.SpeakAsync(text, ct).ConfigureAwait(false);
+            // Kokoro: só frases curtas conhecidas; senão silêncio (não estoura volume)
+            try
+            {
+                await _kokoro.InitializeAsync(ct).ConfigureAwait(false);
+                await _kokoro.SpeakAsync(text, ct).ConfigureAwait(false);
+            }
+            catch (NotSupportedException)
+            {
+                AuraLog.Info("TTS: texto fora do alcance do motor atual, fala pulada.");
+            }
+            catch (Exception ex)
+            {
+                AuraLog.Exception("HybridSpeechService.Kokoro", ex);
+            }
         }
 
         public Task StopAsync()
         {
-            _android.StopAsync();
-            _kokoro.StopAsync();
+            try { _android.StopAsync(); } catch { }
+            try { _kokoro.StopAsync(); } catch { }
             return Task.CompletedTask;
         }
     }

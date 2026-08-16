@@ -12,103 +12,62 @@ using Color = Android.Graphics.Color;
 namespace AURA.Mobile.Platforms.Android
 {
     /// <summary>
-    /// Botão flutuante de voz (FAB) anexado ao decor view da Activity, visível
-    /// em TODAS as abas do app. Um toque fala a última resposta da IA (ou a
-    /// saudação de assistente); outro toque para a fala.
-    ///
-    /// Implementado em Android nativo porque o MAUI não expõe overlay global
-    /// sobre o TabbedPage sem reestruturar o layout.
+    /// FAB de voz. Fica no canto SUPERIOR direito para não cobrir
+    /// o botão Enviar do Chat nem a bottom bar.
     /// </summary>
     public static class VoiceFloatingButton
     {
         private static Button? _fab;
         private static bool _attached;
-        private static float _density = 1f;
 
-        /// <summary>
-        /// Cria o FAB sobre o conteúdo da Activity, no canto inferior direito,
-        /// acima da barra de abas. Chamado depois do OnCreate da Activity.
-        /// </summary>
         public static void Attach(Activity activity)
         {
             if (_attached)
-            {
                 return;
-            }
-
             _attached = true;
 
             if (activity?.Window == null || activity.Window.DecorView is not ViewGroup decor)
-            {
                 return;
-            }
 
-            _density = activity.Resources?.DisplayMetrics?.Density ?? 1f;
+            float density = activity.Resources?.DisplayMetrics?.Density ?? 1f;
+            int Dp(int v) => (int)(v * density + 0.5f);
 
-            // FAB circular com o padrão visual da AURA (accent #4f8aff).
             var fab = new Button(activity)
             {
                 Text = "🔊",
-                TextSize = 20
+                TextSize = 18,
             };
             fab.SetAllCaps(false);
             fab.SetBackgroundDrawable(CreateCircle(Color.ParseColor("#4f8aff"), Color.White));
             fab.SetTextColor(Color.White);
             fab.Gravity = GravityFlags.Center;
+            fab.Elevation = Dp(6);
 
-            int size = Dp(56);
-            int marginEnd = Dp(18);
-            int marginBottom = Dp(76); // acima da barra de abas
-
+            int size = Dp(48);
+            // TOPO direito — longe do Editor/Enviar e da tab bar
             var lp = new FrameLayout.LayoutParams(size, size)
             {
-                Gravity = GravityFlags.Bottom | GravityFlags.End,
-                RightMargin = marginEnd,
-                BottomMargin = marginBottom
+                Gravity = GravityFlags.Top | GravityFlags.End,
+                RightMargin = Dp(14),
+                TopMargin = Dp(52), // abaixo da status/action bar
             };
             fab.LayoutParameters = lp;
-
             fab.Click += OnFabClicked;
             decor.AddView(fab);
             _fab = fab;
 
-            AuraLog.Info("VoiceFloatingButton.Attach OK");
-        }
-
-        /// <summary>Remove o FAB da tela (OnDestroy da Activity).</summary>
-        public static void Detach()
-        {
-            if (_fab?.Parent is ViewGroup parent)
-            {
-                _fab.Click -= OnFabClicked;
-                parent.RemoveView(_fab);
-            }
-
-            _fab = null;
-            _attached = false;
+            AuraLog.Info("VoiceFloatingButton.Attach OK (top-end)");
         }
 
         private static async void OnFabClicked(object? sender, EventArgs e)
         {
             try
             {
-                var services = Microsoft.Maui.IPlatformApplication.Current?.Services;
+                var services = IPlatformApplication.Current?.Services;
                 var voice = services?.GetService<VoiceAssistantService>();
                 if (voice == null)
-                {
                     return;
-                }
-
-                await voice.ToggleAsync();
-
-                // Feedback visual: mostra "■" enquanto fala, "🔊" quando parado.
-                if (sender is Button fab)
-                {
-                    fab.Post(() =>
-                    {
-                        fab.Text = voice.IsSpeaking ? "■" : "🔊";
-                    });
-                }
+                await voice.ToggleAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -116,18 +75,13 @@ namespace AURA.Mobile.Platforms.Android
             }
         }
 
-        private static GradientDrawable CreateCircle(Color stroke, Color fill)
+        private static GradientDrawable CreateCircle(Color fill, Color border)
         {
             var d = new GradientDrawable();
             d.SetShape(ShapeType.Oval);
-            d.SetColor(fill.ToArgb());
-            d.SetStroke(Dp(1), stroke);
+            d.SetColor(fill);
+            d.SetStroke(3, border);
             return d;
-        }
-
-        private static int Dp(float value)
-        {
-            return (int)(value * _density);
         }
     }
 }
