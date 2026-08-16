@@ -70,7 +70,7 @@ public partial class ChatPage : ContentPage
                 string.IsNullOrWhiteSpace(_client.Options.ApiKey))
             {
                 AnswerLabel.Text = "Buscando na web (Bing)...";
-                answer = await WebSearchAnswer.SearchAsync(question);
+                answer = await WebSearchAnswer.SearchWithRefinementAsync(question);
             }
             else
             {

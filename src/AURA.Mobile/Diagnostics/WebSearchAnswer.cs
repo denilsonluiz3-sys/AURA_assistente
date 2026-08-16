@@ -29,6 +29,75 @@ public static class WebSearchAnswer
         Http.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Language", "pt-BR,pt;q=0.9,en;q=0.8");
     }
 
+    // Limite estrito de tentativas para não gastar requisições/tempo à toa
+    // (padrão ReAct/Plan-Execute-Verify: pesquisa, verifica, refina, tenta de novo).
+    private const int MaxRefinementAttempts = 2;
+
+    /// <summary>
+    /// Igual a <see cref="SearchAsync"/>, mas se o primeiro resultado parecer
+    /// insuficiente, refina a consulta automaticamente (ex.: pergunta de
+    /// definição sem resposta -> tenta de novo como "como fazer") antes de
+    /// devolver o melhor resultado obtido.
+    /// </summary>
+    public static async Task<string> SearchWithRefinementAsync(string query, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return "Digite uma pergunta para buscar.";
+
+        string originalQuery = query.Trim();
+        string currentQuery = originalQuery;
+        string lastAnswer = "";
+
+        for (int attempt = 1; attempt <= MaxRefinementAttempts; attempt++)
+        {
+            lastAnswer = await SearchAsync(currentQuery, ct).ConfigureAwait(false);
+
+            if (LooksSufficient(lastAnswer))
+                return lastAnswer;
+
+            if (attempt < MaxRefinementAttempts)
+                currentQuery = RefineQuery(originalQuery);
+        }
+
+        return lastAnswer;
+    }
+
+    /// <summary>
+    /// Verificação heurística (sem custo de mais uma chamada de rede) se o
+    /// resultado parece responder à pergunta.
+    /// [ASSUMPTION: 40 caracteres como piso de "resposta com conteúdo";
+    /// ajustar se estiver descartando respostas curtas válidas.]
+    /// </summary>
+    private static bool LooksSufficient(string answer)
+    {
+        if (string.IsNullOrWhiteSpace(answer))
+            return false;
+
+        string a = answer.Trim();
+
+        if (a.StartsWith("Não foi possível", StringComparison.OrdinalIgnoreCase) ||
+            a.StartsWith("Erro na busca web", StringComparison.OrdinalIgnoreCase) ||
+            a.StartsWith("Digite uma pergunta", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return a.Length >= 40;
+    }
+
+    /// <summary>
+    /// Gera uma segunda tentativa mais objetiva/prática quando a pergunta
+    /// original (ex.: uma definição) não trouxe resultado útil.
+    /// </summary>
+    private static string RefineQuery(string originalQuery)
+    {
+        bool looksLikeHowTo =
+            originalQuery.Contains("como", StringComparison.OrdinalIgnoreCase) ||
+            originalQuery.Contains("tutorial", StringComparison.OrdinalIgnoreCase);
+
+        return looksLikeHowTo
+            ? originalQuery + " tutorial passo a passo"
+            : "como " + originalQuery;
+    }
+
     public static async Task<string> SearchAsync(string query, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(query))

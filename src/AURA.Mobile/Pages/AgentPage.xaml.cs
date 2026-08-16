@@ -163,7 +163,7 @@ public partial class AgentPage : ContentPage
                 string.IsNullOrWhiteSpace(_client.Options.ApiKey))
             {
                 AppendBubble("Buscando na web (Bing)...", user: false, isTool: true);
-                answer = await WebSearchAnswer.SearchAsync(text);
+                answer = await WebSearchAnswer.SearchWithRefinementAsync(text);
             }
             else
             {
