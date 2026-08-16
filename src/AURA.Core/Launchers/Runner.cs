@@ -22,7 +22,8 @@ namespace AURA.Core.Launchers
                 new JarLauncher(),
                 new DllLauncher(),
                 new NodeLauncher(),
-                new GoLauncher()
+                new GoLauncher(),
+                new ShellLauncher()
             })
         {
         }

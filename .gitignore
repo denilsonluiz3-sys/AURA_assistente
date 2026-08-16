@@ -65,3 +65,7 @@ aura-mobile-apk-debug/*.apk
 aura-mobile-apk-debug/*.aab
 aura-mobile-apk-debug/*.apk
 aura-mobile-apk-debug/*.aab
+
+# Python cache
+__pycache__/
+*.pyc

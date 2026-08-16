@@ -105,6 +105,14 @@ public static class MauiProgram
         });
         builder.Services.AddSingleton<Runner>();
 
+        // Fase 3: memória procedural + orquestrador headless (sem LLM pago)
+        builder.Services.AddSingleton<SolutionStore>();
+        builder.Services.AddSingleton(sp => new AuraOrchestrator(
+            sp.GetRequiredService<ILogger>(),
+            sp.GetRequiredService<SolutionStore>(),
+            sp.GetRequiredService<Runner>(),
+            sp.GetRequiredService<SimulationRuntime>()));
+
         // Páginas
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<HomePage>();

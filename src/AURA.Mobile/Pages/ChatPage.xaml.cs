@@ -1,3 +1,4 @@
+using AURA.Agents;
 using AURA.AI;
 using AURA.Mobile.Diagnostics;
 using AURA.Mobile.Speech;
@@ -8,14 +9,16 @@ public partial class ChatPage : ContentPage
 {
     private readonly OpenRouterClient _client;
     private readonly AURA.Memory.MemoryStore _memory;
+    private readonly AuraOrchestrator _orchestrator;
     private readonly VoiceAssistantService? _voice;
 
     public ChatPage(OpenRouterClient client, AURA.Memory.MemoryStore memory,
-        VoiceAssistantService? voice = null)
+        AuraOrchestrator orchestrator, VoiceAssistantService? voice = null)
     {
         InitializeComponent();
         _client = client;
         _memory = memory;
+        _orchestrator = orchestrator;
         _voice = voice;
     }
 
@@ -69,8 +72,8 @@ public partial class ChatPage : ContentPage
             if (string.IsNullOrWhiteSpace(RuntimeConfig.ApiKey) &&
                 string.IsNullOrWhiteSpace(_client.Options.ApiKey))
             {
-                AnswerLabel.Text = "Buscando na web (Bing)...";
-                answer = await WebSearchAnswer.SearchWithRefinementAsync(question);
+                AnswerLabel.Text = "Orquestrando (memória+busca+execução)...";
+                answer = await _orchestrator.ExecuteAsync(question);
             }
             else
             {
