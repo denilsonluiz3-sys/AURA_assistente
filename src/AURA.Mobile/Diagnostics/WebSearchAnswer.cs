@@ -5,8 +5,7 @@ using System.Text.RegularExpressions;
 namespace AURA.Mobile.Diagnostics;
 
 /// <summary>
-/// Resposta sem API key via busca web (Bing), alinhada ao uso que o usuário
-/// já fazia no app: pergunta no chat → trechos de resultado.
+/// Resposta sem API key via busca web (Bing).
 /// </summary>
 public static class WebSearchAnswer
 {
@@ -14,6 +13,13 @@ public static class WebSearchAnswer
     {
         Timeout = TimeSpan.FromSeconds(20),
     };
+
+    // Em string verbatim (@"..."), aspas literais usam "" — nunca \"
+    private const string BingAlgoPattern =
+        @"<li\s+class=""b_algo""[\s\S]*?<h2[^>]*>\s*<a[^>]*href=""([^""]+)""[^>]*>([\s\S]*?)</a>[\s\S]*?(?:<p>|class=""b_caption""[\s\S]*?<p[^>]*>)([\s\S]*?)</p>";
+
+    private const string BingTitlePattern =
+        @"<h2[^>]*>\s*<a[^>]*href=""([^""]+)""[^>]*>([\s\S]*?)</a>";
 
     static WebSearchAnswer()
     {
@@ -51,9 +57,7 @@ public static class WebSearchAnswer
 
     private static async Task<string?> TryBingAsync(string query, CancellationToken ct)
     {
-        string url = string.Format(
-            "https://www.bing.com/search?q={0}",
-            Uri.EscapeDataString(query));
+        string url = "https://www.bing.com/search?q=" + Uri.EscapeDataString(query);
 
         using var req = new HttpRequestMessage(HttpMethod.Get, url);
         using HttpResponseMessage resp = await Http.SendAsync(req, ct).ConfigureAwait(false);
@@ -66,10 +70,7 @@ public static class WebSearchAnswer
 
         var results = new List<(string Title, string Snippet, string Link)>();
 
-        foreach (Match m in Regex.Matches(
-                     html,
-                     @"<li\s+class=\"b_algo\"[\s\S]*?<h2[^>]*>\s*<a[^>]*href=\"([^\"]+)\"[^>]*>([\s\S]*?)</a>[\s\S]*?(?:<p>|class=\"b_caption\"[\s\S]*?<p[^>]*>)([\s\S]*?)</p>",
-                     RegexOptions.IgnoreCase))
+        foreach (Match m in Regex.Matches(html, BingAlgoPattern, RegexOptions.IgnoreCase))
         {
             string link = WebUtility.HtmlDecode(m.Groups[1].Value.Trim());
             string title = StripTags(m.Groups[2].Value);
@@ -83,14 +84,12 @@ public static class WebSearchAnswer
 
         if (results.Count == 0)
         {
-            foreach (Match m in Regex.Matches(
-                         html,
-                         @"<h2[^>]*>\s*<a[^>]*href=\"([^\"]+)\"[^>]*>([\s\S]*?)</a>",
-                         RegexOptions.IgnoreCase))
+            foreach (Match m in Regex.Matches(html, BingTitlePattern, RegexOptions.IgnoreCase))
             {
                 string link = WebUtility.HtmlDecode(m.Groups[1].Value.Trim());
                 string title = StripTags(m.Groups[2].Value);
-                if (string.IsNullOrWhiteSpace(title) || link.Contains("javascript:", StringComparison.OrdinalIgnoreCase))
+                if (string.IsNullOrWhiteSpace(title) ||
+                    link.Contains("javascript:", StringComparison.OrdinalIgnoreCase))
                     continue;
                 results.Add((title, "", link));
                 if (results.Count >= 5)
@@ -186,7 +185,7 @@ public static class WebSearchAnswer
             return "";
         string t = Regex.Replace(html, "<[^>]+>", " ");
         t = WebUtility.HtmlDecode(t);
-        t = Regex.Replace(t, "\\s+", " ").Trim();
+        t = Regex.Replace(t, @"\s+", " ").Trim();
         return t;
     }
 }
