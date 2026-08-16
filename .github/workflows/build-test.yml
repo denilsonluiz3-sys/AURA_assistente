@@ -78,7 +78,7 @@ jobs:
         run: dotnet restore AURA.sln
 
       - name: Restore MAUI Android packages
-        run: dotnet restore src/AURA.Mobile/AURA.Mobile.csproj -f net10.0-android
+        run: dotnet restore src/AURA.Mobile/AURA.Mobile.csproj
 
       - name: Build (Release)
         run: dotnet build AURA.sln -c Release --no-restore
