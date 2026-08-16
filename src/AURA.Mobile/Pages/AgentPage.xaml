@@ -57,51 +57,54 @@
                                  Padding="14,12" />
         </ScrollView>
 
-        <!-- ── Barra de entrada ───────────────────────────────── -->
+        <!-- ── Barra de entrada + config IA ───────────────────── -->
         <Border Grid.Row="2"
                 BackgroundColor="{DynamicResource AuraSurface}"
                 Stroke="{DynamicResource AuraBorder}"
                 StrokeThickness="1"
                 Padding="12,10"
                 StrokeShape="RoundRectangle 0,0,0,0">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                <Border BackgroundColor="{DynamicResource AuraSurface2}"
-                        Stroke="{DynamicResource AuraBorder}"
-                        StrokeThickness="1"
-                        Padding="12,6"
-                        StrokeShape="RoundRectangle 12,12,12,12">
-                    <Editor x:Name="CommandEditor"
-                            MinimumHeightRequest="40"
-                            MaximumHeightRequest="120"
-                            Placeholder="Instrua o agente…"
-                            AutoSize="TextChanges"
-                            BackgroundColor="Transparent" />
-                </Border>
+            <VerticalStackLayout Spacing="8">
+                <ContentView x:Name="ConfigHost" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Border BackgroundColor="{DynamicResource AuraSurface2}"
+                            Stroke="{DynamicResource AuraBorder}"
+                            StrokeThickness="1"
+                            Padding="12,6"
+                            StrokeShape="RoundRectangle 12,12,12,12">
+                        <Editor x:Name="CommandEditor"
+                                MinimumHeightRequest="40"
+                                MaximumHeightRequest="120"
+                                Placeholder="Instrua o agente…"
+                                AutoSize="TextChanges"
+                                BackgroundColor="Transparent" />
+                    </Border>
 
-                <Grid Grid.Column="1"
-                      WidthRequest="44"
-                      HeightRequest="44"
-                      VerticalOptions="End">
-                    <Button x:Name="RunButton"
-                            Text="▶"
-                            Clicked="OnRunClicked"
-                            BackgroundColor="{DynamicResource AuraAccent}"
-                            TextColor="White"
-                            CornerRadius="22"
-                            FontSize="16"
-                            Padding="0"
-                            WidthRequest="44"
-                            HeightRequest="44" />
-                    <ActivityIndicator x:Name="BusyIndicator"
-                                       IsRunning="False"
-                                       IsVisible="False"
-                                       Color="White"
-                                       WidthRequest="22"
-                                       HeightRequest="22"
-                                       HorizontalOptions="Center"
-                                       VerticalOptions="Center" />
+                    <Grid Grid.Column="1"
+                          WidthRequest="44"
+                          HeightRequest="44"
+                          VerticalOptions="End">
+                        <Button x:Name="RunButton"
+                                Text="▶"
+                                Clicked="OnRunClicked"
+                                BackgroundColor="{DynamicResource AuraAccent}"
+                                TextColor="White"
+                                CornerRadius="22"
+                                FontSize="16"
+                                Padding="0"
+                                WidthRequest="44"
+                                HeightRequest="44" />
+                        <ActivityIndicator x:Name="BusyIndicator"
+                                           IsRunning="False"
+                                           IsVisible="False"
+                                           Color="White"
+                                           WidthRequest="22"
+                                           HeightRequest="22"
+                                           HorizontalOptions="Center"
+                                           VerticalOptions="Center" />
+                    </Grid>
                 </Grid>
-            </Grid>
+            </VerticalStackLayout>
         </Border>
 
     </Grid>
