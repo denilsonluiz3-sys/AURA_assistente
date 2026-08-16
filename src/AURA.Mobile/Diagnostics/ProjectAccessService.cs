@@ -15,16 +15,38 @@ namespace AURA.Mobile.Diagnostics;
 public static class ProjectAccessService
 {
     private const string UriPreference = "agent_project_tree_uri";
+    private const string DirectRootPreference = "agent_project_direct_root";
+    private const string NamePreference = "agent_project_name";
     private const string ProjectFolder = "project";
 
+    /// <summary>
+    /// Modo direto: com "Todos os arquivos" (MANAGE_EXTERNAL_STORAGE) concedido,
+    /// a AURA opera na própria pasta escolhida (caminho real), sem cópia privada
+    /// nem sincronização. Sem isso, cai no modo cópia + sync.
+    /// </summary>
+    public static bool IsDirect =>
+        !string.IsNullOrWhiteSpace(Preferences.Default.Get(DirectRootPreference, string.Empty));
+
+    public static string? DirectRoot
+    {
+        get
+        {
+            string raw = Preferences.Default.Get(DirectRootPreference, string.Empty);
+            return raw.Length == 0 ? null : raw;
+        }
+    }
+
     public static string ProjectWorkspaceRoot =>
-        Path.Combine(AgentWorkspace.WorkspaceRoot, ProjectFolder);
+        IsDirect && DirectRoot is string direct
+            ? direct
+            : Path.Combine(AgentWorkspace.WorkspaceRoot, ProjectFolder);
 
     public static bool IsLinked =>
         !string.IsNullOrWhiteSpace(Preferences.Default.Get(UriPreference, string.Empty));
 
     public static string StatusText => IsLinked
-        ? "Projeto vinculado: " + Preferences.Default.Get("agent_project_name", "projeto")
+        ? "Projeto vinculado: " + Preferences.Default.Get(NamePreference, "projeto")
+            + (IsDirect ? " (acesso direto)" : " (cópia local)")
         : "Nenhum projeto vinculado";
 
 #if ANDROID
@@ -41,10 +63,22 @@ public static class ProjectAccessService
         var flags = ActivityFlags.GrantReadUriPermission | ActivityFlags.GrantWriteUriPermission;
         activity.ContentResolver.TakePersistableUriPermission(uri, flags);
 
-        Preferences.Default.Set(UriPreference, uri.ToString());
-        Preferences.Default.Set("agent_project_name",
-            GetDisplayName(activity.ContentResolver, uri) ?? "projeto");
+        string name = GetDisplayName(activity.ContentResolver, uri) ?? "projeto";
+        Preferences.Default.Set(NamePreference, name);
 
+        // Modo direto: caminho real resolvível e "Todos os arquivos" concedido.
+        if (TryDeriveRealPath(uri) is string realRoot &&
+            StoragePermissionHelper.IsAllFilesAccessGranted() &&
+            Directory.Exists(realRoot))
+        {
+            Preferences.Default.Set(UriPreference, uri.ToString());
+            Preferences.Default.Set(DirectRootPreference, realRoot);
+            return true;
+        }
+
+        // Modo cópia: importa para a pasta privada e sincroniza ao final.
+        Preferences.Default.Remove(DirectRootPreference);
+        Preferences.Default.Set(UriPreference, uri.ToString());
         await ImportTreeAsync(activity.ContentResolver, uri, ProjectWorkspaceRoot, ct);
         return true;
     }
@@ -54,22 +88,30 @@ public static class ProjectAccessService
         string raw = Preferences.Default.Get(UriPreference, string.Empty);
         if (string.IsNullOrWhiteSpace(raw))
             return 0;
+        if (IsDirect)
+            return 0; // acesso direto: a AURA já escreve na pasta real.
 
         var activity = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity as AURA.Mobile.MainActivity;
         if (activity == null)
             throw new InvalidOperationException("Activity Android da AURA não está disponível.");
 
         Android.Net.Uri treeUri = Android.Net.Uri.Parse(raw)!;
+        string rootId = DocumentsContract.GetTreeDocumentId(treeUri)!;
+        Android.Net.Uri rootUri = DocumentsContract.BuildDocumentUriUsingTree(treeUri, rootId)!;
         return await SyncDirectoryAsync(activity.ContentResolver, treeUri,
-            ProjectWorkspaceRoot, treeUri, ct);
+            ProjectWorkspaceRoot, rootUri, ct);
     }
 
     public static void Unlink()
     {
+        bool wasDirect = IsDirect;
+        string copyRoot = Path.Combine(AgentWorkspace.WorkspaceRoot, ProjectFolder);
         Preferences.Default.Remove(UriPreference);
-        Preferences.Default.Remove("agent_project_name");
-        if (Directory.Exists(ProjectWorkspaceRoot))
-            Directory.Delete(ProjectWorkspaceRoot, true);
+        Preferences.Default.Remove(DirectRootPreference);
+        Preferences.Default.Remove(NamePreference);
+        // Só remove a cópia local; no modo direto a pasta real pertence ao usuário.
+        if (!wasDirect && Directory.Exists(copyRoot))
+            Directory.Delete(copyRoot, true);
     }
 
     private static async Task ImportTreeAsync(ContentResolver resolver, Android.Net.Uri treeUri,
@@ -202,6 +244,42 @@ public static class ProjectAccessService
         if (cursor != null && cursor.MoveToFirst())
             return cursor.GetString(0);
         return null;
+    }
+
+    /// <summary>
+    /// Converte uma tree URI do external storage em caminho real
+    /// (ex.: "primary:Download/aura_runtime" → /storage/emulated/0/Download/aura_runtime).
+    /// Devolve null para SD cards e provedores não primários.
+    /// </summary>
+    private static string? TryDeriveRealPath(Android.Net.Uri uri)
+    {
+        if (uri.Scheme == null ||
+            !string.Equals(uri.Scheme, "content", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        string treeId;
+        try
+        {
+            treeId = DocumentsContract.GetTreeDocumentId(uri);
+        }
+        catch
+        {
+            return null;
+        }
+
+        const string primary = "primary:";
+        if (!treeId.StartsWith(primary, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        string relative = treeId.Substring(primary.Length).Trim('/');
+        string root = Android.OS.Environment.ExternalStorageDirectory?.AbsolutePath
+                      ?? "/storage/emulated/0";
+        string real = Path.Combine(root, relative);
+        return real.Length > root.Length ? real : null;
     }
 #endif
 

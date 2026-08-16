@@ -69,14 +69,15 @@ public partial class AgentPage : ContentPage
 
         string systemPrompt =
             "Você é o agente de arquivos da AURA, um assistente que trabalha " +
-            "dentro do workspace local da AURA. Quando houver um projeto vinculado, " +
-            "esse workspace é uma cópia de trabalho sincronizada com a pasta escolhida. " +
+            "no diretório de trabalho da AURA. Quando houver um projeto vinculado, " +
+            "o diretório é a própria pasta escolhida (acesso direto) ou uma cópia " +
+            "de trabalho sincronizada. " +
             "Você PODE listar, ler, criar, editar e sobrescrever arquivos do " +
-            "workspace e executar comandos shell (sh -c) nesse diretório. " +
+            "diretório de trabalho e executar comandos shell (sh -c) nesse local. " +
             "Prefira ferramentas a respostas vagas: quando o usuário pedir uma " +
             "tarefa, use as ferramentas e confirme o que foi feito. " +
             "Responda em português, de forma curta e objetiva. " +
-            "Caminhos são sempre relativos ao workspace.";
+            "Caminhos são sempre relativos ao diretório de trabalho.";
 
         _session = new AgentSession(_client, tools, systemPrompt, memory: _memory);
         _session.Step += OnAgentStep;
@@ -91,6 +92,21 @@ public partial class AgentPage : ContentPage
         ProjectButton.IsEnabled = false;
         try
         {
+            if (!StoragePermissionHelper.IsAllFilesAccessGranted())
+            {
+                bool openSettings = await DisplayAlert(
+                    "Acesso direto ao projeto",
+                    "Conceder \"Todos os arquivos\" permite a AURA trabalhar DIRETO " +
+                    "na pasta escolhida (sem cópia local, sem sincronização). " +
+                    "Sem isso, a AURA usa uma cópia privada e sincroniza ao final.",
+                    "Conceder acesso", "Usar cópia local");
+                if (openSettings)
+                {
+                    StoragePermissionHelper.RequestAllFilesAccess();
+                    return;
+                }
+            }
+
             bool linked = await ProjectAccessService.LinkAsync();
             if (!linked)
                 return;
@@ -102,8 +118,12 @@ public partial class AgentPage : ContentPage
 
             EnsureSession();
             AppendBubble(
-                "Projeto vinculado. A AURA trabalha na cópia local e sincroniza " +
-                "as alterações de volta ao projeto após cada tarefa.", user: false);
+                ProjectAccessService.IsDirect
+                    ? "Projeto vinculado em acesso direto. A AURA lista, lê e edita " +
+                      "a pasta escolhida, sem cópia local."
+                    : "Projeto vinculado. A AURA trabalha na cópia local e sincroniza " +
+                      "as alterações de volta ao projeto após cada tarefa.",
+                user: false);
         }
         catch (OperationCanceledException)
         {
@@ -161,7 +181,7 @@ public partial class AgentPage : ContentPage
             _voice?.SetLastUtterance(answer);
             await SpeakAsync(answer);
 
-            if (ProjectAccessService.IsLinked)
+            if (ProjectAccessService.IsLinked && !ProjectAccessService.IsDirect)
             {
                 int synced = await ProjectAccessService.SyncBackAsync();
                 AppendBubble($"↥ Projeto sincronizado: {synced} arquivo(s) atualizado(s).",
