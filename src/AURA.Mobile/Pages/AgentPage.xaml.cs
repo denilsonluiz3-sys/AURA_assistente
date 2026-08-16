@@ -128,6 +128,14 @@ public partial class AgentPage : ContentPage
             return;
         }
 
+        string? readyError = RuntimeConfig.EnsureReadyForRequest(_client);
+        if (readyError != null)
+        {
+            AppendBubble(readyError, user: false, isError: true);
+            return;
+        }
+
+        _session = null;
         EnsureSession();
         AppendBubble(text, user: true);
         CommandEditor.Text = string.Empty;
