@@ -40,7 +40,7 @@
                     WidthRequest="44"
                     HeightRequest="44"
                     Padding="0"
-                    VerticalOptions="Center"
+                    VerticalOptions="Start"
                     Clicked="OnThemeToggleClicked" />
         </Grid>
 

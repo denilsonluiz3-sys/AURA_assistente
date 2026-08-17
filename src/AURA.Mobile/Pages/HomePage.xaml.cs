@@ -69,7 +69,7 @@ public partial class HomePage : ContentPage
         _ = PlayButtonFeedbackAsync(BtnTheme);
     }
 
-    private void ApplyVideoBackground()
+    private async void ApplyVideoBackground()
     {
         if (BgVideo is null) return;
 
@@ -84,14 +84,20 @@ public partial class HomePage : ContentPage
         {
             // Assets em Resources/Raw/ (MauiAsset LogicalName = filename)
             string resource = App.IsSolar ? "solar_bg.mp4" : "lunar_bg.mp4";
+
+            // Não destruir o MediaElement: desfadeia, para, troca a Source e toca (evita tela preta).
+            await BgVideo.FadeTo(0, 150, Easing.Linear);
+            BgVideo.Stop();
             BgVideo.Source = MediaSource.FromResource(resource);
             BgVideo.IsVisible = true;
+            await BgVideo.FadeTo(1, 300, Easing.Linear);
             BgVideo.Play();
         }
         catch (Exception ex)
         {
             AuraLog.Exception("HomePage.ApplyVideoBackground", ex);
-            BgVideo.IsVisible = false;
+            BgVideo.IsVisible = true;
+            BgVideo.Play();
         }
     }
 
