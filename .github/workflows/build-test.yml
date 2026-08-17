@@ -34,11 +34,12 @@ jobs:
             nuget-${{ runner.os }}-
 
       - name: Ban Anthropic (guard)
+        shell: bash
         run: |
-          if rg -i -n "anthropic|claude" --hidden \
-            -g '!.git/**' -g '!**/bin/**' -g '!**/obj/**' \
-            -g '!.github/workflows/build-test.yml' \
-            -g '!src/AURA.AI/OpenRouterClient.cs' . ; then
+          set -euo pipefail
+          if grep -RniE --exclude-dir=.git --exclude-dir=bin --exclude-dir=obj \
+            --exclude='build-test.yml' --exclude='OpenRouterClient.cs' \
+            'anthropic|claude' .; then
             echo "::error::Provedor/modelo banido encontrado no repo."
             exit 1
           fi
