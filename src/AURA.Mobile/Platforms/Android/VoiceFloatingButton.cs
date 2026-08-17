@@ -59,6 +59,18 @@ namespace AURA.Mobile.Platforms.Android
             AuraLog.Info("VoiceFloatingButton.Attach OK (top-end)");
         }
 
+        public static void Detach()
+        {
+            if (_fab?.Parent is ViewGroup parent)
+            {
+                _fab.Click -= OnFabClicked;
+                parent.RemoveView(_fab);
+            }
+
+            _fab = null;
+            _attached = false;
+        }
+
         private static async void OnFabClicked(object? sender, EventArgs e)
         {
             try
