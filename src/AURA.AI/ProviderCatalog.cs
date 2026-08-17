@@ -38,7 +38,6 @@ namespace AURA.AI
         public string AuthHeaderName { get; set; } = "Authorization";
         public string AuthScheme { get; set; } = "Bearer ";
         public AiApiFormat ApiFormat { get; set; } = AiApiFormat.OpenAICompletions;
-        public string AnthropicVersion { get; set; } = string.Empty;
         public List<string> KeyPrefixesList { get; set; } = new();
 
         IReadOnlyList<string> IAiProvider.KeyPrefixes => KeyPrefixesList;

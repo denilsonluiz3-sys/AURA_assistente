@@ -573,7 +573,7 @@ info "Criando AURA AI Provider..."
 cat > "$AGENTS_DIR/aura-ai-provider.agent.md" <<'EOF'
 
 name: AURA AI Provider
-description: Especialista em ILLMProvider, ProviderRegistry, OpenAI, OpenRouter, Anthropic, Gemini, Ollama, tool calling e respostas normalizadas.
+description: Especialista em ILLMProvider, ProviderRegistry, OpenAI, OpenRouter, Gemini, Ollama, tool calling e respostas normalizadas.
 tools:
 
 - read
@@ -591,7 +591,6 @@ Especialista em:
 - ProviderRegistry
 - OpenAI
 - OpenRouter
-- Anthropic
 - Gemini
 - Ollama
 - API keys

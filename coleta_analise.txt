@@ -576,7 +576,6 @@ eecee1a feat: status real dos módulos (implementado vs planejado) + documentaç
 ?? .aura/backup-agent-solution-20260808-162923/
 ?? .aura/backup-agent-solution-v2-20260808-163705/
 ?? .aura/backup-solutions-20260808-161907/
-?? CLAUDE.md
 ?? coleta_analise.txt
 ?? coleta_para_analise.sh
 ?? scripts/auditoria-completa.sh

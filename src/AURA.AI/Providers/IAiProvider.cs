@@ -31,9 +31,6 @@ namespace AURA.AI.Providers
         /// <summary>Formato de API usado pelo provedor.</summary>
         AiApiFormat ApiFormat { get; }
 
-        /// <summary>Versão do header Anthropic quando o formato é AnthropicMessages.</summary>
-        string AnthropicVersion { get; }
-
         /// <summary>
         /// Prefixos confiáveis da chave. Uma chave que começa com um destes
         /// prefixos aponta com alta confiança para este provedor.

@@ -38,9 +38,9 @@ public class ApiKeyProviderResolverTests
 
         using var http = new HttpClient(handler);
         var resolver = new ApiKeyProviderResolver();
-        var credential = new ProviderCredential("sk-ant-test-key", allowProbe: true)
+        var credential = new ProviderCredential("sk-or-test-key", allowProbe: true)
         {
-            PreferredProviderName = "Anthropic"
+            PreferredProviderName = "OpenRouter"
         };
 
         ProviderHealthResult result = resolver.ValidateAsync(credential, http).GetAwaiter().GetResult();
@@ -57,16 +57,6 @@ public class ApiKeyProviderResolverTests
         Assert.True(r.IsConclusive);
         Assert.Equal("OpenRouter", r.Provider!.Name);
         Assert.Equal(ProviderDetectionSource.KeyFormat, r.Source);
-    }
-
-    [Fact]
-    public void Detect_AnthropicPrefix_ResolvesAnthropic()
-    {
-        var resolver = new ApiKeyProviderResolver();
-        ProviderDetectionResult r = resolver.Detect(new ProviderCredential("sk-ant-test123"));
-
-        Assert.True(r.IsConclusive);
-        Assert.Equal("Anthropic", r.Provider!.Name);
     }
 
     [Fact]
@@ -175,8 +165,8 @@ public class ApiKeyProviderResolverTests
         ProviderHealthResult r = RunProbe(HttpStatusCode.Unauthorized, out bool sentXApiKey);
 
         Assert.Equal(ProviderHealthStatus.Unauthorized, r.Status);
-        Assert.True(sentXApiKey, "Chave Anthropic deveria ir no header x-api-key");
-        Assert.DoesNotContain("sk-ant-test-key", r.Message);
+        Assert.True(sentXApiKey, "Chave deveria ir no header de autenticação");
+        Assert.DoesNotContain("sk-or-test-key", r.Message);
     }
 
     [Fact]
@@ -201,9 +191,9 @@ public class ApiKeyProviderResolverTests
         var handler = new FakeHandler(_ => throw new HttpRequestException("boom"));
         using var http = new HttpClient(handler);
         var resolver = new ApiKeyProviderResolver();
-        var credential = new ProviderCredential("sk-ant-net-fail", allowProbe: true)
+        var credential = new ProviderCredential("sk-or-net-fail", allowProbe: true)
         {
-            PreferredProviderName = "Anthropic"
+            PreferredProviderName = "OpenRouter"
         };
 
         ProviderHealthResult r = resolver.ValidateAsync(credential, http).GetAwaiter().GetResult();
@@ -248,27 +238,6 @@ public class ApiKeyProviderResolverTests
         Assert.Equal("Bearer ", client.Options.AuthScheme);
         Assert.Equal(AiApiFormat.OpenAICompletions, client.Options.ApiFormat);
         Assert.False(string.IsNullOrWhiteSpace(client.Options.Model));
-    }
-
-    [Fact]
-    public void Resolve_Anthropic_AppliesXApiKeyAndFormat()
-    {
-        var handler = new FakeHandler(_ =>
-            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"data\":[]}") });
-        using var http = new HttpClient(handler);
-        var resolver = new ApiKeyProviderResolver();
-        var credential = new ProviderCredential("sk-ant-apply-key", allowProbe: true);
-
-        ProviderDetectionResult result = resolver.ResolveAsync(credential, http).GetAwaiter().GetResult();
-        Assert.True(result.IsConclusive);
-
-        var client = new OpenRouterClient(new OpenRouterOptions { ApiKey = "sk-ant-apply-key" });
-        resolver.ApplyToClient(client, result);
-
-        Assert.Equal("https://api.anthropic.com/v1/messages", client.Options.BaseUrl);
-        Assert.Equal("x-api-key", client.Options.AuthHeaderName);
-        Assert.Equal(AiApiFormat.AnthropicMessages, client.Options.ApiFormat);
-        Assert.Contains("2023-06-01", client.Options.AnthropicVersion);
     }
 
     [Fact]

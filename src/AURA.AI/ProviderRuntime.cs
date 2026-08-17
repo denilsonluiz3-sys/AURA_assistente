@@ -105,7 +105,6 @@ namespace AURA.AI
                 AuthHeaderName = Provider.AuthHeaderName,
                 AuthScheme = Provider.AuthScheme,
                 ApiFormat = Provider.ApiFormat,
-                AnthropicVersion = Provider.AnthropicVersion
             };
         }
 

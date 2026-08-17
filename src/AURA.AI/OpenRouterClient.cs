@@ -32,7 +32,6 @@ namespace AURA.AI
         public string AuthHeaderName { get; set; } = "Authorization";
         public string AuthScheme { get; set; } = "Bearer ";
         public AiApiFormat ApiFormat { get; set; } = AiApiFormat.OpenAICompletions;
-        public string AnthropicVersion { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -41,6 +40,8 @@ namespace AURA.AI
     /// </summary>
     public sealed class OpenRouterClient
     {
+        private static readonly string[] BannedTokens = { "anthropic", "claude" };
+
         private readonly ILogger _logger;
 
         public OpenRouterOptions Options { get; }
@@ -49,6 +50,27 @@ namespace AURA.AI
         {
             Options = options ?? throw new ArgumentNullException(nameof(options));
             _logger = logger ?? new ConsoleLogger();
+            GuardAgainstBanned();
+        }
+
+        /// <summary>
+        /// Trava de segurança: recusa qualquer provider/modelo/URL com token
+        /// banido (ex.: anthropic/claude). Lançado no ctor para impedir uso.
+        /// </summary>
+        private void GuardAgainstBanned()
+        {
+            string hay =
+                (Options.Provider ?? string.Empty) + " " +
+                (Options.Model ?? string.Empty) + " " +
+                (Options.BaseUrl ?? string.Empty);
+            foreach (string token in BannedTokens)
+            {
+                if (hay.Contains(token, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        "Provedor/modelo banido no AURA: '" + token + "' não é permitido.");
+                }
+            }
         }
 
         public HttpRequestMessage BuildRequest(string question, string? systemPrompt = null)
@@ -88,12 +110,6 @@ namespace AURA.AI
                 {
                     request.Headers.TryAddWithoutValidation("X-Title", "AURA");
                     request.Headers.TryAddWithoutValidation("X-URL", Options.AppReference);
-                }
-
-                if (Options.ApiFormat == AiApiFormat.AnthropicMessages &&
-                    !string.IsNullOrWhiteSpace(Options.AnthropicVersion))
-                {
-                    request.Headers.TryAddWithoutValidation("anthropic-version", Options.AnthropicVersion);
                 }
             }
 
@@ -267,12 +283,6 @@ namespace AURA.AI
                 request.Headers.TryAddWithoutValidation("X-URL", Options.AppReference);
             }
 
-            if (Options.ApiFormat == AiApiFormat.AnthropicMessages &&
-                !string.IsNullOrWhiteSpace(Options.AnthropicVersion))
-            {
-                request.Headers.TryAddWithoutValidation("anthropic-version", Options.AnthropicVersion);
-            }
-
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
             HttpResponseMessage response = await client.SendAsync(request, ct).ConfigureAwait(false);
@@ -290,7 +300,8 @@ namespace AURA.AI
                 return new AgentChatResponse
                 {
                     Error = string.Format("Falha na chamada LLM ({0} {1}): {2}",
-                        (int)response.StatusCode, response.StatusCode, detail)
+                        (int)response.StatusCode, response.StatusCode, detail),
+                    ErrorKind = ClassifyError(response.StatusCode)
                 };
             }
 
@@ -358,6 +369,26 @@ namespace AURA.AI
             {
                 _logger.Error("LLM: resposta inválida: " + jex.Message);
                 return new AgentChatResponse { Error = "Resposta inválida do modelo: " + jex.Message };
+            }
+        }
+
+        private static AgentErrorKind ClassifyError(HttpStatusCode status)
+        {
+            switch (status)
+            {
+                case HttpStatusCode.BadRequest:
+                    return AgentErrorKind.InvalidRequest;
+                case HttpStatusCode.Unauthorized:
+                case HttpStatusCode.Forbidden:
+                    return AgentErrorKind.InvalidApiKey;
+                case (HttpStatusCode)402:
+                    return AgentErrorKind.PaymentRequired;
+                case HttpStatusCode.TooManyRequests:
+                    return AgentErrorKind.RateLimited;
+                default:
+                    return (int)status >= 500
+                        ? AgentErrorKind.ProviderError
+                        : AgentErrorKind.Unknown;
             }
         }
 

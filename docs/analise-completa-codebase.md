@@ -285,7 +285,7 @@ tests/
 
 10. **Network Check** - Ping 8.8.8.8, IP local, network availability.
 
-11. **LLM Integration (OpenRouterClient)** - Chat completions com function calling, suporte a formato Anthropic, timeout, classificação de erro (401/402/429/5xx), preservação de reasoning details para Gemini.
+11. **LLM Integration (OpenRouterClient)** - Chat completions com function calling, timeout, classificação de erro (401/402/429/5xx), preservação de reasoning details para Gemini.
 
 12. **Agentic Loop (AgentSession)** - Loop multi-turn com tool calling (max 20 rounds), tool registry, streaming step events, persistência em memória.
 
@@ -293,7 +293,7 @@ tests/
 
 14. **Tool Registry** - Register, resolve, try-register, definitions export.
 
-15. **Provider Catalog** - 12 providers: OpenRouter, OpenAI, Anthropic, Google Gemini, Groq, Cerebras, xAI, DeepSeek, Mistral, Together AI, Ollama (local), Custom.
+15. **Provider Catalog** - 12 providers: OpenRouter, OpenAI, Google Gemini, Groq, Cerebras, xAI, DeepSeek, Mistral, Together AI, Ollama (local), Custom.
 
 16. **API Key Provider Detection** - Determinística por prefixo, fallback ambíguo para preferred provider, probe de rede só com `AllowProbe=true`.
 

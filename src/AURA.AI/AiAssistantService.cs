@@ -21,7 +21,7 @@ namespace AURA.AI
         {
             ApiKey = Environment.GetEnvironmentVariable("AURA_OPENROUTER_KEY") ?? string.Empty,
             BaseUrl = "https://openrouter.ai/api/v1/chat/completions",
-            Model = "anthropic/claude-3-haiku"
+            Model = "gpt-5-mini"
         };
 
         /// <summary>Thread-safe entry point for asking the AI anything.</summary>

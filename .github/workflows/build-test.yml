@@ -74,6 +74,17 @@ jobs:
           restore-keys: |
             nuget-${{ runner.os }}-
 
+      - name: Ban Anthropic (guard)
+        run: |
+          if rg -i -n "anthropic|claude" --hidden \
+            -g '!.git/**' -g '!**/bin/**' -g '!**/obj/**' \
+            -g '!.github/workflows/build-test.yml' \
+            -g '!src/AURA.AI/OpenRouterClient.cs' . ; then
+            echo "::error::Provedor/modelo banido encontrado no repo."
+            exit 1
+          fi
+          echo "Guard OK: nenhuma referência banida."
+
       - name: Restore
         run: dotnet restore AURA.sln
 

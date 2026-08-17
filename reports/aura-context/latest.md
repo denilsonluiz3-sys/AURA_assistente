@@ -17,7 +17,6 @@
 ?? .aura/diagnostico/
 ?? .aura/memory-fix-v2-20260809-043306/
 ?? .aura/memory-fix-v2-20260809-045621/
-?? CLAUDE.md
 ?? aura-diagnostico.txt
 ?? coleta_analise.txt
 ?? coleta_para_analise.sh

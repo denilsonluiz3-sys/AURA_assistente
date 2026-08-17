@@ -252,7 +252,6 @@ namespace AURA.AI.Providers
             client.Options.AuthHeaderName = p.AuthHeaderName;
             client.Options.AuthScheme = p.AuthScheme;
             client.Options.ApiFormat = p.ApiFormat;
-            client.Options.AnthropicVersion = p.AnthropicVersion;
         }
 
         // ------------------------------------------------------------------
