@@ -83,15 +83,17 @@ public sealed class ProcessRegistry
             _ => state
         };
 
+        string processId = "cell:" + evt.CellId;
         ProcessInfo? process;
         lock (_sync)
-            _byId.TryGetValue("cell:" + evt.CellId, out process);
+            _byId.TryGetValue(processId, out process);
 
         if (process == null)
         {
             process = new ProcessInfo
             {
-                Id = "cell:" + evt.CellId,
+                Id = processId,
+                CellId = evt.CellId,
                 Title = "Célula " + evt.CellId,
                 Target = "Cells",
                 Status = status,
