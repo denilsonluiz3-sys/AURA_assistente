@@ -50,7 +50,6 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       ${{
-        failure() == false &&
         github.event.workflow_run.conclusion == 'failure' &&
         github.event.workflow_run.name == 'build-and-test' &&
         !startsWith(github.event.workflow_run.head_branch, 'auto-repair/') &&
@@ -66,13 +65,11 @@ jobs:
 
       - name: Create isolated repair branch
         env:
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           git checkout -b "auto-repair/${RUN_ID}"
           git config user.name "AURA Auto-Repair"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git status --short
 
       - name: Collect failed CI logs
         env:
@@ -104,25 +101,23 @@ jobs:
 
             Rules:
             1. Fix the root cause, not symptoms.
-            2. Prepare affected files for the planned AuraOrchestrator architecture where this is
-               naturally compatible: clear interfaces, dependency injection boundaries, structured
-               state/logging and isolated execution seams. Do not invent unrelated features.
+            2. Prepare affected files for the planned AuraOrchestrator architecture where naturally
+               compatible: clear interfaces, dependency-injection boundaries, structured state/logging
+               and isolated execution seams. Do not invent unrelated features.
             3. Preserve existing working behavior.
             4. Do not modify secrets, workflow permissions, or unrelated files.
-            5. Prefer the smallest coherent architectural fix that also supports the next planned
-               phases: Cells, ShellLauncher, retry/restart, review and consolidation.
-            6. If the failure is caused by infrastructure outside the repository, do not fabricate a
-               source fix. Document the blocker in the final message and make no unrelated edits.
-            7. Validate with the available local commands when practical. Do not depend on network
-               access from the Codex sandbox.
-            8. Make only the necessary source/project/test changes. Do not update generated binaries.
+            5. Prefer the smallest coherent architectural fix that also supports Cells, ShellLauncher,
+               retry/restart, review and consolidation.
+            6. If the failure is infrastructure-only, do not fabricate a source fix.
+            7. Validate with available local commands when practical; do not depend on network access.
+            8. Do not update generated binaries.
 
-            This is an auto-repair attempt. Implement the fix directly in the workspace and leave the
-            working tree ready for commit. End with a concise summary of changed files and validation.
+            Implement the fix directly in the workspace and leave it ready for commit.
 
       - name: Detect changes
         id: changes
         run: |
+          rm -rf .aura-ci
           git status --short
           if [ -n "$(git status --porcelain)" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -133,9 +128,7 @@ jobs:
       - name: Commit repair
         if: steps.changes.outputs.changed == 'true'
         run: |
-          git add .
-          git reset -- .aura-ci/failed.log .aura-ci/run.json 2>/dev/null || true
-          git status --short
+          git add -A
           git commit -m "fix(ci): auto-repair failed build"
 
       - name: Push repair branch
