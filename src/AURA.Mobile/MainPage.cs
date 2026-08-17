@@ -51,7 +51,6 @@ namespace AURA.Mobile
 
             BarBackgroundColor = Color.FromArgb("#0c0c12");
             BarTextColor = Color.FromArgb("#e8e8f0");
-
             AuraLog.Info("MainPage.ctor OK");
         }
 
@@ -81,10 +80,6 @@ namespace AURA.Mobile
             }
         }
 
-        /// <summary>
-        /// Reconstrói as abas: só entra o núcleo (Módulos/Navegador) e os
-        /// módulos que já foram baixados e aplicados.
-        /// </summary>
         public void RebuildTabs()
         {
             Children.Clear();
@@ -98,14 +93,42 @@ namespace AURA.Mobile
                     .ToArray();
 
                 if (items.Length == 0)
-                {
                     continue;
-                }
 
                 Children.Add(MakeSection(group.Key, items));
             }
 
             AuraLog.Info("MainPage.RebuildTabs: " + Children.Count + " seções ativas");
+        }
+
+        public async Task NavigateToProcessAsync(string target)
+        {
+            var entry = _entries.FirstOrDefault(e =>
+                string.Equals(e.Label, target, StringComparison.OrdinalIgnoreCase));
+
+            if (entry.Page == null)
+                return;
+
+            var section = Children.OfType<NavigationPage>()
+                .FirstOrDefault(n => string.Equals(n.Title, entry.Section, StringComparison.OrdinalIgnoreCase));
+
+            if (section == null)
+                return;
+
+            CurrentPage = section;
+
+            for (int i = 0; i < section.NavigationStack.Count; i++)
+            {
+                if (!ReferenceEquals(section.NavigationStack[i], entry.Page))
+                    continue;
+
+                while (section.NavigationStack.Count > i + 1)
+                    await section.PopAsync(false);
+                return;
+            }
+
+            if (entry.Page.Parent == null)
+                await section.PushAsync(entry.Page);
         }
 
         private static NavigationPage MakeSection(string title, params (string Label, Page Page)[] items)
