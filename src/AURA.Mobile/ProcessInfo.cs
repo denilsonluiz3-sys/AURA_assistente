@@ -5,13 +5,26 @@ namespace AURA.Mobile;
 
 public sealed class ProcessInfo : INotifyPropertyChanged
 {
+    private string _title = string.Empty;
+    private string _target = string.Empty;
     private string _status = "Pendente";
     private string _message = string.Empty;
     private double _progress;
 
     public string Id { get; init; } = string.Empty;
-    public string Title { get; init; } = string.Empty;
-    public string Target { get; init; } = string.Empty;
+
+    public string Title
+    {
+        get => _title;
+        set => Set(ref _title, value);
+    }
+
+    public string Target
+    {
+        get => _target;
+        set => Set(ref _target, value);
+    }
+
     public string? CellId { get; init; }
 
     public string Status
