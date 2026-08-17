@@ -6,8 +6,6 @@
              BackgroundColor="{DynamicResource AuraBackground}">
 
     <Grid RowDefinitions="Auto,*,Auto">
-
-        <!-- ── Header ─────────────────────────────────────────── -->
         <Border Grid.Row="0"
                 BackgroundColor="{DynamicResource AuraSurface}"
                 Stroke="{DynamicResource AuraBorder}"
@@ -30,20 +28,69 @@
             </VerticalStackLayout>
         </Border>
 
-        <!-- ── Área de resposta ───────────────────────────────── -->
-        <ScrollView Grid.Row="1">
-            <VerticalStackLayout Padding="16,14" Spacing="0">
-                <Border Style="{StaticResource AuraCard}" Margin="0,0,0,4">
-                    <Label x:Name="AnswerLabel"
-                           Text="Digite sua pergunta abaixo."
-                           FontSize="14"
-                           LineBreakMode="WordWrap"
-                           TextColor="{DynamicResource AuraTextPrimary}" />
-                </Border>
-            </VerticalStackLayout>
-        </ScrollView>
+        <Grid Grid.Row="1" RowDefinitions="Auto,*">
+            <Border Grid.Row="0" Style="{StaticResource AuraCard}" Margin="16,14,16,8">
+                <Label x:Name="AnswerLabel"
+                       Text="Digite sua pergunta abaixo."
+                       FontSize="14"
+                       LineBreakMode="WordWrap"
+                       TextColor="{DynamicResource AuraTextPrimary}" />
+            </Border>
 
-        <!-- ── Painel de configuração + envio ────────────────── -->
+            <CollectionView Grid.Row="1"
+                            x:Name="ProcessListView"
+                            Margin="12,0,12,10"
+                            SelectionMode="None"
+                            ItemsLayout="VerticalGrid,2"
+                            ItemsSource="{Binding Processes}">
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout Padding="20" Spacing="4" HorizontalOptions="Center">
+                        <Label Text="Nenhum processo ativo"
+                               FontSize="12"
+                               TextColor="{DynamicResource AuraTextMuted}"
+                               HorizontalTextAlignment="Center" />
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="4"
+                                Padding="10"
+                                BackgroundColor="{DynamicResource AuraSurface}"
+                                Stroke="{DynamicResource AuraBorder}"
+                                StrokeThickness="1"
+                                StrokeShape="RoundRectangle 14">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnProcessTapped" />
+                            </Border.GestureRecognizers>
+                            <VerticalStackLayout Spacing="5">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <Label Text="{Binding Title}"
+                                           FontSize="12"
+                                           FontAttributes="Bold"
+                                           LineBreakMode="TailTruncation"
+                                           TextColor="{DynamicResource AuraTextPrimary}" />
+                                    <Label Grid.Column="1"
+                                           Text="{Binding Status}"
+                                           FontSize="9"
+                                           TextColor="{DynamicResource AuraCyan}"
+                                           HorizontalTextAlignment="End" />
+                                </Grid>
+                                <Label Text="{Binding Message}"
+                                       FontSize="10"
+                                       MaxLines="2"
+                                       LineBreakMode="TailTruncation"
+                                       TextColor="{DynamicResource AuraTextMuted}" />
+                                <ProgressBar Progress="{Binding Progress}"
+                                             HeightRequest="3"
+                                             ProgressColor="{DynamicResource AuraCyan}"
+                                             BackgroundColor="{DynamicResource AuraSurface2}" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </Grid>
+
         <Border Grid.Row="2"
                 BackgroundColor="{DynamicResource AuraSurface}"
                 Stroke="{DynamicResource AuraBorder}"
@@ -51,8 +98,6 @@
                 Padding="16,12"
                 StrokeShape="RoundRectangle 0,0,0,0">
             <VerticalStackLayout Spacing="10">
-
-                <!-- Provedor + Modelo lado a lado -->
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
                     <VerticalStackLayout Spacing="3">
                         <Label Text="PROVEDOR"
@@ -70,7 +115,6 @@
                     </VerticalStackLayout>
                 </Grid>
 
-                <!-- Chave de API -->
                 <VerticalStackLayout Spacing="3">
                     <Label x:Name="ApiKeyLabel"
                            Text="CHAVE DE API"
@@ -81,7 +125,6 @@
                            IsPassword="True" />
                 </VerticalStackLayout>
 
-                <!-- Editor de pergunta + envio -->
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                     <Border BackgroundColor="{DynamicResource AuraSurface2}"
                             Stroke="{DynamicResource AuraBorder}"
@@ -120,9 +163,7 @@
                                            VerticalOptions="Center" />
                     </Grid>
                 </Grid>
-
             </VerticalStackLayout>
         </Border>
-
     </Grid>
 </ContentPage>
