@@ -1,4 +1,5 @@
 using AURA.AI;
+using AURA.Agents;
 using AURA.Core.Events;
 using AURA.Memory;
 using AURA.Mobile.Diagnostics;
@@ -16,11 +17,13 @@ public partial class AgentPage : ContentPage
     private readonly VoiceAssistantService? _voice;
     private readonly ShellExecutor _shell;
     private readonly ProcessRegistry _processes;
+    private readonly AuraOrchestrator _orchestrator;
     private AgentSession? _session;
     private string? _activeProcessId;
 
     public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
-        ShellExecutor shell, ProcessRegistry processes, VoiceAssistantService? voice = null)
+        ShellExecutor shell, ProcessRegistry processes, AuraOrchestrator orchestrator,
+        VoiceAssistantService? voice = null)
     {
         InitializeComponent();
         _client = client;
@@ -28,6 +31,7 @@ public partial class AgentPage : ContentPage
         _speech = speech;
         _shell = shell;
         _processes = processes;
+        _orchestrator = orchestrator;
         ProcessCards.BindingContext = _processes;
         _voice = voice;
     }
@@ -44,7 +48,6 @@ public partial class AgentPage : ContentPage
         }
         cfg.Load(_client);
 
-        string workspace = AgentWorkspace.EnsureCreated();
         string activeRoot = AgentWorkspace.ActiveRoot;
         WorkspaceLabel.Text = ProjectAccessService.StatusText + "\n" +
             "Workspace: " + activeRoot +
@@ -74,19 +77,17 @@ public partial class AgentPage : ContentPage
             "Você é o agente de arquivos da AURA, um assistente que trabalha " +
             "no diretório de trabalho da AURA. Quando houver um projeto vinculado, " +
             "o diretório é a própria pasta escolhida (acesso direto) ou uma cópia " +
-            "de trabalho sincronizada. " +
-            "Você PODE listar, ler, criar, editar e sobrescrever arquivos do " +
-            "diretório de trabalho e executar comandos shell (sh -c) nesse local. " +
-            "Prefira ferramentas a respostas vagas: quando o usuário pedir uma " +
-            "tarefa, use as ferramentas e confirme o que foi feito. " +
-            "Responda em português, de forma curta e objetiva. " +
-            "Caminhos são sempre relativos ao diretório de trabalho.";
+            "de trabalho sincronizada. Você PODE listar, ler, criar, editar e " +
+            "sobrescrever arquivos do diretório de trabalho e executar comandos shell " +
+            "(sh -c) nesse local. Prefira ferramentas a respostas vagas: quando o " +
+            "usuário pedir uma tarefa, use as ferramentas e confirme o que foi feito. " +
+            "Responda em português, de forma curta e objetiva. Caminhos são sempre " +
+            "relativos ao diretório de trabalho.";
 
         _session = new AgentSession(_client, tools, systemPrompt, memory: _memory);
         _session.Step += OnAgentStep;
 
-        AppendBubble("Pronto. Posso listar, ler, criar e editar arquivos do workspace e " +
-            "rodar comandos shell. O que deseja fazer?", user: false);
+        AppendBubble("Pronto. Posso trabalhar no workspace e acompanhar processos em tempo real. O que deseja fazer?", user: false);
     }
 
     private async void OnLinkProjectClicked(object sender, EventArgs e)
@@ -98,9 +99,7 @@ public partial class AgentPage : ContentPage
             {
                 bool openSettings = await DisplayAlert(
                     "Acesso direto ao projeto",
-                    "Conceder \"Todos os arquivos\" permite a AURA trabalhar DIRETO " +
-                    "na pasta escolhida (sem cópia local, sem sincronização). " +
-                    "Sem isso, a AURA usa uma cópia privada e sincroniza ao final.",
+                    "Conceder \"Todos os arquivos\" permite a AURA trabalhar DIRETO na pasta escolhida (sem cópia local, sem sincronização). Sem isso, a AURA usa uma cópia privada e sincroniza ao final.",
                     "Conceder acesso", "Usar cópia local");
                 if (openSettings)
                 {
@@ -121,8 +120,8 @@ public partial class AgentPage : ContentPage
             EnsureSession();
             AppendBubble(
                 ProjectAccessService.IsDirect
-                    ? "Projeto vinculado em acesso direto. A AURA lista, lê e edita a pasta escolhida, sem cópia local."
-                    : "Projeto vinculado. A AURA trabalha na cópia local e sincroniza as alterações de volta ao projeto após cada tarefa.",
+                    ? "Projeto vinculado em acesso direto."
+                    : "Projeto vinculado. As alterações serão sincronizadas ao final.",
                 user: false);
         }
         catch (OperationCanceledException)
@@ -149,23 +148,33 @@ public partial class AgentPage : ContentPage
         RuntimeConfig.Apply(_client);
         AppendBubble(text, user: true);
         CommandEditor.Text = string.Empty;
-
         RunButton.IsEnabled = false;
         BusyIndicator.IsRunning = true;
         BusyIndicator.IsVisible = true;
-        var process = _processes.Begin(text, "Agente", "Preparando execução");
+
+        var process = _processes.Begin(text, "Assistente", "Entendendo solicitação");
         _activeProcessId = process.Id;
 
         try
         {
+            if (ShouldOrchestrate(text))
+            {
+                _processes.Update(process.Id, "Planejando", "Orquestrador analisando a tarefa", 0.15);
+                string answer = await _orchestrator.ExecuteAsync(text);
+                _processes.Complete(process.Id, "Resultado entregue");
+                AppendBubble(answer, user: false);
+                _voice?.SetLastUtterance(answer);
+                await SpeakAsync(answer);
+                return;
+            }
+
             _processes.Update(process.Id, "Executando", "Processando solicitação", 0.1);
-            string answer;
-            if (string.IsNullOrWhiteSpace(RuntimeConfig.ApiKey) &&
-                string.IsNullOrWhiteSpace(_client.Options.ApiKey))
+            string answerFromAgent;
+            if (string.IsNullOrWhiteSpace(RuntimeConfig.ApiKey) && string.IsNullOrWhiteSpace(_client.Options.ApiKey))
             {
                 _processes.Update(process.Id, "Pesquisando", "Buscando na web", 0.35);
                 AppendBubble("Buscando na web (Bing)...", user: false, isTool: true);
-                answer = await WebSearchAnswer.SearchWithRefinementAsync(text);
+                answerFromAgent = await WebSearchAnswer.SearchWithRefinementAsync(text);
             }
             else
             {
@@ -178,21 +187,20 @@ public partial class AgentPage : ContentPage
                 }
                 _session = null;
                 EnsureSession();
-                answer = await _session!.RunAsync(text);
+                answerFromAgent = await _session!.RunAsync(text);
             }
 
             _processes.Complete(process.Id, "Resultado entregue");
-            AppendBubble(answer, user: false);
-            _voice?.SetLastUtterance(answer);
-            await SpeakAsync(answer);
+            AppendBubble(answerFromAgent, user: false);
+            _voice?.SetLastUtterance(answerFromAgent);
+            await SpeakAsync(answerFromAgent);
 
             if (ProjectAccessService.IsLinked && !ProjectAccessService.IsDirect)
             {
                 _processes.Update(process.Id, "Sincronizando", "Atualizando projeto", 0.9);
                 int synced = await ProjectAccessService.SyncBackAsync();
                 _processes.Complete(process.Id, $"Concluído · {synced} arquivo(s) sincronizado(s)");
-                AppendBubble($"↥ Projeto sincronizado: {synced} arquivo(s) atualizado(s).",
-                    user: false, isTool: true);
+                AppendBubble($"↥ Projeto sincronizado: {synced} arquivo(s) atualizado(s).", user: false, isTool: true);
             }
         }
         catch (Exception ex)
@@ -211,14 +219,22 @@ public partial class AgentPage : ContentPage
         }
     }
 
+    private static bool ShouldOrchestrate(string text)
+    {
+        string l = text.ToLowerInvariant();
+        return l.Contains("orquestre") || l.Contains("orquestr") ||
+               l.Contains("planeje") || l.Contains("divida em tarefas") ||
+               l.Contains("coordene") || l.Contains("pesquise e execute") ||
+               l.Contains("pesquise e depois") || l.Contains("execute e depois");
+    }
+
     private void OnAgentStep(AURA.AI.AgentStep step)
     {
         string argsPreview = Shorten(step.Arguments, 70);
         string resultPreview = Shorten(step.Result, 140);
         if (!string.IsNullOrWhiteSpace(_activeProcessId))
             _processes.Update(_activeProcessId, "Executando", step.ToolName, 0.65);
-        AppendBubble("◆ " + step.ToolName + " " + argsPreview + "\n" + resultPreview,
-            user: false, isTool: true);
+        AppendBubble("◆ " + step.ToolName + " " + argsPreview + "\n" + resultPreview, user: false, isTool: true);
     }
 
     private async void OnProcessCardClicked(object sender, EventArgs e)
