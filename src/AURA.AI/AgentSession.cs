@@ -89,7 +89,8 @@ namespace AURA.AI
                     {
                         Role = "assistant",
                         Content = null,
-                        ToolCalls = response.ToolCalls
+                        ToolCalls = response.ToolCalls,
+                        ReasoningDetails = response.ReasoningDetails
                     });
 
                     foreach (AgentToolCall call in response.ToolCalls)

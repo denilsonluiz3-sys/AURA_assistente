@@ -219,6 +219,11 @@ namespace AURA.AI
                         mo["tool_calls"] = calls;
                     }
 
+                    if (m.ReasoningDetails != null)
+                    {
+                        mo["reasoning_details"] = m.ReasoningDetails;
+                    }
+
                     arr.Add(mo);
                 }
             }
@@ -285,8 +290,29 @@ namespace AURA.AI
 
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            HttpResponseMessage response = await client.SendAsync(request, ct).ConfigureAwait(false);
-            string body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            HttpResponseMessage response;
+            string body;
+            try
+            {
+                response = await client.SendAsync(request, ct).ConfigureAwait(false);
+                body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return new AgentChatResponse
+                {
+                    Error = "A chamada ao provedor LLM expirou ou foi cancelada.",
+                    ErrorKind = AgentErrorKind.Timeout
+                };
+            }
+            catch (HttpRequestException hex)
+            {
+                return new AgentChatResponse
+                {
+                    Error = "Falha de rede ao falar com o provedor LLM: " + hex.Message,
+                    ErrorKind = AgentErrorKind.Network
+                };
+            }
 
             if (!response.IsSuccessStatusCode)
             {
@@ -316,6 +342,7 @@ namespace AURA.AI
                     if (message.TryGetProperty("message", out JsonElement msg))
                     {
                         string? content = ReadContentString(msg);
+                        JsonArray? reasoning = ReadReasoningDetails(msg);
                         var calls = new List<AgentToolCall>();
                         if (msg.TryGetProperty("tool_calls", out JsonElement toolCalls))
                         {
@@ -350,7 +377,8 @@ namespace AURA.AI
                                 return new AgentChatResponse
                                 {
                                     Content = null,
-                                    ToolCalls = textCalls
+                                    ToolCalls = textCalls,
+                                    ReasoningDetails = reasoning
                                 };
                             }
                         }
@@ -358,7 +386,8 @@ namespace AURA.AI
                         return new AgentChatResponse
                         {
                             Content = content,
-                            ToolCalls = calls.Count > 0 ? calls : null
+                            ToolCalls = calls.Count > 0 ? calls : null,
+                            ReasoningDetails = reasoning
                         };
                     }
                 }
@@ -370,6 +399,23 @@ namespace AURA.AI
                 _logger.Error("LLM: resposta inválida: " + jex.Message);
                 return new AgentChatResponse { Error = "Resposta inválida do modelo: " + jex.Message };
             }
+        }
+
+        private static JsonArray? ReadReasoningDetails(JsonElement msg)
+        {
+            if (!msg.TryGetProperty("reasoning_details", out JsonElement rd) ||
+                rd.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+
+            var result = new JsonArray();
+            foreach (JsonElement item in rd.EnumerateArray())
+            {
+                result.Add(item.Clone());
+            }
+
+            return result;
         }
 
         private static AgentErrorKind ClassifyError(HttpStatusCode status)

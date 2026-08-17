@@ -378,6 +378,76 @@ namespace AURA.AI
                             IsFree = true
                         }
                     }
+                },
+
+                new ProviderInfo
+                {
+                    Id = "groq",
+                    Name = "Groq (grátis)",
+                    BaseUrl =
+                        "https://api.groq.com/openai/v1/chat/completions",
+                    ModelsUrl =
+                        "https://api.groq.com/openai/v1/models",
+                    NeedsKey = true,
+                    KeyEnv = "GROQ_API_KEY",
+                    KeyHint = "GROQ_API_KEY",
+                    DefaultModelId = "llama-3.3-70b-versatile",
+                    AuthHeaderName = "Authorization",
+                    AuthScheme = "Bearer ",
+                    ApiFormat = AiApiFormat.OpenAICompletions,
+                    KeyPrefixesList = new List<string> { "gsk_" },
+                    Models = new List<ProviderModel>
+                    {
+                        new ProviderModel
+                        {
+                            Id = "llama-3.3-70b-versatile",
+                            Label = "Llama 3.3 70B",
+                            Category = "Grátis",
+                            IsFree = true
+                        },
+                        new ProviderModel
+                        {
+                            Id = "llama-3.1-8b-instant",
+                            Label = "Llama 3.1 8B",
+                            Category = "Grátis",
+                            IsFree = true
+                        }
+                    }
+                },
+
+                new ProviderInfo
+                {
+                    Id = "gemini",
+                    Name = "Google Gemini",
+                    BaseUrl =
+                        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                    ModelsUrl =
+                        "https://generativelanguage.googleapis.com/v1beta/openai/models",
+                    NeedsKey = true,
+                    KeyEnv = "GEMINI_API_KEY",
+                    KeyHint = "GEMINI_API_KEY",
+                    DefaultModelId = "gemini-2.5-flash",
+                    AuthHeaderName = "Authorization",
+                    AuthScheme = "Bearer ",
+                    ApiFormat = AiApiFormat.OpenAICompletions,
+                    KeyPrefixesList = new List<string> { "AIza", "AQ." },
+                    Models = new List<ProviderModel>
+                    {
+                        new ProviderModel
+                        {
+                            Id = "gemini-2.5-flash",
+                            Label = "Gemini 2.5 Flash",
+                            Category = "Grátis",
+                            IsFree = true
+                        },
+                        new ProviderModel
+                        {
+                            Id = "gemini-2.5-flash-lite",
+                            Label = "Gemini 2.5 Flash-Lite",
+                            Category = "Grátis",
+                            IsFree = true
+                        }
+                    }
                 }
             };
         }

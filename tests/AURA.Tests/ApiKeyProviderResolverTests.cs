@@ -44,7 +44,7 @@ public class ApiKeyProviderResolverTests
         };
 
         ProviderHealthResult result = resolver.ValidateAsync(credential, http).GetAwaiter().GetResult();
-        sentXApiKey = handler.LastRequest?.Headers.Contains("x-api-key") == true;
+        sentXApiKey = handler.LastRequest?.Headers.Contains("Authorization") == true;
         return result;
     }
 

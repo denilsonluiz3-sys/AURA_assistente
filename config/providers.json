@@ -12,6 +12,7 @@
       "baseUrl": "https://openrouter.ai/api/v1/chat/completions",
       "needsKey": true,
       "keyEnv": "OPENROUTER_API_KEY",
+      "keyPrefixesList": ["sk-or-"],
       "free": true,
       "priority": 10,
       "models": [
@@ -48,6 +49,7 @@
       "baseUrl": "https://api.groq.com/openai/v1/chat/completions",
       "needsKey": true,
       "keyEnv": "GROQ_API_KEY",
+      "keyPrefixesList": ["gsk_"],
       "free": true,
       "priority": 20,
       "models": [
@@ -72,6 +74,7 @@
       "baseUrl": "https://api.cerebras.ai/v1/chat/completions",
       "needsKey": true,
       "keyEnv": "CEREBRAS_API_KEY",
+      "keyPrefixesList": ["csk-"],
       "free": true,
       "priority": 30,
       "models": [
@@ -96,6 +99,7 @@
       "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
       "needsKey": true,
       "keyEnv": "GEMINI_API_KEY",
+      "keyPrefixesList": ["AIza", "AQ."],
       "free": true,
       "priority": 40,
       "models": [
@@ -120,6 +124,7 @@
       "baseUrl": "https://api.openai.com/v1/chat/completions",
       "needsKey": true,
       "keyEnv": "OPENAI_API_KEY",
+      "keyPrefixesList": ["sk-"],
       "free": false,
       "priority": 100,
       "models": [
