@@ -210,6 +210,22 @@
 
             </Grid>
 
+            <!-- Agentes disponíveis -->
+            <Border Style="{DynamicResource AuraGlassCard}" Padding="16,12">
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="AGENTES DISPONÍVEIS"
+                           FontSize="10"
+                           FontAttributes="Bold"
+                           FontFamily="IBMPlexSans"
+                           TextColor="{DynamicResource AuraTextMuted}" />
+                    <Label x:Name="AgentsLabel"
+                           Text="…"
+                           FontSize="13"
+                           FontFamily="IBMPlexSans"
+                           TextColor="{DynamicResource AuraTextPrimary}" />
+                </VerticalStackLayout>
+            </Border>
+
             <Button Text="↻  Atualizar"
                     Clicked="OnRefreshClicked"
                     Style="{DynamicResource BtnGlass}"

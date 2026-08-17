@@ -1,3 +1,4 @@
+using AURA.Agents;
 using AURA.Network;
 using AURA.SystemInfo;
 
@@ -7,12 +8,14 @@ public partial class DiagnosticoPage : ContentPage
 {
     private readonly SystemAnalyzer _systemAnalyzer;
     private readonly NetworkManager _networkManager;
+    private readonly AgentManager _agentManager;
 
-    public DiagnosticoPage(SystemAnalyzer systemAnalyzer, NetworkManager networkManager)
+    public DiagnosticoPage(SystemAnalyzer systemAnalyzer, NetworkManager networkManager, AgentManager agentManager)
     {
         InitializeComponent();
         _systemAnalyzer = systemAnalyzer;
         _networkManager = networkManager;
+        _agentManager = agentManager;
     }
 
     protected override async void OnAppearing()
@@ -64,6 +67,11 @@ public partial class DiagnosticoPage : ContentPage
 
             VersionValue.Text = AURA.Core.VersionInfo.FullName ?? "—";
             VersionDetail.Text = "AURA Mobile";
+
+            var available = _agentManager.AvailableAssistants();
+            AgentsLabel.Text = available.Count == 0
+                ? "Nenhum agente CLI instalado no dispositivo. Use a aba Assistente."
+                : string.Join("  •  ", available.Select(a => a.Name));
 
             var online = net.HasInternetAccess;
             ConnectionIcon.Text = online ? "🌐" : "⚠️";

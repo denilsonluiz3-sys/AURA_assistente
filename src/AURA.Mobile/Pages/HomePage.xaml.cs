@@ -1,58 +1,35 @@
-using AURA.Agents;
-using AURA.Network;
-using AURA.SystemInfo;
 using CommunityToolkit.Maui.Views;
 
 namespace AURA.Mobile.Pages;
 
 public partial class HomePage : ContentPage
 {
-    private readonly SystemAnalyzer _systemAnalyzer;
-    private readonly NetworkManager _networkManager;
-    private readonly AgentManager _agentManager;
-    private bool _pulseRunning;
-
     private const string VideoBgPrefKey = "aura_video_bg";
 
-    public HomePage(SystemAnalyzer systemAnalyzer, NetworkManager networkManager, AgentManager agentManager)
+    public HomePage()
     {
         InitializeComponent();
-        _systemAnalyzer = systemAnalyzer;
-        _networkManager = networkManager;
-        _agentManager = agentManager;
         App.ThemeChanged += OnThemeChanged;
         UpdateThemeIcon();
 
-        // Long-press no botão de tema alterna vídeo de fundo on/off (Preference).
-        var longPress = new TapGestureRecognizer
-        {
-            NumberOfTapsRequired = 1
-        };
-        // Usamos GestureRecognizer de long-press via pointer se disponível; fallback = double-tap no botão.
+        // Double-tap no botão de tema alterna vídeo de fundo on/off (Preference).
         var doubleTap = new TapGestureRecognizer { NumberOfTapsRequired = 2 };
         doubleTap.Tapped += OnThemeDoubleTapped;
         BtnTheme.GestureRecognizers.Add(doubleTap);
     }
 
-    protected override async void OnAppearing()
+    protected override void OnAppearing()
     {
         base.OnAppearing();
         UpdateThemeIcon();
-        await RefreshAsync();
-        StartOrbPulse();
+        VersionLabel.Text = AURA.Core.VersionInfo.FullName;
         ApplyVideoBackground();
     }
 
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
-        StopOrbPulse();
         PauseVideoBackground();
-    }
-
-    private async void OnRefreshClicked(object? sender, EventArgs e)
-    {
-        await RefreshAsync();
     }
 
     // ── Tema Solar / Lunar ─────────────────────────────────────────
@@ -60,7 +37,7 @@ public partial class HomePage : ContentPage
     private void OnThemeToggleClicked(object? sender, EventArgs e)
     {
         App.ToggleTheme();
-        // Icon is refreshed via ThemeChanged subscription.
+        // Icon e vídeo são atualizados via ThemeChanged.
     }
 
     private void OnThemeChanged()
@@ -68,7 +45,7 @@ public partial class HomePage : ContentPage
         MainThread.BeginInvokeOnMainThread(() =>
         {
             UpdateThemeIcon();
-            ApplyVideoBackground(); // troca source se vídeo estiver ativo
+            ApplyVideoBackground(); // troca source conforme tema
         });
     }
 
@@ -79,9 +56,9 @@ public partial class HomePage : ContentPage
         BtnTheme.Text = App.IsSolar ? "☾" : "☀";
     }
 
-    // ── Vídeo de fundo opcional (C1) ───────────────────────────────
+    // ── Vídeo de fundo (Lunar = lua/aurora, Solar = sol/aurora) ────
 
-    private bool IsVideoBgEnabled => Preferences.Default.Get(VideoBgPrefKey, false);
+    private bool IsVideoBgEnabled => Preferences.Default.Get(VideoBgPrefKey, true);
 
     private void OnThemeDoubleTapped(object? sender, TappedEventArgs e)
     {
@@ -89,21 +66,8 @@ public partial class HomePage : ContentPage
         Preferences.Default.Set(VideoBgPrefKey, next);
         AuraLog.Info($"Vídeo de fundo {(next ? "ativado" : "desativado")} (Preference {VideoBgPrefKey})");
         ApplyVideoBackground();
-        // Feedback visual rápido
         _ = PlayButtonFeedbackAsync(BtnTheme);
     }
-
-    private async void OnCoreOrbTapped(object? sender, TappedEventArgs e)
-    {
-        bool enabled = !IsVideoBgEnabled;
-        Preferences.Default.Set(VideoBgPrefKey, enabled);
-        AuraLog.Info($"Vídeo de fundo {(enabled ? "ativado" : "desativado")} via núcleo (Preference {VideoBgPrefKey})");
-        ApplyVideoBackground();
-        await PlayButtonFeedbackAsync(CoreOrb);
-        if (enabled)
-            await DisplayAlert("Vídeo", "Fundo de vídeo ativado (Solar/Lunar conforme tema).", "OK");
-    }
-
 
     private void ApplyVideoBackground()
     {
@@ -118,7 +82,7 @@ public partial class HomePage : ContentPage
 
         try
         {
-            // Assets esperados em Resources/Raw/ (MauiAsset LogicalName = filename)
+            // Assets em Resources/Raw/ (MauiAsset LogicalName = filename)
             string resource = App.IsSolar ? "solar_bg.mp4" : "lunar_bg.mp4";
             BgVideo.Source = MediaSource.FromResource(resource);
             BgVideo.IsVisible = true;
@@ -143,49 +107,6 @@ public partial class HomePage : ContentPage
         }
     }
 
-    // ── Pulse holográfico (F2 — MAUI nativo, zero NuGet) ───────────
-
-    private void StartOrbPulse()
-    {
-        if (_pulseRunning || CoreOrb is null)
-            return;
-
-        _pulseRunning = true;
-        _ = RunPulseLoopAsync();
-    }
-
-    private void StopOrbPulse()
-    {
-        _pulseRunning = false;
-        CoreOrb?.AbortAnimation("OrbPulse");
-        MiddleRing?.AbortAnimation("RingPulse");
-        OuterRing?.AbortAnimation("OuterPulse");
-    }
-
-    private async Task RunPulseLoopAsync()
-    {
-        // Loop suave: escala 1.0 ↔ 1.08 + leve variação de opacidade no anel médio.
-        while (_pulseRunning)
-        {
-            try
-            {
-                var scaleUp = CoreOrb.ScaleTo(1.08, 900, Easing.SinInOut);
-                var fadeOut = MiddleRing.FadeTo(0.45, 900, Easing.SinInOut);
-                await Task.WhenAll(scaleUp, fadeOut);
-                if (!_pulseRunning) break;
-
-                var scaleDown = CoreOrb.ScaleTo(1.0, 900, Easing.SinInOut);
-                var fadeIn = MiddleRing.FadeTo(0.7, 900, Easing.SinInOut);
-                await Task.WhenAll(scaleDown, fadeIn);
-            }
-            catch
-            {
-                // Página pode ter sido descarregada; encerra o loop.
-                break;
-            }
-        }
-    }
-
     private static async Task PlayButtonFeedbackAsync(View? button)
     {
         if (button is null) return;
@@ -200,12 +121,11 @@ public partial class HomePage : ContentPage
         }
     }
 
-    // ── Bottom bar alinhada à referência (Início | Diagnóstico | Módulos | Agentes | Config) ──
+    // ── Bottom bar (Início | Diagnóstico | Módulos | Agentes | Config) ──
 
     private async void OnInicioClicked(object? sender, EventArgs e)
     {
         await PlayButtonFeedbackAsync(BtnInicio);
-        await RefreshAsync();
     }
 
     private async void OnDiagnosticoClicked(object? sender, EventArgs e)
@@ -229,14 +149,11 @@ public partial class HomePage : ContentPage
     private async void OnConfigClicked(object? sender, EventArgs e)
     {
         await PlayButtonFeedbackAsync(BtnConfig);
-        // Ainda não existe página Config dedicada. Leva à seção Sistema (Início/Diagnóstico/Logs).
+        // Ainda não existe página Config dedicada. Leva à seção Sistema.
         if (!TrySwitchToSection("Sistema"))
             await DisplayAlert("Config", "Seção Sistema não disponível no momento.", "OK");
     }
 
-    /// <summary>
-    /// Troca a aba do TabbedPage para a seção correspondente.
-    /// </summary>
     private async Task NavigateToSectionAndPageAsync(string sectionTitle, string pageLabel)
     {
         if (!TrySwitchToSection(sectionTitle))
@@ -260,43 +177,5 @@ public partial class HomePage : ContentPage
             }
         }
         return false;
-    }
-
-    // ── Refresh ────────────────────────────────────────────────────
-
-    private async Task RefreshAsync()
-    {
-        try
-        {
-            VersionLabel.Text = AURA.Core.VersionInfo.FullName;
-
-            await Task.WhenAll(RefreshSystemOnlyAsync(), RefreshNetworkOnlyAsync());
-
-            var available = _agentManager.AvailableAssistants();
-            AgentsLabel.Text = available.Count == 0
-                ? "Nenhum agente CLI instalado no dispositivo. Use a aba Assistente."
-                : string.Join("  •  ", available.Select(a => a.Name));
-        }
-        catch (Exception ex)
-        {
-            VersionLabel.Text = "Erro ao coletar diagnóstico: " + ex.Message;
-        }
-    }
-
-    private async Task RefreshSystemOnlyAsync()
-    {
-        var diagnostics = await Task.Run(() => _systemAnalyzer.Analyze());
-        OsLabel.Text = "SO: " + diagnostics.OperatingSystem;
-        CpuLabel.Text = "Arquitetura: " + diagnostics.Architecture + "  |  Núcleos: " + diagnostics.ProcessorCount;
-        RamLabel.Text = $"RAM: {diagnostics.TotalMemoryGb:0.0} GB total / {diagnostics.AvailableMemoryGb:0.0} GB livre";
-        DiskLabel.Text = $"Disco {diagnostics.SystemDrive}: {diagnostics.FreeDiskSpaceGb:0.0}/{diagnostics.TotalDiskSpaceGb:0.0} GB";
-    }
-
-    private async Task RefreshNetworkOnlyAsync()
-    {
-        var network = await Task.Run(() => _networkManager.CheckConnection());
-        NetLabel.Text = network.Message
-            + (network.HasInternetAccess ? $"  (latência {network.LatencyMilliseconds} ms)" : "");
-        IpLabel.Text = "IP local: " + network.LocalIpAddress;
     }
 }
