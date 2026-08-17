@@ -1,15 +1,4 @@
 # CI + optional auto-merge workflow for feature branches / PRs
-# - Runs on pull_request events and manually (workflow_dispatch)
-# - Builds and runs tests (dotnet 10)
-# - Optionally auto-merges the PR when tests pass:
-#     * For pull_request events: auto-merge when the PR has the label "auto-merge"
-#     * For manual runs: pass input auto_merge = "true" and pr_number to auto-merge
-#
-# SECURITY: This workflow supports a PAT stored in repository secret COPILOT_PAT
-# (only required if you want the auto-merge feature). Create it with minimum scopes
-# needed (repo) and a short expiry. If you do not create the secret, the workflow
-# will still run CI but skip the auto-merge step.
-#
 name: CI and Optional Auto-merge
 
 on:
@@ -30,27 +19,69 @@ permissions:
   pull-requests: write
   actions: read
 
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+  DOTNET_GCHeapHardLimit: '1C0000000'
+  DOTNET_GCHeapCount: '2'
+
 jobs:
   build-and-test:
-    name: Build and Test (.NET 10)
+    name: Build and Test (.NET 10 + MAUI Android)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v3
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Go 1.23
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Setup Android SDK
+        run: |
+          ANDROID_SDK=/usr/local/lib/android/sdk
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$ANDROID_SDK" >> "$GITHUB_ENV"
+
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android
+
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore AURA.sln
+
+      - name: Restore MAUI Android packages
+        run: dotnet restore src/AURA.Mobile/AURA.Mobile.csproj
 
       - name: Build
-        run: dotnet build -c Release --no-restore
+        run: dotnet build AURA.sln -c Release --no-restore
 
       - name: Test
-        run: dotnet test -c Release --no-build --verbosity normal
+        run: dotnet test tests/AURA.Tests/AURA.Tests.csproj -c Release --no-build --verbosity normal
+
+      - name: Smoke test
+        run: bash scripts/smoke-test.sh
 
   auto-merge:
     name: Auto-merge PR (optional)
@@ -58,51 +89,31 @@ jobs:
     runs-on: ubuntu-latest
     if: needs.build-and-test.result == 'success'
     steps:
-      - name: Checkout (to get repo context)
-        uses: actions/checkout@v4
-
-      - name: Ensure gh CLI present
-        run: |
-          if ! command -v gh >/dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y gh
-          fi
-
       - name: Determine PR number and whether to merge
         id: decide
         env:
           EVENT_NAME: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -e
           PR_NUM=""
           SHOULD_MERGE="false"
 
-          if [ "${EVENT_NAME}" = "pull_request" ]; then
-            PR_NUM=${{ github.event.pull_request.number }}
-            echo "Triggered by pull_request event for PR #${PR_NUM}"
-            # check labels for "auto-merge"
-            labels=$(gh pr view "$PR_NUM" --json labels --jq '.labels[].name' || echo "")
-            echo "PR labels: $labels"
-            if echo "$labels" | grep -q -P '\bauto-merge\b'; then
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            PR_NUM="${{ github.event.pull_request.number }}"
+            labels=$(gh pr view "$PR_NUM" --json labels --jq '.labels[].name' || true)
+            if printf '%s\n' "$labels" | grep -qx 'auto-merge'; then
               SHOULD_MERGE="true"
             fi
           else
-            # manual dispatch
             PR_NUM="${{ github.event.inputs.pr_number }}"
-            if [ -z "$PR_NUM" ]; then
-              echo "No pr_number provided for manual run; skipping merge."
-              echo "should_merge=false" >> $GITHUB_OUTPUT
-              echo "pr_num=" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-            echo "Manual run for PR #${PR_NUM}"
-            if [ "${{ github.event.inputs.auto_merge }}" = "true" ]; then
+            if [ -n "$PR_NUM" ] && [ "${{ github.event.inputs.auto_merge }}" = "true" ]; then
               SHOULD_MERGE="true"
             fi
           fi
 
-          echo "should_merge=$SHOULD_MERGE" >> $GITHUB_OUTPUT
-          echo "pr_num=$PR_NUM" >> $GITHUB_OUTPUT
+          echo "should_merge=$SHOULD_MERGE" >> "$GITHUB_OUTPUT"
+          echo "pr_num=$PR_NUM" >> "$GITHUB_OUTPUT"
 
       - name: Login gh with PAT (if available)
         if: ${{ steps.decide.outputs.should_merge == 'true' }}
@@ -110,7 +121,7 @@ jobs:
           COPILOT_PAT: ${{ secrets.COPILOT_PAT }}
         run: |
           if [ -z "$COPILOT_PAT" ]; then
-            echo "COPILOT_PAT secret not found. Cannot perform auto-merge. Exiting."
+            echo "COPILOT_PAT secret not found. Skipping auto-merge."
             exit 0
           fi
           echo "$COPILOT_PAT" | gh auth login --with-token
@@ -121,15 +132,8 @@ jobs:
           PR: ${{ steps.decide.outputs.pr_num }}
         run: |
           set -e
-          echo "Attempting to auto-merge PR #$PR"
-          # show PR author and head repo info for debugging
-          gh pr view "$PR" --json number,title,author,headRefName,headRepositoryOwner,headRepository --jq '{number:.number,author:.author.login,headRef:.headRefName,headRepo:.headRepository.fullName}'
-          # perform squash merge and delete branch
-          gh pr merge "$PR" --squash --delete-branch --subject "feat(loja): LojaLocalResolver — local module resolver (F4)" || {
-            echo "Auto-merge failed (gh returned non-zero). See logs above."
-            exit 1
-          }
-          echo "PR #$PR merged (squash + branch deleted)."
+          gh pr view "$PR" --json number,title,author,headRefName,headRepositoryOwner,headRepository
+          gh pr merge "$PR" --squash --delete-branch
 
       - name: Skip message when not merging
         if: ${{ steps.decide.outputs.should_merge != 'true' }}
