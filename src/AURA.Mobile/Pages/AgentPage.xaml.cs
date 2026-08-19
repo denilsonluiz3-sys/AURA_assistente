@@ -6,6 +6,7 @@ using AURA.Mobile.Diagnostics;
 using AURA.Mobile.Speech;
 using AURA.Modules.Executors;
 using AURA.Mobile.Controls;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace AURA.Mobile.Pages;
 
