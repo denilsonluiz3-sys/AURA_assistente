@@ -25,8 +25,8 @@
                        TextColor="{DynamicResource AuraTextSecondary}" />
             </VerticalStackLayout>
 
-            <BindableLayout x:Name="ModulesHost">
-                <BindableLayout.ItemTemplate>
+            <CollectionView x:Name="ModulesHost">
+                <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="local:EcosystemModule">
                         <Border Margin="0,4"
                                 Padding="14"
@@ -57,7 +57,7 @@
                         </Border>
                     </DataTemplate>
                 </BindableLayout.ItemTemplate>
-            </BindableLayout>
+            </CollectionView>
 
         </VerticalStackLayout>
     </ScrollView>
