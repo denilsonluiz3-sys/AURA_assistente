@@ -25,7 +25,7 @@
                        TextColor="{DynamicResource AuraTextSecondary}" />
             </VerticalStackLayout>
 
-            <BindableLayout x:Name="ModulesHost">
+            <VerticalStackLayout x:Name="ModulesHost">
                 <BindableLayout.ItemTemplate>
                     <DataTemplate x:DataType="local:EcosystemModule">
                         <Border Margin="0,4"
@@ -57,7 +57,7 @@
                         </Border>
                     </DataTemplate>
                 </BindableLayout.ItemTemplate>
-            </BindableLayout>
+            </VerticalStackLayout>
 
         </VerticalStackLayout>
     </ScrollView>
