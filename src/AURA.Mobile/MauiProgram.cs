@@ -82,7 +82,7 @@ public static class MauiProgram
         // Agentes concretos (IAgent): memória, automação e wrapper de IA.
         builder.Services.AddSingleton<AURA.Agents.MemoryAgent>();
         builder.Services.AddSingleton<AURA.Agents.AutomationAgent>();
-        builder.Services.AddSingleton<AURA.Agents.AiAgent>();
+        builder.Services.AddSingleton<AURA.Agents.AIAgent>();
 
         // Runtime de células + runner ("AURA decide como rodar"), mesmo core do CLI.
         // Células ficam na pasta privada do app (sem permissão extra).
