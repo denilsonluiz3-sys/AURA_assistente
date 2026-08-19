@@ -1,5 +1,6 @@
 using AURA.AI;
 using AURA.Agents;
+using AURA.Abstractions.Execution;
 using AURA.Core.Configuration;
 using AURA.Core.Events;
 using AURA.Core.Logging;
@@ -76,7 +77,15 @@ public static class MauiProgram
         builder.Services.AddSingleton<GitExecutor>();
         builder.Services.AddSingleton<PythonExecutor>();
         builder.Services.AddSingleton<NodeExecutor>();
+        builder.Services.AddSingleton<IToolExecutor>(sp => sp.GetRequiredService<ShellExecutor>());
 
+        // Agentes concretos (IAgent): memória, automação e wrapper de IA.
+        builder.Services.AddSingleton<AURA.Agents.MemoryAgent>();
+        builder.Services.AddSingleton<AURA.Agents.AutomationAgent>();
+        builder.Services.AddSingleton<AURA.Agents.AiAgent>();
+
+        // Runtime de células + runner ("AURA decide como rodar"), mesmo core do CLI.
+        // Células ficam na pasta privada do app (sem permissão extra).
         builder.Services.AddSingleton(sp => new SimulationRuntime(
             sp.GetRequiredService<ILogger>(),
             Path.Combine(FileSystem.AppDataDirectory, "cells"),
