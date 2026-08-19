@@ -38,5 +38,4 @@ jobs:
 
       - name: Ban Anthropic (guard)
         shell: bash
-        run: |
-        
+       
