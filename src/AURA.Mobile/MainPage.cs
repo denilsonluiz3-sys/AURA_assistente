@@ -116,13 +116,14 @@ namespace AURA.Mobile
                 return;
 
             CurrentPage = section;
+            var navigationStack = section.Navigation.NavigationStack;
 
-            for (int i = 0; i < section.NavigationStack.Count; i++)
+            for (int i = 0; i < navigationStack.Count; i++)
             {
-                if (!ReferenceEquals(section.NavigationStack[i], entry.Page))
+                if (!ReferenceEquals(navigationStack[i], entry.Page))
                     continue;
 
-                while (section.NavigationStack.Count > i + 1)
+                while (section.Navigation.NavigationStack.Count > i + 1)
                     await section.PopAsync(false);
                 return;
             }
