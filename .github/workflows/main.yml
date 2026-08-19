@@ -52,7 +52,7 @@ jobs:
         run: dotnet build -c Release --no-restore
 
       - name: Test
-        run: dotnet test --no-build --verbosity normal
+        run: dotnet test --no-build -c Release --verbosity normal
 
   auto-merge:
     name: Auto-merge PR (optional)
