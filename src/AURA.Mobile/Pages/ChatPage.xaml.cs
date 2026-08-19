@@ -1,5 +1,5 @@
-using AURA.Agents;
 using AURA.AI;
+using AURA.Abstractions.Process;
 using AURA.Mobile.Diagnostics;
 using AURA.Mobile.Speech;
 
@@ -9,18 +9,18 @@ public partial class ChatPage : ContentPage
 {
     private readonly OpenRouterClient _client;
     private readonly AURA.Memory.MemoryStore _memory;
-    private readonly AuraOrchestrator _orchestrator;
+    private readonly IProcessOrchestrator _processEngine;
     private readonly VoiceAssistantService? _voice;
     private readonly AURA.Mobile.ProcessRegistry _processes;
 
     public ChatPage(OpenRouterClient client, AURA.Memory.MemoryStore memory,
-        AuraOrchestrator orchestrator, AURA.Mobile.ProcessRegistry processes,
+        IProcessOrchestrator processEngine, AURA.Mobile.ProcessRegistry processes,
         VoiceAssistantService? voice = null)
     {
         InitializeComponent();
         _client = client;
         _memory = memory;
-        _orchestrator = orchestrator;
+        _processEngine = processEngine;
         _processes = processes;
         _voice = voice;
         BindingContext = _processes;
@@ -74,14 +74,9 @@ public partial class ChatPage : ContentPage
         try
         {
             string answer;
-            if (string.IsNullOrWhiteSpace(RuntimeConfig.ApiKey) &&
-                string.IsNullOrWhiteSpace(_client.Options.ApiKey))
-            {
-                AnswerLabel.Text = "Orquestrando (memória+busca+execução)...";
-                process.Message = "Orquestrando memória, busca e execução";
-                answer = await _orchestrator.ExecuteAsync(question);
-            }
-            else
+            LlmHandler? llm = null;
+            if (!string.IsNullOrWhiteSpace(RuntimeConfig.ApiKey) ||
+                !string.IsNullOrWhiteSpace(_client.Options.ApiKey))
             {
                 string? readyError = RuntimeConfig.EnsureReadyForRequest(_client);
                 if (readyError != null)
@@ -91,8 +86,10 @@ public partial class ChatPage : ContentPage
                     return;
                 }
                 var assistant = new AiAssistant(_client, _memory);
-                answer = await assistant.AskAsync(question);
+                llm = (prompt, ct) => assistant.AskAsync(prompt);
             }
+
+            answer = await _processEngine.RunAsync(question, llm);
 
             AnswerLabel.Text = answer;
             _voice?.SetLastUtterance(answer);
