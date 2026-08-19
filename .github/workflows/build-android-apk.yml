@@ -2,7 +2,7 @@ name: build-android-apk
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - 'src/AURA.Mobile/**'
       - 'src/AURA.Abstractions/**'
@@ -14,6 +14,8 @@ on:
       - 'src/AURA.Network/**'
       - 'src/AURA.SystemInfo/**'
       - '.github/workflows/build-android-apk.yml'
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 env:
@@ -50,8 +52,8 @@ jobs:
 
       - name: Set Android SDK env vars
         run: |
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
 
       - name: Install MAUI Android workload
         run: dotnet workload install maui-android
@@ -93,7 +95,6 @@ jobs:
             -p:AndroidPackageFormats=apk \
             $SIGN_ARGS
 
-      # APK assinado com keystore de release (quando secret presente)
       - name: Upload APK release (assinado)
         if: env.KEYSTORE_PRESENT == '1'
         uses: actions/upload-artifact@v4
@@ -102,7 +103,6 @@ jobs:
           path: src/AURA.Mobile/bin/Release/net10.0-android/*-Signed.apk
           if-no-files-found: warn
 
-      # APK de debug (sempre disponível — útil para sideload de teste)
       - name: Upload APK debug (sem keystore)
         uses: actions/upload-artifact@v4
         with:
