@@ -40,7 +40,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
             echo "::error::Provedor/modelo banido encontrado no repo."
             exit 1
           fi
