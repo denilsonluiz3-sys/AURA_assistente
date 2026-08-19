@@ -78,7 +78,7 @@ namespace AURA.Tests
             string result = await engine.RunAsync("pesquise e execute a tarefa");
 
             Assert.Contains("Processo", result);
-            Assert.Contains("Instrução suficiente", result);
+            Assert.Contains("Sentença: Procedente", result);
             Assert.True(orch.Calls >= 1);
         }
 

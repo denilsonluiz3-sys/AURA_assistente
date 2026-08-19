@@ -181,7 +181,7 @@ namespace AURA.Agents
                 : new Verdict { Kind = VerdictKind.Procedente, Reason = "Instrução suficiente coletada" };
             state.AddDecision("sentença: " + state.Verdict.Kind);
 
-            return knowledge;
+            return "Sentença: " + state.Verdict.Kind + "\n\n" + knowledge;
         }
 
         private async Task<string> TryExecutionAsync(ProcessState state, string userCommand,
