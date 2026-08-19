@@ -74,8 +74,11 @@ jobs:
       - name: Restore MAUI Android packages
         run: dotnet restore src/AURA.Mobile/AURA.Mobile.csproj
 
-      - name: Build
+      - name: Build core solution
         run: dotnet build AURA.sln -c Release --no-restore
+
+      - name: Build Android
+        run: dotnet build src/AURA.Mobile/AURA.Mobile.csproj -c Release --no-restore
 
       - name: Test
         run: dotnet test tests/AURA.Tests/AURA.Tests.csproj -c Release --no-build --verbosity normal
@@ -98,20 +101,14 @@ jobs:
           set -e
           PR_NUM=""
           SHOULD_MERGE="false"
-
           if [ "$EVENT_NAME" = "pull_request" ]; then
             PR_NUM="${{ github.event.pull_request.number }}"
             labels=$(gh pr view "$PR_NUM" --json labels --jq '.labels[].name' || true)
-            if printf '%s\n' "$labels" | grep -qx 'auto-merge'; then
-              SHOULD_MERGE="true"
-            fi
+            if printf '%s\n' "$labels" | grep -qx 'auto-merge'; then SHOULD_MERGE="true"; fi
           else
             PR_NUM="${{ github.event.inputs.pr_number }}"
-            if [ -n "$PR_NUM" ] && [ "${{ github.event.inputs.auto_merge }}" = "true" ]; then
-              SHOULD_MERGE="true"
-            fi
+            if [ -n "$PR_NUM" ] && [ "${{ github.event.inputs.auto_merge }}" = "true" ]; then SHOULD_MERGE="true"; fi
           fi
-
           echo "should_merge=$SHOULD_MERGE" >> "$GITHUB_OUTPUT"
           echo "pr_num=$PR_NUM" >> "$GITHUB_OUTPUT"
 
@@ -120,20 +117,14 @@ jobs:
         env:
           COPILOT_PAT: ${{ secrets.COPILOT_PAT }}
         run: |
-          if [ -z "$COPILOT_PAT" ]; then
-            echo "COPILOT_PAT secret not found. Skipping auto-merge."
-            exit 0
-          fi
+          if [ -z "$COPILOT_PAT" ]; then echo "COPILOT_PAT secret not found. Skipping auto-merge."; exit 0; fi
           echo "$COPILOT_PAT" | gh auth login --with-token
 
       - name: Try auto-merge
         if: ${{ steps.decide.outputs.should_merge == 'true' }}
         env:
           PR: ${{ steps.decide.outputs.pr_num }}
-        run: |
-          set -e
-          gh pr view "$PR" --json number,title,author,headRefName,headRepositoryOwner,headRepository
-          gh pr merge "$PR" --squash --delete-branch
+        run: gh pr merge "$PR" --squash --delete-branch
 
       - name: Skip message when not merging
         if: ${{ steps.decide.outputs.should_merge != 'true' }}
