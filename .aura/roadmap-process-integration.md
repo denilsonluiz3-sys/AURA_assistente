@@ -25,3 +25,9 @@
 - [ ] Motor de conhecimento ampliado (perguntas frequentes embutidas e tópicos do sistema).
 
 Estado atual: o `LegalProcessEngine` conduz cada solicitação como um processo jurídico — conciliação via memória/conhecimento local, instrução com pesquisa, sentença (com LLM opcional), recurso com retry isolado, execução e arquivamento — publicando cada fase no `EventBus` para os mini-cards da Assistente. Validação contínua pelo GitHub Actions.
+- [ ] Associar tarefas planejadas a processos nomeados.
+- [ ] Dividir uma solicitação em múltiplas tarefas/Cells.
+- [ ] Retry isolado da tarefa que falhar.
+- [ ] Revisão dos resultados e composição final.
+
+Estado atual: a Assistente possui cards vivos para o fluxo normal e para o `AuraOrchestrator`; o orquestrador publica entendimento, planejamento, pesquisa, execução, revisão, falha e conclusão pelo `EventBus`. Próximo núcleo: tarefas nomeadas, divisão em múltiplas Cells, retry isolado e composição final. Validação contínua pelo GitHub Actions.
