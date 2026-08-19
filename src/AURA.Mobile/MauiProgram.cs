@@ -92,7 +92,8 @@ public static class MauiProgram
             sp.GetRequiredService<ILogger>(),
             sp.GetRequiredService<SolutionStore>(),
             sp.GetRequiredService<Runner>(),
-            sp.GetRequiredService<SimulationRuntime>()));
+            sp.GetRequiredService<SimulationRuntime>(),
+            events: sp.GetRequiredService<EventBus>()));
 
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<HomePage>();

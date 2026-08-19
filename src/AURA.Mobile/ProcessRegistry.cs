@@ -15,6 +15,7 @@ public sealed class ProcessRegistry
     {
         _events = events;
         _events.Subscribe<CellStateChangedEvent>(OnCellStateChanged);
+        _events.Subscribe<OrchestrationStepEvent>(OnOrchestrationStep);
     }
 
     public ProcessInfo Begin(string title, string target, string? message = null)
@@ -62,6 +63,50 @@ public sealed class ProcessRegistry
             process.Status = status;
             process.Message = message;
             process.Progress = Math.Clamp(progress, 0, 1);
+        });
+    }
+
+    private void OnOrchestrationStep(OrchestrationStepEvent evt)
+    {
+        if (string.IsNullOrWhiteSpace(evt.Id))
+            return;
+
+        ProcessInfo? process;
+        lock (_sync)
+            _byId.TryGetValue(evt.Id, out process);
+
+        if (process == null)
+        {
+            process = new ProcessInfo
+            {
+                Id = evt.Id,
+                Title = evt.Title,
+                Target = evt.Target,
+                Status = evt.Status,
+                Message = evt.Message,
+                Progress = Math.Clamp(evt.Progress, 0, 1),
+                StartedAt = evt.OccurredAt
+            };
+
+            lock (_sync)
+                _byId[process.Id] = process;
+
+            var created = process;
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                Processes.Insert(0, created);
+                Trim();
+            });
+            return;
+        }
+
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            process.Title = evt.Title;
+            process.Target = evt.Target;
+            process.Status = evt.Status;
+            process.Message = evt.Message;
+            process.Progress = Math.Clamp(evt.Progress, 0, 1);
         });
     }
 
