@@ -5,16 +5,17 @@ using System.Threading.Tasks;
 namespace AURA.Mobile.Speech
 {
     /// <summary>
-    /// 1) TTS Android nativo (texto livre).
-    /// 2) Kokoro só como último recurso — frases fora do dicionário NÃO disparam
-    ///    excessão ruidosa: apenas logam e seguem em silêncio (evita “só volume”).
+    /// Android native TTS service.
+    ///
+    /// KokoroSpeechService was removed from the mobile project; keep this
+    /// service focused on the native Android implementation so the project
+    /// does not retain a reference to a deleted type.
     /// </summary>
     public sealed class HybridSpeechService : ISpeechService
     {
         private readonly AndroidTtsSpeechService _android = new();
-        private readonly KokoroSpeechService _kokoro = new();
 
-        public bool IsReady => _android.IsReady || _kokoro.IsReady;
+        public bool IsReady => _android.IsReady;
 
         public async Task InitializeAsync(CancellationToken ct = default)
         {
@@ -34,7 +35,6 @@ namespace AURA.Mobile.Speech
             try
             {
                 await _android.SpeakAsync(text, ct).ConfigureAwait(false);
-                return;
             }
             catch (NotSupportedException) { }
             catch (InvalidOperationException) { }
@@ -43,27 +43,11 @@ namespace AURA.Mobile.Speech
             {
                 AuraLog.Exception("HybridSpeechService.AndroidTts", ex);
             }
-
-            // Kokoro: só frases curtas conhecidas; senão silêncio (não estoura volume)
-            try
-            {
-                await _kokoro.InitializeAsync(ct).ConfigureAwait(false);
-                await _kokoro.SpeakAsync(text, ct).ConfigureAwait(false);
-            }
-            catch (NotSupportedException)
-            {
-                AuraLog.Info("TTS: texto fora do alcance do motor atual, fala pulada.");
-            }
-            catch (Exception ex)
-            {
-                AuraLog.Exception("HybridSpeechService.Kokoro", ex);
-            }
         }
 
         public Task StopAsync()
         {
             try { _android.StopAsync(); } catch { }
-            try { _kokoro.StopAsync(); } catch { }
             return Task.CompletedTask;
         }
     }
