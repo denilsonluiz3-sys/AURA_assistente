@@ -120,7 +120,6 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<HomePage>();
-        builder.Services.AddSingleton<EcosystemPage>();
         builder.Services.AddSingleton<DiagnosticoPage>();
         builder.Services.AddSingleton<ChatPage>();
         builder.Services.AddSingleton<AgentPage>();
