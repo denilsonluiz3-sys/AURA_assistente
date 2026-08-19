@@ -17,6 +17,7 @@
 - [x] `ChatPage` roteia toda solicitação pelo `IProcessOrchestrator` (unifica chat + agentes).
 - [x] Retry isolado da etapa que falhar (fase recursal).
 - [x] Revisão dos resultados e composição final (arquivamento).
+- [x] `EcosystemPage`: visualização nativa do ecossistema (Chat, Agente, Células, Runtime, Shell, Python, Git) com navegação direta para as páginas reais.
 
 ## Próximo núcleo (pendente)
 - [ ] Dividir uma solicitação em múltiplas tarefas/Cells nomeadas.
