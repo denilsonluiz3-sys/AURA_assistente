@@ -1,0 +1,171 @@
+name: AURA CI Auto-Repair & Notification
+
+on:
+  workflow_run:
+    workflows: ["build-and-test"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: aura-ci-recovery-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    name: CI result summary
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    steps:
+      - name: Publish result
+        env:
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          {
+            echo "# AURA CI — resultado"
+            echo
+            echo "| Campo | Valor |"
+            echo "|---|---|"
+            echo "| Status | **${CONCLUSION}** |"
+            echo "| Branch | \`${BRANCH}\` |"
+            echo "| Commit | \`${SHA}\` |"
+            echo "| Run | ${RUN_URL} |"
+            echo
+            if [ "$CONCLUSION" = "success" ]; then
+              echo "✅ Build e testes concluídos com sucesso."
+            else
+              echo "❌ CI falhou. O job de Auto-Repair será acionado para falhas elegíveis."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  auto-repair:
+    name: Codex Auto-Repair
+    runs-on: ubuntu-latest
+    if: >-
+      ${{
+        github.event.workflow_run.conclusion == 'failure' &&
+        github.event.workflow_run.name == 'build-and-test' &&
+        !startsWith(github.event.workflow_run.head_branch, 'auto-repair/') &&
+        github.event.workflow_run.event != 'schedule'
+      }}
+    steps:
+      - name: Checkout failing revision
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Create isolated repair branch
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          git checkout -b "auto-repair/${RUN_ID}"
+          git config user.name "AURA Auto-Repair"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Collect failed CI logs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          REPO: ${{ github.repository }}
+        run: |
+          mkdir -p .aura-ci
+          gh run view "$RUN_ID" --repo "$REPO" --log-failed > .aura-ci/failed.log || true
+          gh run view "$RUN_ID" --repo "$REPO" --json conclusion,name,headBranch,headSha,url > .aura-ci/run.json
+          test -s .aura-ci/failed.log || echo "No failed log lines were returned; inspect the workflow configuration and source directly." > .aura-ci/failed.log
+
+      - name: Run Codex Auto-Repair
+        id: codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          permission-profile: ":workspace"
+          prompt: |
+            You are the AURA Lead Engineer performing one controlled auto-repair iteration.
+
+            Project: AURA
+            Stack: .NET 10, C#, MAUI Android, GitHub Actions, Termux-first.
+            Primary CI command: dotnet build AURA.sln -c Release --no-restore
+            Test command: dotnet test tests/AURA.Tests/AURA.Tests.csproj -c Release --no-build --verbosity normal
+
+            Read .aura-ci/failed.log and .aura-ci/run.json first. Then inspect the actual source,
+            project files, solution and existing architecture before changing anything.
+
+            Rules:
+            1. Fix the root cause, not symptoms.
+            2. Prepare affected files for the planned AuraOrchestrator architecture where naturally
+               compatible: clear interfaces, dependency-injection boundaries, structured state/logging
+               and isolated execution seams. Do not invent unrelated features.
+            3. Preserve existing working behavior.
+            4. Do not modify secrets, workflow permissions, or unrelated files.
+            5. Prefer the smallest coherent architectural fix that also supports Cells, ShellLauncher,
+               retry/restart, review and consolidation.
+            6. If the failure is infrastructure-only, do not fabricate a source fix.
+            7. Validate with available local commands when practical; do not depend on network access.
+            8. Do not update generated binaries.
+
+            Implement the fix directly in the workspace and leave it ready for commit.
+
+      - name: Detect changes
+        id: changes
+        run: |
+          rm -rf .aura-ci
+          git status --short
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit repair
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git add -A
+          git commit -m "fix(ci): auto-repair failed build"
+
+      - name: Push repair branch
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          BRANCH: auto-repair/${{ github.event.workflow_run.id }}
+        run: git push --set-upstream origin "$BRANCH"
+
+      - name: Open repair PR
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: auto-repair/${{ github.event.workflow_run.id }}
+          BASE: ${{ github.event.workflow_run.head_branch }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --head "$BRANCH" \
+            --base "$BASE" \
+            --title "fix(ci): auto-repair failed build #${{ github.event.workflow_run.id }}" \
+            --body "Automated repair generated from failed CI run: $RUN_URL\n\nCodex inspected the failed logs and repository source, applied a bounded fix, and opened this PR for validation."
+
+      - name: Publish repair summary
+        if: always()
+        env:
+          CHANGED: ${{ steps.changes.outputs.changed }}
+          CODEX_RESULT: ${{ steps.codex.outcome }}
+        run: |
+          {
+            echo "## 🤖 AURA Auto-Repair"
+            echo
+            echo "- Codex: **${CODEX_RESULT}**"
+            echo "- Alterações detectadas: **${CHANGED}**"
+            if [ "$CHANGED" = "true" ]; then
+              echo "- PR de reparo criado para nova validação."
+            else
+              echo "- Nenhuma alteração segura foi gerada."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
