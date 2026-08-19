@@ -11,40 +11,72 @@ namespace AURA.Core.Launchers
 
         public bool Supports(string filePath)
         {
-            if (string.IsNullOrWhiteSpace(filePath)) return false;
-            string ext = Path.GetExtension(filePath);
-            return Array.IndexOf(Extensions, ext) >= 0
-                || Array.IndexOf(Extensions, ext.ToLowerInvariant()) >= 0;
+            if (string.IsNullOrWhiteSpace(filePath))
+                return false;
+
+            string extension = Path.GetExtension(filePath);
+            return Array.Exists(Extensions, e => string.Equals(e, extension, StringComparison.OrdinalIgnoreCase));
         }
 
         public CellCommand BuildCommand(string filePath, string arguments)
         {
+            if (string.IsNullOrWhiteSpace(filePath))
+                throw new ArgumentException("O caminho do script não pode ser vazio.", nameof(filePath));
+
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException("Script não encontrado.", filePath);
+
             string shell = FindShell();
-            string args = "\"" + filePath + "\" " + (arguments ?? "").Trim();
-            return new CellCommand(shell, args);
+            string script = Quote(filePath);
+            string suffix = string.IsNullOrWhiteSpace(arguments) ? string.Empty : " " + arguments.Trim();
+
+            return new CellCommand(shell, script + suffix);
         }
 
         private static string FindShell()
         {
-            foreach (string c in new[] { "/system/bin/sh", "/bin/sh", "sh", "bash" })
+            if (!OperatingSystem.IsWindows())
             {
-                if (c.StartsWith("/") && File.Exists(c)) return c;
-                string onPath = FindOnPath(c);
-                if (onPath != null) return onPath;
+                foreach (string candidate in new[] { "/system/bin/sh", "/bin/sh", "sh", "bash" })
+                {
+                    string resolved = candidate.StartsWith("/", StringComparison.Ordinal)
+                        ? (File.Exists(candidate) ? candidate : null)
+                        : FindOnPath(candidate);
+
+                    if (!string.IsNullOrWhiteSpace(resolved))
+                        return resolved;
+                }
             }
-            return "/system/bin/sh";
+            else
+            {
+                foreach (string candidate in new[] { "bash", "sh" })
+                {
+                    string resolved = FindOnPath(candidate);
+                    if (!string.IsNullOrWhiteSpace(resolved))
+                        return resolved;
+                }
+            }
+
+            throw new PlatformNotSupportedException(
+                "Nenhum interpretador de shell compatível foi encontrado no ambiente atual.");
         }
 
         private static string FindOnPath(string name)
         {
-            string pathVar = Environment.GetEnvironmentVariable("PATH") ?? "";
-            foreach (string dir in pathVar.Split(Path.PathSeparator))
+            string path = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+            foreach (string directory in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
             {
-                if (string.IsNullOrWhiteSpace(dir)) continue;
-                string full = Path.Combine(dir, name);
-                if (File.Exists(full)) return full;
+                string candidate = Path.Combine(directory, name);
+                if (File.Exists(candidate))
+                    return candidate;
             }
+
             return null;
+        }
+
+        private static string Quote(string value)
+        {
+            return "\"" + value.Replace("\"", "\\\"", StringComparison.Ordinal) + "\"";
         }
     }
 }

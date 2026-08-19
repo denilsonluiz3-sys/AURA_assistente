@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using AURA.Abstractions.Execution;
 
@@ -13,35 +14,28 @@ public sealed class Detection
     public string Extension { get; set; } = string.Empty;
     public double Confidence { get; set; }
     public List<string> Hints { get; set; } = new();
-    public string DetectedBy { get; set; } = string.Empty; // "extension" | "shebang" | "content" | "magic"
+    public string DetectedBy { get; set; } = string.Empty;
 
     public bool Known => Language != "desconhecido";
 }
 
-/// <summary>
-/// Resultado da resolução do runtime (passo 2 do pipeline).
-/// Equivalente a <c>RuntimeResolution</c> do protótipo Python.
-/// </summary>
 public sealed class RuntimeResolution
 {
     public string Language { get; set; } = string.Empty;
-    public string? Binary { get; set; }          // caminho completo ou nome do binário
+    public string? Binary { get; set; }
     public string Version { get; set; } = string.Empty;
     public bool Available { get; set; }
-    public List<string> Missing { get; set; } = new();   // candidatos procurados
+    public List<string> Missing { get; set; } = new();
     public string MinVersionRequired { get; set; } = string.Empty;
     public bool VersionSatisfied { get; set; } = true;
     public string InstallHint { get; set; } = string.Empty;
     public string Detail { get; set; } = string.Empty;
 }
 
-/// <summary>
-/// Uma dependência detectada num arquivo (passo 3 do pipeline).
-/// </summary>
 public sealed class Dependency
 {
     public string Name { get; set; } = string.Empty;
-    public string Kind { get; set; } = "import";   // import | manifest | binary
+    public string Kind { get; set; } = "import";
     public string RequiredBy { get; set; } = string.Empty;
     public string InstallCommand { get; set; } = string.Empty;
     public bool IsRuntime { get; set; }
@@ -49,9 +43,6 @@ public sealed class Dependency
     public override string ToString() => $"{Kind}:{Name}";
 }
 
-/// <summary>
-/// Relatório de dependências detectadas.
-/// </summary>
 public sealed class DependencyReport
 {
     public string Language { get; set; } = string.Empty;
@@ -61,20 +52,14 @@ public sealed class DependencyReport
     public IReadOnlyList<Dependency> Packages => Dependencies.FindAll(d => !d.IsRuntime);
 }
 
-/// <summary>
-/// Resultado da validação de sintaxe (passo 4 do pipeline).
-/// </summary>
 public sealed class SyntaxResult
 {
     public bool Valid { get; set; }
-    public string Tool { get; set; } = string.Empty;   // ex.: "py_compile", "bash -n"
+    public string Tool { get; set; } = string.Empty;
     public List<string> Errors { get; set; } = new();
     public string Detail { get; set; } = string.Empty;
 }
 
-/// <summary>
-/// Relatório de compatibilidade (passo 5 do pipeline).
-/// </summary>
 public sealed class CompatReport
 {
     public bool RuntimeOk { get; set; }
@@ -85,22 +70,14 @@ public sealed class CompatReport
     public bool Ok => RuntimeOk && DependenciesOk && AuxiliaryOk;
 }
 
-/// <summary>Um passo do plano de instalação.</summary>
 public sealed record InstallStep(string What, string Command, bool IsRuntime);
 
-/// <summary>
-/// Plano de instalação gerado pelo installer (passo 6 do pipeline).
-/// </summary>
 public sealed class InstallPlan
 {
     public List<InstallStep> Steps { get; set; } = new();
     public bool Empty => Steps.Count == 0;
 }
 
-/// <summary>
-/// Resultado da execução (passo 8 do pipeline). Fábrica <see cref="From"/>
-/// converte um <see cref="ExecutionResult"/> existente da AURA.
-/// </summary>
 public sealed class ExecutionOutcome
 {
     public bool Success { get; set; }
@@ -127,7 +104,8 @@ public sealed class ExecutionOutcome
 }
 
 /// <summary>
-/// Resultado do pipeline completo (RuntimeManager).
+/// Resultado do pipeline completo. Mantém etapas, mensagens e timestamps para
+/// que o orquestrador possa publicar progresso e a UI possa revisar o resultado.
 /// </summary>
 public sealed class PipelineReport
 {
