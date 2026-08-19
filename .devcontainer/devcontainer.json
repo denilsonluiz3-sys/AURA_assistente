@@ -1,0 +1,44 @@
+{
+  "name": "AURA - Android APK",
+  "remoteUser": "root",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/dotnet:2": {
+      "version": "10.0.x"
+    },
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "17"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12"
+    },
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.23"
+    }
+  },
+  "containerEnv": {
+    "ANDROID_HOME": "/usr/local/android",
+    "ANDROID_SDK_ROOT": "/usr/local/android",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "DOTNET_NOLOGO": "1",
+    "DOTNET_GCHeapHardLimit": "1C0000000",
+    "DOTNET_GCHeapCount": "2"
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.vscode-dotnet-runtime"
+      ],
+      "settings": {
+        "dotnet.defaultSolution": "AURA.sln"
+      }
+    }
+  }
+}

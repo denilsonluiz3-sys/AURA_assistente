@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="AURA.Mobile.Pages.AgentPage"
+             Title="Agente"
+             BackgroundColor="{DynamicResource AuraBackground}">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+        <Border Grid.Row="0"
+                BackgroundColor="{DynamicResource AuraSurface}"
+                Stroke="{DynamicResource AuraBorder}"
+                StrokeThickness="1"
+                Padding="16,12"
+                StrokeShape="RoundRectangle 0,0,0,0">
+            <Grid ColumnDefinitions="*,Auto">
+                <VerticalStackLayout Spacing="2">
+                    <HorizontalStackLayout Spacing="6">
+                        <Label Text="◆" FontSize="14" TextColor="{DynamicResource AuraAccent}" />
+                        <Label Text="AGENTE" FontSize="11" FontAttributes="Bold" TextColor="{DynamicResource AuraAccent}" />
+                    </HorizontalStackLayout>
+                    <Label x:Name="WorkspaceLabel" FontSize="11" TextColor="{DynamicResource AuraTextSecondary}" LineBreakMode="TailTruncation" />
+                    <Label x:Name="ModelLabel" FontSize="10" TextColor="{DynamicResource AuraTextMuted}" LineBreakMode="TailTruncation" />
+                </VerticalStackLayout>
+                <Button Grid.Column="1" x:Name="ProjectButton" Text="📁 Vincular"
+                        Clicked="OnLinkProjectClicked" Style="{StaticResource BtnGhost}"
+                        VerticalOptions="Center" Padding="10,6" FontSize="12" />
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1" BackgroundColor="{DynamicResource AuraSurface}"
+                Stroke="{DynamicResource AuraBorder}" StrokeThickness="1"
+                Padding="10,7" StrokeShape="RoundRectangle 0,0,0,0">
+            <CollectionView x:Name="ProcessCards"
+                            ItemsSource="{Binding Processes}"
+                            ItemsLayout="HorizontalList"
+                            HeightRequest="92"
+                            SelectionMode="None">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Border WidthRequest="190" Margin="0,0,8,0"
+                                BackgroundColor="{DynamicResource AuraSurface2}"
+                                Stroke="{DynamicResource AuraBorder}" StrokeThickness="1"
+                                StrokeShape="RoundRectangle 12">
+                            <Grid Padding="10,7" RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
+                                <Label Grid.ColumnSpan="2" Text="{Binding Title}"
+                                       FontSize="11" FontAttributes="Bold"
+                                       TextColor="{DynamicResource AuraTextPrimary}"
+                                       LineBreakMode="TailTruncation" />
+                                <Label Grid.Row="1" Text="{Binding Status}"
+                                       FontSize="10" TextColor="{DynamicResource AuraAccent}" />
+                                <Button Grid.Row="1" Grid.Column="1" Text="Abrir"
+                                        Clicked="OnProcessCardClicked" FontSize="9"
+                                        Padding="7,2" HeightRequest="25"
+                                        Style="{StaticResource BtnGhost}" />
+                                <ProgressBar Grid.Row="2" Grid.ColumnSpan="2"
+                                             Progress="{Binding Progress}"
+                                             HeightRequest="3"
+                                             ProgressColor="{DynamicResource AuraAccent}" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </Border>
+
+        <ScrollView x:Name="ConversationScroll" Grid.Row="2">
+            <VerticalStackLayout x:Name="ConversationContainer" Spacing="6" Padding="14,12" />
+        </ScrollView>
+
+        <Border Grid.Row="3" BackgroundColor="{DynamicResource AuraSurface}"
+                Stroke="{DynamicResource AuraBorder}" StrokeThickness="1"
+                Padding="12,10" StrokeShape="RoundRectangle 0,0,0,0">
+            <VerticalStackLayout Spacing="8">
+                <ContentView x:Name="ConfigHost" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Border BackgroundColor="{DynamicResource AuraSurface2}"
+                            Stroke="{DynamicResource AuraBorder}" StrokeThickness="1"
+                            Padding="12,6" StrokeShape="RoundRectangle 12,12,12,12">
+                        <Editor x:Name="CommandEditor" MinimumHeightRequest="40" MaximumHeightRequest="120"
+                                Placeholder="Instrua o agente…" AutoSize="TextChanges" BackgroundColor="Transparent" />
+                    </Border>
+                    <Grid Grid.Column="1" WidthRequest="44" HeightRequest="44" VerticalOptions="End">
+                        <Button x:Name="RunButton" Text="▶" Clicked="OnRunClicked"
+                                BackgroundColor="{DynamicResource AuraAccent}" TextColor="White"
+                                CornerRadius="22" FontSize="16" Padding="0" WidthRequest="44" HeightRequest="44" />
+                        <ActivityIndicator x:Name="BusyIndicator" IsRunning="False" IsVisible="False"
+                                           Color="White" WidthRequest="22" HeightRequest="22"
+                                           HorizontalOptions="Center" VerticalOptions="Center" />
+                    </Grid>
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+    </Grid>
+</ContentPage>

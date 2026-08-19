@@ -16,7 +16,7 @@ namespace AURA.Abstractions.Execution
         public List<string> Arguments { get; set; } = new List<string>();
 
         /// <summary>Diretório de trabalho do processo. Null = diretório atual.</summary>
-        public string? WorkingDirectory { get; set; }
+        public string WorkingDirectory { get; set; }
 
         /// <summary>Variáveis de ambiente adicionais aplicadas ao processo.</summary>
         public IDictionary<string, string>? EnvironmentVariables { get; set; }

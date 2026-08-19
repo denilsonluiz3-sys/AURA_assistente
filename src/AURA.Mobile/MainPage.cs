@@ -14,6 +14,7 @@ namespace AURA.Mobile
             EventBus events,
             ModuleManager manager,
             HomePage home,
+            DiagnosticoPage diagnostico,
             ChatPage chat,
             AgentPage agent,
             MemoryPage memory,
@@ -24,9 +25,7 @@ namespace AURA.Mobile
             TerminalPage terminal,
             BrowserPage browser,
             CellsPage cells,
-            RunPage run,
-            ConfigPage config,
-            AgentesPage agentes)
+            RunPage run)
         {
             AuraLog.Info("MainPage.ctor BEGIN");
             _manager = manager;
@@ -35,7 +34,8 @@ namespace AURA.Mobile
                 MainThread.BeginInvokeOnMainThread(RebuildTabs));
             _entries = new List<(string?, string, string, Page)>
             {
-                ("system", "Sistema", "Início", home),
+                (null, "Sistema", "Início", home),
+                ("system", "Sistema", "Diagnóstico", diagnostico),
                 ("logs", "Sistema", "Logs", logs),
                 ("logs", "Sistema", "Correções", fixes),
                 ("ai", "Assistente", "Chat", chat),
@@ -51,7 +51,6 @@ namespace AURA.Mobile
 
             BarBackgroundColor = Color.FromArgb("#0c0c12");
             BarTextColor = Color.FromArgb("#e8e8f0");
-
             AuraLog.Info("MainPage.ctor OK");
         }
 
@@ -81,10 +80,6 @@ namespace AURA.Mobile
             }
         }
 
-        /// <summary>
-        /// Reconstrói as abas: só entra o núcleo (Módulos/Navegador) e os
-        /// módulos que já foram baixados e aplicados.
-        /// </summary>
         public void RebuildTabs()
         {
             Children.Clear();
@@ -98,14 +93,43 @@ namespace AURA.Mobile
                     .ToArray();
 
                 if (items.Length == 0)
-                {
                     continue;
-                }
 
                 Children.Add(MakeSection(group.Key, items));
             }
 
             AuraLog.Info("MainPage.RebuildTabs: " + Children.Count + " seções ativas");
+        }
+
+        public async Task NavigateToProcessAsync(string target)
+        {
+            var entry = _entries.FirstOrDefault(e =>
+                string.Equals(e.Label, target, StringComparison.OrdinalIgnoreCase));
+
+            if (entry.Page == null)
+                return;
+
+            var section = Children.OfType<NavigationPage>()
+                .FirstOrDefault(n => string.Equals(n.Title, entry.Section, StringComparison.OrdinalIgnoreCase));
+
+            if (section == null)
+                return;
+
+            CurrentPage = section;
+            var navigationStack = section.Navigation.NavigationStack;
+
+            for (int i = 0; i < navigationStack.Count; i++)
+            {
+                if (!ReferenceEquals(navigationStack[i], entry.Page))
+                    continue;
+
+                while (section.Navigation.NavigationStack.Count > i + 1)
+                    await section.PopAsync(false);
+                return;
+            }
+
+            if (entry.Page.Parent == null)
+                await section.PushAsync(entry.Page);
         }
 
         private static NavigationPage MakeSection(string title, params (string Label, Page Page)[] items)

@@ -1,5 +1,6 @@
 using AURA.AI;
 using AURA.Agents;
+using AURA.Abstractions.Execution;
 using AURA.Core.Configuration;
 using AURA.Core.Events;
 using AURA.Core.Logging;
@@ -12,6 +13,7 @@ using AURA.Modules.Executors;
 using AURA.Network;
 using AURA.SystemInfo;
 using AURA.Mobile.Speech;
+using CommunityToolkit.Maui;
 
 namespace AURA.Mobile;
 
@@ -22,42 +24,36 @@ public static class MauiProgram
         AuraLog.Info("MauiProgram.CreateMauiApp BEGIN");
         var builder = MauiApp.CreateBuilder();
         builder
-            .UseMauiApp<App>();
+            .UseMauiApp<App>()
+            .UseMauiCommunityToolkitMediaElement(isAndroidForegroundServiceEnabled: false);
 
 #if ANDROID
-        // Handler Android do WebView: mantém o comportamento do MAUI e corrige
-        // rolagem + downloads + target=_blank (ver AuraWebViewHandler).
         builder.ConfigureMauiHandlers(handlers =>
             handlers.AddHandler<Microsoft.Maui.Controls.WebView, AURA.Mobile.Platforms.Android.WebView.AuraWebViewHandler>());
 #endif
 
         AuraLog.Info("MauiProgram: builder created");
 
-        // --- Infraestrutura AURA (mesmo Core/Abstractions usados no CLI) ---
         builder.Services.AddSingleton<ILogger, ConsoleLogger>();
         builder.Services.AddSingleton<EventBus>();
 
-        // Configuração persistida (settings.json/modules.json na pasta privada do app).
         string configDir = Path.Combine(FileSystem.AppDataDirectory, "config");
         builder.Services.AddSingleton(sp => new ConfigLoader(sp.GetRequiredService<ILogger>())
             .LoadSettings(Path.Combine(configDir, "settings.json")));
         builder.Services.AddSingleton(sp => new ConfigLoader(sp.GetRequiredService<ILogger>())
             .LoadModules(Path.Combine(configDir, "modules.json")));
 
-        // Gestor de módulos opcionais: baixa o pacote, aplica (ativa em
-        // modules.json) e remove (desativa + limpa dados locais).
         builder.Services.AddSingleton(sp => new ModuleManager(
             sp.GetRequiredService<ILogger>(),
             Path.Combine(FileSystem.AppDataDirectory, "modules"),
             Path.Combine(configDir, "modules.json"),
-            sp.GetRequiredService<EventBus>()));
+            sp.GetRequiredService<EventBus>(),
+            localPackageProvider: ReadEmbeddedModulePackageAsync));
 
-        // Memória persistente do app: pasta privada do Android (sem permissão extra).
         builder.Services.AddSingleton(sp => new MemoryStore(
             sp.GetRequiredService<ILogger>(),
             Path.Combine(FileSystem.AppDataDirectory, "memory.json")));
 
-        // IA — mesma stack do AURA.AI usado no CLI.
         builder.Services.AddSingleton(sp => new OpenRouterClient(new OpenRouterOptions
         {
             ApiKey = Preferences.Default.Get("ai_api_key", string.Empty),
@@ -67,9 +63,6 @@ public static class MauiProgram
         }, sp.GetRequiredService<ILogger>()));
         builder.Services.AddSingleton<AiAssistant>();
 
-        // Voz da AURA: TTS nativo do Android (texto arbitrário, offline, pt-br)
-        // com Kokoro on-device como fallback. O VoiceAssistantService guarda a
-        // última resposta e expõe falar/parar para o botão flutuante.
         builder.Services.AddSingleton<ISpeechService, HybridSpeechService>();
         builder.Services.AddSingleton<VoiceAssistantService>();
 
@@ -80,11 +73,16 @@ public static class MauiProgram
         builder.Services.AddSingleton<SystemAnalyzer>();
         builder.Services.AddSingleton<NetworkManager>();
 
-        // Executores do repo (Shell/Git/Python/Node) expostos na UI de status.
         builder.Services.AddSingleton<ShellExecutor>();
         builder.Services.AddSingleton<GitExecutor>();
         builder.Services.AddSingleton<PythonExecutor>();
         builder.Services.AddSingleton<NodeExecutor>();
+        builder.Services.AddSingleton<IToolExecutor>(sp => sp.GetRequiredService<ShellExecutor>());
+
+        // Agentes concretos (IAgent): memória, automação e wrapper de IA.
+        builder.Services.AddSingleton<AURA.Agents.MemoryAgent>();
+        builder.Services.AddSingleton<AURA.Agents.AutomationAgent>();
+        builder.Services.AddSingleton<AURA.Agents.AIAgent>();
 
         // Runtime de células + runner ("AURA decide como rodar"), mesmo core do CLI.
         // Células ficam na pasta privada do app (sem permissão extra).
@@ -96,10 +94,19 @@ public static class MauiProgram
             Events = sp.GetRequiredService<EventBus>()
         });
         builder.Services.AddSingleton<Runner>();
+        builder.Services.AddSingleton<ProcessRegistry>();
 
-        // Páginas
+        builder.Services.AddSingleton<SolutionStore>();
+        builder.Services.AddSingleton(sp => new AuraOrchestrator(
+            sp.GetRequiredService<ILogger>(),
+            sp.GetRequiredService<SolutionStore>(),
+            sp.GetRequiredService<Runner>(),
+            sp.GetRequiredService<SimulationRuntime>(),
+            events: sp.GetRequiredService<EventBus>()));
+
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<HomePage>();
+        builder.Services.AddSingleton<DiagnosticoPage>();
         builder.Services.AddSingleton<ChatPage>();
         builder.Services.AddSingleton<AgentPage>();
         builder.Services.AddSingleton<MemoryPage>();
@@ -112,14 +119,11 @@ public static class MauiProgram
         builder.Services.AddSingleton<ImageSearchPage>();
         builder.Services.AddSingleton<CellsPage>();
         builder.Services.AddSingleton<RunPage>();
-        builder.Services.AddSingleton<ConfigPage>();
-        builder.Services.AddSingleton<AgentesPage>();
 
         AuraLog.Info("MauiProgram: services registered");
 
         var app = builder.Build();
 
-        // Memória registra eventos de ciclo de vida das células (reativa MemoryKind.CellEvent).
         try
         {
             var bus = app.Services.GetRequiredService<EventBus>();
@@ -134,5 +138,39 @@ public static class MauiProgram
 
         AuraLog.Info("MauiProgram.CreateMauiApp OK");
         return app;
+    }
+
+    private static async Task<string?> ReadEmbeddedModulePackageAsync(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return null;
+
+        string[] candidates =
+        {
+            $"modulepkgs/{id}/module.json",
+            $"modulepkgs\\{id}\\module.json"
+        };
+
+        foreach (string path in candidates)
+        {
+            try
+            {
+                using Stream stream = await FileSystem.OpenAppPackageFileAsync(path);
+                using var reader = new StreamReader(stream);
+                string json = await reader.ReadToEndAsync();
+                if (!string.IsNullOrWhiteSpace(json))
+                {
+                    AuraLog.Info($"Pacote embarcado lido para o módulo '{id}' ({path}).");
+                    return json;
+                }
+            }
+            catch (Exception ex)
+            {
+                AuraLog.Info($"Asset '{path}' indisponível ({ex.GetType().Name}).");
+            }
+        }
+
+        AuraLog.Warning($"Nenhum pacote embarcado encontrado para o módulo '{id}'.");
+        return null;
     }
 }

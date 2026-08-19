@@ -1,0 +1,8 @@
+{
+  "id": "ai",
+  "name": "IA",
+  "version": "1.0.0",
+  "description": "Assistente inteligente: chat com a IA (OpenRouter) e agente de arquivos com ferramentas.",
+  "features": ["Chat", "Agente", "Workspace e ferramentas"],
+  "pages": ["ChatPage", "AgentPage"]
+}

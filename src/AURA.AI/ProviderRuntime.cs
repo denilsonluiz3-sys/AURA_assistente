@@ -1,0 +1,127 @@
+using System;
+
+namespace AURA.AI
+{
+    /// <summary>
+    /// Resolve o provedor/modelo ativo da AURA.
+    /// A configuração vem do catálogo; segredos vêm somente do ambiente.
+    /// </summary>
+    public sealed class ProviderRuntime
+    {
+        public ProviderInfo Provider { get; }
+        public ProviderModel Model { get; }
+        public string ApiKey { get; }
+        public string KeyEnv { get; }
+
+        private ProviderRuntime(
+            ProviderInfo provider,
+            ProviderModel model,
+            string apiKey,
+            string keyEnv)
+        {
+            Provider = provider;
+            Model = model;
+            ApiKey = apiKey;
+            KeyEnv = keyEnv;
+        }
+
+        public static ProviderRuntime Load()
+        {
+            string providerName =
+                Environment.GetEnvironmentVariable("AURA_PROVIDER")
+                ?? "openai";
+
+            string? modelName =
+                Environment.GetEnvironmentVariable("AURA_MODEL");
+
+            ProviderInfo? provider =
+                ProviderCatalog.Find(providerName);
+
+            if (provider == null)
+            {
+                throw new InvalidOperationException(
+                    $"Provedor '{providerName}' não encontrado no catálogo.");
+            }
+
+            ProviderModel? model = null;
+
+            if (!string.IsNullOrWhiteSpace(modelName))
+            {
+                foreach (ProviderModel candidate in provider.Models)
+                {
+                    if (string.Equals(
+                        candidate.Id,
+                        modelName,
+                        StringComparison.OrdinalIgnoreCase))
+                    {
+                        model = candidate;
+                        break;
+                    }
+                }
+            }
+
+            model ??= provider.Models.Count > 0
+                ? provider.Models[0]
+                : new ProviderModel
+                {
+                    Id = string.Empty,
+                    Label = "modelo padrão"
+                };
+
+            string keyEnv = provider.KeyEnv ?? string.Empty;
+
+            string apiKey = string.IsNullOrWhiteSpace(keyEnv)
+                ? string.Empty
+                : Environment.GetEnvironmentVariable(keyEnv)
+                    ?? string.Empty;
+
+            return new ProviderRuntime(
+                provider,
+                model,
+                apiKey,
+                keyEnv);
+        }
+
+        /// <summary>
+        /// Recarrega o catálogo de providers e cria um novo runtime.
+        /// </summary>
+        public static ProviderRuntime Reload()
+        {
+            ProviderCatalog.Reload();
+            return Load();
+        }
+
+        public OpenRouterOptions CreateOptions()
+        {
+            return new OpenRouterOptions
+            {
+                Provider = Provider.Id,
+                ApiKey = ApiKey,
+                BaseUrl = Provider.BaseUrl,
+                Model = Model.Id,
+                MaxTokens = 1500,
+                TimeoutSeconds = 120,
+                AppReference = "AURA",
+                AuthHeaderName = Provider.AuthHeaderName,
+                AuthScheme = Provider.AuthScheme,
+                ApiFormat = Provider.ApiFormat,
+            };
+        }
+
+        public static string Describe(ProviderRuntime runtime)
+        {
+            string keyStatus =
+                string.IsNullOrWhiteSpace(runtime.KeyEnv)
+                    ? "não necessária"
+                    : string.IsNullOrWhiteSpace(runtime.ApiKey)
+                        ? runtime.KeyEnv + " AUSENTE"
+                        : runtime.KeyEnv + " CONFIGURADA";
+
+            return
+                $"Provedor: {runtime.Provider.Name}\n" +
+                $"Modelo: {runtime.Model.Id}\n" +
+                $"Endpoint: {runtime.Provider.BaseUrl}\n" +
+                $"Chave: {keyStatus}";
+        }
+    }
+}

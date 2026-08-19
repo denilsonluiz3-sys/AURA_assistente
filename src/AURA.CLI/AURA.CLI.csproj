@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>AURA.CLI</AssemblyName>
+    <RootNamespace>AURA.CLI</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AURA.Core\AURA.Core.csproj" />
+    <ProjectReference Include="..\AURA.SystemInfo\AURA.SystemInfo.csproj" />
+    <ProjectReference Include="..\AURA.Network\AURA.Network.csproj" />
+    <ProjectReference Include="..\AURA.Modules\AURA.Modules.csproj" />
+    <ProjectReference Include="..\AURA.Agents\AURA.Agents.csproj" />
+    <ProjectReference Include="..\AURA.AI\AURA.AI.csproj" />
+    <ProjectReference Include="..\AURA.Windows\AURA.Windows.csproj" />
+  </ItemGroup>
+
+</Project>

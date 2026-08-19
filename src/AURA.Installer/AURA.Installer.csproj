@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>AURA.Installer</AssemblyName>
+    <RootNamespace>AURA.Installer</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AURA.Modules\AURA.Modules.csproj" />
+    <ProjectReference Include="..\AURA.SystemInfo\AURA.SystemInfo.csproj" />
+  </ItemGroup>
+
+</Project>

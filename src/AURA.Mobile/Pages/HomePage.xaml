@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:Class="AURA.Mobile.Pages.HomePage"
+             Title="Início"
+             BackgroundColor="{DynamicResource AuraBackground}">
+
+    <Grid RowDefinitions="*,Auto" Padding="0">
+
+        <!-- Fundo de vídeo (Lua/aurora = Lunar, Sol/aurora = Solar). Ocupa a tela inteira. -->
+        <toolkit:MediaElement x:Name="BgVideo"
+                              Grid.RowSpan="2"
+                              Aspect="AspectFill"
+                              ShouldAutoPlay="True"
+                              ShouldLoopPlayback="True"
+                              ShouldMute="True"
+                              Volume="0"
+                              HorizontalOptions="Fill"
+                              VerticalOptions="Fill" />
+
+        <!-- ── Header sobre o fundo ─────────────────────────── -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Padding="20,24,20,16"
+              VerticalOptions="Start" BackgroundColor="Transparent">
+            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                <Label Text="A U R A"
+                       FontSize="32"
+                       FontAttributes="Bold"
+                       TextColor="{DynamicResource AuraAccent}" />
+                <Label x:Name="VersionLabel"
+                       FontSize="12"
+                       TextColor="{DynamicResource AuraTextSecondary}" />
+            </VerticalStackLayout>
+            <Button x:Name="BtnTheme"
+                    Grid.Column="1"
+                    Text="☾"
+                    FontSize="20"
+                    BackgroundColor="Transparent"
+                    TextColor="{DynamicResource AuraAccent}"
+                    WidthRequest="44"
+                    HeightRequest="44"
+                    Padding="0"
+                    VerticalOptions="Start"
+                    Clicked="OnThemeToggleClicked" />
+        </Grid>
+
+        <!-- ── Bottom bar glass (estilo AuraGlassBar) ── -->
+        <Border Grid.Row="1"
+                Style="{StaticResource AuraGlassBar}"
+                Margin="12,0,12,12">
+            <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="4">
+
+                <VerticalStackLayout Grid.Column="0" Spacing="2" HorizontalOptions="Center">
+                    <Button x:Name="BtnInicio"
+                            Text="⌂"
+                            FontSize="18"
+                            BackgroundColor="Transparent"
+                            TextColor="{DynamicResource AuraCyan}"
+                            Padding="0"
+                            HeightRequest="36"
+                            Clicked="OnInicioClicked" />
+                    <Label Text="Início"
+                           FontSize="9"
+                           TextColor="{DynamicResource AuraCyan}"
+                           HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Grid.Column="1" Spacing="2" HorizontalOptions="Center">
+                    <Button x:Name="BtnDiagnostico"
+                            Text="◎"
+                            FontSize="18"
+                            BackgroundColor="Transparent"
+                            TextColor="{DynamicResource AuraTextPrimary}"
+                            Padding="0"
+                            HeightRequest="36"
+                            Clicked="OnDiagnosticoClicked" />
+                    <Label Text="Diagnóstico"
+                           FontSize="9"
+                           TextColor="{DynamicResource AuraTextSecondary}"
+                           HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Grid.Column="2" Spacing="2" HorizontalOptions="Center">
+                    <Button x:Name="BtnModulos"
+                            Text="⊞"
+                            FontSize="18"
+                            BackgroundColor="Transparent"
+                            TextColor="{DynamicResource AuraTextPrimary}"
+                            Padding="0"
+                            HeightRequest="36"
+                            Clicked="OnModulosClicked" />
+                    <Label Text="Módulos"
+                           FontSize="9"
+                           TextColor="{DynamicResource AuraTextSecondary}"
+                           HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Grid.Column="3" Spacing="2" HorizontalOptions="Center">
+                    <Button x:Name="BtnAgentes"
+                            Text="◆"
+                            FontSize="18"
+                            BackgroundColor="Transparent"
+                            TextColor="{DynamicResource AuraTextPrimary}"
+                            Padding="0"
+                            HeightRequest="36"
+                            Clicked="OnAgentesClicked" />
+                    <Label Text="Agentes"
+                           FontSize="9"
+                           TextColor="{DynamicResource AuraTextSecondary}"
+                           HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Grid.Column="4" Spacing="2" HorizontalOptions="Center">
+                    <Button x:Name="BtnConfig"
+                            Text="⚙"
+                            FontSize="18"
+                            BackgroundColor="Transparent"
+                            TextColor="{DynamicResource AuraTextPrimary}"
+                            Padding="0"
+                            HeightRequest="36"
+                            Clicked="OnConfigClicked" />
+                    <Label Text="Config"
+                           FontSize="9"
+                           TextColor="{DynamicResource AuraTextSecondary}"
+                           HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+
+            </Grid>
+        </Border>
+
+    </Grid>
+</ContentPage>
