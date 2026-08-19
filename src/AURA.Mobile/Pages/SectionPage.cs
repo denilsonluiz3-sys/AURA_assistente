@@ -5,7 +5,7 @@ file static class SectionIcons
     private static readonly Dictionary<string, string> Map = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Sistema"] = "⚙", ["Assistente"] = "◈", ["Ferramentas"] = "⬡", ["Apps"] = "▣",
-        ["Início"] = "⌂", ["Logs"] = "≡", ["Correções"] = "⚕", ["Chat"] = "◉",
+        ["Início"] = "⌂", ["Ecossistema"] = "✦", ["Logs"] = "≡", ["Correções"] = "⚕", ["Chat"] = "◉",
         ["Agente"] = "◆", ["Memória"] = "⬟", ["Terminal"] = ">_", ["Executores"] = "▶",
         ["Módulos"] = "⊞", ["Navegador"] = "⊕", ["Células"] = "⬡", ["Rodar programa"] = "▷",
         ["Diagnóstico"] = "◎",

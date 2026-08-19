@@ -25,7 +25,8 @@ namespace AURA.Mobile
             TerminalPage terminal,
             BrowserPage browser,
             CellsPage cells,
-            RunPage run)
+            RunPage run,
+            EcosystemPage ecosystem)
         {
             AuraLog.Info("MainPage.ctor BEGIN");
             _manager = manager;
@@ -35,6 +36,7 @@ namespace AURA.Mobile
             _entries = new List<(string?, string, string, Page)>
             {
                 (null, "Sistema", "Início", home),
+                (null, "Sistema", "Ecossistema", ecosystem),
                 ("system", "Sistema", "Diagnóstico", diagnostico),
                 ("logs", "Sistema", "Logs", logs),
                 ("logs", "Sistema", "Correções", fixes),

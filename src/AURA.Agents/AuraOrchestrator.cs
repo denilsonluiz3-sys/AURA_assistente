@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using AURA.Abstractions.Orchestration;
 using AURA.Core.Events;
 using AURA.Core.Logging;
 using AURA.Core.Launchers;
@@ -18,7 +19,7 @@ namespace AURA.Agents
     /// Loop Sense → Plan → Act → Verify sem depender de LLM pago.
     /// Publica o estado de cada execução para a interface acompanhar em tempo real.
     /// </summary>
-    public sealed class AuraOrchestrator
+    public sealed class AuraOrchestrator : IOrchestrator
     {
         private const int MaxSteps = 5;
         private readonly ILogger _logger;

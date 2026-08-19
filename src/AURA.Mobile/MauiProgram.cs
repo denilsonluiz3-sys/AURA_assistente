@@ -83,6 +83,13 @@ public static class MauiProgram
         builder.Services.AddSingleton<AURA.Agents.MemoryAgent>();
         builder.Services.AddSingleton<AURA.Agents.AutomationAgent>();
         builder.Services.AddSingleton<AURA.Agents.AIAgent>();
+        builder.Services.AddSingleton<AURA.Core.Abstractions.IAgent>(sp => sp.GetRequiredService<AURA.Agents.MemoryAgent>());
+        builder.Services.AddSingleton<AURA.Core.Abstractions.IAgent>(sp => sp.GetRequiredService<AURA.Agents.AutomationAgent>());
+        builder.Services.AddSingleton<AURA.Core.Abstractions.IAgent>(sp => sp.GetRequiredService<AURA.Agents.AIAgent>());
+        builder.Services.AddSingleton(sp => new AURA.Core.Knowledge.KnowledgeManager(
+            Path.Combine(FileSystem.AppDataDirectory, "knowledge"),
+            sp.GetRequiredService<ILogger>()));
+        builder.Services.AddSingleton<AURA.Core.Abstractions.IAgent>(sp => sp.GetRequiredService<AURA.Core.Knowledge.KnowledgeManager>());
 
         // Runtime de células + runner ("AURA decide como rodar"), mesmo core do CLI.
         // Células ficam na pasta privada do app (sem permissão extra).
@@ -103,9 +110,17 @@ public static class MauiProgram
             sp.GetRequiredService<Runner>(),
             sp.GetRequiredService<SimulationRuntime>(),
             events: sp.GetRequiredService<EventBus>()));
+        builder.Services.AddSingleton<AURA.Abstractions.Orchestration.IOrchestrator>(sp => sp.GetRequiredService<AuraOrchestrator>());
+        builder.Services.AddSingleton<AURA.Abstractions.Process.IProcessOrchestrator>(sp =>
+            new AURA.Agents.LegalProcessEngine(
+                sp.GetRequiredService<ILogger>(),
+                sp.GetServices<AURA.Core.Abstractions.IAgent>(),
+                sp.GetRequiredService<AURA.Abstractions.Orchestration.IOrchestrator>(),
+                sp.GetRequiredService<EventBus>()));
 
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<HomePage>();
+        builder.Services.AddSingleton<EcosystemPage>();
         builder.Services.AddSingleton<DiagnosticoPage>();
         builder.Services.AddSingleton<ChatPage>();
         builder.Services.AddSingleton<AgentPage>();
