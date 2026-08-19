@@ -96,6 +96,20 @@ public partial class RunPage : ContentPage
             return;
         }
 
+        // RunPage launches a concrete executable. Shell commands and multiline
+        // scripts belong to TerminalPage, which executes them through /bin/sh.
+        // Rejecting them here prevents ProcessStart from treating the whole
+        // script as an executable path and producing misleading path-length
+        // or working-directory errors.
+        if (!string.IsNullOrWhiteSpace(exe) && (exe.Contains('\n') || exe.Contains('\r')))
+        {
+            ResultLabel.Text =
+                "Entrada inválida: cole comandos/scripts na aba Terminal. " +
+                "Aqui informe apenas o caminho do executável (ex.: /system/bin/sh).";
+            AuraLog.Warning("RunPage: entrada multiline rejeitada como executável; use TerminalPage para scripts.");
+            return;
+        }
+
         BusyIndicator.IsRunning = true;
         BusyIndicator.IsVisible = true;
 
