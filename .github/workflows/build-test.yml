@@ -33,13 +33,14 @@ jobs:
           restore-keys: |
             nuget-${{ runner.os }}-
 
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
       - name: Ban Anthropic (guard)
         shell: bash
         run: |
           set -euo pipefail
-          if grep -RniE --exclude-dir=.git --exclude-dir=bin --exclude-dir=obj \
-            --exclude='build-test.yml' --exclude='OpenRouterClient.cs' \
-            'anthropic|claude' .; then
+
             echo "::error::Provedor/modelo banido encontrado no repo."
             exit 1
           fi
