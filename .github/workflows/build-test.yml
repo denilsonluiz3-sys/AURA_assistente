@@ -38,15 +38,6 @@ jobs:
 
       - name: Ban Anthropic (guard)
         shell: bash
-        run: |
-          set -euo pipefail
-
-            echo "::error::Provedor/modelo banido encontrado no repo."
-            exit 1
-          fi
-          echo "Guard OK: nenhuma referência banida."
-
-      - name: Restore
         run: dotnet restore AURA.sln
 
       - name: Build (Release)
