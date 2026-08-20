@@ -34,6 +34,7 @@ namespace AURA.Agents
         private readonly ToolResolver _toolResolver;
         private readonly IAiClient? _fallbackClient;
         private readonly bool _enableFallback;
+        private readonly FileTool? _fileTool;
 
         public AuraOrchestrator(
             ILogger logger,
@@ -46,7 +47,8 @@ namespace AURA.Agents
             PolicyGuard? policyGuard = null,
             ToolResolver? toolResolver = null,
             IAiClient? fallbackClient = null,
-            bool enableFallback = false)
+            bool enableFallback = false,
+            FileTool? fileTool = null)
         {
             _logger = logger ?? new ConsoleLogger();
             _memory = memory ?? throw new ArgumentNullException(nameof(memory));
@@ -56,6 +58,7 @@ namespace AURA.Agents
             _events = events;
             _intentResolver = intentResolver ?? new HeuristicIntentResolver();
             _policyGuard = policyGuard ?? new PolicyGuard();
+            _fileTool = fileTool;
             _toolResolver = toolResolver ?? CreateToolResolver();
             _fallbackClient = fallbackClient;
             _enableFallback = enableFallback && fallbackClient != null;
@@ -139,7 +142,7 @@ namespace AURA.Agents
 
         private ToolResolver CreateToolResolver()
         {
-            return new ToolResolver(new ITool[]
+            var tools = new List<ITool>
             {
                 new SearchTool(SearchWithRefinementAsync),
                 new RunTool(ExecuteExistingRunnerAsync),
@@ -148,7 +151,12 @@ namespace AURA.Agents
                     string result = await SearchWithRefinementAsync(command, ct).ConfigureAwait(false);
                     return new ToolResult(!string.IsNullOrWhiteSpace(result), result);
                 })
-            });
+            };
+
+            if (_fileTool != null)
+                tools.Add(_fileTool);
+
+            return new ToolResolver(tools);
         }
 
         private async Task<ToolResult> ExecuteExistingRunnerAsync(string command, CancellationToken ct)
@@ -225,7 +233,7 @@ namespace AURA.Agents
             string html = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
             var list = new List<(string, string)>();
-            var re = new Regex(@"<a[^>]+href=""(https?://[^""]+)""[^>]*>([^<]+)</a>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            var re = new Regex(@"<a[^>]+href=\"\"(https?://[^\"\"]+)\"\"[^>]*>([^<]+)</a>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
             foreach (Match m in re.Matches(html))
             {
                 string href = m.Groups[1].Value;
