@@ -78,6 +78,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<PythonExecutor>();
         builder.Services.AddSingleton<NodeExecutor>();
         builder.Services.AddSingleton<IToolExecutor>(sp => sp.GetRequiredService<ShellExecutor>());
+        builder.Services.AddSingleton<AURA.Core.Abstractions.IWebSearch, AURA.Core.WebSearchService>();
 
         // Agentes concretos (IAgent): memória, automação e wrapper de IA.
         builder.Services.AddSingleton<AURA.Agents.MemoryAgent>();

@@ -166,6 +166,11 @@ namespace AURA.CLI
                     case "agent":
                         AgentCommand(parts);
                         break;
+                    case "ensinar":
+                    case "aprender":
+                    case "professora":
+                        EnsinarCommand(parts).GetAwaiter().GetResult();
+                        break;
                     case "aichave":
                         AiKeyCommand(parts);
                         break;
@@ -457,6 +462,84 @@ namespace AURA.CLI
             }
         }
 
+        private static void EnsinarCommand(string[] parts)
+        {
+            string task = string.Join(" ", parts.Skip(1)).Trim();
+            if (string.IsNullOrWhiteSpace(task))
+            {
+                Console.WriteLine("Uso: ensinar <descrição da tarefa>");
+                Console.WriteLine("Exemplo: ensinar como baixar um arquivo com Python");
+                return;
+            }
+
+            string workspace = Path.Combine(UserAuraDir(), "workspace");
+            Directory.CreateDirectory(workspace);
+
+            var webSearch = new WebSearchService();
+            OpenRouterClient? client = null;
+            if (!string.IsNullOrWhiteSpace(ReadAiKey()))
+            {
+                try { client = EnsureAiClient(); } catch { client = null; }
+            }
+
+            var tools = new System.Collections.Generic.List<AgentTool>
+            {
+                new InterpretCommandTool(),
+                new SearchMemoryTool(new SolutionStore(_logger)),
+                new WebSearchTool(webSearch),
+                new CodeExtractorTool(webSearch, client),
+                new CodeExecutorTool(Shell, workspace),
+                new ShellAgentTool(workspace, Shell),
+                new WebFetchTool()
+            };
+
+            string systemPrompt =
+                "Você é a AURA Professora. Dada uma tarefa de aprendizado, " +
+                "execute o fluxo: 1) busque na memória por tarefas similares; " +
+                "2) pesquise na web exemplos; 3) extraia o código; " +
+                "4) execute o código e valide o resultado. " +
+                "Se o código falhar, tente novamente com ajustes. " +
+                "Responda em português com o que aprendeu e o resultado final. " +
+                "Workspace: " + workspace;
+
+            var session = new AgentSession(
+                client ?? new OpenRouterClient(new OpenRouterOptions(), _logger),
+                tools, systemPrompt, _logger, _memory);
+
+            session.Step += step =>
+            {
+                Console.WriteLine();
+                Console.WriteLine("  ◆ " + step.ToolName + " " + step.Arguments);
+                if (!string.IsNullOrWhiteSpace(step.Result))
+                {
+                    Console.WriteLine("    " + step.Result.Replace("\n", "\n    "));
+                }
+            };
+
+            Console.WriteLine("🧠 AURA está aprendendo...");
+            Console.WriteLine("📝 Tarefa: " + task);
+            Console.WriteLine("Modelo: " + (client?.Options.Model ?? "heurístico") + " · workspace: " + workspace);
+            Console.WriteLine();
+
+            try
+            {
+                string answer = session.RunAsync(
+                    "Ensinar: " + task,
+                    client != null ? SharedHttpClient : null).GetAwaiter().GetResult();
+
+                _memory.Append(MemoryEntry.Answer($"ensinar:{task}", answer));
+
+                Console.WriteLine();
+                Console.WriteLine("=== RESULTADO DO APRENDIZADO ===");
+                Console.WriteLine(answer);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Erro: " + ex.Message);
+                _logger.Error(ex.ToString());
+            }
+        }
+
         private static void AiKeyCommand(string[] parts)
         {
             if (parts.Length < 2)
@@ -482,6 +565,21 @@ namespace AURA.CLI
         private static string UserAuraDir()
         {
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".aura");
+        }
+
+        private static string ReadAiKey()
+        {
+            string apiKey = Environment.GetEnvironmentVariable("OPENROUTER_API_KEY") ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                string keyFile = Path.Combine(UserAuraDir(), "ai_key.txt");
+                if (File.Exists(keyFile))
+                {
+                    apiKey = File.ReadAllText(keyFile).Trim();
+                }
+            }
+
+            return apiKey;
         }
 
         private static OpenRouterClient EnsureAiClient(string? model = null)
@@ -774,6 +872,7 @@ namespace AURA.CLI
             Console.WriteLine("  ask \"pergunta\"          Pergunta via assistente, logada em célula");
             Console.WriteLine("  chat \"pergunta\"          Pergunta direta à IA (OpenRouter) [--model x]");
             Console.WriteLine("  agent \"instrução\"        Agente de arquivos num workspace (IA + ferramentas)");
+            Console.WriteLine("  ensinar \"tarefa\"         AURA Professora: pesquisa, extrai e executa código");
             Console.WriteLine("  aichave <sk-or-...>      Salva a chave da IA em ~/.aura/ai_key.txt");
             Console.WriteLine("  exec <shell|git|python|node> <cmd> [args]   Executa via executor");
             Console.WriteLine("  run aichat --cell chat  Inicia assistente como célula");
