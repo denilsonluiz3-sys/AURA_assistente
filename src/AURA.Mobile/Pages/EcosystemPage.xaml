@@ -1,49 +1,64 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:AURA.Mobile.Pages"
              x:Class="AURA.Mobile.Pages.EcosystemPage"
-             Title="Ecossistema AURA"
+             Title="Ecossistema"
              BackgroundColor="{DynamicResource AuraBackground}">
-    
-    <Grid RowDefinitions="Auto,*" Padding="16" RowSpacing="10">
-        
-        <Label Text="🌌 Ecossistema AURA"
-               FontAttributes="Bold"
-               FontSize="18"
-               TextColor="{DynamicResource AuraTextPrimary}" />
-        
-        <CollectionView Grid.Row="1" 
-                        x:Name="ModulesCollection"
-                        ItemsSource="{Binding Modules}">
-            <CollectionView.ItemTemplate>
-                <DataTemplate>
-                    <Grid Padding="10" 
-                          BackgroundColor="{DynamicResource AuraSurface}"
-                          CornerRadius="8"
-                          Margin="0,5">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <Label Grid.Column="0" 
-                               Text="{Binding Icon}"
-                               FontSize="24"
-                               VerticalOptions="Center"/>
-                        
-                        <VerticalStackLayout Grid.Column="1" 
-                                             Margin="10,0,0,0">
-                            <Label Text="{Binding Name}"
-                                   FontAttributes="Bold"
-                                   TextColor="{DynamicResource AuraTextPrimary}"/>
-                            <Label Text="{Binding Description}"
-                                   FontSize="12"
-                                   TextColor="{DynamicResource AuraTextSecondary}"/>
-                        </VerticalStackLayout>
-                    </Grid>
-                </DataTemplate>
-            </CollectionView.ItemTemplate>
-        </CollectionView>
-        
-    </Grid>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20,24,20,32" Spacing="16">
+
+            <VerticalStackLayout Spacing="4">
+                <Label Text="ECOSSISTEMA AURA"
+                       FontAttributes="Bold"
+                       FontSize="11"
+                       CharacterSpacing="2"
+                       TextColor="{DynamicResource AuraAccent}" />
+                <Label Text="Uma inteligência central para orquestrar tudo."
+                       FontAttributes="Bold"
+                       FontSize="22"
+                       TextColor="{DynamicResource AuraTextPrimary}" />
+                <Label Text="AURA conecta conversas, agentes, células independentes e ferramentas de desenvolvimento em um núcleo operacional único — vivo, expansível e pronto para executar."
+                       FontSize="14"
+                       LineHeight="1.4"
+                       TextColor="{DynamicResource AuraTextSecondary}" />
+            </VerticalStackLayout>
+
+            <CollectionView x:Name="ModulesCollection" SelectionMode="None">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="local:EcosystemModule">
+                        <Border Margin="0,4"
+                                Padding="14"
+                                StrokeThickness="1"
+                                Stroke="#2a3a6a"
+                                StrokeShape="RoundRectangle 14"
+                                BackgroundColor="{DynamicResource AuraSurface}">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnModuleTapped" />
+                            </Border.GestureRecognizers>
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                                <Label Grid.Column="0"
+                                       Text="{Binding Icon}"
+                                       FontSize="26"
+                                       HorizontalOptions="Center"
+                                       VerticalOptions="Center" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                    <Label Text="{Binding Label}"
+                                           FontAttributes="Bold"
+                                           FontSize="16"
+                                           TextColor="{DynamicResource AuraTextPrimary}" />
+                                    <Label Text="{Binding Description}"
+                                           FontSize="13"
+                                           LineBreakMode="WordWrap"
+                                           TextColor="{DynamicResource AuraTextSecondary}" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+        </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>
