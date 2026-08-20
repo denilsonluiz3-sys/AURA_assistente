@@ -16,10 +16,6 @@ using AURA.Memory;
 
 namespace AURA.Agents
 {
-    /// <summary>
-    /// Loop Sense → Plan → Act → Verify com decisão local determinística.
-    /// IA externa, quando configurada, existe somente como fallback opcional.
-    /// </summary>
     public sealed class AuraOrchestrator : IOrchestrator
     {
         private const int MaxSteps = 5;
@@ -37,20 +33,7 @@ namespace AURA.Agents
         private readonly FileTool? _fileTool;
         private readonly IAndroidCapabilityService? _androidCapabilities;
 
-        public AuraOrchestrator(
-            ILogger logger,
-            SolutionStore memory,
-            Runner runner,
-            SimulationRuntime runtime,
-            HttpClient? httpClient = null,
-            EventBus? events = null,
-            IIntentResolver? intentResolver = null,
-            PolicyGuard? policyGuard = null,
-            ToolResolver? toolResolver = null,
-            IAiClient? fallbackClient = null,
-            bool enableFallback = false,
-            FileTool? fileTool = null,
-            IAndroidCapabilityService? androidCapabilities = null)
+        public AuraOrchestrator(ILogger logger, SolutionStore memory, Runner runner, SimulationRuntime runtime, HttpClient? httpClient = null, EventBus? events = null, IIntentResolver? intentResolver = null, PolicyGuard? policyGuard = null, ToolResolver? toolResolver = null, IAiClient? fallbackClient = null, bool enableFallback = false, FileTool? fileTool = null, IAndroidCapabilityService? androidCapabilities = null)
         {
             _logger = logger ?? new ConsoleLogger();
             _memory = memory ?? throw new ArgumentNullException(nameof(memory));
@@ -69,9 +52,7 @@ namespace AURA.Agents
 
         public async Task<string> ExecuteAsync(string userCommand, CancellationToken ct = default, bool confirmed = false)
         {
-            if (string.IsNullOrWhiteSpace(userCommand))
-                return "Comando vazio.";
-
+            if (string.IsNullOrWhiteSpace(userCommand)) return "Comando vazio.";
             userCommand = userCommand.Trim();
             string normalized = userCommand.ToLowerInvariant();
             string processId = "orchestration:" + Guid.NewGuid().ToString("N");
@@ -80,10 +61,7 @@ namespace AURA.Agents
 
             IntentResult intent = _intentResolver.Resolve(normalized);
             AuthorizationResult auth = _policyGuard.Authorize(intent.Intent, userCommand);
-
-            if (auth.Decision == AuthorizationDecision.Blocked)
-                return "❌ Comando não autorizado: " + userCommand;
-
+            if (auth.Decision == AuthorizationDecision.Blocked) return "❌ Comando não autorizado: " + userCommand;
             if (auth.Decision == AuthorizationDecision.RequiresConfirmation && !confirmed)
             {
                 Publish(processId, "Política", "PolicyGuard", "Aguardando", auth.Message, 0.15);
@@ -102,7 +80,6 @@ namespace AURA.Agents
             {
                 ct.ThrowIfCancellationRequested();
                 Publish(processId, "Orquestração", "Planejamento", "Executando", "Passo " + step + "/" + MaxSteps + " — " + intent.Intent, Math.Min(0.1 + step * 0.08, 0.3));
-
                 ToolResult result;
                 try
                 {
@@ -135,11 +112,9 @@ namespace AURA.Agents
                         return result.Output + "\n\n❌ Fallback falhou: " + ex.Message;
                     }
                 }
-
                 Publish(processId, "Orquestração", "Assistente", "Falhou", result.Output, 1);
                 return result.Output;
             }
-
             return "Limite de passos. Seja mais específico.";
         }
 
@@ -155,10 +130,7 @@ namespace AURA.Agents
                     return new ToolResult(!string.IsNullOrWhiteSpace(result), result);
                 })
             };
-
-            if (_fileTool != null)
-                tools.Add(_fileTool);
-
+            if (_fileTool != null) tools.Add(_fileTool);
             if (_androidCapabilities != null)
             {
                 tools.Add(new AndroidTool(async (command, parameters, ct) =>
@@ -181,31 +153,24 @@ namespace AURA.Agents
                         "audio" => _androidCapabilities.GetAudio(),
                         _ => _androidCapabilities.GetAll()
                     };
-
                     return new ToolResult(true, output);
                 }));
             }
-
             return new ToolResolver(tools);
         }
 
         private string ResolveSensor(string command)
         {
-            if (command.Contains("luz", StringComparison.OrdinalIgnoreCase) || command.Contains("light", StringComparison.OrdinalIgnoreCase))
-                return _androidCapabilities!.GetLight();
-            if (command.Contains("giroscop", StringComparison.OrdinalIgnoreCase) || command.Contains("gyroscope", StringComparison.OrdinalIgnoreCase))
-                return _androidCapabilities!.GetGyroscope();
-            if (command.Contains("magnet", StringComparison.OrdinalIgnoreCase))
-                return _androidCapabilities!.GetMagnetometer();
+            if (command.Contains("luz", StringComparison.OrdinalIgnoreCase) || command.Contains("light", StringComparison.OrdinalIgnoreCase)) return _androidCapabilities!.GetLight();
+            if (command.Contains("giroscop", StringComparison.OrdinalIgnoreCase) || command.Contains("gyroscope", StringComparison.OrdinalIgnoreCase)) return _androidCapabilities!.GetGyroscope();
+            if (command.Contains("magnet", StringComparison.OrdinalIgnoreCase)) return _androidCapabilities!.GetMagnetometer();
             return _androidCapabilities!.GetAccelerometer();
         }
 
         private async Task<ToolResult> ExecuteExistingRunnerAsync(string command, CancellationToken ct)
         {
             string path = ExtractFilePath(command);
-            if (path == null || !_runner.CanRun(path))
-                return new ToolResult(false, "❌ Arquivo não encontrado ou não suportado: " + (path ?? command));
-
+            if (path == null || !_runner.CanRun(path)) return new ToolResult(false, "❌ Arquivo não encontrado ou não suportado: " + (path ?? command));
             Publish("tool:" + Guid.NewGuid().ToString("N"), "Execução", "Cells", "Executando", "Executando " + path, 0.55);
             try
             {
@@ -225,16 +190,7 @@ namespace AURA.Agents
 
         private void Publish(string id, string title, string target, string status, string message, double progress)
         {
-            _events?.Publish(new OrchestrationStepEvent
-            {
-                Id = id,
-                Title = title,
-                Target = target,
-                Status = status,
-                Message = message,
-                Progress = Math.Clamp(progress, 0, 1),
-                OccurredAt = DateTime.UtcNow
-            });
+            _events?.Publish(new OrchestrationStepEvent { Id = id, Title = title, Target = target, Status = status, Message = message, Progress = Math.Clamp(progress, 0, 1), OccurredAt = DateTime.UtcNow });
         }
 
         public async Task<string> SearchWithRefinementAsync(string query, CancellationToken ct = default)
@@ -247,14 +203,10 @@ namespace AURA.Agents
                 {
                     await Task.Delay(Random.Shared.Next(400, 1200), ct).ConfigureAwait(false);
                     List<(string Title, string Url)> results = await SearchDuckDuckGoLiteAsync(current, ct).ConfigureAwait(false);
-                    if (results.Count > 0)
-                        return FormatResults(results);
+                    if (results.Count > 0) return FormatResults(results);
                     current = RefineQuery(query, i);
                 }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
+                catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
                     _logger.Warning("[SEARCH] " + ex.Message);
@@ -274,7 +226,7 @@ namespace AURA.Agents
             string html = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
             var list = new List<(string, string)>();
-            var re = new Regex(@"<a[^>]+href=\"\"(https?://[^\"\"]+)\"\"[^>]*>([^<]+)</a>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            var re = new Regex(@"<a[^>]+href=""(https?://[^""]+)""[^>]*>([^<]+)</a>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
             foreach (Match m in re.Matches(html))
             {
                 string href = m.Groups[1].Value;
@@ -290,8 +242,7 @@ namespace AURA.Agents
         {
             var sb = new StringBuilder();
             sb.AppendLine("## Resultados da Web:");
-            foreach ((string Title, string Url) r in results)
-                sb.AppendLine("- **" + r.Title + "**: " + r.Url);
+            foreach ((string Title, string Url) r in results) sb.AppendLine("- **" + r.Title + "**: " + r.Url);
             return sb.ToString();
         }
 
