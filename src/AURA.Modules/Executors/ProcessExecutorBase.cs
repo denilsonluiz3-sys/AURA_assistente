@@ -39,6 +39,40 @@ public abstract class ProcessExecutorBase : IToolExecutor
         return result;
     }
 
+    /// <summary>Configura PATH/LD_LIBRARY_PATH do Termux ao executar binários dele.</summary>
+    private static void ApplyTermuxEnvironment(ProcessStartInfo psi, string fileName)
+    {
+        const string termuxRoot = "/data/data/com.termux/files/usr";
+        if (!OperatingSystem.IsAndroid() || !fileName.StartsWith(termuxRoot, StringComparison.Ordinal))
+            return;
+
+        var binDir = Path.Combine(termuxRoot, "bin");
+        var libDir = Path.Combine(termuxRoot, "lib");
+        var home = Path.Combine("/data/data/com.termux/files/home");
+
+        if (!psi.Environment.ContainsKey("PATH"))
+        {
+            var currentPath = psi.Environment.TryGetValue("PATH", out var existingPath)
+                ? existingPath
+                : Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+            psi.Environment["PATH"] = binDir + Path.PathSeparator + currentPath;
+        }
+        else
+        {
+            psi.Environment["PATH"] = binDir + Path.PathSeparator + psi.Environment["PATH"];
+        }
+
+        if (Directory.Exists(libDir))
+        {
+            psi.Environment["LD_LIBRARY_PATH"] = libDir;
+        }
+
+        if (!psi.Environment.ContainsKey("HOME") && Directory.Exists(home))
+        {
+            psi.Environment["HOME"] = home;
+        }
+    }
+
     private static List<string> BuildShellCommand(string fileName, IEnumerable<string> arguments)
     {
         var escapedArgs = string.Join(" ", arguments.Select(a => a.Contains(' ') ? $"'{a}'" : a));
@@ -60,6 +94,8 @@ public abstract class ProcessExecutorBase : IToolExecutor
             UseShellExecute = false,
             CreateNoWindow = true
         };
+
+        ApplyTermuxEnvironment(psi, fileName);
 
         foreach (var arg in arguments)
             psi.ArgumentList.Add(arg);
@@ -117,11 +153,30 @@ public abstract class ProcessExecutorBase : IToolExecutor
         };
     }
 
-    /// <summary>Procura o primeiro binário disponível dentre os candidatos, olhando o PATH.</summary>
+    /// <summary>
+    /// Procura o primeiro binário disponível dentre os candidatos. Além do
+    /// PATH, procura nos diretórios do Termux (Android), onde o app não
+    /// costuma ter acesso via variável de ambiente.
+    /// </summary>
     protected static string? ResolveBinary(params string[] candidates)
     {
         var pathEnv = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
-        var dirs = pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+        var dirs = pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries).ToList();
+
+        if (OperatingSystem.IsAndroid())
+        {
+            string[] termuxDirs =
+            {
+                "/data/data/com.termux/files/usr/bin",
+                "/data/data/com.termux/files/usr/local/bin",
+                "/data/data/com.termux/files/home/.local/bin"
+            };
+            foreach (var termuxDir in termuxDirs)
+            {
+                if (!dirs.Contains(termuxDir))
+                    dirs.Add(termuxDir);
+            }
+        }
 
         foreach (var candidate in candidates)
         {

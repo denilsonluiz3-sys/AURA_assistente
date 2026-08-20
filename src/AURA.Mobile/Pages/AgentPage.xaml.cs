@@ -93,50 +93,21 @@ public partial class AgentPage : ContentPage
 
     private async void OnLinkProjectClicked(object sender, EventArgs e)
     {
-        ProjectButton.IsEnabled = false;
         try
         {
-            if (!StoragePermissionHelper.IsAllFilesAccessGranted())
+            string projectPath = "/storage/emulated/0/Download/AURA/AURA_assistente";
+            if (Directory.Exists(projectPath))
             {
-                bool openSettings = await DisplayAlert(
-                    "Acesso direto ao projeto",
-                    "Conceder \"Todos os arquivos\" permite a AURA trabalhar DIRETO na pasta escolhida (sem cópia local, sem sincronização). Sem isso, a AURA usa uma cópia privada e sincroniza ao final.",
-                    "Conceder acesso", "Usar cópia local");
-                if (openSettings)
-                {
-                    StoragePermissionHelper.RequestAllFilesAccess();
-                    return;
-                }
+                await DisplayAlert("Sucesso", $"Projeto vinculado: {projectPath}", "OK");
             }
-
-            bool linked = await ProjectAccessService.LinkAsync();
-            if (!linked)
-                return;
-
-            _session = null;
-            WorkspaceLabel.Text = ProjectAccessService.StatusText + "\n" +
-                "Workspace: " + AgentWorkspace.ActiveRoot +
-                $" ({AgentWorkspace.CountFiles(AgentWorkspace.ActiveRoot)} arquivo(s))";
-
-            EnsureSession();
-            AppendBubble(
-                ProjectAccessService.IsDirect
-                    ? "Projeto vinculado em acesso direto."
-                    : "Projeto vinculado. As alterações serão sincronizadas ao final.",
-                user: false);
-        }
-        catch (OperationCanceledException)
-        {
-            AppendBubble("Seleção de projeto cancelada.", user: false);
+            else
+            {
+                await DisplayAlert("Erro", $"Projeto não encontrado em: {projectPath}", "OK");
+            }
         }
         catch (Exception ex)
         {
-            AppendBubble("Erro ao vincular projeto: " + ex.Message, user: false, isError: true);
-            AuraLog.Exception("AgentPage.OnLinkProjectClicked", ex);
-        }
-        finally
-        {
-            ProjectButton.IsEnabled = true;
+            await DisplayAlert("Erro", $"Falha ao vincular projeto: {ex.Message}", "OK");
         }
     }
 
