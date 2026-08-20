@@ -28,8 +28,8 @@ jobs:
             --repo "${{ github.repository }}" \
             --state open \
             --base main \
-            --json number,isDraft,headRefName \
-            --jq '.[] | select(.isDraft == false) | .number' \
+            --json number \
+            --jq '.[].number' \
           | while read -r pr; do
               [ -n "$pr" ] || continue
               echo "Updating PR #$pr from main..."
