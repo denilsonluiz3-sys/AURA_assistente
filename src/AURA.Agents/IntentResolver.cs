@@ -36,18 +36,57 @@ namespace AURA.Agents
                 return Result("list_files", 0.90, command, "liste", "listar", "ls");
 
             if (ContainsAny(command, "bateria", "battery"))
-                return Result("android_battery", 0.85, command, "bateria", "battery");
+                return AndroidResult(command, "battery", 0.85, "bateria", "battery");
 
-            if (ContainsAny(command, "sensor", "luz", "acelerometro", "acelerômetro"))
-                return Result("android_sensor", 0.80, command, "sensor", "luz", "acelerometro", "acelerômetro");
+            if (ContainsAny(command, "sensor", "luz", "acelerometro", "acelerômetro", "giroscopio", "giroscópio", "magnetometro", "magnetômetro"))
+                return AndroidResult(command, "sensor", 0.80, "sensor", "luz", "acelerometro", "acelerômetro", "giroscopio", "giroscópio", "magnetometro", "magnetômetro");
 
             if (ContainsAny(command, "gps", "localização", "localizacao"))
-                return Result("android_location", 0.80, command, "gps", "localização", "localizacao");
+                return AndroidResult(command, "location", 0.80, "gps", "localização", "localizacao");
 
             if (ContainsAny(command, "camera", "câmera"))
-                return Result("android_camera", 0.80, command, "camera", "câmera");
+                return AndroidResult(command, "camera", 0.80, "camera", "câmera");
+
+            if (ContainsAny(command, "bluetooth"))
+                return AndroidResult(command, "bluetooth", 0.80, "bluetooth");
+
+            if (ContainsAny(command, "clipboard", "área de transferência", "area de transferencia"))
+                return AndroidResult(command, "clipboard", 0.80, "clipboard", "área de transferência", "area de transferencia");
+
+            if (ContainsAny(command, "memória do dispositivo", "memoria do dispositivo"))
+                return AndroidResult(command, "memory", 0.80, "memória do dispositivo", "memoria do dispositivo");
+
+            if (ContainsAny(command, "armazenamento", "storage"))
+                return AndroidResult(command, "storage", 0.80, "armazenamento", "storage");
+
+            if (ContainsAny(command, "aplicativos instalados", "apps instalados"))
+                return AndroidResult(command, "apps", 0.80, "aplicativos instalados", "apps instalados");
+
+            if (ContainsAny(command, "dispositivo", "device", "propriedades android", "properties"))
+                return AndroidResult(command, "device", 0.75, "dispositivo", "device", "propriedades android", "properties");
 
             return new IntentResult("conversar", 0.50, new Dictionary<string, string>());
+        }
+
+        private static IntentResult AndroidResult(string command, string action, double confidence, params string[] triggers)
+        {
+            var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["action"] = action
+            };
+
+            foreach (string trigger in triggers)
+            {
+                int index = command.IndexOf(trigger, StringComparison.OrdinalIgnoreCase);
+                if (index >= 0)
+                {
+                    string value = command.Substring(index + trigger.Length).Trim();
+                    if (!string.IsNullOrWhiteSpace(value)) parameters["query"] = value;
+                    break;
+                }
+            }
+
+            return new IntentResult("android", confidence, parameters);
         }
 
         private static IntentResult Result(string intent, double confidence, string command, params string[] triggers)
