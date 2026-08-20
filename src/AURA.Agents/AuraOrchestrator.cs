@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using AURA.Abstractions;
 using AURA.Abstractions.Orchestration;
 using AURA.Core.Events;
 using AURA.Core.Logging;
@@ -16,8 +17,8 @@ using AURA.Memory;
 namespace AURA.Agents
 {
     /// <summary>
-    /// Loop Sense → Plan → Act → Verify sem depender de LLM pago.
-    /// Publica o estado de cada execução para a interface acompanhar em tempo real.
+    /// Loop Sense → Plan → Act → Verify com decisão local determinística.
+    /// IA externa, quando configurada, existe somente como fallback opcional.
     /// </summary>
     public sealed class AuraOrchestrator : IOrchestrator
     {
@@ -28,6 +29,11 @@ namespace AURA.Agents
         private readonly SimulationRuntime _runtime;
         private readonly HttpClient _http;
         private readonly EventBus? _events;
+        private readonly IIntentResolver _intentResolver;
+        private readonly PolicyGuard _policyGuard;
+        private readonly ToolResolver _toolResolver;
+        private readonly IAiClient? _fallbackClient;
+        private readonly bool _enableFallback;
 
         public AuraOrchestrator(
             ILogger logger,
@@ -35,7 +41,12 @@ namespace AURA.Agents
             Runner runner,
             SimulationRuntime runtime,
             HttpClient? httpClient = null,
-            EventBus? events = null)
+            EventBus? events = null,
+            IIntentResolver? intentResolver = null,
+            PolicyGuard? policyGuard = null,
+            ToolResolver? toolResolver = null,
+            IAiClient? fallbackClient = null,
+            bool enableFallback = false)
         {
             _logger = logger ?? new ConsoleLogger();
             _memory = memory ?? throw new ArgumentNullException(nameof(memory));
@@ -43,17 +54,35 @@ namespace AURA.Agents
             _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
             _http = httpClient ?? CreateAntiDetectClient();
             _events = events;
+            _intentResolver = intentResolver ?? new HeuristicIntentResolver();
+            _policyGuard = policyGuard ?? new PolicyGuard();
+            _toolResolver = toolResolver ?? CreateToolResolver();
+            _fallbackClient = fallbackClient;
+            _enableFallback = enableFallback && fallbackClient != null;
         }
 
-        public async Task<string> ExecuteAsync(string userCommand, CancellationToken ct = default)
+        public async Task<string> ExecuteAsync(string userCommand, CancellationToken ct = default, bool confirmed = false)
         {
             if (string.IsNullOrWhiteSpace(userCommand))
                 return "Comando vazio.";
 
             userCommand = userCommand.Trim();
+            string normalized = userCommand.ToLowerInvariant();
             string processId = "orchestration:" + Guid.NewGuid().ToString("N");
             Publish(processId, "Orquestração", "Assistente", "Executando", "Entendendo solicitação", 0.05);
-            _logger.Info("[ORQUESTRA] " + userCommand);
+            _logger.Info("[ORQUESTRA] " + normalized);
+
+            IntentResult intent = _intentResolver.Resolve(normalized);
+            AuthorizationResult auth = _policyGuard.Authorize(intent.Intent, userCommand);
+
+            if (auth.Decision == AuthorizationDecision.Blocked)
+                return "❌ Comando não autorizado: " + userCommand;
+
+            if (auth.Decision == AuthorizationDecision.RequiresConfirmation && !confirmed)
+            {
+                Publish(processId, "Política", "PolicyGuard", "Aguardando", auth.Message, 0.15);
+                return "⚠️ " + auth.Message + " Responda explicitamente para confirmar a execução.";
+            }
 
             SolutionEntry hit = _memory.FindBestMatch(userCommand);
             if (hit != null)
@@ -63,87 +92,97 @@ namespace AURA.Agents
                 return "💾 Memória:\nAção: " + hit.ActionTaken + "\n" + hit.ResultDetails;
             }
 
-            var history = new List<string>();
-            string context = "";
-
             for (int step = 1; step <= MaxSteps; step++)
             {
                 ct.ThrowIfCancellationRequested();
-                bool wantsSearch = NeedsSearch(userCommand) || (step == 1 && NeedsResearchFirst(userCommand));
-                bool wantsRun = NeedsExecution(userCommand);
+                Publish(processId, "Orquestração", "Planejamento", "Executando", "Passo " + step + "/" + MaxSteps + " — " + intent.Intent, Math.Min(0.1 + step * 0.08, 0.3));
 
-                Publish(processId, "Orquestração", "Planejamento", "Executando", "Passo " + step + "/" + MaxSteps, Math.Min(0.1 + step * 0.08, 0.3));
-
-                if (wantsSearch && string.IsNullOrEmpty(context))
+                ToolResult result;
+                try
                 {
-                    Publish(processId, "Pesquisa", "Browser", "Pesquisando", "Buscando e refinando informações", 0.35);
-                    _logger.Info("[ORQUESTRA] busca web passo " + step);
-                    context = await SearchWithRefinementAsync(userCommand, ct).ConfigureAwait(false);
-                    history.Add("search:" + userCommand);
-
-                    if (IsSearchOnly(userCommand))
-                    {
-                        _memory.Record(userCommand, "web_search", context, success: true);
-                        Publish(processId, "Orquestração", "Assistente", "Concluído", "Resultado revisado e entregue", 1);
-                        return context;
-                    }
-                    continue;
+                    ITool tool = _toolResolver.Resolve(intent.Intent);
+                    result = await tool.ExecuteAsync(userCommand, intent.Parameters, ct).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.Error("[TOOL] " + ex.Message);
+                    result = new ToolResult(false, "❌ Ferramenta falhou: " + ex.Message);
                 }
 
-                if (wantsRun)
+                if (result.Success)
                 {
-                    string path = ExtractFilePath(userCommand);
-                    if (path != null && _runner.CanRun(path))
-                    {
-                        Publish(processId, "Execução", "Cells", "Executando", "Executando " + path, 0.55);
-                        _logger.Info("[ORQUESTRA] runner " + path);
-                        try
-                        {
-                            Cell cell = await _runner.RunAsync(_runtime, null, path).ConfigureAwait(false);
-                            Publish(processId, "Verificação", "Cells", "Revisando", "Validando célula " + cell.Id, 0.8);
-                            await Task.Delay(800, ct).ConfigureAwait(false);
-                            string log = _runtime.ReadCellLog(cell.Id, 40);
-                            string msg = "✅ Célula " + cell.Id + " [" + cell.State + "]\n" + log;
-                            _memory.Record(userCommand, "run:" + path, msg, success: true);
-                            Publish(processId, "Orquestração", "Assistente", "Concluído", "Resultado revisado e entregue", 1);
-                            return msg;
-                        }
-                        catch (Exception ex)
-                        {
-                            Publish(processId, "Execução", "Cells", "Falhou", ex.Message, 1);
-                            string err = "❌ Execução: " + ex.Message;
-                            if (!string.IsNullOrEmpty(context))
-                                err += "\n\nContexto web:\n" + context;
-                            _memory.Record(userCommand, "run_fail", err, success: false);
-                            return err;
-                        }
-                    }
-
-                    if (!string.IsNullOrEmpty(context))
-                    {
-                        string combined = "Contexto obtido. Refine o comando ou indique o arquivo:\n" + context;
-                        _memory.Record(userCommand, "context_only", combined, success: true);
-                        Publish(processId, "Orquestração", "Assistente", "Concluído", "Contexto entregue", 1);
-                        return combined;
-                    }
-                }
-
-                if (string.IsNullOrEmpty(context))
-                {
-                    Publish(processId, "Pesquisa", "Browser", "Pesquisando", "Pesquisa de apoio", 0.45);
-                    context = await SearchWithRefinementAsync(userCommand, ct).ConfigureAwait(false);
-                    _memory.Record(userCommand, "web_search", context, success: !string.IsNullOrWhiteSpace(context));
+                    _memory.Record(userCommand, intent.Intent, result.Output, success: true);
                     Publish(processId, "Orquestração", "Assistente", "Concluído", "Resultado revisado e entregue", 1);
-                    return context;
+                    return result.Output;
                 }
 
-                break;
+                if (_enableFallback && _fallbackClient != null)
+                {
+                    try
+                    {
+                        string fallbackResult = await _fallbackClient.ChatAsync(userCommand, ct).ConfigureAwait(false);
+                        return "🤖 IA fallback:\n" + fallbackResult;
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logger.Error("[FALLBACK] " + ex.Message);
+                        return result.Output + "\n\n❌ Fallback falhou: " + ex.Message;
+                    }
+                }
+
+                Publish(processId, "Orquestração", "Assistente", "Falhou", result.Output, 1);
+                return result.Output;
             }
 
-            Publish(processId, "Orquestração", "Assistente", "Concluído", "Processamento finalizado", 1);
-            return string.IsNullOrEmpty(context)
-                ? "Limite de passos. Seja mais específico."
-                : context;
+            return "Limite de passos. Seja mais específico.";
+        }
+
+        private ToolResolver CreateToolResolver()
+        {
+            return new ToolResolver(new ITool[]
+            {
+                new DelegateTool("search", async (command, parameters, ct) =>
+                {
+                    string query = parameters.TryGetValue("query", out string? value) && !string.IsNullOrWhiteSpace(value)
+                        ? value
+                        : command;
+                    Publish("tool:" + Guid.NewGuid().ToString("N"), "Pesquisa", "Browser", "Pesquisando", "Buscando e refinando informações", 0.35);
+                    string result = await SearchWithRefinementAsync(query, ct).ConfigureAwait(false);
+                    return new ToolResult(!string.IsNullOrWhiteSpace(result) && !result.StartsWith("Falha na busca:", StringComparison.OrdinalIgnoreCase), result);
+                }),
+                new DelegateTool("execute", ExecuteExistingRunnerAsync),
+                new DelegateTool("conversar", async (command, _, ct) =>
+                {
+                    string result = await SearchWithRefinementAsync(command, ct).ConfigureAwait(false);
+                    return new ToolResult(!string.IsNullOrWhiteSpace(result), result);
+                })
+            });
+        }
+
+        private async Task<ToolResult> ExecuteExistingRunnerAsync(
+            string command,
+            Dictionary<string, string> parameters,
+            CancellationToken ct)
+        {
+            string path = ExtractFilePath(command);
+            if (path == null || !_runner.CanRun(path))
+                return new ToolResult(false, "❌ Arquivo não encontrado ou não suportado: " + (path ?? command));
+
+            Publish("tool:" + Guid.NewGuid().ToString("N"), "Execução", "Cells", "Executando", "Executando " + path, 0.55);
+            try
+            {
+                Cell cell = await _runner.RunAsync(_runtime, null, path).ConfigureAwait(false);
+                Publish("tool:" + Guid.NewGuid().ToString("N"), "Verificação", "Cells", "Revisando", "Validando célula " + cell.Id, 0.8);
+                await Task.Delay(800, ct).ConfigureAwait(false);
+                string log = _runtime.ReadCellLog(cell.Id, 40);
+                return new ToolResult(true, "✅ Célula " + cell.Id + " [" + cell.State + "]\n" + log);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                string err = "❌ Execução: " + ex.Message;
+                _memory.Record(command, "run_fail", err, success: false);
+                return new ToolResult(false, err);
+            }
         }
 
         private void Publish(string id, string title, string target, string status, string message, double progress)
@@ -169,10 +208,14 @@ namespace AURA.Agents
                 try
                 {
                     await Task.Delay(Random.Shared.Next(400, 1200), ct).ConfigureAwait(false);
-                    var results = await SearchDuckDuckGoLiteAsync(current, ct).ConfigureAwait(false);
+                    List<(string Title, string Url)> results = await SearchDuckDuckGoLiteAsync(current, ct).ConfigureAwait(false);
                     if (results.Count > 0)
                         return FormatResults(results);
                     current = RefineQuery(query, i);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -188,7 +231,7 @@ namespace AURA.Agents
             string url = "https://lite.duckduckgo.com/lite/?q=" + Uri.EscapeDataString(query);
             using var req = new HttpRequestMessage(HttpMethod.Get, url);
             req.Headers.TryAddWithoutValidation("Referer", "https://lite.duckduckgo.com/");
-            using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
+            using HttpResponseMessage resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
             resp.EnsureSuccessStatusCode();
             string html = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
@@ -209,7 +252,8 @@ namespace AURA.Agents
         {
             var sb = new StringBuilder();
             sb.AppendLine("## Resultados da Web:");
-            foreach (var r in results) sb.AppendLine("- **" + r.Title + "**: " + r.Url);
+            foreach ((string Title, string Url) r in results)
+                sb.AppendLine("- **" + r.Title + "**: " + r.Url);
             return sb.ToString();
         }
 
@@ -224,33 +268,9 @@ namespace AURA.Agents
             return q;
         }
 
-        private static bool NeedsSearch(string t)
-        {
-            string l = t.ToLowerInvariant();
-            return l.Contains("pesquise") || l.Contains("busque") || l.Contains("procure") || l.Contains("o que é") || l.Contains("o que e") || l.Contains("como ") || l.Contains("search") || l.Contains("what is");
-        }
-
-        private static bool IsSearchOnly(string t)
-        {
-            string l = t.ToLowerInvariant();
-            return (l.Contains("pesquise") || l.Contains("busque") || l.Contains("procure")) && !NeedsExecution(t);
-        }
-
-        private static bool NeedsResearchFirst(string t)
-        {
-            string l = t.ToLowerInvariant();
-            return l.Contains("como ") || l.Contains("tutorial");
-        }
-
-        private static bool NeedsExecution(string t)
-        {
-            string l = t.ToLowerInvariant();
-            return l.Contains("execute") || l.Contains("rode") || l.Contains("rodar") || l.Contains("crie") || l.Contains("run ") || l.EndsWith(".py") || l.EndsWith(".sh") || l.EndsWith(".jar") || l.EndsWith(".dll") || l.EndsWith(".js");
-        }
-
         private static string? ExtractFilePath(string t)
         {
-            var m = Regex.Match(t, @"(/[^\s]+?\.(py|sh|jar|dll|js|bash))", RegexOptions.IgnoreCase);
+            Match m = Regex.Match(t, @"(/[^\s]+?\.(py|sh|jar|dll|js|bash))", RegexOptions.IgnoreCase);
             if (m.Success) return m.Groups[1].Value;
             m = Regex.Match(t, @"([\w\./\\-]+\.(py|sh|jar|dll|js|bash))", RegexOptions.IgnoreCase);
             return m.Success ? m.Groups[1].Value : null;
