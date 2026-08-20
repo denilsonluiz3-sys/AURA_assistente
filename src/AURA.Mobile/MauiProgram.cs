@@ -1,5 +1,6 @@
 using AURA.AI;
 using AURA.Agents;
+using AURA.Abstractions;
 using AURA.Abstractions.Execution;
 using AURA.Core.Configuration;
 using AURA.Core.Events;
@@ -31,6 +32,9 @@ public static class MauiProgram
 #if ANDROID
         builder.ConfigureMauiHandlers(handlers =>
             handlers.AddHandler<Microsoft.Maui.Controls.WebView, AURA.Mobile.Platforms.Android.WebView.AuraWebViewHandler>());
+
+        builder.Services.AddSingleton<IAndroidCapabilityService>(sp =>
+            new Services.AndroidCapabilityService(Android.App.Application.Context));
 #endif
 
         AuraLog.Info("MauiProgram: builder created");
@@ -93,8 +97,6 @@ public static class MauiProgram
             sp.GetRequiredService<ILogger>()));
         builder.Services.AddSingleton<AURA.Core.Abstractions.IAgent>(sp => sp.GetRequiredService<AURA.Core.Knowledge.KnowledgeManager>());
 
-        // Runtime de células + runner ("AURA decide como rodar"), mesmo core do CLI.
-        // Células ficam na pasta privada do app (sem permissão extra).
         builder.Services.AddSingleton(sp => new SimulationRuntime(
             sp.GetRequiredService<ILogger>(),
             Path.Combine(FileSystem.AppDataDirectory, "cells"),
@@ -107,6 +109,42 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<SolutionStore>();
         builder.Services.AddSingleton<FileTool>(sp => new FileTool(AgentWorkspace.ActiveRoot));
+
+        // Capacidades Android são expostas ao agente por um adaptador neutro.
+#if ANDROID
+        builder.Services.AddSingleton<ITool>(sp =>
+            new AndroidTool(async (command, parameters, ct) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                var capabilities = sp.GetRequiredService<IAndroidCapabilityService>();
+                string action = parameters.TryGetValue("action", out var value)
+                    ? value
+                    : command;
+
+                string output = action switch
+                {
+                    var x when x.Contains("bateria", StringComparison.OrdinalIgnoreCase) || x.Contains("battery", StringComparison.OrdinalIgnoreCase) => capabilities.GetBattery(),
+                    var x when x.Contains("luz", StringComparison.OrdinalIgnoreCase) || x.Contains("light", StringComparison.OrdinalIgnoreCase) => capabilities.GetLight(),
+                    var x when x.Contains("acelerometro", StringComparison.OrdinalIgnoreCase) || x.Contains("acelerômetro", StringComparison.OrdinalIgnoreCase) => capabilities.GetAccelerometer(),
+                    var x when x.Contains("giroscopio", StringComparison.OrdinalIgnoreCase) || x.Contains("gyroscope", StringComparison.OrdinalIgnoreCase) => capabilities.GetGyroscope(),
+                    var x when x.Contains("magnetometro", StringComparison.OrdinalIgnoreCase) || x.Contains("magnetômetro", StringComparison.OrdinalIgnoreCase) => capabilities.GetMagnetometer(),
+                    var x when x.Contains("gps", StringComparison.OrdinalIgnoreCase) || x.Contains("localização", StringComparison.OrdinalIgnoreCase) || x.Contains("localizacao", StringComparison.OrdinalIgnoreCase) => capabilities.GetLocation(),
+                    var x when x.Contains("camera", StringComparison.OrdinalIgnoreCase) || x.Contains("câmera", StringComparison.OrdinalIgnoreCase) => capabilities.GetCameras(),
+                    var x when x.Contains("audio", StringComparison.OrdinalIgnoreCase) || x.Contains("áudio", StringComparison.OrdinalIgnoreCase) => capabilities.GetAudio(),
+                    var x when x.Contains("bluetooth", StringComparison.OrdinalIgnoreCase) => capabilities.GetBluetooth(),
+                    var x when x.Contains("clipboard", StringComparison.OrdinalIgnoreCase) || x.Contains("área de transferência", StringComparison.OrdinalIgnoreCase) => capabilities.GetClipboard(),
+                    var x when x.Contains("network", StringComparison.OrdinalIgnoreCase) || x.Contains("rede", StringComparison.OrdinalIgnoreCase) => capabilities.GetNetwork(),
+                    var x when x.Contains("device", StringComparison.OrdinalIgnoreCase) || x.Contains("dispositivo", StringComparison.OrdinalIgnoreCase) => capabilities.GetDevice(),
+                    var x when x.Contains("apps", StringComparison.OrdinalIgnoreCase) || x.Contains("aplicativos", StringComparison.OrdinalIgnoreCase) => capabilities.GetApps(),
+                    var x when x.Contains("properties", StringComparison.OrdinalIgnoreCase) || x.Contains("propriedades", StringComparison.OrdinalIgnoreCase) => capabilities.GetProperties(),
+                    var x when x.Contains("memory", StringComparison.OrdinalIgnoreCase) || x.Contains("memória", StringComparison.OrdinalIgnoreCase) || x.Contains("memoria", StringComparison.OrdinalIgnoreCase) => capabilities.GetMemory(),
+                    var x when x.Contains("storage", StringComparison.OrdinalIgnoreCase) || x.Contains("armazenamento", StringComparison.OrdinalIgnoreCase) => capabilities.GetStorage(),
+                    _ => capabilities.GetAll()
+                };
+
+                return new ToolResult(true, output);
+            }));
+#endif
 
         builder.Services.AddSingleton<AuraOrchestrator>(sp =>
             new AuraOrchestrator(
