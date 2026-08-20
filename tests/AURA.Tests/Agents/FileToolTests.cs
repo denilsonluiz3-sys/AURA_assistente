@@ -1,4 +1,5 @@
 using AURA.Agents;
+using Xunit;
 
 namespace AURA.Tests.Agents;
 

@@ -2,7 +2,7 @@ using System;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using AURA.Mobile.Services;
+using AURA.Abstractions;
 
 namespace AURA.AI
 {
