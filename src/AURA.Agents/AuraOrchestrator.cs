@@ -141,16 +141,8 @@ namespace AURA.Agents
         {
             return new ToolResolver(new ITool[]
             {
-                new DelegateTool("search", async (command, parameters, ct) =>
-                {
-                    string query = parameters.TryGetValue("query", out string? value) && !string.IsNullOrWhiteSpace(value)
-                        ? value
-                        : command;
-                    Publish("tool:" + Guid.NewGuid().ToString("N"), "Pesquisa", "Browser", "Pesquisando", "Buscando e refinando informações", 0.35);
-                    string result = await SearchWithRefinementAsync(query, ct).ConfigureAwait(false);
-                    return new ToolResult(!string.IsNullOrWhiteSpace(result) && !result.StartsWith("Falha na busca:", StringComparison.OrdinalIgnoreCase), result);
-                }),
-                new DelegateTool("execute", ExecuteExistingRunnerAsync),
+                new SearchTool(SearchWithRefinementAsync),
+                new RunTool(ExecuteExistingRunnerAsync),
                 new DelegateTool("conversar", async (command, _, ct) =>
                 {
                     string result = await SearchWithRefinementAsync(command, ct).ConfigureAwait(false);
@@ -159,10 +151,7 @@ namespace AURA.Agents
             });
         }
 
-        private async Task<ToolResult> ExecuteExistingRunnerAsync(
-            string command,
-            Dictionary<string, string> parameters,
-            CancellationToken ct)
+        private async Task<ToolResult> ExecuteExistingRunnerAsync(string command, CancellationToken ct)
         {
             string path = ExtractFilePath(command);
             if (path == null || !_runner.CanRun(path))
