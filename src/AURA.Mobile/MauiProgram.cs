@@ -1,5 +1,6 @@
 using AURA.AI;
 using AURA.Agents;
+using AURA.Abstractions;
 using AURA.Abstractions.Execution;
 using AURA.Core.Configuration;
 using AURA.Core.Events;
@@ -7,6 +8,7 @@ using AURA.Core.Logging;
 using AURA.Core.Launchers;
 using AURA.Core.Runtime;
 using AURA.Memory;
+using AURA.Mobile.Diagnostics;
 using AURA.Mobile.Pages;
 using AURA.Modules;
 using AURA.Modules.Executors;
@@ -30,6 +32,9 @@ public static class MauiProgram
 #if ANDROID
         builder.ConfigureMauiHandlers(handlers =>
             handlers.AddHandler<Microsoft.Maui.Controls.WebView, AURA.Mobile.Platforms.Android.WebView.AuraWebViewHandler>());
+
+        builder.Services.AddSingleton<IAndroidCapabilityService>(sp =>
+            new Services.AndroidCapabilityService(Android.App.Application.Context));
 #endif
 
         AuraLog.Info("MauiProgram: builder created");
@@ -78,8 +83,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<PythonExecutor>();
         builder.Services.AddSingleton<NodeExecutor>();
         builder.Services.AddSingleton<IToolExecutor>(sp => sp.GetRequiredService<ShellExecutor>());
+        builder.Services.AddSingleton<AURA.Core.Abstractions.IWebSearch, AURA.Core.WebSearchService>();
 
-        // Agentes concretos (IAgent): memória, automação e wrapper de IA.
         builder.Services.AddSingleton<AURA.Agents.MemoryAgent>();
         builder.Services.AddSingleton<AURA.Agents.AutomationAgent>();
         builder.Services.AddSingleton<AURA.Agents.AIAgent>();
@@ -91,8 +96,6 @@ public static class MauiProgram
             sp.GetRequiredService<ILogger>()));
         builder.Services.AddSingleton<AURA.Core.Abstractions.IAgent>(sp => sp.GetRequiredService<AURA.Core.Knowledge.KnowledgeManager>());
 
-        // Runtime de células + runner ("AURA decide como rodar"), mesmo core do CLI.
-        // Células ficam na pasta privada do app (sem permissão extra).
         builder.Services.AddSingleton(sp => new SimulationRuntime(
             sp.GetRequiredService<ILogger>(),
             Path.Combine(FileSystem.AppDataDirectory, "cells"),
@@ -104,12 +107,20 @@ public static class MauiProgram
         builder.Services.AddSingleton<ProcessRegistry>();
 
         builder.Services.AddSingleton<SolutionStore>();
-        builder.Services.AddSingleton(sp => new AuraOrchestrator(
-            sp.GetRequiredService<ILogger>(),
-            sp.GetRequiredService<SolutionStore>(),
-            sp.GetRequiredService<Runner>(),
-            sp.GetRequiredService<SimulationRuntime>(),
-            events: sp.GetRequiredService<EventBus>()));
+        builder.Services.AddSingleton<FileTool>(sp => new FileTool(AgentWorkspace.ActiveRoot));
+
+        builder.Services.AddSingleton<AuraOrchestrator>(sp =>
+            new AuraOrchestrator(
+                sp.GetRequiredService<ILogger>(),
+                sp.GetRequiredService<SolutionStore>(),
+                sp.GetRequiredService<Runner>(),
+                sp.GetRequiredService<SimulationRuntime>(),
+                events: sp.GetRequiredService<EventBus>(),
+                fileTool: sp.GetRequiredService<FileTool>(),
+#if ANDROID
+                androidCapabilities: sp.GetRequiredService<IAndroidCapabilityService>()
+#endif
+            ));
         builder.Services.AddSingleton<AURA.Abstractions.Orchestration.IOrchestrator>(sp => sp.GetRequiredService<AuraOrchestrator>());
         builder.Services.AddSingleton<AURA.Abstractions.Process.IProcessOrchestrator>(sp =>
             new AURA.Agents.LegalProcessEngine(

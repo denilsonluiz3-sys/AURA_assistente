@@ -48,17 +48,32 @@ namespace AURA.Agents
             _shell = shell ?? throw new ArgumentNullException(nameof(shell));
             _http = httpClient ?? CreateAntiDetectClient();
             _events = events;
+            _intentResolver = intentResolver ?? new HeuristicIntentResolver();
+            _policyGuard = policyGuard ?? new PolicyGuard();
+            _fileTool = fileTool;
+            _androidCapabilities = androidCapabilities;
+            _toolResolver = toolResolver ?? CreateToolResolver();
+            _fallbackClient = fallbackClient;
+            _enableFallback = enableFallback && fallbackClient != null;
         }
 
-        public async Task<string> ExecuteAsync(string userCommand, CancellationToken ct = default)
+        public async Task<string> ExecuteAsync(string userCommand, CancellationToken ct = default, bool confirmed = false)
         {
-            if (string.IsNullOrWhiteSpace(userCommand))
-                return "Comando vazio.";
-
+            if (string.IsNullOrWhiteSpace(userCommand)) return "Comando vazio.";
             userCommand = userCommand.Trim();
+            string normalized = userCommand.ToLowerInvariant();
             string processId = "orchestration:" + Guid.NewGuid().ToString("N");
             Publish(processId, "Orquestração", "Assistente", "Executando", "Entendendo solicitação", 0.05);
-            _logger.Info("[ORQUESTRA] " + userCommand);
+            _logger.Info("[ORQUESTRA] " + normalized);
+
+            IntentResult intent = _intentResolver.Resolve(normalized);
+            AuthorizationResult auth = _policyGuard.Authorize(intent.Intent, userCommand);
+            if (auth.Decision == AuthorizationDecision.Blocked) return "❌ Comando não autorizado: " + userCommand;
+            if (auth.Decision == AuthorizationDecision.RequiresConfirmation && !confirmed)
+            {
+                Publish(processId, "Política", "PolicyGuard", "Aguardando", auth.Message, 0.15);
+                return "⚠️ " + auth.Message + " Responda explicitamente para confirmar a execução.";
+            }
 
             // 1. Verificar memória procedural
             SolutionEntry hit = _memory.FindBestMatch(userCommand);
