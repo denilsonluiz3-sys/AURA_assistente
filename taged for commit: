@@ -1,0 +1,357 @@
+[1mdiff --git a/src/AURA.Agents/AuraOrchestrator.cs b/src/AURA.Agents/AuraOrchestrator.cs[m
+[1mindex 976bb29..8864395 100644[m
+[1m--- a/src/AURA.Agents/AuraOrchestrator.cs[m
+[1m+++ b/src/AURA.Agents/AuraOrchestrator.cs[m
+[36m@@ -1,39 +1,43 @@[m
+ using System;[m
+ using System.Collections.Generic;[m
+[32m+[m[32musing System.IO;[m
+ using System.Linq;[m
+ using System.Net.Http;[m
+ using System.Text;[m
+ using System.Text.RegularExpressions;[m
+ using System.Threading;[m
+ using System.Threading.Tasks;[m
+[31m-using AURA.Abstractions.Orchestration;[m
+ using AURA.Core.Events;[m
+ using AURA.Core.Logging;[m
+ using AURA.Core.Launchers;[m
+ using AURA.Core.Runtime;[m
+ using AURA.Memory;[m
+[32m+[m[32musing AURA.Abstractions.Execution;[m
+[32m+[m[32musing AURA.AI;[m
+ [m
+ namespace AURA.Agents[m
+ {[m
+     /// <summary>[m
+[31m-    /// Loop Sense → Plan → Act → Verify sem depender de LLM pago.[m
+[32m+[m[32m    /// Loop Sense → Plan → Act → Verify com IA integrada via AgentSession.[m
+     /// Publica o estado de cada execução para a interface acompanhar em tempo real.[m
+     /// </summary>[m
+[31m-    public sealed class AuraOrchestrator : IOrchestrator[m
+[32m+[m[32m    public sealed class AuraOrchestrator[m
+     {[m
+[31m-        private const int MaxSteps = 5;[m
+[32m+[m[32m        private const int MaxSteps = 8;[m
+         private readonly ILogger _logger;[m
+         private readonly SolutionStore _memory;[m
+         private readonly Runner _runner;[m
+         private readonly SimulationRuntime _runtime;[m
+         private readonly HttpClient _http;[m
+         private readonly EventBus? _events;[m
+[32m+[m[32m        private readonly IToolExecutor _shell;[m
+ [m
+         public AuraOrchestrator([m
+             ILogger logger,[m
+             SolutionStore memory,[m
+             Runner runner,[m
+             SimulationRuntime runtime,[m
+[32m+[m[32m            IToolExecutor shell,[m
+             HttpClient? httpClient = null,[m
+             EventBus? events = null)[m
+         {[m
+[36m@@ -41,6 +45,7 @@[m [mnamespace AURA.Agents[m
+             _memory = memory ?? throw new ArgumentNullException(nameof(memory));[m
+             _runner = runner ?? throw new ArgumentNullException(nameof(runner));[m
+             _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));[m
+[32m+[m[32m            _shell = shell ?? throw new ArgumentNullException(nameof(shell));[m
+             _http = httpClient ?? CreateAntiDetectClient();[m
+             _events = events;[m
+         }[m
+[36m@@ -55,215 +60,122 @@[m [mnamespace AURA.Agents[m
+             Publish(processId, "Orquestração", "Assistente", "Executando", "Entendendo solicitação", 0.05);[m
+             _logger.Info("[ORQUESTRA] " + userCommand);[m
+ [m
+[32m+[m[32m            // 1. Verificar memória procedural[m
+             SolutionEntry hit = _memory.FindBestMatch(userCommand);[m
+             if (hit != null)[m
+             {[m
+                 Publish(processId, "Orquestração", "Memória", "Concluído", "Resultado recuperado da memória", 1);[m
+                 _logger.Info("[MEMÓRIA] hit " + hit.Id);[m
+[31m-                return "💾 Memória:\nAção: " + hit.ActionTaken + "\n" + hit.ResultDetails;[m
+[32m+[m[32m                return "💾 Memória:\n" + hit.ResultDetails;[m
+             }[m
+ [m
+[31m-            var history = new List<string>();[m
+[31m-            string context = "";[m
+[32m+[m[32m            Publish(processId, "Orquestração", "Planejamento", "Executando", "Criando plano de execução", 0.15);[m
+ [m
+[31m-            for (int step = 1; step <= MaxSteps; step++)[m
+[32m+[m[32m            // 2. Criar ferramentas para o agente[m
+[32m+[m[32m            string workspace = AgentWorkspace();[m
+[32m+[m[32m            var tools = new List<AgentTool>[m
+             {[m
+[31m-                ct.ThrowIfCancellationRequested();[m
+[31m-                bool wantsSearch = NeedsSearch(userCommand) || (step == 1 && NeedsResearchFirst(userCommand));[m
+[31m-                bool wantsRun = NeedsExecution(userCommand);[m
+[31m-[m
+[31m-                Publish(processId, "Orquestração", "Planejamento", "Executando", "Passo " + step + "/" + MaxSteps, Math.Min(0.1 + step * 0.08, 0.3));[m
+[31m-[m
+[31m-                if (wantsSearch && string.IsNullOrEmpty(context))[m
+[31m-                {[m
+[31m-                    Publish(processId, "Pesquisa", "Browser", "Pesquisando", "Buscando e refinando informações", 0.35);[m
+[31m-                    _logger.Info("[ORQUESTRA] busca web passo " + step);[m
+[31m-                    context = await SearchWithRefinementAsync(userCommand, ct).ConfigureAwait(false);[m
+[31m-                    history.Add("search:" + userCommand);[m
+[31m-[m
+[31m-                    if (IsSearchOnly(userCommand))[m
+[31m-                    {[m
+[31m-                        _memory.Record(userCommand, "web_search", context, success: true);[m
+[31m-                        Publish(processId, "Orquestração", "Assistente", "Concluído", "Resultado revisado e entregue", 1);[m
+[31m-                        return context;[m
+[31m-                    }[m
+[31m-                    continue;[m
+[31m-                }[m
+[31m-[m
+[31m-                if (wantsRun)[m
+[31m-                {[m
+[31m-                    string path = ExtractFilePath(userCommand);[m
+[31m-                    if (path != null && _runner.CanRun(path))[m
+[31m-                    {[m
+[31m-                        Publish(processId, "Execução", "Cells", "Executando", "Executando " + path, 0.55);[m
+[31m-                        _logger.Info("[ORQUESTRA] runner " + path);[m
+[31m-                        try[m
+[31m-                        {[m
+[31m-                            Cell cell = await _runner.RunAsync(_runtime, null, path).ConfigureAwait(false);[m
+[31m-                            Publish(processId, "Verificação", "Cells", "Revisando", "Validando célula " + cell.Id, 0.8);[m
+[31m-                            await Task.Delay(800, ct).ConfigureAwait(false);[m
+[31m-                            string log = _runtime.ReadCellLog(cell.Id, 40);[m
+[31m-                            string msg = "✅ Célula " + cell.Id + " [" + cell.State + "]\n" + log;[m
+[31m-                            _memory.Record(userCommand, "run:" + path, msg, success: true);[m
+[31m-                            Publish(processId, "Orquestração", "Assistente", "Concluído", "Resultado revisado e entregue", 1);[m
+[31m-                            return msg;[m
+[31m-                        }[m
+[31m-                        catch (Exception ex)[m
+[31m-                        {[m
+[31m-                            Publish(processId, "Execução", "Cells", "Falhou", ex.Message, 1);[m
+[31m-                            string err = "❌ Execução: " + ex.Message;[m
+[31m-                            if (!string.IsNullOrEmpty(context))[m
+[31m-                                err += "\n\nContexto web:\n" + context;[m
+[31m-                            _memory.Record(userCommand, "run_fail", err, success: false);[m
+[31m-                            return err;[m
+[31m-                        }[m
+[31m-                    }[m
+[31m-[m
+[31m-                    if (!string.IsNullOrEmpty(context))[m
+[31m-                    {[m
+[31m-                        string combined = "Contexto obtido. Refine o comando ou indique o arquivo:\n" + context;[m
+[31m-                        _memory.Record(userCommand, "context_only", combined, success: true);[m
+[31m-                        Publish(processId, "Orquestração", "Assistente", "Concluído", "Contexto entregue", 1);[m
+[31m-                        return combined;[m
+[31m-                    }[m
+[31m-                }[m
+[31m-[m
+[31m-                if (string.IsNullOrEmpty(context))[m
+[31m-                {[m
+[31m-                    Publish(processId, "Pesquisa", "Browser", "Pesquisando", "Pesquisa de apoio", 0.45);[m
+[31m-                    context = await SearchWithRefinementAsync(userCommand, ct).ConfigureAwait(false);[m
+[31m-                    _memory.Record(userCommand, "web_search", context, success: !string.IsNullOrWhiteSpace(context));[m
+[31m-                    Publish(processId, "Orquestração", "Assistente", "Concluído", "Resultado revisado e entregue", 1);[m
+[31m-                    return context;[m
+[31m-                }[m
+[31m-[m
+[31m-                break;[m
+[31m-            }[m
+[31m-[m
+[31m-            Publish(processId, "Orquestração", "Assistente", "Concluído", "Processamento finalizado", 1);[m
+[31m-            return string.IsNullOrEmpty(context)[m
+[31m-                ? "Limite de passos. Seja mais específico."[m
+[31m-                : context;[m
+[31m-        }[m
+[31m-[m
+[31m-        private void Publish(string id, string title, string target, string status, string message, double progress)[m
+[31m-        {[m
+[31m-            _events?.Publish(new OrchestrationStepEvent[m
+[32m+[m[32m                new InterpretCommandTool(),[m
+[32m+[m[32m                new SearchMemoryTool(_memory),[m
+[32m+[m[32m                new ListDirTool(workspace),[m
+[32m+[m[32m                new ReadFileTool(workspace),[m
+[32m+[m[32m                new WriteFileTool(workspace),[m
+[32m+[m[32m                new EditFileTool(workspace),[m
+[32m+[m[32m                new ShellAgentTool(workspace, _shell),[m
+[32m+[m[32m                new WebFetchTool()[m
+[32m+[m[32m            };[m
+[32m+[m
+[32m+[m[32m            // 3. Criar sessão do agente com IA[m
+[32m+[m[32m            var client = new OpenRouterClient(new OpenRouterOptions[m
+             {[m
+[31m-                Id = id,[m
+[31m-                Title = title,[m
+[31m-                Target = target,[m
+[31m-                Status = status,[m
+[31m-                Message = message,[m
+[31m-                Progress = Math.Clamp(progress, 0, 1),[m
+[31m-                OccurredAt = DateTime.UtcNow[m
+[32m+[m[32m                ApiKey = Environment.GetEnvironmentVariable("OPENROUTER_API_KEY") ??[m[41m [m
+[32m+[m[32m                         Environment.GetEnvironmentVariable("AURA_OPENROUTER_KEY") ?? "",[m
+[32m+[m[32m                Model = Environment.GetEnvironmentVariable("AURA_MODEL") ?? "qwen/qwen-plus",[m
+[32m+[m[32m                MaxTokens = 1500,[m
+[32m+[m[32m                TimeoutSeconds = 90,[m
+[32m+[m[32m                AppReference = "AURA-Orchestrator"[m
+             });[m
+[31m-        }[m
+ [m
+[31m-        public async Task<string> SearchWithRefinementAsync(string query, CancellationToken ct = default)[m
+[31m-        {[m
+[31m-            string current = query;[m
+[31m-            for (int i = 0; i <= 2; i++)[m
+[32m+[m[32m            string systemPrompt =[m[41m [m
+[32m+[m[32m                "Você é o orquestrador da AURA, um assistente inteligente que ajuda a executar tarefas. " +[m
+[32m+[m[32m                "Analise o pedido do usuário e use as ferramentas disponíveis para executá-lo.\n\n" +[m
+[32m+[m[32m                "FLUXO DE TRABALHO:\n" +[m
+[32m+[m[32m                "1. Use interpret_command para entender o que o usuário quer.\n" +[m
+[32m+[m[32m                "2. Use search_memory para ver se já fizemos algo parecido.\n" +[m
+[32m+[m[32m                "3. Use as ferramentas de arquivo (list_dir, read_file, write_file, edit_file).\n" +[m
+[32m+[m[32m                "4. Use run_shell para executar comandos.\n" +[m
+[32m+[m[32m                "5. Use web_fetch para buscar informações na web.\n\n" +[m
+[32m+[m[32m                "REGRAS:\n" +[m
+[32m+[m[32m                "- Responda em português, de forma clara e objetiva.\n" +[m
+[32m+[m[32m                "- Sempre confirme o que foi feito.\n" +[m
+[32m+[m[32m                "- Se algo falhar, explique o erro e sugira alternativas.\n" +[m
+[32m+[m[32m                "- O workspace é: " + workspace;[m
+[32m+[m
+[32m+[m[32m            var session = new AgentSession(client, tools, systemPrompt, _logger);[m
+[32m+[m[32m            session.Step += step => OnAgentStep(processId, step);[m
+[32m+[m
+[32m+[m[32m            Publish(processId, "Orquestração", "IA", "Executando", "Processando com IA...", 0.3);[m
+[32m+[m
+[32m+[m[32m            string result;[m
+[32m+[m[32m            try[m
+             {[m
+[31m-                ct.ThrowIfCancellationRequested();[m
+[31m-                try[m
+[31m-                {[m
+[31m-                    await Task.Delay(Random.Shared.Next(400, 1200), ct).ConfigureAwait(false);[m
+[31m-                    var results = await SearchDuckDuckGoLiteAsync(current, ct).ConfigureAwait(false);[m
+[31m-                    if (results.Count > 0)[m
+[31m-                        return FormatResults(results);[m
+[31m-                    current = RefineQuery(query, i);[m
+[31m-                }[m
+[31m-                catch (Exception ex)[m
+[31m-                {[m
+[31m-                    _logger.Warning("[SEARCH] " + ex.Message);[m
+[31m-                    if (i == 2) return "Falha na busca: " + ex.Message;[m
+[31m-                }[m
+[32m+[m[32m                result = await session.RunAsync(userCommand, ct);[m
+[32m+[m[32m                Publish(processId, "Orquestração", "Assistente", "Concluído", "Resultado entregue", 1);[m
+             }[m
+[31m-            return "Nenhum resultado após refinamentos.";[m
+[31m-        }[m
+[31m-[m
+[31m-        private async Task<List<(string Title, string Url)>> SearchDuckDuckGoLiteAsync(string query, CancellationToken ct)[m
+[31m-        {[m
+[31m-            string url = "https://lite.duckduckgo.com/lite/?q=" + Uri.EscapeDataString(query);[m
+[31m-            using var req = new HttpRequestMessage(HttpMethod.Get, url);[m
+[31m-            req.Headers.TryAddWithoutValidation("Referer", "https://lite.duckduckgo.com/");[m
+[31m-            using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);[m
+[31m-            resp.EnsureSuccessStatusCode();[m
+[31m-            string html = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);[m
+[31m-[m
+[31m-            var list = new List<(string, string)>();[m
+[31m-            var re = new Regex(@"<a[^>]+href=""(https?://[^""]+)""[^>]*>([^<]+)</a>", RegexOptions.IgnoreCase | RegexOptions.Compiled);[m
+[31m-            foreach (Match m in re.Matches(html))[m
+[32m+[m[32m            catch (Exception ex)[m
+             {[m
+[31m-                string href = m.Groups[1].Value;[m
+[31m-                string title = System.Net.WebUtility.HtmlDecode(m.Groups[2].Value).Trim();[m
+[31m-                if (href.Contains("duckduckgo.com", StringComparison.OrdinalIgnoreCase) || title.Length < 3) continue;[m
+[31m-                list.Add((title, href));[m
+[31m-                if (list.Count >= 5) break;[m
+[32m+[m[32m                _logger.Error("[ORQUESTRA] Erro: " + ex.Message);[m
+[32m+[m[32m                Publish(processId, "Orquestração", "Assistente", "Falhou", ex.Message, 1);[m
+[32m+[m[32m                result = "❌ Erro ao processar: " + ex.Message;[m
+             }[m
+[31m-            return list;[m
+[31m-        }[m
+[31m-[m
+[31m-        private static string FormatResults(List<(string Title, string Url)> results)[m
+[31m-        {[m
+[31m-            var sb = new StringBuilder();[m
+[31m-            sb.AppendLine("## Resultados da Web:");[m
+[31m-            foreach (var r in results) sb.AppendLine("- **" + r.Title + "**: " + r.Url);[m
+[31m-            return sb.ToString();[m
+[31m-        }[m
+ [m
+[31m-        private static string RefineQuery(string q, int attempt)[m
+[31m-        {[m
+[31m-            if (attempt == 0) return q + " tutorial";[m
+[31m-            if (attempt == 1)[m
+[32m+[m[32m            // 4. Aprender com o resultado[m
+[32m+[m[32m            if (!result.StartsWith("❌"))[m
+             {[m
+[31m-                string[] parts = q.Split(' ', StringSplitOptions.RemoveEmptyEntries);[m
+[31m-                return string.Join(" ", parts.Take(Math.Min(4, parts.Length))) + " how to";[m
+[32m+[m[32m                _memory.Record(userCommand, "orchestration", result, success: true);[m
+[32m+[m[32m                _logger.Info("[MEMÓRIA] Registrado: " + userCommand);[m
+             }[m
+[31m-            return q;[m
+[31m-        }[m
+[31m-[m
+[31m-        private static bool NeedsSearch(string t)[m
+[31m-        {[m
+[31m-            string l = t.ToLowerInvariant();[m
+[31m-            return l.Contains("pesquise") || l.Contains("busque") || l.Contains("procure") || l.Contains("o que é") || l.Contains("o que e") || l.Contains("como ") || l.Contains("search") || l.Contains("what is");[m
+[31m-        }[m
+ [m
+[31m-        private static bool IsSearchOnly(string t)[m
+[31m-        {[m
+[31m-            string l = t.ToLowerInvariant();[m
+[31m-            return (l.Contains("pesquise") || l.Contains("busque") || l.Contains("procure")) && !NeedsExecution(t);[m
+[32m+[m[32m            return result;[m
+         }[m
+ [m
+[31m-        private static bool NeedsResearchFirst(string t)[m
+[32m+[m[32m        private void OnAgentStep(string processId, AgentStep step)[m
+         {[m
+[31m-            string l = t.ToLowerInvariant();[m
+[31m-            return l.Contains("como ") || l.Contains("tutorial");[m
+[32m+[m[32m            string resultPreview = step.Result.Length > 100 ? step.Result.Substring(0, 100) + "..." : step.Result;[m
+[32m+[m[32m            Publish(processId, step.ToolName, "Ferramenta", "Executando", resultPreview, 0.5);[m
+[32m+[m[32m            _logger.Info("[AGENT] " + step.ToolName + ": " + step.Arguments);[m
+         }[m
+ [m
+[31m-        private static bool NeedsExecution(string t)[m
+[32m+[m[32m        private string AgentWorkspace()[m
+         {[m
+[31m-            string l = t.ToLowerInvariant();[m
+[31m-            return l.Contains("execute") || l.Contains("rode") || l.Contains("rodar") || l.Contains("crie") || l.Contains("run ") || l.EndsWith(".py") || l.EndsWith(".sh") || l.EndsWith(".jar") || l.EndsWith(".dll") || l.EndsWith(".js");[m
+[32m+[m[32m            // Usar o workspace da AURA[m
+[32m+[m[32m            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);[m
+[32m+[m[32m            string workspace = Path.Combine(home, "AURA", "workspace");[m
+[32m+[m[32m            try { Directory.CreateDirectory(workspace); } catch { }[m
+[32m+[m[32m            return workspace;[m
+         }[m
+ [m
+[31m-        private static string? ExtractFilePath(string t)[m
+[32m+[m[32m        private void Publish(string id, string title, string target, string status, string message, double progress)[m
+         {[m
+[31m-            var m = Regex.Match(t, @"(/[^\s]+?\.(py|sh|jar|dll|js|bash))", RegexOptions.IgnoreCase);[m
+[31m-            if (m.Success) return m.Groups[1].Value;[m
+[31m-            m = Regex.Match(t, @"([\w\./\\-]+\.(py|sh|jar|dll|js|bash))", RegexOptions.IgnoreCase);[m
+[31m-            return m.Success ? m.Groups[1].Value : null;[m
+[32m+[m[32m            _events?.Publish(new OrchestrationStepEvent[m
+[32m+[m[32m            {[m
+[32m+[m[32m                Id = id,[m
+[32m+[m[32m                Title = title,[m
+[32m+[m[32m                Target = target,[m
+[32m+[m[32m                Status = status,[m
+[32m+[m[32m                Message = message,[m
+[32m+[m[32m                Progress = Math.Clamp(progress, 0, 1),[m
+[32m+[m[32m                OccurredAt = DateTime.UtcNow[m
+[32m+[m[32m            });[m
+         }[m
+ [m
+         private static HttpClient CreateAntiDetectClient()[m
+         {[m
+             var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };[m
+[31m-            client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Mobile Safari/537.36");[m
+[31m-            client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");[m
+[32m+[m[32m            client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent",[m[41m [m
+[32m+[m[32m                "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36");[m
+[32m+[m[32m            client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "text/html,application/xhtml+xml");[m
+             client.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Language", "pt-BR,pt;q=0.9,en;q=0.8");[m
+[31m-            client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Ch-Ua-Mobile", "?1");[m
+[31m-            client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Ch-Ua-Platform", "\"Android\"");[m
+             return client;[m
+         }[m
+     }[m
