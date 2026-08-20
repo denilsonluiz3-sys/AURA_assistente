@@ -69,3 +69,4 @@ aura-mobile-apk-debug/*.aab
 # Python cache
 __pycache__/
 *.pyc
+src/AURA.Mobile/Resources/Raw/kokoro-v1.0.int8.onnx
