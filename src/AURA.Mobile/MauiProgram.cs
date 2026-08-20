@@ -7,6 +7,7 @@ using AURA.Core.Logging;
 using AURA.Core.Launchers;
 using AURA.Core.Runtime;
 using AURA.Memory;
+using AURA.Mobile.Diagnostics;
 using AURA.Mobile.Pages;
 using AURA.Modules;
 using AURA.Modules.Executors;
@@ -105,12 +106,16 @@ public static class MauiProgram
         builder.Services.AddSingleton<ProcessRegistry>();
 
         builder.Services.AddSingleton<SolutionStore>();
-        builder.Services.AddSingleton(sp => new AuraOrchestrator(
-            sp.GetRequiredService<ILogger>(),
-            sp.GetRequiredService<SolutionStore>(),
-            sp.GetRequiredService<Runner>(),
-            sp.GetRequiredService<SimulationRuntime>(),
-            events: sp.GetRequiredService<EventBus>()));
+        builder.Services.AddSingleton<FileTool>(sp => new FileTool(AgentWorkspace.ActiveRoot));
+
+        builder.Services.AddSingleton<AuraOrchestrator>(sp =>
+            new AuraOrchestrator(
+                sp.GetRequiredService<ILogger>(),
+                sp.GetRequiredService<SolutionStore>(),
+                sp.GetRequiredService<Runner>(),
+                sp.GetRequiredService<SimulationRuntime>(),
+                events: sp.GetRequiredService<EventBus>(),
+                fileTool: sp.GetRequiredService<FileTool>()));
         builder.Services.AddSingleton<AURA.Abstractions.Orchestration.IOrchestrator>(sp => sp.GetRequiredService<AuraOrchestrator>());
         builder.Services.AddSingleton<AURA.Abstractions.Process.IProcessOrchestrator>(sp =>
             new AURA.Agents.LegalProcessEngine(
