@@ -169,7 +169,7 @@ namespace AURA.CLI
                     case "ensinar":
                     case "aprender":
                     case "professora":
-                        EnsinarCommand(parts).GetAwaiter().GetResult();
+                        EnsinarCommand(parts);
                         break;
                     case "aichave":
                         AiKeyCommand(parts);
@@ -527,7 +527,7 @@ namespace AURA.CLI
                     "Ensinar: " + task,
                     client != null ? SharedHttpClient : null).GetAwaiter().GetResult();
 
-                _memory.Append(MemoryEntry.Answer($"ensinar:{task}", answer));
+                _memory.Append(MemoryEntry.Answer(answer));
 
                 Console.WriteLine();
                 Console.WriteLine("=== RESULTADO DO APRENDIZADO ===");
