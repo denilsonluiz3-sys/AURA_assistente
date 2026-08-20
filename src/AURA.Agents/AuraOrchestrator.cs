@@ -35,6 +35,7 @@ namespace AURA.Agents
         private readonly IAiClient? _fallbackClient;
         private readonly bool _enableFallback;
         private readonly FileTool? _fileTool;
+        private readonly IAndroidCapabilityService? _androidCapabilities;
 
         public AuraOrchestrator(
             ILogger logger,
@@ -48,7 +49,8 @@ namespace AURA.Agents
             ToolResolver? toolResolver = null,
             IAiClient? fallbackClient = null,
             bool enableFallback = false,
-            FileTool? fileTool = null)
+            FileTool? fileTool = null,
+            IAndroidCapabilityService? androidCapabilities = null)
         {
             _logger = logger ?? new ConsoleLogger();
             _memory = memory ?? throw new ArgumentNullException(nameof(memory));
@@ -59,6 +61,7 @@ namespace AURA.Agents
             _intentResolver = intentResolver ?? new HeuristicIntentResolver();
             _policyGuard = policyGuard ?? new PolicyGuard();
             _fileTool = fileTool;
+            _androidCapabilities = androidCapabilities;
             _toolResolver = toolResolver ?? CreateToolResolver();
             _fallbackClient = fallbackClient;
             _enableFallback = enableFallback && fallbackClient != null;
@@ -156,7 +159,45 @@ namespace AURA.Agents
             if (_fileTool != null)
                 tools.Add(_fileTool);
 
+            if (_androidCapabilities != null)
+            {
+                tools.Add(new AndroidTool(async (command, parameters, ct) =>
+                {
+                    ct.ThrowIfCancellationRequested();
+                    string action = parameters.TryGetValue("action", out string? value) ? value : command;
+                    string output = action switch
+                    {
+                        "battery" => _androidCapabilities.GetBattery(),
+                        "sensor" => ResolveSensor(command),
+                        "location" => _androidCapabilities.GetLocation(),
+                        "camera" => _androidCapabilities.GetCameras(),
+                        "bluetooth" => _androidCapabilities.GetBluetooth(),
+                        "clipboard" => _androidCapabilities.GetClipboard(),
+                        "memory" => _androidCapabilities.GetMemory(),
+                        "storage" => _androidCapabilities.GetStorage(),
+                        "apps" => _androidCapabilities.GetApps(),
+                        "device" => _androidCapabilities.GetDevice(),
+                        "light" => _androidCapabilities.GetLight(),
+                        "audio" => _androidCapabilities.GetAudio(),
+                        _ => _androidCapabilities.GetAll()
+                    };
+
+                    return new ToolResult(true, output);
+                }));
+            }
+
             return new ToolResolver(tools);
+        }
+
+        private string ResolveSensor(string command)
+        {
+            if (command.Contains("luz", StringComparison.OrdinalIgnoreCase) || command.Contains("light", StringComparison.OrdinalIgnoreCase))
+                return _androidCapabilities!.GetLight();
+            if (command.Contains("giroscop", StringComparison.OrdinalIgnoreCase) || command.Contains("gyroscope", StringComparison.OrdinalIgnoreCase))
+                return _androidCapabilities!.GetGyroscope();
+            if (command.Contains("magnet", StringComparison.OrdinalIgnoreCase))
+                return _androidCapabilities!.GetMagnetometer();
+            return _androidCapabilities!.GetAccelerometer();
         }
 
         private async Task<ToolResult> ExecuteExistingRunnerAsync(string command, CancellationToken ct)
