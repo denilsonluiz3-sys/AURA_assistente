@@ -15,6 +15,10 @@ using AURA.AI;
 
 namespace AURA.Agents
 {
+    /// <summary>
+    /// Loop Sense → Plan → Act → Verify com IA integrada via AgentSession.
+    /// Publica o estado de cada execução para a interface acompanhar em tempo real.
+    /// </summary>
     public sealed class AuraOrchestrator
     {
         private readonly ILogger _logger;
@@ -45,7 +49,7 @@ namespace AURA.Agents
             _shell = shell ?? throw new ArgumentNullException(nameof(shell));
             _webSearch = webSearch ?? throw new ArgumentNullException(nameof(webSearch));
             _aiClient = aiClient;
-            _http = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            _http = httpClient ?? CreateAntiDetectClient();
             _events = events;
         }
 
@@ -55,15 +59,22 @@ namespace AURA.Agents
                 return "Comando vazio.";
 
             userCommand = userCommand.Trim();
+            string processId = "orchestration:" + Guid.NewGuid().ToString("N");
             _logger.Info("[ORQUESTRA] " + userCommand);
+            Publish(processId, "Orquestração", "Assistente", "Executando", "Entendendo solicitação", 0.05);
 
+            // 1. Verificar memória procedural
             SolutionEntry hit = _memory.FindBestMatch(userCommand);
             if (hit != null)
             {
+                Publish(processId, "Orquestração", "Memória", "Concluído", "Resultado recuperado da memória", 1);
                 _logger.Info("[MEMÓRIA] hit " + hit.Id);
                 return "💾 Memória:\n" + hit.ResultDetails;
             }
 
+            Publish(processId, "Orquestração", "Planejamento", "Executando", "Criando plano de execução", 0.15);
+
+            // 2. Criar ferramentas para o agente
             string workspace = AgentWorkspace();
             var tools = new List<AgentTool>
             {
@@ -80,13 +91,15 @@ namespace AURA.Agents
                 new CodeExecutorTool(_shell, workspace)
             };
 
+            // 3. Criar sessão do agente com IA
             string apiKey = Environment.GetEnvironmentVariable("OPENROUTER_API_KEY") ?? "";
             var client = _aiClient ?? new OpenRouterClient(new OpenRouterOptions
             {
                 ApiKey = apiKey,
                 Model = string.IsNullOrEmpty(apiKey) ? "openrouter/free" : "qwen/qwen-plus",
                 MaxTokens = 2000,
-                TimeoutSeconds = 90
+                TimeoutSeconds = 90,
+                AppReference = "AURA-Orchestrator"
             });
 
             string systemPrompt = 
@@ -95,22 +108,71 @@ namespace AURA.Agents
                 "Workspace: " + workspace;
 
             var session = new AgentSession(client, tools, systemPrompt, _logger);
-            string result = await session.RunAsync(userCommand, _http, ct);
+            session.Step += step => OnAgentStep(processId, step);
 
+            Publish(processId, "Orquestração", "IA", "Executando", "Processando com IA...", 0.3);
+
+            string result;
+            try
+            {
+                result = await session.RunAsync(userCommand, _http, ct);
+                Publish(processId, "Orquestração", "Assistente", "Concluído", "Resultado entregue", 1);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("[ORQUESTRA] Erro: " + ex.Message);
+                Publish(processId, "Orquestração", "Assistente", "Falhou", ex.Message, 1);
+                result = "❌ Erro ao processar: " + ex.Message;
+            }
+
+            // 4. Aprender com o resultado
             if (!result.StartsWith("❌"))
             {
                 _memory.Record(userCommand, "orchestration", result, success: true);
+                _logger.Info("[MEMÓRIA] Registrado: " + userCommand);
             }
 
             return result;
         }
 
+        private void OnAgentStep(string processId, AgentStep step)
+        {
+            string resultPreview = step.Result.Length > 100 ? step.Result.Substring(0, 100) + "..." : step.Result;
+            Publish(processId, step.ToolName, "Ferramenta", "Executando", resultPreview, 0.5);
+            _logger.Info("[AGENT] " + step.ToolName + ": " + step.Arguments);
+        }
+
         private string AgentWorkspace()
         {
+            // Usar o workspace da AURA
             string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string workspace = Path.Combine(home, "AURA", "workspace");
             try { Directory.CreateDirectory(workspace); } catch { }
             return workspace;
+        }
+
+        private void Publish(string id, string title, string target, string status, string message, double progress)
+        {
+            _events?.Publish(new OrchestrationStepEvent
+            {
+                Id = id,
+                Title = title,
+                Target = target,
+                Status = status,
+                Message = message,
+                Progress = Math.Clamp(progress, 0, 1),
+                OccurredAt = DateTime.UtcNow
+            });
+        }
+
+        private static HttpClient CreateAntiDetectClient()
+        {
+            var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent",
+                "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36");
+            client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "text/html,application/xhtml+xml");
+            client.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Language", "pt-BR,pt;q=0.9,en;q=0.8");
+            return client;
         }
     }
 }

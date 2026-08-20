@@ -48,8 +48,9 @@ public sealed class AuraOrchestratorIntegrationTests
         // determinística antes de qualquer chamada de rede.
         using var fixture = new OrchestratorFixture(new OpenRouterClient(new OpenRouterOptions { ApiKey = "" }));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Orchestrator.ExecuteAsync("comando totalmente novo que não existe na memória"));
+        string result = await fixture.Orchestrator.ExecuteAsync("comando totalmente novo que não existe na memória");
+
+        Assert.StartsWith("❌ Erro ao processar:", result);
     }
 
     private sealed class OrchestratorFixture : IDisposable
