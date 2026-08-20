@@ -26,7 +26,7 @@
             </VerticalStackLayout>
 
             <VerticalStackLayout x:Name="ModulesHost">
-                <CollectionView.ItemTemplate>
+                <BindableLayout.ItemTemplate>
                     <DataTemplate x:DataType="local:EcosystemModule">
                         <Border Margin="0,4"
                                 Padding="14"
