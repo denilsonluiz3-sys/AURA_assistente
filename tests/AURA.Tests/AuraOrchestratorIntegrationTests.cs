@@ -1,9 +1,13 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.Agents;
+using AURA.AI;
+using AURA.Abstractions.Execution;
+using AURA.Core;
+using AURA.Core.Abstractions;
+using AURA.Core.Launchers;
 using AURA.Core.Logging;
 using AURA.Core.Runtime;
 using AURA.Memory;
@@ -14,26 +18,39 @@ namespace AURA.Tests;
 public sealed class AuraOrchestratorIntegrationTests
 {
     [Fact]
-    public async Task ExecuteAsync_ShouldRequireConfirmation_ForExecuteIntent()
+    public async Task ExecuteAsync_EmptyCommand_ReturnsError()
     {
         using var fixture = new OrchestratorFixture();
 
-        string result = await fixture.Orchestrator.ExecuteAsync("execute teste.sh");
+        string result = await fixture.Orchestrator.ExecuteAsync("   ");
 
-        Assert.StartsWith("⚠️", result);
-        Assert.Contains("confirm", result, StringComparison.OrdinalIgnoreCase);
-        Assert.False(fixture.Tool.Executed);
+        Assert.Equal("Comando vazio.", result);
     }
 
     [Fact]
-    public async Task ExecuteAsync_ShouldExecuteInjectedTool_WhenConfirmed()
+    public async Task ExecuteAsync_MemoryHit_ReturnsStoredResult()
     {
         using var fixture = new OrchestratorFixture();
 
-        string result = await fixture.Orchestrator.ExecuteAsync("execute teste.sh", confirmed: true);
+        // Pre-populate memory
+        fixture.Memory.Record("pesquise e execute a tarefa", "orchestration", "resultado da memória", success: true);
 
-        Assert.Equal("executed", result);
-        Assert.True(fixture.Tool.Executed);
+        string result = await fixture.Orchestrator.ExecuteAsync("pesquise e execute a tarefa");
+
+        Assert.StartsWith("💾 Memória:", result);
+        Assert.Contains("resultado da memória", result);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NoMemoryHit_DelegatesToAgentSession()
+    {
+        // Cliente sem ApiKey: o AgentSession delega e falha de forma
+        // determinística antes de qualquer chamada de rede.
+        using var fixture = new OrchestratorFixture(new OpenRouterClient(new OpenRouterOptions { ApiKey = "" }));
+
+        string result = await fixture.Orchestrator.ExecuteAsync("comando totalmente novo que não existe na memória");
+
+        Assert.StartsWith("❌ Erro ao processar:", result);
     }
 
     private sealed class OrchestratorFixture : IDisposable
@@ -41,10 +58,10 @@ public sealed class AuraOrchestratorIntegrationTests
         private readonly string _root = Path.Combine(Path.GetTempPath(), "aura-tests-" + Guid.NewGuid().ToString("N"));
         private readonly SimulationRuntime _runtime;
 
-        public FakeTool Tool { get; } = new();
+        public SolutionStore Memory { get; }
         public AuraOrchestrator Orchestrator { get; }
 
-        public OrchestratorFixture()
+        public OrchestratorFixture(OpenRouterClient? aiClient = null)
         {
             Directory.CreateDirectory(_root);
             var logger = new ConsoleLogger();
@@ -54,15 +71,21 @@ public sealed class AuraOrchestratorIntegrationTests
                 new DirectoryCellBackend(),
                 persist: false);
 
-            var memory = new SolutionStore(logger, Path.Combine(_root, "memory"));
-            var tools = new ToolResolver(new ITool[] { Tool });
+            Memory = new SolutionStore(logger, Path.Combine(_root, "memory"));
+            var runner = new Runner(new ILauncher[] { });
+            var shell = new FakeExecutor();
+            var webSearch = new FakeWebSearch();
 
             Orchestrator = new AuraOrchestrator(
                 logger,
-                memory,
-                new AURA.Core.Launchers.Runner(),
+                Memory,
+                runner,
                 _runtime,
-                toolResolver: tools);
+                shell,
+                webSearch,
+                aiClient: aiClient,
+                httpClient: null,
+                events: null);
         }
 
         public void Dispose()
@@ -72,19 +95,35 @@ public sealed class AuraOrchestratorIntegrationTests
         }
     }
 
-    private sealed class FakeTool : ITool
+    private sealed class FakeExecutor : IToolExecutor
     {
-        public bool Executed { get; private set; }
-        public string Intent => "execute";
+        public string Name => "fake";
+        public int Calls { get; private set; }
 
-        public Task<ToolResult> ExecuteAsync(
-            string command,
-            Dictionary<string, string> parameters,
-            CancellationToken ct = default)
+        public bool IsAvailable() => true;
+
+        public Task<ExecutionResult> ExecuteAsync(ExecutionRequest request, CancellationToken cancellationToken = default)
         {
-            ct.ThrowIfCancellationRequested();
-            Executed = true;
-            return Task.FromResult(new ToolResult(true, "executed"));
+            Calls++;
+            return Task.FromResult(new ExecutionResult { Success = true, StandardOutput = "ok" });
+        }
+    }
+
+    private sealed class FakeWebSearch : IWebSearch
+    {
+        public string Response { get; set; } = "Resultado web";
+        public int Calls { get; private set; }
+
+        public Task<string> SearchAsync(string query, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult(Response);
+        }
+
+        public Task<string> SearchWithRefinementAsync(string query, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult(Response);
         }
     }
 }

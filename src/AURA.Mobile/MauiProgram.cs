@@ -15,6 +15,7 @@ using AURA.Modules.Executors;
 using AURA.Network;
 using AURA.SystemInfo;
 using AURA.Mobile.Speech;
+using AURA.Mobile.Services;
 using CommunityToolkit.Maui;
 
 namespace AURA.Mobile;
@@ -70,6 +71,7 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<ISpeechService, HybridSpeechService>();
         builder.Services.AddSingleton<VoiceAssistantService>();
+        builder.Services.AddSingleton<IAndroidCapabilityService, AndroidCapabilityService>();
 
         builder.Services.AddSingleton(sp => new AgentManager(sp.GetRequiredService<ILogger>())
         {

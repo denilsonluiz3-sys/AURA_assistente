@@ -1,4 +1,7 @@
 using CommunityToolkit.Maui.Views;
+#if ANDROID
+using AURA.Mobile.Platforms.Android;
+#endif
 
 namespace AURA.Mobile.Pages;
 
@@ -12,10 +15,29 @@ public partial class HomePage : ContentPage
         App.ThemeChanged += OnThemeChanged;
         UpdateThemeIcon();
 
-        // Double-tap no botão de tema alterna vídeo de fundo on/off (Preference).
         var doubleTap = new TapGestureRecognizer { NumberOfTapsRequired = 2 };
         doubleTap.Tapped += OnThemeDoubleTapped;
         BtnTheme.GestureRecognizers.Add(doubleTap);
+
+        // V16 - Teste nativo Android
+        RunAndroidBridgeTest();
+    }
+
+    private void RunAndroidBridgeTest()
+    {
+#if ANDROID
+        try
+        {
+            var resultado = AuraAndroidBridgeTest.Run();
+            System.Diagnostics.Debug.WriteLine(resultado);
+            AuraLog.Info("V16 TESTE EXECUTADO");
+            AuraLog.Info(resultado);
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("V16 Teste", ex);
+        }
+#endif
     }
 
     protected override void OnAppearing()
@@ -37,7 +59,6 @@ public partial class HomePage : ContentPage
     private void OnThemeToggleClicked(object? sender, EventArgs e)
     {
         App.ToggleTheme();
-        // Icon e vídeo são atualizados via ThemeChanged.
     }
 
     private void OnThemeChanged()
@@ -45,18 +66,17 @@ public partial class HomePage : ContentPage
         MainThread.BeginInvokeOnMainThread(() =>
         {
             UpdateThemeIcon();
-            ApplyVideoBackground(); // troca source conforme tema
+            ApplyVideoBackground();
         });
     }
 
     private void UpdateThemeIcon()
     {
         if (BtnTheme is null) return;
-        // Solar → mostra lua (próximo estado = Lunar); Lunar → mostra sol
         BtnTheme.Text = App.IsSolar ? "☾" : "☀";
     }
 
-    // ── Vídeo de fundo (Lunar = lua/aurora, Solar = sol/aurora) ────
+    // ── Vídeo de fundo ────────────────────────────────────────────
 
     private bool IsVideoBgEnabled => Preferences.Default.Get(VideoBgPrefKey, true);
 
@@ -64,7 +84,7 @@ public partial class HomePage : ContentPage
     {
         bool next = !IsVideoBgEnabled;
         Preferences.Default.Set(VideoBgPrefKey, next);
-        AuraLog.Info($"Vídeo de fundo {(next ? "ativado" : "desativado")} (Preference {VideoBgPrefKey})");
+        AuraLog.Info($"Vídeo de fundo {(next ? "ativado" : "desativado")}");
         ApplyVideoBackground();
         _ = PlayButtonFeedbackAsync(BtnTheme);
     }
@@ -82,10 +102,7 @@ public partial class HomePage : ContentPage
 
         try
         {
-            // Assets em Resources/Raw/ (MauiAsset LogicalName = filename)
             string resource = App.IsSolar ? "solar_bg.mp4" : "lunar_bg.mp4";
-
-            // Não destruir o MediaElement: desfadeia, para, troca a Source e toca (evita tela preta).
             await BgVideo.FadeTo(0, 150, Easing.Linear);
             BgVideo.Stop();
             BgVideo.Source = MediaSource.FromResource(resource);
@@ -103,14 +120,7 @@ public partial class HomePage : ContentPage
 
     private void PauseVideoBackground()
     {
-        try
-        {
-            BgVideo?.Pause();
-        }
-        catch
-        {
-            // ignore
-        }
+        try { BgVideo?.Pause(); } catch { }
     }
 
     private static async Task PlayButtonFeedbackAsync(View? button)
@@ -121,13 +131,10 @@ public partial class HomePage : ContentPage
             await button.ScaleTo(0.85, 80, Easing.CubicOut);
             await button.ScaleTo(1.0, 120, Easing.CubicIn);
         }
-        catch
-        {
-            // ignore
-        }
+        catch { }
     }
 
-    // ── Bottom bar (Início | Diagnóstico | Módulos | Agentes | Config) ──
+    // ── Bottom bar ──────────────────────────────────────────────────
 
     private async void OnInicioClicked(object? sender, EventArgs e)
     {
@@ -155,7 +162,6 @@ public partial class HomePage : ContentPage
     private async void OnConfigClicked(object? sender, EventArgs e)
     {
         await PlayButtonFeedbackAsync(BtnConfig);
-        // Ainda não existe página Config dedicada. Leva à seção Sistema.
         if (!TrySwitchToSection("Sistema"))
             await DisplayAlert("Config", "Seção Sistema não disponível no momento.", "OK");
     }
@@ -164,8 +170,7 @@ public partial class HomePage : ContentPage
     {
         if (!TrySwitchToSection(sectionTitle))
         {
-            await DisplayAlert(pageLabel, $"Seção \"{sectionTitle}\" ainda não está ativa (módulo não aplicado).", "OK");
-            return;
+            await DisplayAlert(pageLabel, $"Seção \"{sectionTitle}\" ainda não está ativa.", "OK");
         }
     }
 
