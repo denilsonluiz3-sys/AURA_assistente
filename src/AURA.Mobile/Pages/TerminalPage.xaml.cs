@@ -1,5 +1,8 @@
 using AURA.Abstractions.Execution;
 using AURA.Modules.Executors;
+#if ANDROID
+using AURA.Mobile.Platforms.Android;
+#endif
 
 namespace AURA.Mobile.Pages;
 
@@ -19,7 +22,7 @@ public partial class TerminalPage : ContentPage
         UpdateDirLabel();
 
         AppendLine("AURA Terminal — comandos via /bin/sh (sandbox do app).");
-        AppendLine("Comandos internos: clear, cd <dir>, pwd, help.", dim: true);
+        AppendLine("Comandos internos: clear, cd <dir>, pwd, help, capabilities.", dim: true);
         AppendLine();
     }
 
@@ -111,8 +114,26 @@ public partial class TerminalPage : ContentPage
 
         if (lower == "help")
         {
-            AppendLine("Comandos internos: clear, cd <dir>, pwd, help.");
+            AppendLine("Comandos internos: clear, cd <dir>, pwd, help, capabilities.");
+            AppendLine("capabilities = laboratório nativo da AURA; teste somente leitura.", dim: true);
             AppendLine("Qualquer outro comando roda via sh -c no diretório atual.", dim: true);
+            return;
+        }
+
+        if (lower == "capabilities" || lower == "aura capabilities" || lower == "aura test")
+        {
+#if ANDROID
+            try
+            {
+                AppendLine(AuraAndroidBridgeTest.Run());
+            }
+            catch (Exception ex)
+            {
+                AppendLine("Capability Lab error: " + ex.Message, error: true);
+            }
+#else
+            AppendLine("Capability Lab: disponível somente no Android.", error: true);
+#endif
             return;
         }
 
