@@ -4,8 +4,8 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.Abstractions;
-using AURA.Core.Abstractions;
 using AURA.Abstractions.Execution;
+using AURA.Core.Abstractions;
 
 namespace AURA.Agents;
 
@@ -23,7 +23,6 @@ public sealed class AndroidKernelTool : ITool
         string action = parameters.TryGetValue("action", out var value) ? value : "all";
         string text = parameters.TryGetValue("text", out var textValue) ? textValue : string.Empty;
         int ms = parameters.TryGetValue("milliseconds", out var msValue) && int.TryParse(msValue, out var parsed) ? parsed : 500;
-
         try
         {
             string result = action.ToLowerInvariant() switch
@@ -51,10 +50,7 @@ public sealed class AndroidKernelTool : ITool
             };
             return Task.FromResult(new ToolResult(true, result));
         }
-        catch (Exception ex)
-        {
-            return Task.FromResult(new ToolResult(false, "Erro Android: " + ex.Message));
-        }
+        catch (Exception ex) { return Task.FromResult(new ToolResult(false, "Erro Android: " + ex.Message)); }
     }
 }
 
@@ -82,8 +78,14 @@ public sealed class KernelShellTool : ITool
     {
         try
         {
-            string output = await _shell.ExecuteAsync(command, ct);
-            return new ToolResult(true, output ?? string.Empty);
+            var request = new ExecutionRequest
+            {
+                Command = command,
+                WorkingDirectory = AgentWorkspace.ActiveRoot,
+                Timeout = TimeSpan.FromSeconds(60)
+            };
+            ExecutionResult result = await _shell.ExecuteAsync(request, ct);
+            return new ToolResult(result.Success, result.CombineOutput());
         }
         catch (Exception ex) { return new ToolResult(false, "Erro no shell: " + ex.Message); }
     }
@@ -99,10 +101,9 @@ public sealed class KernelFileTool : ITool
     {
         string action = parameters.TryGetValue("action", out var a) ? a : "list";
         string relative = parameters.TryGetValue("path", out var p) ? p : string.Empty;
-        string path = Resolve(relative);
-
         try
         {
+            string path = Resolve(relative);
             switch (action.ToLowerInvariant())
             {
                 case "read":
