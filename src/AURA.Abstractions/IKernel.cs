@@ -6,12 +6,14 @@ namespace AURA.Abstractions;
 
 /// <summary>
 /// Entrada única do Kernel autônomo da AURA.
-/// A implementação deve conseguir executar capacidades locais sem depender de um LLM.
+/// A implementação executa capacidades locais sem depender de um LLM.
 /// </summary>
 public interface IKernel : IOrchestrator
 {
+    // Mantém a mesma assinatura do contrato de orquestração para evitar duas
+    // entradas sobrecarregadas com ordens de parâmetros diferentes.
     Task<string> ExecuteAsync(
         string command,
-        bool confirmed = false,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        bool confirmed = false);
 }
