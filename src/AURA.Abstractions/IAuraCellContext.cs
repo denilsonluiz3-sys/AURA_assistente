@@ -6,5 +6,5 @@ public interface IAuraCellContext
 {
     string CellId { get; }
     CancellationToken CancellationToken { get; }
-    IAndroidCapabilityService Android { get; }
+    IDeviceDiagnosticCapability Device { get; }
 }
