@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="AURA.Mobile.Pages.ProgramsPage"
+             Title="Programas AURA"
+             BackgroundColor="{DynamicResource AuraBackground}">
+    <Grid RowDefinitions="Auto,*" Padding="16,12">
+        <VerticalStackLayout Spacing="4">
+            <Label Text="Programas AURA" FontSize="20" FontAttributes="Bold" TextColor="{DynamicResource AuraTextPrimary}" />
+            <Label Text="Programas internos controlados" FontSize="13" TextColor="{DynamicResource AuraTextSecondary}" />
+        </VerticalStackLayout>
+        <CollectionView Grid.Row="1" Margin="0,12" SelectionMode="None" ItemsSource="{Binding Programs}">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Border BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="14,12" Margin="0,6" StrokeShape="RoundRectangle 14">
+                        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="*,Auto" RowSpacing="6">
+                            <Label Grid.Row="0" Text="{Binding DisplayName}" FontSize="16" FontAttributes="Bold" TextColor="{DynamicResource AuraTextPrimary}" />
+                            <Label Grid.Row="0" Grid.Column="1" Text="{Binding StatusText}" FontSize="12" FontAttributes="Bold" TextColor="{Binding StatusColor}" VerticalOptions="Center" />
+                            <Label Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Description}" FontSize="12" TextColor="{DynamicResource AuraTextSecondary}" />
+                            <Label Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding CapabilitiesText}" FontSize="11" TextColor="{DynamicResource AuraTextMuted}" LineBreakMode="TailTruncation" />
+                            <Label Grid.Row="3" Grid.ColumnSpan="2" Text="{Binding ResultSummary}" FontSize="13" TextColor="{DynamicResource AuraTextPrimary}" IsVisible="{Binding HasResult}" LineBreakMode="WordWrap" />
+                            <Button Grid.Row="4" Grid.ColumnSpan="2" Text="{Binding ActionButtonText}" Command="{Binding ExecuteCommand}" IsEnabled="{Binding CanExecute}" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="8" Padding="12,8" FontSize="13" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>
