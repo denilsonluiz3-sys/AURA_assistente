@@ -8,6 +8,18 @@ Para agentes de IA que precisam analisar ou modificar o código-fonte, consulte 
 
 Ele documenta a arquitetura real, regras de dependência, fluxo do Kernel, `PolicyGuard`, Cell Programs, integração Android, DI, testes e CI/CD, além de uma ordem recomendada para leitura do repositório.
 
+O `README_AI.md` também possui um snapshot automático da árvore de código e das referências entre projetos, atualizado pelo GitHub Actions após mudanças relevantes no código.
+
+## Atualização automática da documentação de IA
+
+O workflow [`update-ai-docs.yml`](.github/workflows/update-ai-docs.yml) mantém o `README_AI.md` sincronizado com o estado real do repositório.
+
+Ele é acionado após mudanças em `src/`, `tests/`, arquivos `.csproj`, `AURA.sln`, configurações de build ou workflows. O workflow reconstrói o snapshot técnico e publica a atualização automaticamente na `main`.
+
+Alterações feitas somente no `README_AI.md` não acionam o próprio workflow, evitando loops de execução.
+
+O código-fonte continua sendo a fonte de verdade; o `README_AI.md` é um mapa atualizado para agentes de IA.
+
 ## Código-fonte
 
 - `src/AURA.Abstractions` — contratos compartilhados
