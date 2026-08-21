@@ -23,7 +23,6 @@ namespace AURA.Mobile.ViewModels
         private void LoadPrograms() { Programs.Clear(); foreach (var program in _registry.All) Programs.Add(new ProgramCardViewModel(program, _runner, _contextFactory, _logger)); }
         public event PropertyChangedEventHandler? PropertyChanged;
     }
-
     public sealed class ProgramCardViewModel : INotifyPropertyChanged
     {
         private readonly IAuraCellProgram _program;
@@ -46,16 +45,7 @@ namespace AURA.Mobile.ViewModels
         public string ActionButtonText => State == ProgramState.Running ? "Executando…" : "Executar";
         public bool CanExecute => State != ProgramState.Running;
         public ICommand ExecuteCommand { get; }
-        private async Task ExecuteAsync()
-        {
-            if (_isRunning) return;
-            _isRunning = true; State = ProgramState.Running; LastResult = null;
-            using var cts = new CancellationTokenSource();
-            try { var context = _contextFactory.Create($"program-ui-{Guid.NewGuid():N}", cts.Token); var result = await _runner.RunAsync(_program, context, cts.Token); if (result.IsSuccess) { State = ProgramState.Success; LastResult = FormatResult(result.Data); } else { State = ProgramState.Failed; LastResult = $"Erro: {result.Error}"; } }
-            catch (OperationCanceledException) { State = ProgramState.Cancelled; LastResult = "Cancelado"; }
-            catch (Exception ex) { State = ProgramState.Failed; LastResult = $"Erro: {ex.Message}"; _logger.Error($"Falha no programa {_program.Name}: {ex.Message}"); }
-            finally { _isRunning = false; OnChanged(nameof(CanExecute)); OnChanged(nameof(ActionButtonText)); }
-        }
+        private async Task ExecuteAsync() { if (_isRunning) return; _isRunning = true; State = ProgramState.Running; LastResult = null; using var cts = new CancellationTokenSource(); try { var context = _contextFactory.Create($"program-ui-{Guid.NewGuid():N}", cts.Token); var result = await _runner.RunAsync(_program, context, cts.Token); if (result.IsSuccess) { State = ProgramState.Success; LastResult = FormatResult(result.Data); } else { State = ProgramState.Failed; LastResult = $"Erro: {result.Error}"; } } catch (OperationCanceledException) { State = ProgramState.Cancelled; LastResult = "Cancelado"; } catch (Exception ex) { State = ProgramState.Failed; LastResult = $"Erro: {ex.Message}"; _logger.Error($"Falha no programa {_program.Name}: {ex.Message}"); } finally { _isRunning = false; OnChanged(nameof(CanExecute)); OnChanged(nameof(ActionButtonText)); } }
         private static string FormatResult(object? data) => data == null ? "Sem dados" : System.Text.Json.JsonSerializer.Serialize(data, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
