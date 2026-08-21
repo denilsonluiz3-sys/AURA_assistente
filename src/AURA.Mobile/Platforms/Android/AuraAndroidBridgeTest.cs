@@ -5,6 +5,10 @@ using Android.Content;
 using Android.Hardware;
 using Android.Media;
 using Android.Provider;
+using AndroidApplication = Android.App.Application;
+using AndroidCameraManager = Android.Hardware.Camera2.CameraManager;
+using AndroidProcess = Android.OS.Process;
+using AndroidSecurityException = Java.Lang.SecurityException;
 
 namespace AURA.Mobile.Platforms.Android
 {
@@ -16,10 +20,10 @@ namespace AURA.Mobile.Platforms.Android
         public static string Run()
         {
             var r = new StringBuilder();
-            var context = global::Android.App.Application.Context;
+            var context = AndroidApplication.Context;
 
             r.AppendLine("=== AURA ANDROID NATIVE BRIDGE V16 ===");
-            r.AppendLine($"UID={global::Android.OS.Process.MyUid()}");
+            r.AppendLine($"UID={AndroidProcess.MyUid()}");
             r.AppendLine($"PACKAGE={context.PackageName}");
 
             Test(r, "PackageManager", () =>
@@ -41,7 +45,7 @@ namespace AURA.Mobile.Platforms.Android
                 context.GetSystemService(Context.AudioService) is AudioManager);
 
             Test(r, "CameraManager", () =>
-                context.GetSystemService(Context.CameraService) is global::Android.Hardware.Camera2.CameraManager);
+                context.GetSystemService(Context.CameraService) is AndroidCameraManager);
 
             r.AppendLine("=== V16 DONE ===");
             return r.ToString();
@@ -53,7 +57,7 @@ namespace AURA.Mobile.Platforms.Android
             {
                 r.AppendLine(action() ? $"[PASS] {name}" : $"[UNAVAILABLE] {name}");
             }
-            catch (global::Android.OS.SecurityException ex)
+            catch (AndroidSecurityException ex)
             {
                 r.AppendLine($"[DENIED] {name}: {ex.Message}");
             }
