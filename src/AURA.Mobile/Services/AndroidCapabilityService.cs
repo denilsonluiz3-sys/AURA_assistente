@@ -64,7 +64,7 @@ public sealed class AndroidCapabilityService : IAndroidCapabilityService
     {
         try
         {
-            var manager = (LocationManager?)_context.GetSystemService(Context.LocationService);
+            var manager = (global::Android.Locations.LocationManager?)_context.GetSystemService(Context.LocationService);
             if (manager == null)
                 return "Localização: serviço indisponível.";
 
@@ -75,7 +75,7 @@ public sealed class AndroidCapabilityService : IAndroidCapabilityService
                 return "Localização: permissão não concedida.";
             }
 
-            Android.Locations.Location? best = null;
+            global::Android.Locations.Location? best = null;
             foreach (string provider in manager.GetProviders(true))
             {
                 try
