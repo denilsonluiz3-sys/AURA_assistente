@@ -10,6 +10,34 @@ Ele documenta a arquitetura real, regras de dependência, fluxo do Kernel, `Poli
 
 O `README_AI.md` também possui um snapshot automático da árvore de código e das referências entre projetos, atualizado pelo GitHub Actions após mudanças relevantes no código.
 
+## Diagnóstico automático de erros para IAs
+
+Quando um workflow de build ou segurança falha, o GitHub Actions pode registrar automaticamente um relatório técnico em [`docs/ai/CI_FAILURE_LATEST.md`](docs/ai/CI_FAILURE_LATEST.md) e manter o histórico em [`docs/ai/ci-failures/`](docs/ai/ci-failures/).
+
+O guia [`docs/ai/AI_ERROR_GUIDE.md`](docs/ai/AI_ERROR_GUIDE.md) define o procedimento para uma IA localizar o primeiro erro real, classificar a causa, consultar falhas anteriores, corrigir o código e validar novamente.
+
+Para problemas que dependam do ambiente PRoot Ubuntu, existe [`scripts/ai/proot/aura-repair.sh`](scripts/ai/proot/aura-repair.sh). Por padrão ele apenas diagnostica; `--apply` executa somente reparos locais determinísticos e não faz build Android automaticamente.
+
+Fluxo:
+
+```text
+Código alterado
+      ↓
+GitHub Actions
+      ↓
+Falha
+      ↓
+Diagnóstico automático
+      ↓
+docs/ai/CI_FAILURE_LATEST.md
+      ↓
+IA consulta código + logs + histórico
+      ↓
+Correção automática/PR ou script PRoot
+      ↓
+CI valida novamente
+```
+
 ## Atualização automática da documentação de IA
 
 O workflow [`update-ai-docs.yml`](.github/workflows/update-ai-docs.yml) mantém o `README_AI.md` sincronizado com o estado real do repositório.
