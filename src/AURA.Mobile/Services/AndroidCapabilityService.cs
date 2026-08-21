@@ -127,7 +127,7 @@ public sealed class AndroidCapabilityService : IAndroidCapabilityService
             if (audio == null)
                 return "Áudio: serviço indisponível.";
 
-            return $"Áudio: modo={audio.Mode}, música={audio.GetStreamVolume(Stream.Music)}/{audio.GetStreamMaxVolume(Stream.Music)}, chamada={audio.GetStreamVolume(Stream.VoiceCall)}/{audio.GetStreamMaxVolume(Stream.VoiceCall)}.";
+            return $"Áudio: modo={audio.Mode}, música={audio.GetStreamVolume(global::Android.Media.Stream.Music)}/{audio.GetStreamMaxVolume(global::Android.Media.Stream.Music)}, chamada={audio.GetStreamVolume(global::Android.Media.Stream.VoiceCall)}/{audio.GetStreamMaxVolume(global::Android.Media.Stream.VoiceCall)}.";
         }
         catch (Exception ex)
         {
