@@ -35,7 +35,7 @@ public static class MauiProgram
             handlers.AddHandler<Microsoft.Maui.Controls.WebView, AURA.Mobile.Platforms.Android.WebView.AuraWebViewHandler>());
 
         builder.Services.AddSingleton<IAndroidCapabilityService>(sp =>
-            new Services.AndroidCapabilityService(Android.App.Application.Context));
+            new Services.AndroidCapabilityService(global::Android.App.Application.Context));
 #endif
 
         AuraLog.Info("MauiProgram: builder created");
@@ -117,13 +117,12 @@ public static class MauiProgram
                 sp.GetRequiredService<SolutionStore>(),
                 sp.GetRequiredService<Runner>(),
                 sp.GetRequiredService<SimulationRuntime>(),
-                events: sp.GetRequiredService<EventBus>(),
-                fileTool: sp.GetRequiredService<FileTool>(),
-#if ANDROID
-                androidCapabilities: sp.GetRequiredService<IAndroidCapabilityService>()
-#endif
-            ));
-        builder.Services.AddSingleton<AURA.Abstractions.Orchestration.IOrchestrator>(sp => sp.GetRequiredService<AuraOrchestrator>());
+                sp.GetRequiredService<IToolExecutor>(),
+                sp.GetRequiredService<AURA.Core.Abstractions.IWebSearch>(),
+                sp.GetRequiredService<OpenRouterClient>(),
+                events: sp.GetRequiredService<EventBus>()));
+        builder.Services.AddSingleton<AURA.Abstractions.Orchestration.IOrchestrator>(sp =>
+            sp.GetRequiredService<AuraOrchestrator>());
         builder.Services.AddSingleton<AURA.Abstractions.Process.IProcessOrchestrator>(sp =>
             new AURA.Agents.LegalProcessEngine(
                 sp.GetRequiredService<ILogger>(),
