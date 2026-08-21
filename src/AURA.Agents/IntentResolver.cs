@@ -22,6 +22,24 @@ namespace AURA.Agents
         {
             string command = normalizedCommand ?? string.Empty;
 
+            // Programas AURA devem vencer a regra genérica de "dispositivo".
+            if (ContainsAny(command,
+                "diagnóstico do aparelho",
+                "diagnostico do aparelho",
+                "informações do dispositivo",
+                "informacoes do dispositivo",
+                "como está o aparelho",
+                "como esta o aparelho"))
+            {
+                return AndroidResult(command, "device-diagnostic", 0.95,
+                    "diagnóstico do aparelho",
+                    "diagnostico do aparelho",
+                    "informações do dispositivo",
+                    "informacoes do dispositivo",
+                    "como está o aparelho",
+                    "como esta o aparelho");
+            }
+
             if (ContainsAny(command, "pesquise", "busque", "procure", "search"))
                 return Result("search", 0.95, command, "pesquise", "busque", "procure", "search");
 
