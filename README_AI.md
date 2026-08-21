@@ -220,8 +220,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `bfdcf61`
-- Data UTC: `2026-08-21 23:11:58 UTC`
+- Commit: `4d23bec`
+- Data UTC: `2026-08-21 23:46:22 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -546,9 +546,9 @@ testes relacionados
 
 ### Últimos commits
 
-- `bfdcf61` ci(ai): diagnóstico automático de falhas e suporte PRoot (2026-08-21)
-- `44acd80` docs: document automatic AI documentation synchronization (2026-08-21)
-- `12bd9e0` docs(ai): sync README_AI with source tree (2026-08-21)
-- `b1178cc` ci: add automatic AI documentation sync workflow (2026-08-21)
-- `f825f6f` feat: add controlled AURA cell program V1 (#59) (2026-08-21)
+- `4d23bec` Ai/improve ai context (#62) (2026-08-21)
+- `348786c` docs(ai): record CI failure diagnostics (2026-08-21)
+- `39999e4` docs(ai): record CI failure diagnostics (2026-08-21)
+- `2a1fe60` docs(ai): record CI failure diagnostics (2026-08-21)
+- `feee21b` docs(ai): sync README_AI with source tree (2026-08-21)
 <!-- AI-DOCS:END -->
