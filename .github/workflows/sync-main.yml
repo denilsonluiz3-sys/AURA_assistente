@@ -3,6 +3,8 @@ name: AURA Sync Main
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/ai/**'
   workflow_dispatch:
 
 concurrency:
