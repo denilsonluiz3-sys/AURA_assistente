@@ -20,15 +20,15 @@ public sealed class DeviceDiagnosticProgram : IAuraCellProgram
     {
         ct.ThrowIfCancellationRequested();
 
-        var device = context.Android.GetDevice();
-        var properties = context.Android.GetProperties();
-        var battery = context.Android.GetBattery();
-        var network = context.Android.GetNetwork();
+        var device = context.Device.GetDevice();
+        var properties = context.Device.GetProperties();
+        var battery = context.Device.GetBattery();
+        var network = context.Device.GetNetwork();
 
         return Task.FromResult(CellProgramResult.Ok(new
         {
             Device = device,
-            AndroidProperties = properties,
+            DeviceProperties = properties,
             Battery = battery,
             Network = network
         }));
