@@ -71,7 +71,6 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<ISpeechService, HybridSpeechService>();
         builder.Services.AddSingleton<VoiceAssistantService>();
-        builder.Services.AddSingleton<IAndroidCapabilityService, AndroidCapabilityService>();
 
         builder.Services.AddSingleton(sp => new AgentManager(sp.GetRequiredService<ILogger>())
         {
@@ -117,12 +116,11 @@ public static class MauiProgram
                 sp.GetRequiredService<SolutionStore>(),
                 sp.GetRequiredService<Runner>(),
                 sp.GetRequiredService<SimulationRuntime>(),
-                events: sp.GetRequiredService<EventBus>(),
-                fileTool: sp.GetRequiredService<FileTool>(),
-#if ANDROID
-                androidCapabilities: sp.GetRequiredService<IAndroidCapabilityService>()
-#endif
-            ));
+                sp.GetRequiredService<IToolExecutor>(),
+                sp.GetRequiredService<AURA.Core.Abstractions.IWebSearch>(),
+                sp.GetRequiredService<OpenRouterClient>(),
+                events: sp.GetRequiredService<EventBus>()));
+
         builder.Services.AddSingleton<AURA.Abstractions.Orchestration.IOrchestrator>(sp => sp.GetRequiredService<AuraOrchestrator>());
         builder.Services.AddSingleton<AURA.Abstractions.Process.IProcessOrchestrator>(sp =>
             new AURA.Agents.LegalProcessEngine(
