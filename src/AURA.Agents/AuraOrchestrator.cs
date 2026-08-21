@@ -11,6 +11,7 @@ using AURA.Core.Launchers;
 using AURA.Core.Runtime;
 using AURA.Memory;
 using AURA.Abstractions.Execution;
+using AURA.Abstractions.Orchestration;
 using AURA.AI;
 
 namespace AURA.Agents
@@ -19,7 +20,7 @@ namespace AURA.Agents
     /// Loop Sense → Plan → Act → Verify com IA integrada via AgentSession.
     /// Publica o estado de cada execução para a interface acompanhar em tempo real.
     /// </summary>
-    public sealed class AuraOrchestrator
+    public sealed class AuraOrchestrator : IOrchestrator
     {
         private readonly ILogger _logger;
         private readonly SolutionStore _memory;
@@ -53,7 +54,7 @@ namespace AURA.Agents
             _events = events;
         }
 
-        public async Task<string> ExecuteAsync(string userCommand, CancellationToken ct = default)
+        public async Task<string> ExecuteAsync(string userCommand, CancellationToken ct = default, bool confirmed = false)
         {
             if (string.IsNullOrWhiteSpace(userCommand))
                 return "Comando vazio.";
@@ -63,7 +64,6 @@ namespace AURA.Agents
             _logger.Info("[ORQUESTRA] " + userCommand);
             Publish(processId, "Orquestração", "Assistente", "Executando", "Entendendo solicitação", 0.05);
 
-            // 1. Verificar memória procedural
             SolutionEntry hit = _memory.FindBestMatch(userCommand);
             if (hit != null)
             {
@@ -74,7 +74,6 @@ namespace AURA.Agents
 
             Publish(processId, "Orquestração", "Planejamento", "Executando", "Criando plano de execução", 0.15);
 
-            // 2. Criar ferramentas para o agente
             string workspace = AgentWorkspace();
             var tools = new List<AgentTool>
             {
@@ -91,7 +90,6 @@ namespace AURA.Agents
                 new CodeExecutorTool(_shell, workspace)
             };
 
-            // 3. Criar sessão do agente com IA
             string apiKey = Environment.GetEnvironmentVariable("OPENROUTER_API_KEY") ?? "";
             var client = _aiClient ?? new OpenRouterClient(new OpenRouterOptions
             {
@@ -102,7 +100,7 @@ namespace AURA.Agents
                 AppReference = "AURA-Orchestrator"
             });
 
-            string systemPrompt = 
+            string systemPrompt =
                 "Você é o orquestrador da AURA. Use as ferramentas para executar tarefas.\n" +
                 "FLUXO: interpret_command → search_memory → web_search → extract_code → execute_code\n" +
                 "Workspace: " + workspace;
@@ -125,7 +123,6 @@ namespace AURA.Agents
                 result = "❌ Erro ao processar: " + ex.Message;
             }
 
-            // 4. Aprender com o resultado
             if (!result.StartsWith("❌"))
             {
                 _memory.Record(userCommand, "orchestration", result, success: true);
@@ -144,7 +141,6 @@ namespace AURA.Agents
 
         private string AgentWorkspace()
         {
-            // Usar o workspace da AURA
             string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string workspace = Path.Combine(home, "AURA", "workspace");
             try { Directory.CreateDirectory(workspace); } catch { }
