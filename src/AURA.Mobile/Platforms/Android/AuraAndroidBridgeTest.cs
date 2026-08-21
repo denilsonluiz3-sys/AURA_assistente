@@ -8,7 +8,6 @@ using Android.Provider;
 using AndroidApplication = Android.App.Application;
 using AndroidCameraManager = Android.Hardware.Camera2.CameraManager;
 using AndroidProcess = Android.OS.Process;
-using AndroidSecurityException = Java.Lang.SecurityException;
 
 namespace AURA.Mobile.Platforms.Android
 {
@@ -22,7 +21,7 @@ namespace AURA.Mobile.Platforms.Android
             var r = new StringBuilder();
             var context = AndroidApplication.Context;
 
-            r.AppendLine("=== AURA ANDROID NATIVE BRIDGE V16 ===");
+            r.AppendLine("=== AURA ANDROID NATIVE BRIDGE V17 ===");
             r.AppendLine($"UID={AndroidProcess.MyUid()}");
             r.AppendLine($"PACKAGE={context.PackageName}");
 
@@ -47,7 +46,7 @@ namespace AURA.Mobile.Platforms.Android
             Test(r, "CameraManager", () =>
                 context.GetSystemService(Context.CameraService) is AndroidCameraManager);
 
-            r.AppendLine("=== V16 DONE ===");
+            r.AppendLine("=== V17 DONE ===");
             return r.ToString();
         }
 
@@ -57,12 +56,11 @@ namespace AURA.Mobile.Platforms.Android
             {
                 r.AppendLine(action() ? $"[PASS] {name}" : $"[UNAVAILABLE] {name}");
             }
-            catch (AndroidSecurityException ex)
-            {
-                r.AppendLine($"[DENIED] {name}: {ex.Message}");
-            }
             catch (Exception ex)
             {
+                // Android/Java SecurityException is surfaced through the managed
+                // Java exception hierarchy. Do not reference a platform-specific
+                // SecurityException type here; that binding differs by target.
                 r.AppendLine($"[ERROR] {name}: {ex.GetType().Name}: {ex.Message}");
             }
         }
