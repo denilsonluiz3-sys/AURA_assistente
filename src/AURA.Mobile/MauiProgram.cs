@@ -121,10 +121,8 @@ public static class MauiProgram
                 sp.GetRequiredService<OpenRouterClient>(),
                 events: sp.GetRequiredService<EventBus>(),
                 android: sp.GetService<IAndroidCapabilityService>()));
-
         builder.Services.AddSingleton<IKernel>(sp => sp.GetRequiredService<AuraOrchestrator>());
-        builder.Services.AddSingleton<AURA.Abstractions.Orchestration.IOrchestrator>(sp =>
-            sp.GetRequiredService<AuraOrchestrator>());
+        builder.Services.AddSingleton<AURA.Abstractions.Orchestration.IOrchestrator>(sp => sp.GetRequiredService<AuraOrchestrator>());
         builder.Services.AddSingleton<AURA.Abstractions.Process.IProcessOrchestrator>(sp =>
             new AURA.Agents.LegalProcessEngine(
                 sp.GetRequiredService<ILogger>(),
@@ -156,24 +154,50 @@ public static class MauiProgram
         try
         {
             var bus = app.Services.GetRequiredService<EventBus>();
-            AuraLog.Info("MauiProgram: EventBus resolved");
+            var memory = app.Services.GetRequiredService<MemoryStore>();
+            bus.Subscribe<CellStateChangedEvent>(evt =>
+                memory.Append(MemoryEntry.CellStateChange(evt.CellId, evt.To)));
         }
         catch (Exception ex)
         {
-            AuraLog.Error("MauiProgram: EventBus resolution failed: " + ex.Message);
+            AuraLog.Exception("MauiProgram.MemoryEventSink", ex);
         }
 
-        AuraLog.Info("MauiProgram.CreateMauiApp END");
+        AuraLog.Info("MauiProgram.CreateMauiApp OK");
         return app;
     }
 
-    private static async Task<Stream?> ReadEmbeddedModulePackageAsync(string moduleId)
+    private static async Task<string?> ReadEmbeddedModulePackageAsync(string id)
     {
-        string resourceName = "AURA.Mobile.Resources.Modules." + moduleId + ".zip";
-        var assembly = typeof(MauiProgram).Assembly;
-        Stream? stream = assembly.GetManifestResourceStream(resourceName);
-        if (stream != null) return stream;
-        await Task.CompletedTask;
+        if (string.IsNullOrWhiteSpace(id))
+            return null;
+
+        string[] candidates =
+        {
+            $"modulepkgs/{id}/module.json",
+            $"modulepkgs\\{id}\\module.json"
+        };
+
+        foreach (string path in candidates)
+        {
+            try
+            {
+                using Stream stream = await FileSystem.OpenAppPackageFileAsync(path);
+                using var reader = new StreamReader(stream);
+                string json = await reader.ReadToEndAsync();
+                if (!string.IsNullOrWhiteSpace(json))
+                {
+                    AuraLog.Info($"Pacote embarcado lido para o módulo '{id}' ({path}).");
+                    return json;
+                }
+            }
+            catch (Exception ex)
+            {
+                AuraLog.Info($"Asset '{path}' indisponível ({ex.GetType().Name}).");
+            }
+        }
+
+        AuraLog.Warning($"Nenhum pacote embarcado encontrado para o módulo '{id}'.");
         return null;
     }
 }
