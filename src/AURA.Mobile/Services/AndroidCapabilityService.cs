@@ -40,8 +40,8 @@ public sealed class AndroidCapabilityService : IAndroidCapabilityService
             int percentage = level >= 0 && scale > 0 ? level * 100 / scale : -1;
             string charging = status switch
             {
-                (int)BatteryStatus.Charging => "carregando",
-                (int)BatteryStatus.Full => "completa",
+                (int)global::Android.OS.BatteryStatus.Charging => "carregando",
+                (int)global::Android.OS.BatteryStatus.Full => "completa",
                 _ => "não carregando"
             };
 
@@ -86,7 +86,6 @@ public sealed class AndroidCapabilityService : IAndroidCapabilityService
                 }
                 catch
                 {
-                    // Alguns providers podem negar acesso individualmente.
                 }
             }
 
@@ -104,7 +103,7 @@ public sealed class AndroidCapabilityService : IAndroidCapabilityService
     {
         try
         {
-            var manager = (Android.Hardware.Camera2.CameraManager?)_context.GetSystemService(Context.CameraService);
+            var manager = (global::Android.Hardware.Camera2.CameraManager?)_context.GetSystemService(Context.CameraService);
             if (manager == null)
                 return "Câmeras: serviço indisponível.";
 
