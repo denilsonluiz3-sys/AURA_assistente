@@ -214,3 +214,340 @@ testes relacionados
   ↓
 .github/workflows/*
 ```
+
+<!-- AI-DOCS:START -->
+## Snapshot automático do código
+
+> Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
+
+- Commit: `b1178cc`
+- Data UTC: `2026-08-21 22:58:28 UTC`
+- Branch: `main`
+
+### Projetos
+
+- `src/AURA.AI/AURA.AI.csproj`
+- `src/AURA.Abstractions/AURA.Abstractions.csproj`
+- `src/AURA.Agents/AURA.Agents.csproj`
+- `src/AURA.CLI/AURA.CLI.csproj`
+- `src/AURA.Core/AURA.Core.csproj`
+- `src/AURA.Installer/AURA.Installer.csproj`
+- `src/AURA.Memory/AURA.Memory.csproj`
+- `src/AURA.Mobile/AURA.Mobile.csproj`
+- `src/AURA.Modules/AURA.Modules.csproj`
+- `src/AURA.Network/AURA.Network.csproj`
+- `src/AURA.SystemInfo/AURA.SystemInfo.csproj`
+- `src/AURA.Windows/AURA.Windows.csproj`
+- `tests/AURA.Tests/AURA.Tests.csproj`
+
+### Estrutura de código
+
+- `src/AURA.AI`: 29 arquivos C#, 0 arquivos XAML
+- `src/AURA.Abstractions`: 16 arquivos C#, 0 arquivos XAML
+- `src/AURA.Agents`: 16 arquivos C#, 0 arquivos XAML
+- `src/AURA.CLI`: 1 arquivos C#, 0 arquivos XAML
+- `src/AURA.Core`: 39 arquivos C#, 0 arquivos XAML
+- `src/AURA.Installer`: 17 arquivos C#, 0 arquivos XAML
+- `src/AURA.Memory`: 5 arquivos C#, 0 arquivos XAML
+- `src/AURA.Mobile`: 54 arquivos C#, 34 arquivos XAML
+- `src/AURA.Modules`: 23 arquivos C#, 0 arquivos XAML
+- `src/AURA.Network`: 2 arquivos C#, 0 arquivos XAML
+- `src/AURA.SystemInfo`: 2 arquivos C#, 0 arquivos XAML
+- `src/AURA.Windows`: 0 arquivos C#, 0 arquivos XAML
+
+### Referências entre projetos
+
+**src/AURA.AI/AURA.AI.csproj**
+- ../AURA.Abstractions/AURA.Abstractions.csproj
+- ../AURA.Core/AURA.Core.csproj
+- ../AURA.Memory/AURA.Memory.csproj
+
+**src/AURA.Agents/AURA.Agents.csproj**
+- ../AURA.Abstractions/AURA.Abstractions.csproj
+- ../AURA.Core/AURA.Core.csproj
+- ../AURA.Memory/AURA.Memory.csproj
+- ../AURA.AI/AURA.AI.csproj
+
+**src/AURA.CLI/AURA.CLI.csproj**
+- ../AURA.Core/AURA.Core.csproj
+- ../AURA.SystemInfo/AURA.SystemInfo.csproj
+- ../AURA.Network/AURA.Network.csproj
+- ../AURA.Modules/AURA.Modules.csproj
+- ../AURA.Agents/AURA.Agents.csproj
+- ../AURA.AI/AURA.AI.csproj
+- ../AURA.Windows/AURA.Windows.csproj
+
+**src/AURA.Installer/AURA.Installer.csproj**
+- ../AURA.Modules/AURA.Modules.csproj
+- ../AURA.SystemInfo/AURA.SystemInfo.csproj
+
+**src/AURA.Memory/AURA.Memory.csproj**
+- ../AURA.Core/AURA.Core.csproj
+
+**src/AURA.Mobile/AURA.Mobile.csproj**
+- ../AURA.Abstractions/AURA.Abstractions.csproj
+- ../AURA.Core/AURA.Core.csproj
+- ../AURA.Modules/AURA.Modules.csproj
+- ../AURA.Agents/AURA.Agents.csproj
+- ../AURA.Memory/AURA.Memory.csproj
+- ../AURA.AI/AURA.AI.csproj
+- ../AURA.Network/AURA.Network.csproj
+- ../AURA.SystemInfo/AURA.SystemInfo.csproj
+
+**src/AURA.Modules/AURA.Modules.csproj**
+- ../AURA.Abstractions/AURA.Abstractions.csproj
+- ../AURA.Core/AURA.Core.csproj
+
+**src/AURA.Windows/AURA.Windows.csproj**
+- ../AURA.Core/AURA.Core.csproj
+
+**tests/AURA.Tests/AURA.Tests.csproj**
+- ../../src/AURA.Abstractions/AURA.Abstractions.csproj
+- ../../src/AURA.Agents/AURA.Agents.csproj
+- ../../src/AURA.Core/AURA.Core.csproj
+- ../../src/AURA.SystemInfo/AURA.SystemInfo.csproj
+- ../../src/AURA.Network/AURA.Network.csproj
+- ../../src/AURA.Modules/AURA.Modules.csproj
+- ../../src/AURA.AI/AURA.AI.csproj
+- ../../src/AURA.Installer/AURA.Installer.csproj
+- ../../src/AURA.Memory/AURA.Memory.csproj
+
+### Workflows
+
+- `.github/workflows/build-android-apk.yml`
+- `.github/workflows/codeql.yml`
+- `.github/workflows/sync-main.yml`
+- `.github/workflows/update-ai-docs.yml`
+
+### Arquivos de código relevantes
+
+- `src/AURA.AI/AgentChat.cs`
+- `src/AURA.AI/AgentSession.cs`
+- `src/AURA.AI/AgentTool.cs`
+- `src/AURA.AI/AgentToolResult.cs`
+- `src/AURA.AI/AgentTools/AndroidCapabilityTool.cs`
+- `src/AURA.AI/AgentTools/CodeExecutorTool.cs`
+- `src/AURA.AI/AgentTools/CodeExtractorTool.cs`
+- `src/AURA.AI/AgentTools/FileTools.cs`
+- `src/AURA.AI/AgentTools/InterpretCommandTool.cs`
+- `src/AURA.AI/AgentTools/SearchFilesTool.cs`
+- `src/AURA.AI/AgentTools/SearchMemoryTool.cs`
+- `src/AURA.AI/AgentTools/ShellAgentTool.cs`
+- `src/AURA.AI/AgentTools/WebFetchTool.cs`
+- `src/AURA.AI/AgentTools/WebSearchTool.cs`
+- `src/AURA.AI/AgentTools/WorkspaceAgentTool.cs`
+- `src/AURA.AI/AiAssistant.cs`
+- `src/AURA.AI/AiAssistantService.cs`
+- `src/AURA.AI/OpenRouterAiClientAdapter.cs`
+- `src/AURA.AI/OpenRouterClient.cs`
+- `src/AURA.AI/ProviderCatalog.cs`
+- `src/AURA.AI/ProviderRuntime.cs`
+- `src/AURA.AI/Providers/AiApiFormat.cs`
+- `src/AURA.AI/Providers/ApiKeyProviderResolver.cs`
+- `src/AURA.AI/Providers/IAiProvider.cs`
+- `src/AURA.AI/Providers/IApiKeyProviderResolver.cs`
+- `src/AURA.AI/Providers/ProviderCredential.cs`
+- `src/AURA.AI/Providers/ProviderDetectionResult.cs`
+- `src/AURA.AI/Providers/ProviderHealthResult.cs`
+- `src/AURA.AI/ToolRegistry.cs`
+- `src/AURA.Abstractions/CellProgramResult.cs`
+- `src/AURA.Abstractions/Execution/ExecutionRequest.cs`
+- `src/AURA.Abstractions/Execution/ExecutionResult.cs`
+- `src/AURA.Abstractions/Execution/IToolExecutor.cs`
+- `src/AURA.Abstractions/IAiClient.cs`
+- `src/AURA.Abstractions/IAndroidCapabilityService.cs`
+- `src/AURA.Abstractions/IAuraCellContext.cs`
+- `src/AURA.Abstractions/IAuraCellContextFactory.cs`
+- `src/AURA.Abstractions/IAuraCellProgram.cs`
+- `src/AURA.Abstractions/IDeviceDiagnosticCapability.cs`
+- `src/AURA.Abstractions/Orchestration/IOrchestrator.cs`
+- `src/AURA.Abstractions/Process/IProcessOrchestrator.cs`
+- `src/AURA.Abstractions/Process/ProcessState.cs`
+- `src/AURA.Abstractions/Process/Verdict.cs`
+- `src/AURA.Abstractions/Runtime/RuntimeInterfaces.cs`
+- `src/AURA.Abstractions/Runtime/RuntimeModels.cs`
+- `src/AURA.Agents/AIAgent.cs`
+- `src/AURA.Agents/AgentManager.cs`
+- `src/AURA.Agents/AuraOrchestrator.cs`
+- `src/AURA.Agents/AutomationAgent.cs`
+- `src/AURA.Agents/IntentResolver.cs`
+- `src/AURA.Agents/LegalProcessEngine.cs`
+- `src/AURA.Agents/MemoryAgent.cs`
+- `src/AURA.Agents/PolicyGuard.cs`
+- `src/AURA.Agents/Programs/CellProgramRegistry.cs`
+- `src/AURA.Agents/Programs/CellProgramRunner.cs`
+- `src/AURA.Agents/Programs/DeviceDiagnosticProgram.cs`
+- `src/AURA.Agents/ToolResolver.cs`
+- `src/AURA.Agents/Tools/AndroidTool.cs`
+- `src/AURA.Agents/Tools/FileTool.cs`
+- `src/AURA.Agents/Tools/RunTool.cs`
+- `src/AURA.Agents/Tools/SearchTool.cs`
+- `src/AURA.CLI/Program.cs`
+- `src/AURA.Core/Abstractions/IAgent.cs`
+- `src/AURA.Core/Abstractions/ICommand.cs`
+- `src/AURA.Core/Abstractions/IModule.cs`
+- `src/AURA.Core/Abstractions/IPlugin.cs`
+- `src/AURA.Core/Abstractions/IService.cs`
+- `src/AURA.Core/Abstractions/IWebSearch.cs`
+- `src/AURA.Core/Bootstrap/AuraBootstrap.cs`
+- `src/AURA.Core/Configuration/AuraConfiguration.cs`
+- `src/AURA.Core/Configuration/ConfigLoader.cs`
+- `src/AURA.Core/Configuration/ModulesConfiguration.cs`
+- `src/AURA.Core/DependencyInjection/ServiceContainer.cs`
+- `src/AURA.Core/Events/AuraEvents.cs`
+- `src/AURA.Core/Events/EventBus.cs`
+- `src/AURA.Core/Events/IEvent.cs`
+- `src/AURA.Core/Events/OrchestrationStepEvent.cs`
+- `src/AURA.Core/Knowledge/KnowledgeManager.cs`
+- `src/AURA.Core/Launchers/CellCommand.cs`
+- `src/AURA.Core/Launchers/DllLauncher.cs`
+- `src/AURA.Core/Launchers/GoLauncher.cs`
+- `src/AURA.Core/Launchers/ILauncher.cs`
+- `src/AURA.Core/Launchers/JarLauncher.cs`
+- `src/AURA.Core/Launchers/NodeLauncher.cs`
+- `src/AURA.Core/Launchers/PythonLauncher.cs`
+- `src/AURA.Core/Launchers/Runner.cs`
+- `src/AURA.Core/Launchers/ShellLauncher.cs`
+- `src/AURA.Core/Logging/ConsoleLogger.cs`
+- `src/AURA.Core/Logging/FileLogger.cs`
+- `src/AURA.Core/Logging/ILogger.cs`
+- `src/AURA.Core/Runtime/Cell.cs`
+- `src/AURA.Core/Runtime/CellNetworkPolicy.cs`
+- `src/AURA.Core/Runtime/CellState.cs`
+- `src/AURA.Core/Runtime/CellStore.cs`
+- `src/AURA.Core/Runtime/DirectoryCellBackend.cs`
+- `src/AURA.Core/Runtime/ICellBackend.cs`
+- `src/AURA.Core/Runtime/PluginWatcher.cs`
+- `src/AURA.Core/Runtime/ResourceLimits.cs`
+- `src/AURA.Core/Runtime/SimulationRuntime.cs`
+- `src/AURA.Core/VersionInfo.cs`
+- `src/AURA.Core/WebSearchService.cs`
+- `src/AURA.Installer/ArtifactAnalysisService.cs`
+- `src/AURA.Installer/ArtifactIdentification.cs`
+- `src/AURA.Installer/ArtifactType.cs`
+- `src/AURA.Installer/DependencyReport.cs`
+- `src/AURA.Installer/EnvironmentSelectionResult.cs`
+- `src/AURA.Installer/EnvironmentSelectionService.cs`
+- `src/AURA.Installer/FileIdentifier.cs`
+- `src/AURA.Installer/IDependencyAnalyzer.cs`
+- `src/AURA.Installer/IEnvironmentSelector.cs`
+- `src/AURA.Installer/IFileIdentifier.cs`
+- `src/AURA.Installer/IInstaller.cs`
+- `src/AURA.Installer/InstallationResult.cs`
+- `src/AURA.Installer/InstallationService.cs`
+- `src/AURA.Installer/PythonDependencyAnalyzer.cs`
+- `src/AURA.Installer/PythonEnvironmentSelector.cs`
+- `src/AURA.Installer/PythonInstaller.cs`
+- `src/AURA.Installer/PythonStdlibModules.cs`
+- `src/AURA.Memory/MemoryEntry.cs`
+- `src/AURA.Memory/MemoryStore.cs`
+- `src/AURA.Memory/RequestContext.cs`
+- `src/AURA.Memory/SolutionRule.cs`
+- `src/AURA.Memory/SolutionStore.cs`
+- `src/AURA.Mobile/App.xaml`
+- `src/AURA.Mobile/App.xaml.cs`
+- `src/AURA.Mobile/Controls/AiConfig.cs`
+- `src/AURA.Mobile/Controls/AiConfigView.cs`
+- `src/AURA.Mobile/DesignSystem.cs`
+- `src/AURA.Mobile/Diagnostics/AgentWorkspace.cs`
+- `src/AURA.Mobile/Diagnostics/FixProposal.cs`
+- `src/AURA.Mobile/Diagnostics/ProjectAccessService.cs`
+- `src/AURA.Mobile/Diagnostics/RuntimeConfig.cs`
+- `src/AURA.Mobile/Diagnostics/SearchCatalog.cs`
+- `src/AURA.Mobile/Diagnostics/WebSearchAnswer.cs`
+- `src/AURA.Mobile/MainPage.cs`
+- `src/AURA.Mobile/MauiProgram.cs`
+- `src/AURA.Mobile/Pages/AgentPage.xaml`
+- `src/AURA.Mobile/Pages/AgentPage.xaml.cs`
+- `src/AURA.Mobile/Pages/BrowserPage.xaml`
+- `src/AURA.Mobile/Pages/BrowserPage.xaml.cs`
+- `src/AURA.Mobile/Pages/BrowserSettingsPage.cs`
+- `src/AURA.Mobile/Pages/CellsPage.xaml`
+- `src/AURA.Mobile/Pages/CellsPage.xaml.cs`
+- `src/AURA.Mobile/Pages/ChatPage.xaml`
+- `src/AURA.Mobile/Pages/ChatPage.xaml.cs`
+- `src/AURA.Mobile/Pages/DiagnosticoPage.xaml`
+- `src/AURA.Mobile/Pages/DiagnosticoPage.xaml.cs`
+- `src/AURA.Mobile/Pages/EcosystemPage.xaml`
+- `src/AURA.Mobile/Pages/EcosystemPage.xaml.cs`
+- `src/AURA.Mobile/Pages/ExecutorsPage.xaml`
+- `src/AURA.Mobile/Pages/ExecutorsPage.xaml.cs`
+- `src/AURA.Mobile/Pages/FixesPage.xaml`
+- `src/AURA.Mobile/Pages/FixesPage.xaml.cs`
+- `src/AURA.Mobile/Pages/HomePage.xaml`
+- `src/AURA.Mobile/Pages/HomePage.xaml.cs`
+- `src/AURA.Mobile/Pages/ImageSearchPage.xaml`
+- `src/AURA.Mobile/Pages/ImageSearchPage.xaml.cs`
+- `src/AURA.Mobile/Pages/LogsPage.xaml`
+- `src/AURA.Mobile/Pages/LogsPage.xaml.cs`
+- `src/AURA.Mobile/Pages/MemoryPage.xaml`
+- `src/AURA.Mobile/Pages/MemoryPage.xaml.cs`
+- `src/AURA.Mobile/Pages/ModulesPage.xaml`
+- `src/AURA.Mobile/Pages/ModulesPage.xaml.cs`
+- `src/AURA.Mobile/Pages/ProgramsPage.xaml`
+- `src/AURA.Mobile/Pages/ProgramsPage.xaml.cs`
+- `src/AURA.Mobile/Pages/RunPage.xaml`
+- `src/AURA.Mobile/Pages/RunPage.xaml.cs`
+- `src/AURA.Mobile/Pages/SectionPage.cs`
+- `src/AURA.Mobile/Pages/TerminalPage.xaml`
+- `src/AURA.Mobile/Pages/TerminalPage.xaml.cs`
+- `src/AURA.Mobile/Platforms/Android/AuraAndroidBridgeTest.cs`
+- `src/AURA.Mobile/Platforms/Android/AuraLog.cs`
+- `src/AURA.Mobile/Platforms/Android/MainActivity.cs`
+- `src/AURA.Mobile/Platforms/Android/MainApplication.cs`
+- `src/AURA.Mobile/Platforms/Android/StoragePermissionHelper.cs`
+- `src/AURA.Mobile/Platforms/Android/VoiceFloatingButton.cs`
+- `src/AURA.Mobile/Platforms/Android/VpnHelper.cs`
+- `src/AURA.Mobile/Platforms/Android/WebView/AuraDownloadListener.cs`
+- `src/AURA.Mobile/Platforms/Android/WebView/AuraLongClickListener.cs`
+- `src/AURA.Mobile/Platforms/Android/WebView/AuraTouchListener.cs`
+- `src/AURA.Mobile/Platforms/Android/WebView/AuraWebViewHandler.cs`
+- `src/AURA.Mobile/ProcessInfo.cs`
+- `src/AURA.Mobile/ProcessRegistry.cs`
+- `src/AURA.Mobile/RoleToColorConverter.cs`
+- `src/AURA.Mobile/Services/AndroidCapabilityService.cs`
+- `src/AURA.Mobile/Services/AuraCellContext.cs`
+- `src/AURA.Mobile/Services/AuraCellContextFactory.cs`
+- `src/AURA.Mobile/Services/WebSearchService.cs`
+- `src/AURA.Mobile/Speech/AndroidTtsSpeechService.cs`
+- `src/AURA.Mobile/Speech/HybridSpeechService.cs`
+- `src/AURA.Mobile/Speech/ISpeechService.cs`
+- `src/AURA.Mobile/Speech/VoiceAssistantService.cs`
+- `src/AURA.Mobile/ViewModels/ModuleRow.cs`
+- `src/AURA.Mobile/ViewModels/ProgramsPageViewModel.cs`
+- `src/AURA.Modules/Executors/GitExecutor.cs`
+- `src/AURA.Modules/Executors/NodeExecutor.cs`
+- `src/AURA.Modules/Executors/ProcessExecutorBase.cs`
+- `src/AURA.Modules/Executors/PythonExecutor.cs`
+- `src/AURA.Modules/Executors/ShellExecutor.cs`
+- `src/AURA.Modules/Loja/LockHelper.cs`
+- `src/AURA.Modules/Loja/LojaLocalResolver.cs`
+- `src/AURA.Modules/Loja/LojaUninstaller.cs`
+- `src/AURA.Modules/ModuleCatalog.cs`
+- `src/AURA.Modules/ModuleDifficulty.cs`
+- `src/AURA.Modules/ModuleInfo.cs`
+- `src/AURA.Modules/ModuleManager.cs`
+- `src/AURA.Modules/ModuleStatus.cs`
+- `src/AURA.Modules/Runtime/BinaryPath.cs`
+- `src/AURA.Modules/Runtime/CompatibilityChecker.cs`
+- `src/AURA.Modules/Runtime/DependencyAnalyzer.cs`
+- `src/AURA.Modules/Runtime/Installer.cs`
+- `src/AURA.Modules/Runtime/LanguageDetector.cs`
+- `src/AURA.Modules/Runtime/RuntimeCatalog.cs`
+- `src/AURA.Modules/Runtime/RuntimeManager.cs`
+- `src/AURA.Modules/Runtime/RuntimeProcessExecutor.cs`
+- `src/AURA.Modules/Runtime/RuntimeResolver.cs`
+- `src/AURA.Modules/Runtime/SyntaxValidator.cs`
+- `src/AURA.Network/NetworkManager.cs`
+- `src/AURA.Network/NetworkStatus.cs`
+- `src/AURA.SystemInfo/SystemAnalyzer.cs`
+- `src/AURA.SystemInfo/SystemDiagnosticsResult.cs`
+
+### Últimos commits
+
+- `b1178cc` ci: add automatic AI documentation sync workflow (2026-08-21)
+- `f825f6f` feat: add controlled AURA cell program V1 (#59) (2026-08-21)
+- `bbdaa03` docs: add public README and link AI architecture guide (2026-08-21)
+- `4c6a544` docs: add AI-readable repository architecture guide (2026-08-21)
+- `0df32ba` ci: keep only AURA workflows (2026-08-21)
+<!-- AI-DOCS:END -->
