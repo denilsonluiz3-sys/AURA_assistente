@@ -1,0 +1,142 @@
+name: AURA AI Failure Diagnostics
+
+on:
+  workflow_run:
+    workflows:
+      - AURA Android APK
+      - CodeQL Advanced
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Workflow run ID to inspect'
+        required: true
+        type: string
+
+concurrency:
+  group: aura-ai-failure-diagnostics-${{ github.event.workflow_run.id || github.event.inputs.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  diagnose:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion != 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Collect failed run metadata and logs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_RUN_ID: ${{ github.event.workflow_run.id }}
+          INPUT_RUN_ID: ${{ github.event.inputs.run_id }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RUN_ID="${EVENT_RUN_ID:-${INPUT_RUN_ID:-}}"
+          test -n "$RUN_ID" || { echo 'run_id ausente' >&2; exit 1; }
+
+          mkdir -p docs/ai/ci-failures
+
+          gh run view "$RUN_ID" --repo "$REPOSITORY" --json \
+            databaseId,name,displayTitle,status,conclusion,headBranch,headSha,event,createdAt,updatedAt,url \
+            > /tmp/run.json
+
+          gh run view "$RUN_ID" --repo "$REPOSITORY" --json jobs \
+            > /tmp/jobs.json
+
+          gh run view "$RUN_ID" --repo "$REPOSITORY" --log-failed > /tmp/failed.log 2>&1 || true
+
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+
+          run = json.loads(Path('/tmp/run.json').read_text())
+          jobs = json.loads(Path('/tmp/jobs.json').read_text())
+          raw = Path('/tmp/failed.log').read_text(errors='replace')
+
+          # Remove common secret-bearing patterns while preserving useful diagnostics.
+          redactions = [
+              (r'(?i)(authorization:\s*bearer\s+)[^\s]+', r'\1[REDACTED]'),
+              (r'(?i)(password\s*[=:]\s*)[^\s]+', r'\1[REDACTED]'),
+              (r'(?i)(token\s*[=:]\s*)[^\s]+', r'\1[REDACTED]'),
+              (r'(?i)(api[_-]?key\s*[=:]\s*)[^\s]+', r'\1[REDACTED]'),
+              (r'(?i)(secret\s*[=:]\s*)[^\s]+', r'\1[REDACTED]'),
+          ]
+          for pattern, repl in redactions:
+              raw = re.sub(pattern, repl, raw)
+
+          lines = raw.splitlines()
+          error_lines = [
+              line for line in lines
+              if re.search(r'\b(error|failed|failure|exception|fatal|NETSDK\d+|CS\d{4}|XA\d+|NU\d{4}|MSB\d{4})\b', line, re.I)
+          ]
+
+          if error_lines:
+              key = '\n'.join(error_lines[-80:])
+          elif lines:
+              key = '\n'.join(lines[-120:])
+          else:
+              key = 'Nenhum log de falha foi disponibilizado pelo GitHub para esta execução.'
+
+          conclusion = run.get('conclusion') or 'unknown'
+          workflow = run.get('name') or 'unknown'
+          sha = run.get('headSha') or 'unknown'
+          short_sha = sha[:7] if sha != 'unknown' else sha
+          run_id = str(run.get('databaseId') or os.environ.get('RUN_ID', 'unknown'))
+
+          def classify(text):
+              checks = [
+                  ('MAUI workload / SDK', r'NETSDK1147|maui-android|workload'),
+                  ('Android SDK / NDK / Java', r'ANDROID|XA\d+|sdkmanager|NDK|JDK|Java'),
+                  ('NuGet / restore', r'NU\d{4}|restore|NuGet|package'),
+                  ('C# / compilação', r'CS\d{4}|compil|namespace|does not exist'),
+                  ('XAML / source generator', r'XAML|SourceGen|sg\.cs|XamlGenerator'),
+                  ('GitHub Actions / configuração', r'workflow|permission|actions/|runner|YAML|yaml'),
+                  ('CodeQL / segurança', r'CodeQL|code scanning|security'),
+              ]
+              found = [name for name, pattern in checks if re.search(pattern, text, re.I)]
+              return found[0] if found else 'Indeterminada — consultar o primeiro erro real do log.'
+
+          category = classify(key)
+          job_names = [j.get('name') for j in jobs.get('jobs', []) if j.get('conclusion') not in (None, 'success')]
+          if not job_names:
+              job_names = [j.get('name') for j in jobs.get('jobs', [])]
+
+          report = f'''# Falha CI — {workflow} — run {run_id}\n\n'''
+          report += f'''- Workflow: `{workflow}`\n- Run: `{run_id}`\n- Conclusão: `{conclusion}`\n- Branch: `{run.get('headBranch', 'unknown')}`\n- Commit: `{short_sha}`\n- Evento: `{run.get('event', 'unknown')}`\n- URL: {run.get('url', '')}\n- Jobs relevantes: {', '.join(job_names) or 'não identificado'}\n- Categoria provável: **{category}**\n\n'''
+          report += '''## Como uma IA deve continuar\n\n1. Leia este relatório e o `README_AI.md`.\n2. Inspecione o workflow/job indicado.\n3. Localize o primeiro erro real, ignorando erros em cascata.\n4. Verifique `global.json`, `.csproj`, `NuGet.Config` e arquivos relacionados.\n5. Procure ocorrências semelhantes em `docs/ai/ci-failures/`.\n6. Corrija somente a causa comprovada.\n7. Valide novamente no GitHub Actions.\n\n'''
+          report += '## Evidência do log\n\n```text\n' + key[-16000:] + '\n```\n'
+
+          latest = Path('docs/ai/CI_FAILURE_LATEST.md')
+          history = Path('docs/ai/ci-failures') / f'{run_id}.md'
+          latest.write_text(report, encoding='utf-8')
+          history.write_text(report, encoding='utf-8')
+          PY
+
+      - name: Publish diagnostic report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/ai/CI_FAILURE_LATEST.md docs/ai/ci-failures/
+          if git diff --cached --quiet; then
+            echo 'Nenhuma alteração de diagnóstico para publicar.'
+            exit 0
+          fi
+          git commit -m "docs(ai): record CI failure diagnostics"
+          git push origin HEAD:main
