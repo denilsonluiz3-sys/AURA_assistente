@@ -1,5 +1,6 @@
 using AURA.AI;
 using AURA.Agents;
+using AURA.Agents.Programs;
 using AURA.Abstractions;
 using AURA.Abstractions.Execution;
 using AURA.Core.Configuration;
@@ -36,12 +37,23 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<IAndroidCapabilityService>(sp =>
             new Services.AndroidCapabilityService(Android.App.Application.Context));
+
+        builder.Services.AddSingleton<IAuraCellContextFactory, AuraCellContextFactory>();
+        builder.Services.AddSingleton<CellProgramRunner>();
+        builder.Services.AddSingleton<CellProgramRegistry>(sp =>
+        {
+            var registry = new CellProgramRegistry();
+            registry.Register(new DeviceDiagnosticProgram());
+            return registry;
+        });
 #endif
 
         AuraLog.Info("MauiProgram: builder created");
 
         builder.Services.AddSingleton<ILogger, ConsoleLogger>();
         builder.Services.AddSingleton<EventBus>();
+        builder.Services.AddSingleton<IIntentResolver, HeuristicIntentResolver>();
+        builder.Services.AddSingleton<PolicyGuard>();
 
         string configDir = Path.Combine(FileSystem.AppDataDirectory, "config");
         builder.Services.AddSingleton(sp => new ConfigLoader(sp.GetRequiredService<ILogger>())
@@ -119,7 +131,15 @@ public static class MauiProgram
                 sp.GetRequiredService<IToolExecutor>(),
                 sp.GetRequiredService<AURA.Core.Abstractions.IWebSearch>(),
                 sp.GetRequiredService<OpenRouterClient>(),
-                events: sp.GetRequiredService<EventBus>()));
+                events: sp.GetRequiredService<EventBus>(),
+                intentResolver: sp.GetRequiredService<IIntentResolver>(),
+                policyGuard: sp.GetRequiredService<PolicyGuard>(),
+#if ANDROID
+                cellRegistry: sp.GetRequiredService<CellProgramRegistry>(),
+                cellRunner: sp.GetRequiredService<CellProgramRunner>(),
+                contextFactory: sp.GetRequiredService<IAuraCellContextFactory>()
+#endif
+            ));
 
         builder.Services.AddSingleton<AURA.Abstractions.Orchestration.IOrchestrator>(sp => sp.GetRequiredService<AuraOrchestrator>());
         builder.Services.AddSingleton<AURA.Abstractions.Process.IProcessOrchestrator>(sp =>
