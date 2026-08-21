@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.Core.Abstractions;
@@ -10,15 +11,13 @@ using AURA.Core.Logging;
 using AURA.Core.Launchers;
 using AURA.Core.Runtime;
 using AURA.Memory;
+using AURA.Abstractions;
 using AURA.Abstractions.Execution;
 using AURA.AI;
+using AURA.Agents.Programs;
 
 namespace AURA.Agents
 {
-    /// <summary>
-    /// Loop Sense → Plan → Act → Verify com IA integrada via AgentSession.
-    /// Publica o estado de cada execução para a interface acompanhar em tempo real.
-    /// </summary>
     public sealed class AuraOrchestrator : AURA.Abstractions.Orchestration.IOrchestrator
     {
         private readonly ILogger _logger;
@@ -30,6 +29,11 @@ namespace AURA.Agents
         private readonly IToolExecutor _shell;
         private readonly OpenRouterClient? _aiClient;
         private readonly IWebSearch _webSearch;
+        private readonly IIntentResolver _intentResolver;
+        private readonly PolicyGuard _policyGuard;
+        private readonly CellProgramRegistry _cellRegistry;
+        private readonly CellProgramRunner _cellRunner;
+        private readonly IAuraCellContextFactory? _contextFactory;
 
         public AuraOrchestrator(
             ILogger logger,
@@ -40,7 +44,12 @@ namespace AURA.Agents
             IWebSearch webSearch,
             OpenRouterClient? aiClient = null,
             HttpClient? httpClient = null,
-            EventBus? events = null)
+            EventBus? events = null,
+            IIntentResolver? intentResolver = null,
+            PolicyGuard? policyGuard = null,
+            CellProgramRegistry? cellRegistry = null,
+            CellProgramRunner? cellRunner = null,
+            IAuraCellContextFactory? contextFactory = null)
         {
             _logger = logger ?? new ConsoleLogger();
             _memory = memory ?? throw new ArgumentNullException(nameof(memory));
@@ -51,12 +60,16 @@ namespace AURA.Agents
             _aiClient = aiClient;
             _http = httpClient ?? CreateAntiDetectClient();
             _events = events;
+            _intentResolver = intentResolver ?? new HeuristicIntentResolver();
+            _policyGuard = policyGuard ?? new PolicyGuard();
+            _cellRegistry = cellRegistry ?? new CellProgramRegistry();
+            _cellRunner = cellRunner ?? new CellProgramRunner(_logger);
+            _contextFactory = contextFactory;
         }
 
         public async Task<string> ExecuteAsync(string userCommand, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(userCommand))
-                return "Comando vazio.";
+            if (string.IsNullOrWhiteSpace(userCommand)) return "Comando vazio.";
 
             userCommand = userCommand.Trim();
             string processId = "orchestration:" + Guid.NewGuid().ToString("N");
@@ -69,6 +82,30 @@ namespace AURA.Agents
                 Publish(processId, "Orquestração", "Memória", "Concluído", "Resultado recuperado da memória", 1);
                 _logger.Info("[MEMÓRIA] hit " + hit.Id);
                 return "💾 Memória:\n" + hit.ResultDetails;
+            }
+
+            var intent = _intentResolver.Resolve(userCommand);
+            if (intent.Intent == "android" &&
+                intent.Parameters.TryGetValue("action", out string? action) &&
+                _cellRegistry.Resolve(action) is IAuraCellProgram program)
+            {
+                if (_contextFactory is null)
+                    return "❌ Programa AURA indisponível: contexto nativo não registrado.";
+
+                var auth = _policyGuard.Authorize(program.RequiredCapabilities, userCommand);
+                if (auth.Decision == AuthorizationDecision.Blocked)
+                    return "❌ " + auth.Message;
+                if (auth.Decision == AuthorizationDecision.RequiresConfirmation)
+                    return "⚠️ " + auth.Message;
+
+                string cellId = "program-" + Guid.NewGuid().ToString("N");
+                IAuraCellContext context = _contextFactory.Create(cellId, ct);
+                CellProgramResult result = await _cellRunner.RunAsync(program, context, ct);
+                if (!result.IsSuccess) return "❌ " + result.Error;
+
+                string serialized = JsonSerializer.Serialize(result.Data, new JsonSerializerOptions { WriteIndented = true });
+                Publish(processId, "Programa AURA", program.Name, "Concluído", "Programa executado", 1);
+                return serialized;
             }
 
             Publish(processId, "Orquestração", "Planejamento", "Executando", "Criando plano de execução", 0.15);
@@ -106,7 +143,6 @@ namespace AURA.Agents
 
             var session = new AgentSession(client, tools, systemPrompt, _logger);
             session.Step += step => OnAgentStep(processId, step);
-
             Publish(processId, "Orquestração", "IA", "Executando", "Processando com IA...", 0.3);
 
             string result;
@@ -131,10 +167,7 @@ namespace AURA.Agents
             return result;
         }
 
-        Task<string> AURA.Abstractions.Orchestration.IOrchestrator.ExecuteAsync(
-            string userCommand,
-            CancellationToken cancellationToken,
-            bool confirmed)
+        Task<string> AURA.Abstractions.Orchestration.IOrchestrator.ExecuteAsync(string userCommand, CancellationToken cancellationToken, bool confirmed)
             => ExecuteAsync(userCommand, cancellationToken);
 
         private void OnAgentStep(string processId, AgentStep step)
