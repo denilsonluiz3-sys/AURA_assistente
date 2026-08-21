@@ -71,7 +71,6 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<ISpeechService, HybridSpeechService>();
         builder.Services.AddSingleton<VoiceAssistantService>();
-        builder.Services.AddSingleton<IAndroidCapabilityService, AndroidCapabilityService>();
 
         builder.Services.AddSingleton(sp => new AgentManager(sp.GetRequiredService<ILogger>())
         {
@@ -182,7 +181,7 @@ public static class MauiProgram
         {
             try
             {
-                using Stream stream = await FileSystem.OpenAppPackageFileAsync(path);
+                using System.IO.Stream stream = await FileSystem.OpenAppPackageFileAsync(path);
                 using var reader = new StreamReader(stream);
                 string json = await reader.ReadToEndAsync();
                 if (!string.IsNullOrWhiteSpace(json))
