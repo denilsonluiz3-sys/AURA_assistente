@@ -220,8 +220,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `b1178cc`
-- Data UTC: `2026-08-21 22:58:28 UTC`
+- Commit: `bfdcf61`
+- Data UTC: `2026-08-21 23:11:58 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -314,6 +314,7 @@ testes relacionados
 
 ### Workflows
 
+- `.github/workflows/ai-failure-diagnostics.yml`
 - `.github/workflows/build-android-apk.yml`
 - `.github/workflows/codeql.yml`
 - `.github/workflows/sync-main.yml`
@@ -545,9 +546,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `bfdcf61` ci(ai): diagnóstico automático de falhas e suporte PRoot (2026-08-21)
+- `44acd80` docs: document automatic AI documentation synchronization (2026-08-21)
+- `12bd9e0` docs(ai): sync README_AI with source tree (2026-08-21)
 - `b1178cc` ci: add automatic AI documentation sync workflow (2026-08-21)
 - `f825f6f` feat: add controlled AURA cell program V1 (#59) (2026-08-21)
-- `bbdaa03` docs: add public README and link AI architecture guide (2026-08-21)
-- `4c6a544` docs: add AI-readable repository architecture guide (2026-08-21)
-- `0df32ba` ci: keep only AURA workflows (2026-08-21)
 <!-- AI-DOCS:END -->
