@@ -64,7 +64,7 @@ public sealed class AuraOrchestrator : IKernel
         {
             new KernelSearchTool(_webSearch),
             new KernelShellTool(_shell),
-            new KernelFileTool(AgentWorkspace()),
+            new KernelFileTool(GetAgentWorkspace()),
             new KernelConversationTool()
         };
         if (android != null)
@@ -105,8 +105,9 @@ public sealed class AuraOrchestrator : IKernel
             }
             else if (toolIntent == "create_file" || toolIntent == "list_files")
             {
+                string originalIntent = toolIntent;
                 toolIntent = "file";
-                parameters["action"] = toolIntent == "file" && intent.Intent == "create_file" ? "write" : "list";
+                parameters["action"] = originalIntent == "create_file" ? "write" : "list";
                 if (parameters.TryGetValue("query", out var path) && !parameters.ContainsKey("path")) parameters["path"] = path;
             }
 
@@ -141,15 +142,15 @@ public sealed class AuraOrchestrator : IKernel
         {
             new InterpretCommandTool(),
             new SearchMemoryTool(_memory),
-            new ListDirTool(AgentWorkspace()),
-            new ReadFileTool(AgentWorkspace()),
-            new WriteFileTool(AgentWorkspace()),
-            new EditFileTool(AgentWorkspace()),
-            new ShellAgentTool(AgentWorkspace(), _shell),
+            new ListDirTool(GetAgentWorkspace()),
+            new ReadFileTool(GetAgentWorkspace()),
+            new WriteFileTool(GetAgentWorkspace()),
+            new EditFileTool(GetAgentWorkspace()),
+            new ShellAgentTool(GetAgentWorkspace(), _shell),
             new WebFetchTool(),
             new WebSearchTool(_webSearch),
             new CodeExtractorTool(_webSearch, _aiClient),
-            new CodeExecutorTool(_shell, AgentWorkspace())
+            new CodeExecutorTool(_shell, GetAgentWorkspace())
         };
 
         string apiKey = Environment.GetEnvironmentVariable("OPENROUTER_API_KEY") ?? "";
@@ -164,7 +165,7 @@ public sealed class AuraOrchestrator : IKernel
 
         string systemPrompt =
             "Você é o fallback conversacional da AURA. O Kernel já tentou resolver a solicitação localmente. " +
-            "Use ferramentas apenas quando a intenção não puder ser resolvida deterministicamente. Workspace: " + AgentWorkspace();
+            "Use ferramentas apenas quando a intenção não puder ser resolvida deterministicamente. Workspace: " + GetAgentWorkspace();
 
         var session = new AgentSession(client, tools, systemPrompt, _logger);
         session.Step += step =>
@@ -190,10 +191,9 @@ public sealed class AuraOrchestrator : IKernel
         }
     }
 
-    private static string Normalize(string value) =>
-        value.Trim().ToLowerInvariant();
+    private static string Normalize(string value) => value.Trim().ToLowerInvariant();
 
-    private string AgentWorkspace()
+    private static string GetAgentWorkspace()
     {
         string workspace = AgentWorkspace.ActiveRoot;
         try { Directory.CreateDirectory(workspace); } catch { }
