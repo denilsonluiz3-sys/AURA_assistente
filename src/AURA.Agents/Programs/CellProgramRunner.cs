@@ -9,10 +9,12 @@ namespace AURA.Agents.Programs;
 public sealed class CellProgramRunner
 {
     private readonly ILogger _logger;
+    private readonly PolicyGuard _policyGuard;
 
-    public CellProgramRunner(ILogger logger)
+    public CellProgramRunner(ILogger logger, PolicyGuard? policyGuard = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _policyGuard = policyGuard ?? new PolicyGuard();
     }
 
     public async Task<CellProgramResult> RunAsync(
@@ -22,6 +24,12 @@ public sealed class CellProgramRunner
     {
         if (program is null) throw new ArgumentNullException(nameof(program));
         if (context is null) throw new ArgumentNullException(nameof(context));
+
+        var authorization = _policyGuard.Authorize(program.RequiredCapabilities, program.Name);
+        if (authorization.Decision == AuthorizationDecision.Blocked)
+            return CellProgramResult.Fail(authorization.Message);
+        if (authorization.Decision == AuthorizationDecision.RequiresConfirmation)
+            return CellProgramResult.Fail(authorization.Message);
 
         try
         {
