@@ -3,17 +3,60 @@ using System;
 using System.Text;
 using Android.Content;
 using Android.Hardware;
+using Android.Hardware.Camera2;
 using Android.Media;
+using Android.Net;
+using Android.OS;
 using Android.Provider;
 
-namespace AURA.Mobile.Platforms.Android
+namespace AURA.Mobile.Platforms.Android;
+
+/// <summary>
+/// Safe, read-only probe of Android capabilities available to the AURA app UID.
+/// No settings, files, device state, or external services are modified.
+/// </summary>
+public static class AuraAndroidBridgeTest
 {
     /// <summary>
     /// Teste de acesso nativo às APIs Android.
     /// </summary>
     public static class AuraAndroidBridgeTest
     {
-        public static string Run()
+        var r = new StringBuilder();
+        var context = Application.Context;
+
+        r.AppendLine("=== AURA ANDROID CAPABILITY LAB V18 ===");
+        r.AppendLine($"UID={Process.MyUid()}");
+        r.AppendLine($"PACKAGE={context.PackageName}");
+        r.AppendLine($"ANDROID={Build.VERSION.Release}");
+        r.AppendLine($"SDK={Build.VERSION.SdkInt}");
+        r.AppendLine($"ABI={Build.SupportedAbis?.Length > 0 ? Build.SupportedAbis[0] : "unknown"}");
+        r.AppendLine();
+
+        Test(r, "PackageManager", () =>
+            context.PackageManager?.GetPackageInfo(context.PackageName!, 0) != null);
+
+        Test(r, "Settings.System READ", () =>
+            Settings.System.GetString(context.ContentResolver, Settings.System.ScreenBrightness) != null);
+
+        Test(r, "Settings.Secure READ", () =>
+            !string.IsNullOrEmpty(Settings.Secure.GetString(context.ContentResolver, Settings.Secure.AndroidId)));
+
+        Test(r, "Accelerometer", () =>
+            (context.GetSystemService(Context.SensorService) as SensorManager)
+                ?.GetDefaultSensor(SensorType.Accelerometer) != null);
+
+        Test(r, "Gyroscope", () =>
+            (context.GetSystemService(Context.SensorService) as SensorManager)
+                ?.GetDefaultSensor(SensorType.Gyroscope) != null);
+
+        Test(r, "AudioManager", () =>
+            context.GetSystemService(Context.AudioService) is AudioManager);
+
+        Test(r, "CameraManager", () =>
+            context.GetSystemService(Context.CameraService) is CameraManager);
+
+        Test(r, "LocationManager", () =>
         {
             var r = new StringBuilder();
             var context = global::Android.App.Application.Context;
