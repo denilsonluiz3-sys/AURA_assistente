@@ -188,11 +188,20 @@ namespace AURA.AI
                         mo["tool_calls"] = calls;
                     }
 
-                    // DeepClone: JsonNode só pode ter um parent. O mesmo
-                    // ReasoningDetails reutilizado em rounds 2+ causava
-                    // "The node already has a parent".
-                    if (m.ReasoningDetails != null)
-                        mo["reasoning_details"] = m.ReasoningDetails.DeepClone();
+                    // Parse fresco a cada request — nunca reutiliza JsonNode com parent.
+                    if (!string.IsNullOrWhiteSpace(m.ReasoningDetailsJson))
+                    {
+                        try
+                        {
+                            JsonNode? rd = JsonNode.Parse(m.ReasoningDetailsJson);
+                            if (rd != null)
+                                mo["reasoning_details"] = rd;
+                        }
+                        catch (JsonException)
+                        {
+                            // ignora reasoning inválido; preferível a quebrar o turno
+                        }
+                    }
 
                     arr.Add(mo);
                 }
@@ -239,7 +248,7 @@ namespace AURA.AI
                 payload["tools"] = toolsArray;
             }
 
-            string json = JsonSerializer.Serialize(payload);
+            string json = payload.ToJsonString();
             HttpClient client = httpClient ?? ResolveClient();
             var request = new HttpRequestMessage(HttpMethod.Post, Options.BaseUrl);
 
@@ -307,7 +316,7 @@ namespace AURA.AI
                     if (message.TryGetProperty("message", out JsonElement msg))
                     {
                         string? content = ReadContentString(msg);
-                        JsonArray? reasoning = ReadReasoningDetails(msg);
+                        string? reasoningJson = ReadReasoningDetailsJson(msg);
                         var calls = new List<AgentToolCall>();
                         if (msg.TryGetProperty("tool_calls", out JsonElement toolCalls))
                         {
@@ -340,7 +349,7 @@ namespace AURA.AI
                                 {
                                     Content = null,
                                     ToolCalls = textCalls,
-                                    ReasoningDetails = reasoning
+                                    ReasoningDetailsJson = reasoningJson
                                 };
                             }
                         }
@@ -349,7 +358,7 @@ namespace AURA.AI
                         {
                             Content = content,
                             ToolCalls = calls.Count > 0 ? calls : null,
-                            ReasoningDetails = reasoning
+                            ReasoningDetailsJson = reasoningJson
                         };
                     }
                 }
@@ -363,17 +372,14 @@ namespace AURA.AI
             }
         }
 
-        private static JsonArray? ReadReasoningDetails(JsonElement msg)
+        /// <summary>Extrai reasoning_details como texto JSON bruto (sem JsonNode).</summary>
+        private static string? ReadReasoningDetailsJson(JsonElement msg)
         {
             if (!msg.TryGetProperty("reasoning_details", out JsonElement rd) ||
-                rd.ValueKind != JsonValueKind.Array)
+                rd.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
                 return null;
 
-            var result = new JsonArray();
-            foreach (JsonElement item in rd.EnumerateArray())
-                result.Add(item.Clone());
-
-            return result;
+            return rd.GetRawText();
         }
 
         private static AgentErrorKind ClassifyError(HttpStatusCode status)

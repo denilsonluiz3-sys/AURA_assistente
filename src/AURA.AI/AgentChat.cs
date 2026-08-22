@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json.Nodes;
 
 namespace AURA.AI
 {
@@ -33,17 +32,12 @@ namespace AURA.AI
         public List<AgentToolCall>? ToolCalls { get; set; }
 
         /// <summary>
-        /// Blocos de "reasoning" opacos (formato "google-gemini-v1" etc.)
-        /// devolvidos pelo OpenRouter junto de uma mensagem assistant com
-        /// tool_calls. Modelos Gemini "thinking" (gemini-3.x) EXIGEM que
-        /// esse array seja reenviado, sem alteração, na próxima requisição
-        /// que contém os tool_calls correspondentes — senão o provedor
-        /// responde 400 "missing a thought_signature". Guardado como
-        /// JsonArray bruto (sem reserializar campo a campo) porque a ordem
-        /// e o conteúdo exato dos blocos precisam ser preservados
-        /// byte-a-byte. Ver: https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
+        /// Blocos de reasoning opacos (OpenRouter / Gemini thinking) como JSON
+        /// bruto. Guardado como <b>string</b> (não JsonNode) para nunca sofrer
+        /// "The node already has a parent" ao remontar o payload em rounds 2+.
+        /// Reenviado byte-a-byte na mensagem assistant com tool_calls.
         /// </summary>
-        public JsonArray? ReasoningDetails { get; set; }
+        public string? ReasoningDetailsJson { get; set; }
     }
 
     /// <summary>Uma chamada de ferramenta solicitada pelo modelo.</summary>
@@ -66,10 +60,8 @@ namespace AURA.AI
         /// <summary>Chamadas de ferramenta solicitadas (quando houver).</summary>
         public List<AgentToolCall>? ToolCalls { get; set; }
 
-        /// <summary>Blocos de reasoning brutos devolvidos junto com esta mensagem
-        /// assistant (ver <see cref="AgentMessage.ReasoningDetails"/>). Precisa ser
-        /// reanexado à mensagem assistant correspondente no histórico.</summary>
-        public JsonArray? ReasoningDetails { get; set; }
+        /// <summary>JSON bruto de reasoning_details (mesmo formato da API).</summary>
+        public string? ReasoningDetailsJson { get; set; }
 
         public string? Error { get; set; }
 
