@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `4727db2`
-- Data UTC: `2026-08-22 20:49:03 UTC`
+- Commit: `d62a144`
+- Data UTC: `2026-08-22 21:19:35 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -596,9 +596,9 @@ testes relacionados
 
 ### Últimos commits
 
-- `4727db2` fix(agent): memória persistente explícita + anti-crash de UI no APK (#73) (2026-08-22)
-- `c50a1db` chore(ci): simplify codemagic.yaml to one clear APK workflow (#74) (2026-08-22)
-- `03f2e1e` docs(ai): record CI failure context (2026-08-22)
-- `42d95d4` chore(ci): update codemagic.yaml for net10 MAUI APK 2.1 (#71) (2026-08-22)
-- `330aaec` docs(ai): record CI failure context (2026-08-22)
+- `d62a144` fix(tests): align reasoning response property with AgentChatResponse (2026-08-22)
+- `69faf9c` docs(ai): record CI failure context (2026-08-22)
+- `e68826b` docs(ai): record CI failure context (2026-08-22)
+- `822387f` docs(ai): record CI failure context (2026-08-22)
+- `3250508` docs(ai): record CI failure context (2026-08-22)
 <!-- AI-DOCS:END -->
