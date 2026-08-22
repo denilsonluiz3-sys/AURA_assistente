@@ -23,7 +23,7 @@ public static class AuraAndroidBridgeTest
     public static string Run()
     {
         var r = new StringBuilder();
-        var context = Android.App.Application.Context;
+        var context = global::Android.App.Application.Context;
 
         r.AppendLine("=== AURA ANDROID CAPABILITY LAB V18 ===");
         r.AppendLine($"UID={Process.MyUid()}");
