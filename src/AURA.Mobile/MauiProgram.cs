@@ -3,6 +3,7 @@ using AURA.Agents;
 using AURA.Agents.Programs;
 using AURA.Abstractions;
 using AURA.Abstractions.Execution;
+using AURA.Abstractions.Orchestration;
 using AURA.Core.Configuration;
 using AURA.Core.Events;
 using AURA.Core.Logging;
@@ -40,6 +41,7 @@ public static class MauiProgram
             registry.Register(new DeviceDiagnosticProgram());
             return registry;
         });
+        builder.Services.AddSingleton<ISpeechRecognitionService, AndroidSpeechRecognitionService>();
 #endif
 
         AuraLog.Info("MauiProgram: builder created");
@@ -57,7 +59,11 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new OpenRouterClient(new OpenRouterOptions { ApiKey = Preferences.Default.Get("ai_api_key", string.Empty), BaseUrl = "https://openrouter.ai/api/v1/chat/completions", Model = "qwen/qwen-plus", MaxTokens = 1500 }, sp.GetRequiredService<ILogger>()));
         builder.Services.AddSingleton<AiAssistant>();
         builder.Services.AddSingleton<ISpeechService, HybridSpeechService>();
-        builder.Services.AddSingleton<VoiceAssistantService>();
+        builder.Services.AddSingleton<VoiceAssistantService>(sp => new VoiceAssistantService(
+            sp.GetRequiredService<ISpeechService>(),
+            sp.GetService<ISpeechRecognitionService>(),
+            sp.GetService<IOrchestrator>(),
+            sp.GetService<IIntentResolver>()));
         builder.Services.AddSingleton(sp => new AgentManager(sp.GetRequiredService<ILogger>()) { Events = sp.GetRequiredService<EventBus>() });
         builder.Services.AddSingleton<SystemAnalyzer>();
         builder.Services.AddSingleton<NetworkManager>();
@@ -89,13 +95,25 @@ public static class MauiProgram
             cellRegistry: sp.GetRequiredService<CellProgramRegistry>(), cellRunner: sp.GetRequiredService<CellProgramRunner>(), contextFactory: sp.GetRequiredService<IAuraCellContextFactory>()
 #endif
         ));
-        builder.Services.AddSingleton<AURA.Abstractions.Orchestration.IOrchestrator>(sp => sp.GetRequiredService<AuraOrchestrator>());
-        builder.Services.AddSingleton<AURA.Abstractions.Process.IProcessOrchestrator>(sp => new AURA.Agents.LegalProcessEngine(sp.GetRequiredService<ILogger>(), sp.GetServices<AURA.Core.Abstractions.IAgent>(), sp.GetRequiredService<AURA.Abstractions.Orchestration.IOrchestrator>(), sp.GetRequiredService<EventBus>()));
+        builder.Services.AddSingleton<IOrchestrator>(sp => sp.GetRequiredService<AuraOrchestrator>());
+        builder.Services.AddSingleton<AURA.Abstractions.Process.IProcessOrchestrator>(sp => new AURA.Agents.LegalProcessEngine(sp.GetRequiredService<ILogger>(), sp.GetServices<AURA.Core.Abstractions.IAgent>(), sp.GetRequiredService<IOrchestrator>(), sp.GetRequiredService<EventBus>()));
 
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<HomePage>();
         builder.Services.AddSingleton<EcosystemPage>();
-        builder.Services.AddSingleton<DiagnosticoPage>();
+        builder.Services.AddSingleton<DiagnosticoPage>(sp => new DiagnosticoPage(
+            sp.GetRequiredService<SystemAnalyzer>(),
+            sp.GetRequiredService<NetworkManager>(),
+            sp.GetRequiredService<AgentManager>(),
+#if ANDROID
+            sp.GetService<CellProgramRegistry>(),
+            sp.GetService<CellProgramRunner>(),
+            sp.GetService<IAuraCellContextFactory>(),
+            sp.GetService<ILogger>()
+#else
+            null, null, null, sp.GetService<ILogger>()
+#endif
+        ));
         builder.Services.AddSingleton<ChatPage>();
         builder.Services.AddSingleton<AgentPage>();
         builder.Services.AddSingleton<MemoryPage>();

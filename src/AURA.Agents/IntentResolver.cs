@@ -22,6 +22,25 @@ namespace AURA.Agents
         {
             string command = normalizedCommand ?? string.Empty;
 
+            // Navegação de UI (antes de regras genéricas)
+            if (ContainsAny(command,
+                "abra o terminal", "abrir terminal", "abre o terminal", "abrir o terminal",
+                "open terminal"))
+                return NavigateResult("Terminal", 0.95);
+
+            if (ContainsAny(command,
+                "abra programas", "abrir programas", "abre programas", "abrir programa",
+                "lista de programas", "catálogo de programas", "catalogo de programas"))
+                return NavigateResult("Programas", 0.95);
+
+            if (ContainsAny(command,
+                "abra o chat", "abrir chat", "abre o chat"))
+                return NavigateResult("Chat", 0.90);
+
+            if (ContainsAny(command,
+                "abra módulos", "abrir módulos", "abrir modulos", "abre módulos"))
+                return NavigateResult("Módulos", 0.90);
+
             // Programas AURA devem vencer a regra genérica de "dispositivo".
             if (ContainsAny(command,
                 "diagnóstico do aparelho",
@@ -29,7 +48,18 @@ namespace AURA.Agents
                 "informações do dispositivo",
                 "informacoes do dispositivo",
                 "como está o aparelho",
-                "como esta o aparelho"))
+                "como esta o aparelho",
+                "faça um diagnóstico",
+                "faca um diagnostico",
+                "fazer diagnóstico",
+                "fazer diagnostico",
+                "diagnostique",
+                "diagnostique meu celular",
+                "diagnostique o celular",
+                "rodar diagnóstico",
+                "rodar diagnostico",
+                "executar diagnóstico",
+                "executar diagnostico"))
             {
                 return AndroidResult(command, "device-diagnostic", 0.95,
                     "diagnóstico do aparelho",
@@ -37,7 +67,18 @@ namespace AURA.Agents
                     "informações do dispositivo",
                     "informacoes do dispositivo",
                     "como está o aparelho",
-                    "como esta o aparelho");
+                    "como esta o aparelho",
+                    "faça um diagnóstico",
+                    "faca um diagnostico",
+                    "fazer diagnóstico",
+                    "fazer diagnostico",
+                    "diagnostique",
+                    "diagnostique meu celular",
+                    "diagnostique o celular",
+                    "rodar diagnóstico",
+                    "rodar diagnostico",
+                    "executar diagnóstico",
+                    "executar diagnostico");
             }
 
             if (ContainsAny(command, "pesquise", "busque", "procure", "search"))
@@ -84,6 +125,14 @@ namespace AURA.Agents
                 return AndroidResult(command, "device", 0.75, "dispositivo", "device", "propriedades android", "properties");
 
             return new IntentResult("conversar", 0.50, new Dictionary<string, string>());
+        }
+
+        private static IntentResult NavigateResult(string pageLabel, double confidence)
+        {
+            return new IntentResult("navigate", confidence, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["page"] = pageLabel
+            });
         }
 
         private static IntentResult AndroidResult(string command, string action, double confidence, params string[] triggers)

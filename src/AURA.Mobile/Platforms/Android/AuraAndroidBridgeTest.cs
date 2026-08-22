@@ -6,6 +6,7 @@ using Android.Bluetooth;
 using Android.Content;
 using Android.Hardware;
 using Android.Hardware.Camera2;
+using Android.Locations;
 using Android.Media;
 using Android.Net;
 using Android.OS;
@@ -22,14 +23,14 @@ public static class AuraAndroidBridgeTest
     public static string Run()
     {
         var r = new StringBuilder();
-        var context = Application.Context;
+        var context = global::Android.App.Application.Context;
 
         r.AppendLine("=== AURA ANDROID CAPABILITY LAB V18 ===");
         r.AppendLine($"UID={Process.MyUid()}");
         r.AppendLine($"PACKAGE={context.PackageName}");
         r.AppendLine($"ANDROID={Build.VERSION.Release}");
         r.AppendLine($"SDK={Build.VERSION.SdkInt}");
-        r.AppendLine($"ABI={Build.SupportedAbis?.Length > 0 ? Build.SupportedAbis[0] : "unknown"}");
+        r.AppendLine($"ABI={(Build.SupportedAbis != null && Build.SupportedAbis.Count > 0 ? Build.SupportedAbis[0] : "unknown")}");
         r.AppendLine();
 
         Test(r, "PackageManager", () =>

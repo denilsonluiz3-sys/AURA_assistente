@@ -72,6 +72,32 @@ Resolver → identificar capacidades → PolicyGuard → executar
 
 Uma capacidade desconhecida deve ser bloqueada por padrão. A UI não deve contornar o `PolicyGuard`.
 
+## UI unificada (navegação Mobile)
+
+A UI Mobile está organizada em seções no `MainPage` (TabbedPage + `SectionPage`), sem remover páginas existentes:
+
+```text
+Sistema
+  Início (HomePage) · Ecossistema · Diagnóstico (hub Sistema) · Correções
+Assistente
+  Chat · Agente · Memória · Navegador
+Ferramentas
+  Terminal · Executores · Módulos · Logs
+Apps
+  Programas · Células · Rodar programa
+```
+
+Arquivos-chave:
+
+- `src/AURA.Mobile/MainPage.cs` — registro de seções e `NavigateToProcessAsync`
+- `src/AURA.Mobile/Pages/SectionPage.cs` — grade 2×N por seção
+- `src/AURA.Mobile/Pages/HomePage.xaml(.cs)` — status + atalhos + entrada de comando
+- `src/AURA.Mobile/Pages/DiagnosticoPage.xaml(.cs)` — hub Sistema + Device Diagnostic via Cell Program
+- `src/AURA.Mobile/Pages/ProgramsPage.xaml` + `ViewModels/ProgramsPageViewModel.cs` — catálogo de programas
+- `src/AURA.Mobile/Pages/ChatPage.xaml.cs` — intent → `IOrchestrator` antes do fluxo IA
+
+Home e Assistente não reimplementam lógica de programa: encaminham para o orquestrador / navegação existente.
+
 ## Cell Programs
 
 Cell Programs são programas internos controlados. A V1 não representa isolamento real de processos ou sandbox de segurança.
@@ -109,6 +135,8 @@ Apps → Programas → ProgramsPage
           resultado no card
 ```
 
+O hub Sistema (`DiagnosticoPage`) também pode disparar `device-diagnostic` pelo mesmo caminho PolicyGuard → Runner.
+
 ## UI de Programas
 
 Arquivos principais:
@@ -117,23 +145,41 @@ Arquivos principais:
 - `src/AURA.Mobile/Pages/ProgramsPage.xaml.cs`
 - `src/AURA.Mobile/ViewModels/ProgramsPageViewModel.cs`
 
-Cada programa aparece como um card independente com estado, capacidades, resultado e ação de execução. A UI não deve chamar diretamente serviços Android quando existe um programa/runner/policy para a operação.
+Estados do card: Disponível · Executando · Concluído · Bloqueado · Requer confirmação · Indisponível · Erro.
+
+A UI não deve chamar diretamente serviços Android quando existe um programa/runner/policy para a operação.
 
 ## IntentResolver
 
-O resolvedor transforma comandos em intenções estruturadas. Exemplo da V1:
+O resolvedor transforma comandos em intenções estruturadas. Exemplos V1:
 
 ```text
-"diagnóstico do aparelho"
+"faça um diagnóstico" / "diagnostique meu celular"
         ↓
-intent = android
+intent = android, action = device-diagnostic
         ↓
-action = device-diagnostic
+CellProgramRegistry → PolicyGuard → Runner
+
+"abra o terminal"
         ↓
-CellProgramRegistry.Resolve()
+intent = navigate, page = Terminal
+        ↓
+MainPage.NavigateToProcessAsync
 ```
 
-Localize primeiro o resolver realmente usado pelo `AuraOrchestrator`; não duplique regras em camadas diferentes.
+Consumidores: `AuraOrchestrator`, `ChatPage`, `VoiceAssistantService` (após STT).
+
+Localize primeiro o resolver usado pelo orquestrador; não duplique regras em camadas diferentes.
+
+## Voz (TTS + STT)
+
+- FAB nativo: `Platforms/Android/VoiceFloatingButton.cs` (topo direito)
+- TTS: `ISpeechService` → `HybridSpeechService` / `AndroidTtsSpeechService`
+- STT: `ISpeechRecognitionService` → `AndroidSpeechRecognitionService` (`SpeechRecognizer`, pt-BR)
+- Orquestração de voz: `VoiceAssistantService` (escuta → intent/orquestrador → fala)
+- Permissão: `RECORD_AUDIO` + `Permissions.Microphone`
+
+Toque no FAB inicia escuta; segundo toque cancela. JSON longo é resumido na fala.
 
 ## Memória
 
