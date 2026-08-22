@@ -12,6 +12,7 @@
     <ProjectReference Include="..\AURA.Abstractions\AURA.Abstractions.csproj" />
     <ProjectReference Include="..\AURA.Core\AURA.Core.csproj" />
     <ProjectReference Include="..\AURA.Memory\AURA.Memory.csproj" />
+    <ProjectReference Include="..\AURA.AI\AURA.AI.csproj" />
   </ItemGroup>
 
 </Project>

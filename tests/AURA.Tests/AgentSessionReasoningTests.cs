@@ -28,12 +28,6 @@ public class AgentSessionReasoningTests
         public void Error(string message) { }
     }
 
-    /// <summary>
-    /// Simula o OpenRouter: 1ª chamada devolve tool_calls + reasoning_details
-    /// (formato Gemini). 2ª chamada exige que o mesmo reasoning_details volte
-    /// intacto na mensagem assistant; se não vier, devolve 400 (reproduzindo
-    /// o erro real "missing a thought_signature").
-    /// </summary>
     private sealed class GeminiReasoningHandler : HttpMessageHandler
     {
         private readonly string _toolName;
@@ -49,8 +43,7 @@ public class AgentSessionReasoningTests
             _toolResultExpectedSnippet = toolResultExpectedSnippet;
         }
 
-        protected override async Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request, CancellationToken ct)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             CallCount++;
             string bodyText = await request.Content!.ReadAsStringAsync(ct);
@@ -59,8 +52,6 @@ public class AgentSessionReasoningTests
 
             if (CallCount == 1)
             {
-                // Primeira rodada: modelo pede a ferramenta e devolve
-                // reasoning_details (formato Gemini via OpenRouter).
                 string reply = JsonSerializer.Serialize(new
                 {
                     choices = new object[]
@@ -100,9 +91,6 @@ public class AgentSessionReasoningTests
                 };
             }
 
-            // Segunda rodada: valida que a mensagem assistant enviada de
-            // volta contém o reasoning_details intacto. Sem isso, o
-            // OpenRouter real devolveria 400.
             JsonElement messages = LastRequestBody.Value.GetProperty("messages");
             bool foundIntactReasoning = false;
             bool foundToolResult = false;
@@ -145,7 +133,6 @@ public class AgentSessionReasoningTests
             }
 
             Assert.True(foundToolResult, "resultado da ferramenta não encontrado na 2ª requisição");
-
             string finalReply = JsonSerializer.Serialize(new
             {
                 choices = new object[]
@@ -184,16 +171,11 @@ public class AgentSessionReasoningTests
             OpenRouterClient client = MakeClient(handler, out HttpClient http);
             var tools = new List<AgentTool> { new ShellAgentTool(workspace, new ShellExecutor()) };
             var session = new AgentSession(client, tools, logger: new FakeLogger());
-
             string result = await session.RunAsync("roda echo oi", http);
-
             Assert.Equal(2, handler.CallCount);
             Assert.Equal("ok, concluído", result);
         }
-        finally
-        {
-            Directory.Delete(workspace, recursive: true);
-        }
+        finally { Directory.Delete(workspace, recursive: true); }
     }
 
     [Fact]
@@ -207,16 +189,11 @@ public class AgentSessionReasoningTests
             OpenRouterClient client = MakeClient(handler, out HttpClient http);
             var tools = new List<AgentTool> { new ListDirTool(workspace) };
             var session = new AgentSession(client, tools, logger: new FakeLogger());
-
             string result = await session.RunAsync("liste os arquivos", http);
-
             Assert.Equal(2, handler.CallCount);
             Assert.Equal("ok, concluído", result);
         }
-        finally
-        {
-            Directory.Delete(workspace, recursive: true);
-        }
+        finally { Directory.Delete(workspace, recursive: true); }
     }
 
     [Fact]
@@ -225,35 +202,26 @@ public class AgentSessionReasoningTests
         string workspace = CreateTempWorkspace();
         try
         {
-            var handler = new GeminiReasoningHandler(
-                "write_file", "{\"path\":\"novo.txt\",\"content\":\"ola\"}", "OK");
+            var handler = new GeminiReasoningHandler("write_file", "{\"path\":\"novo.txt\",\"content\":\"ola\"}", "OK");
             OpenRouterClient client = MakeClient(handler, out HttpClient http);
             var tools = new List<AgentTool> { new WriteFileTool(workspace) };
             var session = new AgentSession(client, tools, logger: new FakeLogger());
-
             string result = await session.RunAsync("crie o arquivo novo.txt", http);
-
             Assert.Equal(2, handler.CallCount);
             Assert.Equal("ok, concluído", result);
             Assert.True(File.Exists(Path.Combine(workspace, "novo.txt")));
         }
-        finally
-        {
-            Directory.Delete(workspace, recursive: true);
-        }
+        finally { Directory.Delete(workspace, recursive: true); }
     }
 
     [Fact]
     public async Task MissingReasoningDetails_ReproducesOriginal400Bug()
     {
-        // Prova que, SEM o fix (reenviando reasoning_details), o mesmo
-        // handler reproduz o erro 400 original "missing a thought_signature".
         string workspace = CreateTempWorkspace();
         try
         {
             var handler = new GeminiReasoningHandler("run_shell", "{\"command\":\"echo oi\"}", "oi");
             OpenRouterClient client = MakeClient(handler, out HttpClient http);
-
             var messages = new List<AgentMessage>
             {
                 new AgentMessage { Role = "user", Content = "roda echo oi" }
@@ -264,9 +232,8 @@ public class AgentSessionReasoningTests
                 http);
 
             Assert.NotNull(first.ToolCalls);
-            Assert.NotNull(first.ReasoningDetails);
+            Assert.NotNull(first.ReasoningDetailsJson);
 
-            // Monta a 2ª requisição SEM copiar ReasoningDetails de propósito.
             messages.Add(new AgentMessage { Role = "assistant", ToolCalls = first.ToolCalls });
             messages.Add(new AgentMessage { Role = "tool", ToolCallId = first.ToolCalls![0].Id, Content = "oi" });
 
@@ -278,10 +245,7 @@ public class AgentSessionReasoningTests
             Assert.Equal(AgentErrorKind.InvalidRequest, second.ErrorKind);
             Assert.Contains("thought_signature", second.Error);
         }
-        finally
-        {
-            Directory.Delete(workspace, recursive: true);
-        }
+        finally { Directory.Delete(workspace, recursive: true); }
     }
 
     [Theory]
@@ -290,18 +254,14 @@ public class AgentSessionReasoningTests
     [InlineData(HttpStatusCode.TooManyRequests, AgentErrorKind.RateLimited)]
     [InlineData(HttpStatusCode.InternalServerError, AgentErrorKind.ProviderError)]
     [InlineData(HttpStatusCode.BadRequest, AgentErrorKind.InvalidRequest)]
-    public async Task ChatToolsAsync_ClassifiesHttpErrorsByStatusCode(
-        HttpStatusCode status, AgentErrorKind expectedKind)
+    public async Task ChatToolsAsync_ClassifiesHttpErrorsByStatusCode(HttpStatusCode status, AgentErrorKind expectedKind)
     {
         var handler = new StatusHandler(status);
         using var http = new HttpClient(handler);
         var options = new OpenRouterOptions { ApiKey = "test-key" };
         var client = new OpenRouterClient(options, new FakeLogger());
-
         AgentChatResponse response = await client.ChatToolsAsync(
-            new List<AgentMessage> { new AgentMessage { Role = "user", Content = "oi" } },
-            httpClient: http);
-
+            new List<AgentMessage> { new AgentMessage { Role = "user", Content = "oi" } }, httpClient: http);
         Assert.Equal(expectedKind, response.ErrorKind);
         Assert.False(string.IsNullOrEmpty(response.Error));
     }
@@ -310,9 +270,7 @@ public class AgentSessionReasoningTests
     {
         private readonly HttpStatusCode _status;
         public StatusHandler(HttpStatusCode status) => _status = status;
-
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request, CancellationToken ct)
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             return Task.FromResult(new HttpResponseMessage(_status)
             {
@@ -328,18 +286,14 @@ public class AgentSessionReasoningTests
         using var http = new HttpClient(handler) { Timeout = TimeSpan.FromMilliseconds(50) };
         var options = new OpenRouterOptions { ApiKey = "test-key", TimeoutSeconds = 1 };
         var client = new OpenRouterClient(options, new FakeLogger());
-
         AgentChatResponse response = await client.ChatToolsAsync(
-            new List<AgentMessage> { new AgentMessage { Role = "user", Content = "oi" } },
-            httpClient: http);
-
+            new List<AgentMessage> { new AgentMessage { Role = "user", Content = "oi" } }, httpClient: http);
         Assert.Equal(AgentErrorKind.Timeout, response.ErrorKind);
     }
 
     private sealed class TimeoutHandler : HttpMessageHandler
     {
-        protected override async Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request, CancellationToken ct)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             await Task.Delay(TimeSpan.FromSeconds(5), ct);
             return new HttpResponseMessage(HttpStatusCode.OK);

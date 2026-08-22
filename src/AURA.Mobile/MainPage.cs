@@ -9,44 +9,34 @@ namespace AURA.Mobile
         private readonly ModuleManager _manager;
         private readonly List<(string? ModuleId, string Section, string Label, Page Page)> _entries;
         private bool _permissionsAsked;
+        private CancellationTokenSource? _rebuildCts;
 
-        public MainPage(
-            EventBus events,
-            ModuleManager manager,
-            HomePage home,
-            DiagnosticoPage diagnostico,
-            ChatPage chat,
-            AgentPage agent,
-            MemoryPage memory,
-            ExecutorsPage executors,
-            ModulesPage modules,
-            LogsPage logs,
-            FixesPage fixes,
-            TerminalPage terminal,
-            BrowserPage browser,
-            CellsPage cells,
-            RunPage run,
-            EcosystemPage ecosystem)
+        public MainPage(EventBus events, ModuleManager manager, HomePage home, DiagnosticoPage diagnostico, ChatPage chat, AgentPage agent, MemoryPage memory, ExecutorsPage executors, ModulesPage modules, LogsPage logs, FixesPage fixes, TerminalPage terminal, BrowserPage browser, CellsPage cells, RunPage run, ProgramsPage programs, EcosystemPage ecosystem)
         {
             AuraLog.Info("MainPage.ctor BEGIN");
             _manager = manager;
-
+            // Debounce: aplicar 7 módulos não deve reconstruir abas 7 vezes
             events.Subscribe<ModuleStateChangedEvent>(_ =>
-                MainThread.BeginInvokeOnMainThread(RebuildTabs));
+                MainThread.BeginInvokeOnMainThread(ScheduleRebuildTabs));
+
             _entries = new List<(string?, string, string, Page)>
             {
                 (null, "Sistema", "Início", home),
                 (null, "Sistema", "Ecossistema", ecosystem),
                 ("system", "Sistema", "Diagnóstico", diagnostico),
-                ("logs", "Sistema", "Logs", logs),
                 ("logs", "Sistema", "Correções", fixes),
+
                 ("ai", "Assistente", "Chat", chat),
                 ("ai", "Assistente", "Agente", agent),
                 ("memory", "Assistente", "Memória", memory),
                 (null, "Assistente", "Navegador", browser),
+
                 ("terminal", "Ferramentas", "Terminal", terminal),
                 ("executors", "Ferramentas", "Executores", executors),
                 (null, "Ferramentas", "Módulos", modules),
+                ("logs", "Ferramentas", "Logs", logs),
+
+                (null, "Apps", "Programas", programs),
                 ("cells", "Apps", "Células", cells),
                 ("cells", "Apps", "Rodar programa", run)
             };
@@ -60,78 +50,65 @@ namespace AURA.Mobile
         {
             base.OnAppearing();
             RebuildTabs();
-
-            if (_permissionsAsked)
-                return;
+            if (_permissionsAsked) return;
             _permissionsAsked = true;
-
             try
             {
                 await StoragePermissionHelper.EnsureStorageAccessAsync();
-
-                if (!StoragePermissionHelper.IsAllFilesAccessGranted()
-                    && !Preferences.Get("all_files_access_asked", false))
+                if (!StoragePermissionHelper.IsAllFilesAccessGranted() && !Preferences.Get("all_files_access_asked", false))
                 {
                     Preferences.Set("all_files_access_asked", true);
                     StoragePermissionHelper.RequestAllFilesAccess();
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) { AuraLog.Info("Permissões de armazenamento: " + ex.Message); }
+        }
+
+        /// <summary>Agrupa vários Apply em um único RebuildTabs (~250 ms).</summary>
+        private void ScheduleRebuildTabs()
+        {
+            try { _rebuildCts?.Cancel(); } catch { /* ignore */ }
+            _rebuildCts = new CancellationTokenSource();
+            var token = _rebuildCts.Token;
+            _ = Task.Run(async () =>
             {
-                AuraLog.Info("Permissões de armazenamento: " + ex.Message);
-            }
+                try
+                {
+                    await Task.Delay(250, token);
+                    if (token.IsCancellationRequested) return;
+                    MainThread.BeginInvokeOnMainThread(RebuildTabs);
+                }
+                catch (TaskCanceledException) { /* coalesced */ }
+            });
         }
 
         public void RebuildTabs()
         {
             Children.Clear();
-
-            foreach (IGrouping<string, (string ModuleId, string Section, string Label, Page Page)> group
-                in _entries.GroupBy(e => e.Section))
+            foreach (IGrouping<string, (string ModuleId, string Section, string Label, Page Page)> group in _entries.GroupBy(e => e.Section))
             {
-                var items = group
-                    .Where(e => e.ModuleId == null || _manager.IsApplied(e.ModuleId))
-                    .Select(e => (e.Label, e.Page))
-                    .ToArray();
-
-                if (items.Length == 0)
-                    continue;
-
+                var items = group.Where(e => e.ModuleId == null || _manager.IsApplied(e.ModuleId)).Select(e => (e.Label, e.Page)).ToArray();
+                if (items.Length == 0) continue;
                 Children.Add(MakeSection(group.Key, items));
             }
-
             AuraLog.Info("MainPage.RebuildTabs: " + Children.Count + " seções ativas");
         }
 
         public async Task NavigateToProcessAsync(string target)
         {
-            var entry = _entries.FirstOrDefault(e =>
-                string.Equals(e.Label, target, StringComparison.OrdinalIgnoreCase));
-
-            if (entry.Page == null)
-                return;
-
-            var section = Children.OfType<NavigationPage>()
-                .FirstOrDefault(n => string.Equals(n.Title, entry.Section, StringComparison.OrdinalIgnoreCase));
-
-            if (section == null)
-                return;
-
+            var entry = _entries.FirstOrDefault(e => string.Equals(e.Label, target, StringComparison.OrdinalIgnoreCase));
+            if (entry.Page == null) return;
+            var section = Children.OfType<NavigationPage>().FirstOrDefault(n => string.Equals(n.Title, entry.Section, StringComparison.OrdinalIgnoreCase));
+            if (section == null) return;
             CurrentPage = section;
             var navigationStack = section.Navigation.NavigationStack;
-
             for (int i = 0; i < navigationStack.Count; i++)
             {
-                if (!ReferenceEquals(navigationStack[i], entry.Page))
-                    continue;
-
-                while (section.Navigation.NavigationStack.Count > i + 1)
-                    await section.PopAsync(false);
+                if (!ReferenceEquals(navigationStack[i], entry.Page)) continue;
+                while (section.Navigation.NavigationStack.Count > i + 1) await section.PopAsync(false);
                 return;
             }
-
-            if (entry.Page.Parent == null)
-                await section.PushAsync(entry.Page);
+            if (entry.Page.Parent == null) await section.PushAsync(entry.Page);
         }
 
         private static NavigationPage MakeSection(string title, params (string Label, Page Page)[] items)

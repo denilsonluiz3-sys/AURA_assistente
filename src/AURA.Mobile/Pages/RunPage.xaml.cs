@@ -21,9 +21,7 @@ public partial class RunPage : ContentPage
     {
         string text = ResultLabel.Text ?? string.Empty;
         if (string.IsNullOrWhiteSpace(text))
-        {
             return;
-        }
 
         await Clipboard.Default.SetTextAsync(text);
         string original = CopyButton.Text;
@@ -42,9 +40,7 @@ public partial class RunPage : ContentPage
             });
 
             if (result == null)
-            {
                 return;
-            }
 
             _filePath = result.FullPath;
             FileLabel.Text = "Arquivo: " + _filePath;
@@ -80,15 +76,21 @@ public partial class RunPage : ContentPage
 
     private async void OnRunClicked(object sender, EventArgs e)
     {
-        string exe = ExeEntry.Text?.Trim() ?? string.Empty;
-        string id = CellIdEntry.Text?.Trim() ?? string.Empty;
+        string exe = SanitizePathOrExe(ExeEntry.Text);
+        string id = SanitizeCellId(CellIdEntry.Text);
         string args = ArgsEntry.Text?.Trim() ?? string.Empty;
+
+        // args de várias linhas / scripts não cabem no campo executável
+        if (!string.IsNullOrEmpty(exe) && (exe.Contains('\n') || exe.StartsWith("#!") || exe.Length > 512))
+        {
+            ResultLabel.Text = "Executável inválido: use um caminho curto (sem script multilinha). " +
+                "Para scripts, escolha o arquivo pelo seletor.";
+            return;
+        }
 
         var limits = new ResourceLimits();
         if (long.TryParse(MemEntry.Text, out long mb) && mb > 0)
-        {
             limits.MemoryLimitMb = mb;
-        }
 
         if (string.IsNullOrWhiteSpace(exe) && string.IsNullOrWhiteSpace(_filePath))
         {
@@ -108,6 +110,7 @@ public partial class RunPage : ContentPage
                 {
                     id = Path.GetFileNameWithoutExtension(exe) + "-" +
                         Guid.NewGuid().ToString("N").Substring(0, 6);
+                    id = SanitizeCellId(id);
                 }
 
                 cell = _runtime.CreateCell(id, exe, args,
@@ -117,6 +120,11 @@ public partial class RunPage : ContentPage
             }
             else
             {
+                if (string.IsNullOrWhiteSpace(id))
+                    id = Path.GetFileNameWithoutExtension(_filePath!) + "-" +
+                        Guid.NewGuid().ToString("N").Substring(0, 6);
+
+                id = SanitizeCellId(id);
                 cell = await _runner.RunAsync(_runtime, id, _filePath!, args,
                     limits: limits.IsEmpty ? null : limits);
             }
@@ -128,7 +136,7 @@ public partial class RunPage : ContentPage
         }
         catch (Exception ex)
         {
-            ResultLabel.Text = "Erro: " + ex.Message;
+            ResultLabel.Text = "Erro: " + (ex.Message.Length > 400 ? ex.Message[..400] + "…" : ex.Message);
             AuraLog.Exception("RunPage.Run", ex);
         }
         finally
@@ -136,5 +144,47 @@ public partial class RunPage : ContentPage
             BusyIndicator.IsRunning = false;
             BusyIndicator.IsVisible = false;
         }
+    }
+
+    /// <summary>Remove quebras de linha e caracteres ilegais de path; evita PathTooLong.</summary>
+    private static string SanitizePathOrExe(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return string.Empty;
+
+        string s = raw.Trim().Replace("\0", string.Empty);
+        // uma linha só
+        int nl = s.IndexOfAny(new[] { '\r', '\n' });
+        if (nl >= 0)
+            s = s.Substring(0, nl).Trim();
+
+        foreach (char c in Path.GetInvalidPathChars())
+            s = s.Replace(c.ToString(), string.Empty);
+
+        if (s.Length > 512)
+            s = s.Substring(0, 512);
+
+        return s;
+    }
+
+    private static string SanitizeCellId(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return string.Empty;
+
+        var sb = new System.Text.StringBuilder(raw.Length);
+        foreach (char c in raw.Trim())
+        {
+            if (char.IsLetterOrDigit(c) || c is '-' or '_' or '.')
+                sb.Append(c);
+        }
+
+        string id = sb.ToString();
+        if (id.Length > 64)
+            id = id.Substring(0, 64);
+        if (string.IsNullOrEmpty(id) || id is "null" or "undefined")
+            id = "cell-" + Guid.NewGuid().ToString("N")[..8];
+
+        return id;
     }
 }

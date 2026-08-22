@@ -8,7 +8,7 @@ file static class SectionIcons
         ["Início"] = "⌂", ["Ecossistema"] = "✦", ["Logs"] = "≡", ["Correções"] = "⚕", ["Chat"] = "◉",
         ["Agente"] = "◆", ["Memória"] = "⬟", ["Terminal"] = ">_", ["Executores"] = "▶",
         ["Módulos"] = "⊞", ["Navegador"] = "⊕", ["Células"] = "⬡", ["Rodar programa"] = "▷",
-        ["Diagnóstico"] = "◎",
+        ["Diagnóstico"] = "◎", ["Programas"] = "▣",
     };
 
     public static string Get(string label) =>
@@ -32,6 +32,15 @@ public sealed class SectionPage : ContentPage
         Title = title;
         BackgroundColor = Bg;
 
+        string subtitle = title switch
+        {
+            "Sistema" => "Dispositivo · diagnóstico · ecossistema",
+            "Assistente" => "Chat · agentes · memória",
+            "Ferramentas" => "Terminal · executores · módulos · logs",
+            "Apps" => "Programas · células · automação",
+            _ => "AURA · " + items.Length + " opção" + (items.Length != 1 ? "ões" : "")
+        };
+
         var header = new VerticalStackLayout
         {
             Padding = new Thickness(20, 22, 20, 8),
@@ -45,7 +54,7 @@ public sealed class SectionPage : ContentPage
                 },
                 new Label
                 {
-                    Text = "AURA · " + items.Length + " opção" + (items.Length != 1 ? "ões" : ""),
+                    Text = subtitle,
                     FontSize = 12, TextColor = TextSec,
                 }
             }
@@ -126,7 +135,6 @@ public sealed class SectionPage : ContentPage
     /// </summary>
     private async Task NavigateSafeAsync(string label, Page page)
     {
-        // Já está nesta NavigationPage?
         for (int i = 0; i < Navigation.NavigationStack.Count; i++)
         {
             if (!ReferenceEquals(Navigation.NavigationStack[i], page))

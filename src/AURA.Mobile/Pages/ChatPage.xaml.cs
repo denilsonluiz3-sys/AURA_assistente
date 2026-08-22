@@ -1,7 +1,7 @@
 using AURA.AI;
+using AURA.Abstractions.Orchestration;
 using AURA.Abstractions.Process;
 using AURA.Agents;
-using AURA.AI;
 using AURA.Mobile.Diagnostics;
 using AURA.Mobile.Speech;
 
@@ -12,17 +12,26 @@ public partial class ChatPage : ContentPage
     private readonly OpenRouterClient _client;
     private readonly AURA.Memory.MemoryStore _memory;
     private readonly IProcessOrchestrator _processEngine;
+    private readonly IOrchestrator _orchestrator;
+    private readonly IIntentResolver _intentResolver;
     private readonly VoiceAssistantService? _voice;
     private readonly AURA.Mobile.ProcessRegistry _processes;
 
-    public ChatPage(OpenRouterClient client, AURA.Memory.MemoryStore memory,
-        IProcessOrchestrator processEngine, AURA.Mobile.ProcessRegistry processes,
+    public ChatPage(
+        OpenRouterClient client,
+        AURA.Memory.MemoryStore memory,
+        IProcessOrchestrator processEngine,
+        IOrchestrator orchestrator,
+        IIntentResolver intentResolver,
+        AURA.Mobile.ProcessRegistry processes,
         VoiceAssistantService? voice = null)
     {
         InitializeComponent();
         _client = client;
         _memory = memory;
         _processEngine = processEngine;
+        _orchestrator = orchestrator;
+        _intentResolver = intentResolver;
         _processes = processes;
         _voice = voice;
         BindingContext = _processes;
@@ -75,6 +84,33 @@ public partial class ChatPage : ContentPage
 
         try
         {
+            // 1) Intents determinísticos (navigate / android programs) via orquestrador
+            var intent = _intentResolver.Resolve(question);
+
+            if (intent.Intent == "navigate"
+                && intent.Parameters.TryGetValue("page", out string? pageLabel)
+                && !string.IsNullOrWhiteSpace(pageLabel))
+            {
+                AnswerLabel.Text = $"Abrindo {pageLabel}…";
+                _processes.Complete(process.Id);
+                if (Application.Current?.Windows?.FirstOrDefault()?.Page is MainPage main)
+                    await main.NavigateToProcessAsync(pageLabel);
+                else if (Application.Current?.MainPage is MainPage mainLegacy)
+                    await mainLegacy.NavigateToProcessAsync(pageLabel);
+                return;
+            }
+
+            if (intent.Intent == "android"
+                || intent.Confidence >= 0.85)
+            {
+                string orchResult = await _orchestrator.ExecuteAsync(question);
+                AnswerLabel.Text = orchResult;
+                _voice?.SetLastUtterance(orchResult);
+                _processes.Complete(process.Id);
+                return;
+            }
+
+            // 2) Fluxo de processo / IA existente
             string answer;
             LlmHandler? llm = null;
             if (!string.IsNullOrWhiteSpace(RuntimeConfig.ApiKey) ||
@@ -116,8 +152,10 @@ public partial class ChatPage : ContentPage
         if (sender is not Border border || border.BindingContext is not AURA.Mobile.ProcessInfo process)
             return;
 
-        if (Application.Current?.MainPage is AURA.Mobile.MainPage mainPage)
-            await mainPage.NavigateToProcessAsync(process.Target);
+        if (Application.Current?.Windows?.FirstOrDefault()?.Page is MainPage main)
+            await main.NavigateToProcessAsync(process.Target);
+        else if (Application.Current?.MainPage is MainPage mainLegacy)
+            await mainLegacy.NavigateToProcessAsync(process.Target);
     }
 
     private void OnProviderChanged(object? sender, EventArgs e)

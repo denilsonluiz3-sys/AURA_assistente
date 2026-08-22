@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.IO;
 using System.Net.Http;
-using System.Text;
-using System.Text.RegularExpressions;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.Abstractions;
@@ -13,6 +12,10 @@ using AURA.Core.Logging;
 using AURA.Core.Launchers;
 using AURA.Core.Runtime;
 using AURA.Memory;
+using AURA.Abstractions;
+using AURA.Abstractions.Execution;
+using AURA.AI;
+using AURA.Agents.Programs;
 
 namespace AURA.Agents
 {
@@ -22,7 +25,6 @@ namespace AURA.Agents
     /// </summary>
     public sealed class AuraOrchestrator : IOrchestrator
     {
-        private const int MaxSteps = 5;
         private readonly ILogger _logger;
         private readonly SolutionStore _memory;
         private readonly Runner _runner;
@@ -40,6 +42,9 @@ namespace AURA.Agents
             SolutionStore memory,
             Runner runner,
             SimulationRuntime runtime,
+            IToolExecutor shell,
+            IWebSearch webSearch,
+            OpenRouterClient? aiClient = null,
             HttpClient? httpClient = null,
             EventBus? events = null,
             IIntentResolver? intentResolver = null,
@@ -52,6 +57,9 @@ namespace AURA.Agents
             _memory = memory ?? throw new ArgumentNullException(nameof(memory));
             _runner = runner ?? throw new ArgumentNullException(nameof(runner));
             _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+            _shell = shell ?? throw new ArgumentNullException(nameof(shell));
+            _webSearch = webSearch ?? throw new ArgumentNullException(nameof(webSearch));
+            _aiClient = aiClient;
             _http = httpClient ?? CreateAntiDetectClient();
             _events = events;
             _intentResolver = intentResolver ?? new HeuristicIntentResolver();
@@ -63,8 +71,7 @@ namespace AURA.Agents
 
         public async Task<string> ExecuteAsync(string userCommand, CancellationToken ct = default, bool confirmed = false)
         {
-            if (string.IsNullOrWhiteSpace(userCommand))
-                return "Comando vazio.";
+            if (string.IsNullOrWhiteSpace(userCommand)) return "Comando vazio.";
 
             userCommand = userCommand.Trim();
             string normalized = userCommand.ToLowerInvariant();
@@ -89,7 +96,7 @@ namespace AURA.Agents
             {
                 Publish(processId, "Orquestração", "Memória", "Concluído", "Resultado recuperado da memória", 1);
                 _logger.Info("[MEMÓRIA] hit " + hit.Id);
-                return "💾 Memória:\nAção: " + hit.ActionTaken + "\n" + hit.ResultDetails;
+                return "💾 Memória:\n" + hit.ResultDetails;
             }
 
             for (int step = 1; step <= MaxSteps; step++)
@@ -185,19 +192,31 @@ namespace AURA.Agents
             }
         }
 
-        private void Publish(string id, string title, string target, string status, string message, double progress)
-        {
-            _events?.Publish(new OrchestrationStepEvent
+            string workspace = AgentWorkspace();
+            var tools = new List<AgentTool>
             {
-                Id = id,
-                Title = title,
-                Target = target,
-                Status = status,
-                Message = message,
-                Progress = Math.Clamp(progress, 0, 1),
-                OccurredAt = DateTime.UtcNow
+                new InterpretCommandTool(),
+                new SearchMemoryTool(_memory),
+                new ListDirTool(workspace),
+                new ReadFileTool(workspace),
+                new WriteFileTool(workspace),
+                new EditFileTool(workspace),
+                new ShellAgentTool(workspace, _shell),
+                new WebFetchTool(),
+                new WebSearchTool(_webSearch),
+                new CodeExtractorTool(_webSearch, _aiClient),
+                new CodeExecutorTool(_shell, workspace)
+            };
+
+            string apiKey = Environment.GetEnvironmentVariable("OPENROUTER_API_KEY") ?? "";
+            var client = _aiClient ?? new OpenRouterClient(new OpenRouterOptions
+            {
+                ApiKey = apiKey,
+                Model = string.IsNullOrEmpty(apiKey) ? "openrouter/free" : "qwen/qwen-plus",
+                MaxTokens = 2000,
+                TimeoutSeconds = 90,
+                AppReference = "AURA-Orchestrator"
             });
-        }
 
         public async Task<string> SearchWithRefinementAsync(string query, CancellationToken ct = default)
         {
@@ -235,15 +254,17 @@ namespace AURA.Agents
             resp.EnsureSuccessStatusCode();
             string html = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
-            var list = new List<(string, string)>();
-            var re = new Regex(@"<a[^>]+href=""(https?://[^""]+)""[^>]*>([^<]+)</a>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-            foreach (Match m in re.Matches(html))
+            string result;
+            try
             {
-                string href = m.Groups[1].Value;
-                string title = System.Net.WebUtility.HtmlDecode(m.Groups[2].Value).Trim();
-                if (href.Contains("duckduckgo.com", StringComparison.OrdinalIgnoreCase) || title.Length < 3) continue;
-                list.Add((title, href));
-                if (list.Count >= 5) break;
+                result = await session.RunAsync(userCommand, _http, ct);
+                Publish(processId, "Orquestração", "Assistente", "Concluído", "Resultado entregue", 1);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("[ORQUESTRA] Erro: " + ex.Message);
+                Publish(processId, "Orquestração", "Assistente", "Falhou", ex.Message, 1);
+                result = "❌ Erro ao processar: " + ex.Message;
             }
             return list;
         }
@@ -257,16 +278,11 @@ namespace AURA.Agents
             return sb.ToString();
         }
 
-        private static string RefineQuery(string q, int attempt)
-        {
-            if (attempt == 0) return q + " tutorial";
-            if (attempt == 1)
+            if (!result.StartsWith("❌"))
             {
-                string[] parts = q.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                return string.Join(" ", parts.Take(Math.Min(4, parts.Length))) + " how to";
+                _memory.Record(userCommand, "orchestration", result, success: true);
+                _logger.Info("[MEMÓRIA] Registrado: " + userCommand);
             }
-            return q;
-        }
 
         private static string? ExtractFilePath(string t)
         {
@@ -279,11 +295,9 @@ namespace AURA.Agents
         private static HttpClient CreateAntiDetectClient()
         {
             var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-            client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Mobile Safari/537.36");
-            client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+            client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36");
+            client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "text/html,application/xhtml+xml");
             client.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Language", "pt-BR,pt;q=0.9,en;q=0.8");
-            client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Ch-Ua-Mobile", "?1");
-            client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Ch-Ua-Platform", "\"Android\"");
             return client;
         }
     }

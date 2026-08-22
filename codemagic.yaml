@@ -1,3 +1,4 @@
+# ÚNICO workflow da AURA — gere o APK Android aqui.
 workflows:
   aura-mobile-apk:
     name: AURA Mobile Android (APK)
@@ -7,39 +8,56 @@ workflows:
       vars:
         DOTNET_PATH: $CM_BUILD_DIR/dotnet
         DOTNET_BIN: $CM_BUILD_DIR/dotnet/dotnet
-        # Para assinar com sua própria keystore (instalação sobre o APK antigo):
-        #   1) Suba a keystore em "Code signing identities" (Codemagic).
-        #   2) Adicione abaixo `android_signing: [ <reference-name> ]`.
-        #   3) Passe -p:AndroidKeyStore=True e os -p:AndroidSigning* (CM_KEYSTORE_PATH,
-        #      CM_KEY_ALIAS, CM_KEY_PASSWORD, CM_KEYSTORE_PASSWORD).
-        # Sem isso, o APK sai assinado com a keystore de debug (instala por sideload).
+        DOTNET_VERSION: "10.0.110"
+        ANDROID_TFM: net10.0-android
+        AURA_DISPLAY_VERSION: "2.1"
     scripts:
-      - name: Instalar .NET SDK 10
+      - name: Install .NET 10
         script: |
-          wget https://dot.net/v1/dotnet-install.sh
+          set -euo pipefail
+          curl -fsSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
           chmod +x dotnet-install.sh
-          # Versão fixada pelo global.json do repositório (10.0.110).
-          ./dotnet-install.sh --install-dir $DOTNET_PATH --version 10.0.110
-          $DOTNET_BIN --version
-      - name: Instalar workload MAUI Android
+          ./dotnet-install.sh --install-dir "$DOTNET_PATH" --version "$DOTNET_VERSION"
+          export PATH="$DOTNET_PATH:$PATH"
+          "$DOTNET_BIN" --info
+
+      - name: Install MAUI Android workload
         script: |
-          $DOTNET_BIN workload install maui-android
-      - name: Instalar dependências do Android SDK (API 36)
+          set -euo pipefail
+          export PATH="$DOTNET_PATH:$PATH"
+          "$DOTNET_BIN" workload install maui-android
+
+      - name: Restore
         script: |
-          $DOTNET_BIN build src/AURA.Mobile/AURA.Mobile.csproj \
+          set -euo pipefail
+          export PATH="$DOTNET_PATH:$PATH"
+          "$DOTNET_BIN" restore src/AURA.Mobile/AURA.Mobile.csproj
+
+      - name: Install Android SDK deps
+        script: |
+          set -euo pipefail
+          export PATH="$DOTNET_PATH:$PATH"
+          SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
+          echo "SDK=$SDK_DIR"
+          "$DOTNET_BIN" build src/AURA.Mobile/AURA.Mobile.csproj \
             -t:InstallAndroidDependencies \
-            -f net10.0-android \
-            -p:AndroidSdkDirectory=/usr/local/share/android-sdk \
+            -f "$ANDROID_TFM" \
+            -p:AndroidSdkDirectory="$SDK_DIR" \
             -p:AcceptAndroidSDKLicenses=True
-      - name: Publicar APK (Release)
+
+      - name: Publish APK
         script: |
-          cd $CM_BUILD_DIR
-          $DOTNET_BIN publish src/AURA.Mobile/AURA.Mobile.csproj \
-            -f net10.0-android \
+          set -euo pipefail
+          export PATH="$DOTNET_PATH:$PATH"
+          mkdir -p "$CM_BUILD_DIR/artifacts"
+          "$DOTNET_BIN" publish src/AURA.Mobile/AURA.Mobile.csproj \
+            -f "$ANDROID_TFM" \
             -c Release \
             -p:AndroidPackageFormats=apk \
-            -p:ApplicationVersion=$BUILD_NUMBER \
-            -p:ApplicationDisplayVersion="1.0.0" \
-            -o $CM_BUILD_DIR/artifacts
+            -p:ApplicationVersion="${BUILD_NUMBER:-1}" \
+            -p:ApplicationDisplayVersion="$AURA_DISPLAY_VERSION" \
+            -o "$CM_BUILD_DIR/artifacts"
+          find "$CM_BUILD_DIR/artifacts" -name '*.apk' -print
+
     artifacts:
-      - artifacts/*.apk
+      - artifacts/**/*.apk

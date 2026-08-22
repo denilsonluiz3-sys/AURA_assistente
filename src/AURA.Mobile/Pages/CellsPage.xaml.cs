@@ -1,3 +1,4 @@
+using AURA.Core.Events;
 using AURA.Core.Launchers;
 using AURA.Core.Runtime;
 using Cell = AURA.Core.Runtime.Cell;
@@ -9,19 +10,23 @@ public partial class CellsPage : ContentPage
     private readonly SimulationRuntime _runtime;
     private readonly Runner _runner;
     private readonly RunPage _runPage;
+    private readonly EventBus _events;
     private bool _loaded;
+    private bool _subscribed;
 
-    public CellsPage(SimulationRuntime runtime, Runner runner, RunPage runPage)
+    public CellsPage(SimulationRuntime runtime, Runner runner, RunPage runPage, EventBus events)
     {
         InitializeComponent();
         _runtime = runtime;
         _runner = runner;
         _runPage = runPage;
+        _events = events;
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        SubscribeRuntimeEvents();
 
         if (!_loaded)
         {
@@ -37,6 +42,39 @@ public partial class CellsPage : ContentPage
         }
 
         Refresh();
+    }
+
+    protected override void OnDisappearing()
+    {
+        UnsubscribeRuntimeEvents();
+        base.OnDisappearing();
+    }
+
+    private void SubscribeRuntimeEvents()
+    {
+        if (_subscribed)
+        {
+            return;
+        }
+
+        _events.Subscribe<CellStateChangedEvent>(OnCellStateChanged);
+        _subscribed = true;
+    }
+
+    private void UnsubscribeRuntimeEvents()
+    {
+        if (!_subscribed)
+        {
+            return;
+        }
+
+        _events.Unsubscribe<CellStateChangedEvent>(OnCellStateChanged);
+        _subscribed = false;
+    }
+
+    private void OnCellStateChanged(CellStateChangedEvent _)
+    {
+        MainThread.BeginInvokeOnMainThread(Refresh);
     }
 
     private void Refresh()

@@ -19,32 +19,194 @@
                               HorizontalOptions="Fill"
                               VerticalOptions="Fill" />
 
-        <!-- ── Header sobre o fundo ─────────────────────────── -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Padding="20,24,20,16"
-              VerticalOptions="Start" BackgroundColor="Transparent">
-            <VerticalStackLayout Grid.Column="0" Spacing="2">
-                <Label Text="A U R A"
-                       FontSize="32"
-                       FontAttributes="Bold"
-                       TextColor="{DynamicResource AuraAccent}" />
-                <Label x:Name="VersionLabel"
-                       FontSize="12"
-                       TextColor="{DynamicResource AuraTextSecondary}" />
-            </VerticalStackLayout>
-            <Button x:Name="BtnTheme"
-                    Grid.Column="1"
-                    Text="☾"
-                    FontSize="20"
-                    BackgroundColor="Transparent"
-                    TextColor="{DynamicResource AuraAccent}"
-                    WidthRequest="44"
-                    HeightRequest="44"
-                    Padding="0"
-                    VerticalOptions="Start"
-                    Clicked="OnThemeToggleClicked" />
-        </Grid>
+        <ScrollView Grid.Row="0" Padding="0" VerticalOptions="Fill">
+            <VerticalStackLayout Spacing="0" Padding="0,0,0,12">
 
-        <!-- ── Bottom bar glass (estilo AuraGlassBar) ── -->
+                <!-- Header -->
+                <Grid ColumnDefinitions="*,Auto" Padding="20,24,20,12"
+                      VerticalOptions="Start" BackgroundColor="Transparent">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label Text="A U R A"
+                               FontSize="32"
+                               FontAttributes="Bold"
+                               TextColor="{DynamicResource AuraAccent}" />
+                        <Label x:Name="VersionLabel"
+                               FontSize="12"
+                               TextColor="{DynamicResource AuraTextSecondary}" />
+                    </VerticalStackLayout>
+                    <Button x:Name="BtnTheme"
+                            Grid.Column="1"
+                            Text="☾"
+                            FontSize="20"
+                            BackgroundColor="Transparent"
+                            TextColor="{DynamicResource AuraAccent}"
+                            WidthRequest="44"
+                            HeightRequest="44"
+                            Padding="0"
+                            VerticalOptions="Start"
+                            Clicked="OnThemeToggleClicked" />
+                </Grid>
+
+                <!-- Command entry -->
+                <Border Margin="16,4,16,12"
+                        BackgroundColor="{DynamicResource AuraSurface}"
+                        Stroke="{DynamicResource AuraBorder}"
+                        StrokeThickness="1"
+                        Padding="12,8">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="14" />
+                    </Border.StrokeShape>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Entry x:Name="CommandEntry"
+                               Grid.Column="0"
+                               Placeholder="Pergunte ou diga um comando"
+                               PlaceholderColor="{DynamicResource AuraTextMuted}"
+                               TextColor="{DynamicResource AuraTextPrimary}"
+                               BackgroundColor="Transparent"
+                               FontSize="14"
+                               ReturnType="Go"
+                               Completed="OnCommandCompleted" />
+                        <Button x:Name="BtnSendCommand"
+                                Grid.Column="1"
+                                Text="➤"
+                                FontSize="16"
+                                BackgroundColor="{DynamicResource AuraAccent}"
+                                TextColor="White"
+                                WidthRequest="40"
+                                HeightRequest="40"
+                                Padding="0"
+                                CornerRadius="10"
+                                Clicked="OnSendCommandClicked" />
+                    </Grid>
+                </Border>
+
+                <!-- Quick actions -->
+                <Label Text="Ações rápidas"
+                       Margin="20,4,20,8"
+                       FontSize="12"
+                       FontAttributes="Bold"
+                       TextColor="{DynamicResource AuraTextSecondary}" />
+                <Grid Margin="16,0,16,16"
+                      ColumnDefinitions="*,*,*,*"
+                      ColumnSpacing="8">
+                    <Border Grid.Column="0"
+                            BackgroundColor="{DynamicResource AuraSurface}"
+                            Stroke="{DynamicResource AuraBorder}"
+                            StrokeThickness="1"
+                            Padding="8,12">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="12" />
+                        </Border.StrokeShape>
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnQuickDiagnostico" />
+                        </Border.GestureRecognizers>
+                        <VerticalStackLayout Spacing="6" HorizontalOptions="Center">
+                            <Label Text="◎" FontSize="22" TextColor="{DynamicResource AuraAccent}" HorizontalTextAlignment="Center" />
+                            <Label Text="Diagnosticar" FontSize="10" TextColor="{DynamicResource AuraTextPrimary}" HorizontalTextAlignment="Center" LineBreakMode="WordWrap" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Grid.Column="1"
+                            BackgroundColor="{DynamicResource AuraSurface}"
+                            Stroke="{DynamicResource AuraBorder}"
+                            StrokeThickness="1"
+                            Padding="8,12">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="12" />
+                        </Border.StrokeShape>
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnQuickProgramas" />
+                        </Border.GestureRecognizers>
+                        <VerticalStackLayout Spacing="6" HorizontalOptions="Center">
+                            <Label Text="▷" FontSize="22" TextColor="{DynamicResource AuraAccent}" HorizontalTextAlignment="Center" />
+                            <Label Text="Programa" FontSize="10" TextColor="{DynamicResource AuraTextPrimary}" HorizontalTextAlignment="Center" LineBreakMode="WordWrap" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Grid.Column="2"
+                            BackgroundColor="{DynamicResource AuraSurface}"
+                            Stroke="{DynamicResource AuraBorder}"
+                            StrokeThickness="1"
+                            Padding="8,12">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="12" />
+                        </Border.StrokeShape>
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnQuickTerminal" />
+                        </Border.GestureRecognizers>
+                        <VerticalStackLayout Spacing="6" HorizontalOptions="Center">
+                            <Label Text=">_" FontSize="22" TextColor="{DynamicResource AuraAccent}" HorizontalTextAlignment="Center" />
+                            <Label Text="Terminal" FontSize="10" TextColor="{DynamicResource AuraTextPrimary}" HorizontalTextAlignment="Center" LineBreakMode="WordWrap" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Grid.Column="3"
+                            BackgroundColor="{DynamicResource AuraSurface}"
+                            Stroke="{DynamicResource AuraBorder}"
+                            StrokeThickness="1"
+                            Padding="8,12">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="12" />
+                        </Border.StrokeShape>
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnQuickChat" />
+                        </Border.GestureRecognizers>
+                        <VerticalStackLayout Spacing="6" HorizontalOptions="Center">
+                            <Label Text="◉" FontSize="22" TextColor="{DynamicResource AuraAccent}" HorizontalTextAlignment="Center" />
+                            <Label Text="Perguntar" FontSize="10" TextColor="{DynamicResource AuraTextPrimary}" HorizontalTextAlignment="Center" LineBreakMode="WordWrap" />
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+
+                <!-- Estado -->
+                <Label Text="Estado"
+                       Margin="20,4,20,8"
+                       FontSize="12"
+                       FontAttributes="Bold"
+                       TextColor="{DynamicResource AuraTextSecondary}" />
+                <Border Margin="16,0,16,16"
+                        BackgroundColor="{DynamicResource AuraSurface}"
+                        Stroke="{DynamicResource AuraBorder}"
+                        StrokeThickness="1"
+                        Padding="14,12">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="12" />
+                    </Border.StrokeShape>
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2" HorizontalOptions="Center">
+                            <Label x:Name="StatusSistema" Text="Sistema ✓" FontSize="12" TextColor="{DynamicResource AuraSuccess}" HorizontalTextAlignment="Center" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2" HorizontalOptions="Center">
+                            <Label x:Name="StatusRede" Text="Rede ✓" FontSize="12" TextColor="{DynamicResource AuraSuccess}" HorizontalTextAlignment="Center" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="2" Spacing="2" HorizontalOptions="Center">
+                            <Label x:Name="StatusBateria" Text="Bateria —" FontSize="12" TextColor="{DynamicResource AuraTextSecondary}" HorizontalTextAlignment="Center" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </Border>
+
+                <!-- Atividade recente -->
+                <Label Text="Atividade recente"
+                       Margin="20,4,20,8"
+                       FontSize="12"
+                       FontAttributes="Bold"
+                       TextColor="{DynamicResource AuraTextSecondary}" />
+                <Border Margin="16,0,16,8"
+                        BackgroundColor="{DynamicResource AuraSurface}"
+                        Stroke="{DynamicResource AuraBorder}"
+                        StrokeThickness="1"
+                        Padding="14,12">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="12" />
+                    </Border.StrokeShape>
+                    <Label x:Name="RecentActivityLabel"
+                           Text="Nenhuma atividade recente."
+                           FontSize="12"
+                           TextColor="{DynamicResource AuraTextMuted}"
+                           LineBreakMode="WordWrap" />
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Bottom bar glass -->
         <Border Grid.Row="1"
                 Style="{StaticResource AuraGlassBar}"
                 Margin="12,0,12,12">

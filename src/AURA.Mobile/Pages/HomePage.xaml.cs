@@ -1,4 +1,7 @@
 using CommunityToolkit.Maui.Views;
+#if ANDROID
+using AURA.Mobile.Platforms.Android;
+#endif
 
 namespace AURA.Mobile.Pages;
 
@@ -12,10 +15,28 @@ public partial class HomePage : ContentPage
         App.ThemeChanged += OnThemeChanged;
         UpdateThemeIcon();
 
-        // Double-tap no botão de tema alterna vídeo de fundo on/off (Preference).
         var doubleTap = new TapGestureRecognizer { NumberOfTapsRequired = 2 };
         doubleTap.Tapped += OnThemeDoubleTapped;
         BtnTheme.GestureRecognizers.Add(doubleTap);
+
+        RunAndroidBridgeTest();
+    }
+
+    private void RunAndroidBridgeTest()
+    {
+#if ANDROID
+        try
+        {
+            var resultado = AuraAndroidBridgeTest.Run();
+            System.Diagnostics.Debug.WriteLine(resultado);
+            AuraLog.Info("V16 TESTE EXECUTADO");
+            AuraLog.Info(resultado);
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("V16 Teste", ex);
+        }
+#endif
     }
 
     protected override void OnAppearing()
@@ -24,6 +45,7 @@ public partial class HomePage : ContentPage
         UpdateThemeIcon();
         VersionLabel.Text = AURA.Core.VersionInfo.FullName;
         ApplyVideoBackground();
+        RefreshStatus();
     }
 
     protected override void OnDisappearing()
@@ -32,12 +54,55 @@ public partial class HomePage : ContentPage
         PauseVideoBackground();
     }
 
+    private void RefreshStatus()
+    {
+        try
+        {
+            StatusSistema.Text = "Sistema ✓";
+            StatusSistema.TextColor = Color.FromArgb("#3ec97a");
+
+            var access = Connectivity.Current.NetworkAccess;
+            bool online = access == NetworkAccess.Internet || access == NetworkAccess.ConstrainedInternet;
+            StatusRede.Text = online ? "Rede ✓" : "Rede ✗";
+            StatusRede.TextColor = online ? Color.FromArgb("#3ec97a") : Color.FromArgb("#e05560");
+
+#if ANDROID
+            try
+            {
+                var bm = (Android.OS.BatteryManager?)Android.App.Application.Context.GetSystemService(Android.Content.Context.BatteryService);
+                int level = bm?.GetIntProperty((int)Android.OS.BatteryProperty.Capacity) ?? -1;
+                if (level >= 0)
+                {
+                    StatusBateria.Text = $"Bateria {level}%";
+                    StatusBateria.TextColor = level > 20 ? Color.FromArgb("#3ec97a") : Color.FromArgb("#f0a050");
+                }
+                else
+                {
+                    StatusBateria.Text = "Bateria —";
+                    StatusBateria.TextColor = Color.FromArgb("#7a7a90");
+                }
+            }
+            catch
+            {
+                StatusBateria.Text = "Bateria —";
+                StatusBateria.TextColor = Color.FromArgb("#7a7a90");
+            }
+#else
+            StatusBateria.Text = "Bateria —";
+            StatusBateria.TextColor = Color.FromArgb("#7a7a90");
+#endif
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("HomePage.RefreshStatus", ex);
+        }
+    }
+
     // ── Tema Solar / Lunar ─────────────────────────────────────────
 
     private void OnThemeToggleClicked(object? sender, EventArgs e)
     {
         App.ToggleTheme();
-        // Icon e vídeo são atualizados via ThemeChanged.
     }
 
     private void OnThemeChanged()
@@ -45,18 +110,17 @@ public partial class HomePage : ContentPage
         MainThread.BeginInvokeOnMainThread(() =>
         {
             UpdateThemeIcon();
-            ApplyVideoBackground(); // troca source conforme tema
+            ApplyVideoBackground();
         });
     }
 
     private void UpdateThemeIcon()
     {
         if (BtnTheme is null) return;
-        // Solar → mostra lua (próximo estado = Lunar); Lunar → mostra sol
         BtnTheme.Text = App.IsSolar ? "☾" : "☀";
     }
 
-    // ── Vídeo de fundo (Lunar = lua/aurora, Solar = sol/aurora) ────
+    // ── Vídeo de fundo ────────────────────────────────────────────
 
     private bool IsVideoBgEnabled => Preferences.Default.Get(VideoBgPrefKey, true);
 
@@ -64,7 +128,7 @@ public partial class HomePage : ContentPage
     {
         bool next = !IsVideoBgEnabled;
         Preferences.Default.Set(VideoBgPrefKey, next);
-        AuraLog.Info($"Vídeo de fundo {(next ? "ativado" : "desativado")} (Preference {VideoBgPrefKey})");
+        AuraLog.Info($"Vídeo de fundo {(next ? "ativado" : "desativado")}");
         ApplyVideoBackground();
         _ = PlayButtonFeedbackAsync(BtnTheme);
     }
@@ -82,10 +146,7 @@ public partial class HomePage : ContentPage
 
         try
         {
-            // Assets em Resources/Raw/ (MauiAsset LogicalName = filename)
             string resource = App.IsSolar ? "solar_bg.mp4" : "lunar_bg.mp4";
-
-            // Não destruir o MediaElement: desfadeia, para, troca a Source e toca (evita tela preta).
             await BgVideo.FadeTo(0, 150, Easing.Linear);
             BgVideo.Stop();
             BgVideo.Source = MediaSource.FromResource(resource);
@@ -103,14 +164,7 @@ public partial class HomePage : ContentPage
 
     private void PauseVideoBackground()
     {
-        try
-        {
-            BgVideo?.Pause();
-        }
-        catch
-        {
-            // ignore
-        }
+        try { BgVideo?.Pause(); } catch { }
     }
 
     private static async Task PlayButtonFeedbackAsync(View? button)
@@ -121,13 +175,80 @@ public partial class HomePage : ContentPage
             await button.ScaleTo(0.85, 80, Easing.CubicOut);
             await button.ScaleTo(1.0, 120, Easing.CubicIn);
         }
-        catch
-        {
-            // ignore
-        }
+        catch { }
     }
 
-    // ── Bottom bar (Início | Diagnóstico | Módulos | Agentes | Config) ──
+    // ── Command entry ─────────────────────────────────────────────
+
+    private async void OnCommandCompleted(object? sender, EventArgs e)
+    {
+        await SubmitCommandAsync();
+    }
+
+    private async void OnSendCommandClicked(object? sender, EventArgs e)
+    {
+        await SubmitCommandAsync();
+    }
+
+    private async Task SubmitCommandAsync()
+    {
+        string text = (CommandEntry?.Text ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(text)) return;
+
+        RecentActivityLabel.Text = $"Comando: {text}";
+        CommandEntry.Text = string.Empty;
+
+        // Navega para Chat (Assistente) — orquestração completa fica na próxima fase
+        await NavigateToLabelAsync("Chat");
+    }
+
+    // ── Quick actions ─────────────────────────────────────────────
+
+    private async void OnQuickDiagnostico(object? sender, TappedEventArgs e)
+    {
+        RecentActivityLabel.Text = "Ação: Diagnosticar";
+        await NavigateToLabelAsync("Diagnóstico");
+    }
+
+    private async void OnQuickProgramas(object? sender, TappedEventArgs e)
+    {
+        RecentActivityLabel.Text = "Ação: Programas";
+        await NavigateToLabelAsync("Programas");
+    }
+
+    private async void OnQuickTerminal(object? sender, TappedEventArgs e)
+    {
+        RecentActivityLabel.Text = "Ação: Terminal";
+        await NavigateToLabelAsync("Terminal");
+    }
+
+    private async void OnQuickChat(object? sender, TappedEventArgs e)
+    {
+        RecentActivityLabel.Text = "Ação: Perguntar à AURA";
+        await NavigateToLabelAsync("Chat");
+    }
+
+    private async Task NavigateToLabelAsync(string label)
+    {
+        if (Application.Current?.Windows?.FirstOrDefault()?.Page is MainPage main)
+        {
+            await main.NavigateToProcessAsync(label);
+            return;
+        }
+
+        // Fallback por seção conhecida
+        string section = label switch
+        {
+            "Diagnóstico" or "Logs" or "Correções" or "Ecossistema" => "Sistema",
+            "Chat" or "Agente" or "Memória" or "Navegador" => "Assistente",
+            "Terminal" or "Executores" or "Módulos" => "Ferramentas",
+            "Programas" or "Células" or "Rodar programa" => "Apps",
+            _ => "Sistema"
+        };
+        await NavigateToSectionAndPageAsync(section, label);
+    }
+
+    // ── Bottom bar ──────────────────────────────────────────────────
 
     private async void OnInicioClicked(object? sender, EventArgs e)
     {
@@ -137,25 +258,24 @@ public partial class HomePage : ContentPage
     private async void OnDiagnosticoClicked(object? sender, EventArgs e)
     {
         await PlayButtonFeedbackAsync(BtnDiagnostico);
-        await NavigateToSectionAndPageAsync("Sistema", "Diagnóstico");
+        await NavigateToLabelAsync("Diagnóstico");
     }
 
     private async void OnModulosClicked(object? sender, EventArgs e)
     {
         await PlayButtonFeedbackAsync(BtnModulos);
-        await NavigateToSectionAndPageAsync("Ferramentas", "Módulos");
+        await NavigateToLabelAsync("Módulos");
     }
 
     private async void OnAgentesClicked(object? sender, EventArgs e)
     {
         await PlayButtonFeedbackAsync(BtnAgentes);
-        await NavigateToSectionAndPageAsync("Assistente", "Agente");
+        await NavigateToLabelAsync("Agente");
     }
 
     private async void OnConfigClicked(object? sender, EventArgs e)
     {
         await PlayButtonFeedbackAsync(BtnConfig);
-        // Ainda não existe página Config dedicada. Leva à seção Sistema.
         if (!TrySwitchToSection("Sistema"))
             await DisplayAlert("Config", "Seção Sistema não disponível no momento.", "OK");
     }
@@ -164,8 +284,7 @@ public partial class HomePage : ContentPage
     {
         if (!TrySwitchToSection(sectionTitle))
         {
-            await DisplayAlert(pageLabel, $"Seção \"{sectionTitle}\" ainda não está ativa (módulo não aplicado).", "OK");
-            return;
+            await DisplayAlert(pageLabel, $"Seção \"{sectionTitle}\" ainda não está ativa.", "OK");
         }
     }
 

@@ -1,0 +1,132 @@
+name: AURA AI Documentation Sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '*.sln'
+      - '**/*.csproj'
+      - 'global.json'
+      - 'Directory.Build.props'
+      - '.github/workflows/**'
+      - '!README_AI.md'
+      - '!README.md'
+  workflow_dispatch:
+
+concurrency:
+  group: aura-ai-docs-main
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  update-ai-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate repository snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p .ai-docs
+
+          {
+            echo '## Snapshot automático do código'
+            echo
+            echo '> Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.'
+            echo
+            echo "- Commit: \`$(git rev-parse --short HEAD)\`"
+            echo "- Data UTC: \`$(date -u '+%Y-%m-%d %H:%M:%S UTC')\`"
+            echo "- Branch: \`$(git branch --show-current)\`"
+            echo
+            echo '### Projetos'
+            echo
+            find src tests -name '*.csproj' -print 2>/dev/null | sort | while read -r f; do
+              echo "- \`$f\`"
+            done
+            echo
+            echo '### Estrutura de código'
+            echo
+            for d in src/*; do
+              [ -d "$d" ] || continue
+              cs=$(find "$d" -type f -name '*.cs' | wc -l | tr -d ' ')
+              xaml=$(find "$d" -type f \( -name '*.xaml' -o -name '*.xaml.cs' \) | wc -l | tr -d ' ')
+              echo "- \`$d\`: ${cs} arquivos C#, ${xaml} arquivos XAML"
+            done
+            echo
+            echo '### Referências entre projetos'
+            echo
+            find src tests -name '*.csproj' -print 2>/dev/null | sort | while read -r f; do
+              refs=$(grep -o 'ProjectReference Include="[^"]*"' "$f" 2>/dev/null || true)
+              if [ -n "$refs" ]; then
+                echo "**$f**"
+                echo "$refs" | sed 's/ProjectReference Include="/- /; s/"$//' | sed 's#\\#/#g'
+                echo
+              fi
+            done
+            echo '### Workflows'
+            echo
+            find .github/workflows -maxdepth 1 -type f -name '*.yml' -o -name '*.yaml' 2>/dev/null | sort | while read -r f; do
+              echo "- \`$f\`"
+            done
+            echo
+            echo '### Arquivos de código relevantes'
+            echo
+            find src -type f \( -name '*.cs' -o -name '*.xaml' \) | sort | sed -n '1,250p' | while read -r f; do
+              echo "- \`$f\`"
+            done
+            echo
+            echo '### Últimos commits'
+            echo
+            git log -5 --pretty=format:'- `%h` %s (%ad)' --date=short
+            echo
+          } > .ai-docs/generated.txt
+
+      - name: Update generated section in README_AI.md
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          readme = Path('README_AI.md')
+          marker_start = '<!-- AI-DOCS:START -->'
+          marker_end = '<!-- AI-DOCS:END -->'
+          generated = Path('.ai-docs/generated.txt').read_text(encoding='utf-8').strip() + '\n'
+          text = readme.read_text(encoding='utf-8') if readme.exists() else '# AURA_assistente — Guia para Agentes de IA\n\n'
+
+          block = f'{marker_start}\n{generated}{marker_end}'
+          if marker_start in text and marker_end in text:
+              before = text.split(marker_start, 1)[0]
+              after = text.split(marker_end, 1)[1]
+              text = before + block + after
+          else:
+              text = text.rstrip() + '\n\n' + block + '\n'
+
+          readme.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit documentation update
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README_AI.md
+          if git diff --cached --quiet; then
+            echo 'README_AI.md já está atualizado.'
+            exit 0
+          fi
+          git commit -m 'docs(ai): sync README_AI with source tree'
+          git push origin HEAD:main

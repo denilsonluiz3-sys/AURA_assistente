@@ -1,30 +1,44 @@
-name: build-android-apk
+name: AURA Android APK
 
 on:
   push:
     branches: [main]
     paths:
-      - 'src/AURA.Mobile/**'
-      - 'src/AURA.Abstractions/**'
-      - 'src/AURA.Core/**'
-      - 'src/AURA.Modules/**'
-      - 'src/AURA.Agents/**'
-      - 'src/AURA.Memory/**'
-      - 'src/AURA.AI/**'
-      - 'src/AURA.Network/**'
-      - 'src/AURA.SystemInfo/**'
+      - 'src/**'
+      - '*.sln'
+      - '*.props'
+      - '*.targets'
+      - 'global.json'
+      - 'NuGet.Config'
+      - '.github/workflows/build-android-apk.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - '*.sln'
+      - '*.props'
+      - '*.targets'
+      - 'global.json'
+      - 'NuGet.Config'
       - '.github/workflows/build-android-apk.yml'
   workflow_dispatch:
+
+concurrency:
+  group: aura-android-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   DOTNET_CLI_TELEMETRY_OPTOUT: '1'
   DOTNET_NOLOGO: '1'
-  DOTNET_GCHeapHardLimit: '1C0000000'
-  DOTNET_GCHeapCount: '2'
+
+permissions:
+  contents: read
 
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,10 +48,10 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Setup JDK 17 (Android)
+      - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
 
       - name: Setup Android SDK
@@ -47,11 +61,6 @@ jobs:
           ndk-version: r26d
           emulator: false
           api36: true
-
-      - name: Set Android SDK env vars
-        run: |
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
 
       - name: Install MAUI Android workload
         run: dotnet workload install maui-android
@@ -67,21 +76,22 @@ jobs:
       - name: Restore
         run: dotnet restore src/AURA.Mobile/AURA.Mobile.csproj
 
-      - name: Setup keystore de assinatura (secret)
+      - name: Configure release signing
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           if [ -n "${{ secrets.AURA_KEYSTORE_B64 }}" ]; then
             mkdir -p keystore
             echo "${{ secrets.AURA_KEYSTORE_B64 }}" | base64 -d > keystore/aura-release.jks
             echo "KEYSTORE_PRESENT=1" >> "$GITHUB_ENV"
-            echo "Keystore restaurada do secret."
           else
-            echo "::warning::Secret AURA_KEYSTORE_B64 ausente; APK será assinado com keystore de debug (instalação por cima falhará)."
+            echo "KEYSTORE_PRESENT=0" >> "$GITHUB_ENV"
           fi
 
-      - name: Build APK (Release)
+      - name: Build APK
+        id: build
         run: |
           SIGN_ARGS=""
-          if [ "$KEYSTORE_PRESENT" = "1" ]; then
+          if [ "${KEYSTORE_PRESENT:-0}" = "1" ]; then
             SIGN_ARGS="-p:AndroidSigningKeyStore=keystore/aura-release.jks \
               -p:AndroidSigningKeyAlias=${{ secrets.AURA_KEYSTORE_ALIAS }} \
               -p:AndroidSigningKeyPass=${{ secrets.AURA_KEYSTORE_PASS }} \
@@ -93,20 +103,14 @@ jobs:
             -p:AndroidPackageFormats=apk \
             $SIGN_ARGS
 
-      # APK assinado com keystore de release (quando secret presente)
-      - name: Upload APK release (assinado)
-        if: env.KEYSTORE_PRESENT == '1'
+      # Quota de storage do Actions esgota com frequência; não deve marcar o job
+      # como falha de código (build já terminou com 0 erros).
+      - name: Upload APK
+        if: success()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: aura-mobile-apk-release
-          path: src/AURA.Mobile/bin/Release/net10.0-android/*-Signed.apk
+          name: aura-mobile-apk-${{ github.event_name == 'pull_request' && 'pr' || 'main' }}-${{ github.run_id }}
+          path: src/AURA.Mobile/bin/Release/net10.0-android/*.apk
           if-no-files-found: warn
-
-      # APK de debug (sempre disponível — útil para sideload de teste)
-      - name: Upload APK debug (sem keystore)
-        uses: actions/upload-artifact@v4
-        with:
-          name: aura-mobile-apk-debug
-          path: |
-            src/AURA.Mobile/bin/Release/net10.0-android/*.apk
-          if-no-files-found: error
+          retention-days: 2

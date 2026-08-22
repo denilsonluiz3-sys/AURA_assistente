@@ -26,7 +26,7 @@ namespace AURA.Tests
             public string Result = "Resultado da instrução pesquisada.";
             public int Calls;
 
-            public Task<string> ExecuteAsync(string userCommand, CancellationToken ct = default)
+            public Task<string> ExecuteAsync(string userCommand, CancellationToken ct = default, bool confirmed = false)
             {
                 Calls++;
                 return Task.FromResult(Result);

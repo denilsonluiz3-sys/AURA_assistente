@@ -2,7 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="AURA.Mobile.Pages.DiagnosticoPage"
-             Title="Diagnóstico"
+             Title="Sistema"
              BackgroundColor="{DynamicResource AuraBackground}">
 
     <ScrollView>
@@ -10,16 +10,65 @@
 
             <!-- Header -->
             <VerticalStackLayout Spacing="4">
-                <Label Text="Diagnóstico do dispositivo"
+                <Label Text="Sistema"
                        Style="{StaticResource Heading}"
                        FontSize="26" />
-                <Label Text="Valores lidos das APIs do sistema. O que o aparelho não expõe aparece como indisponível."
+                <Label Text="Visão consolidada do dispositivo. Capacidades passam por PolicyGuard."
                        FontSize="13"
-                       FontFamily="IBMPlexSans"
                        TextColor="{DynamicResource AuraTextSecondary}" />
             </VerticalStackLayout>
 
+            <!-- Ação principal: Device Diagnostic via Cell Program -->
+            <Border Style="{DynamicResource AuraGlassCard}" Padding="16,14">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="DIAGNÓSTICO COMPLETO"
+                           FontSize="10"
+                           FontAttributes="Bold"
+                           TextColor="{DynamicResource AuraTextMuted}" />
+                    <Label Text="Executa DeviceDiagnosticProgram (PolicyGuard → CellProgramRunner)."
+                           FontSize="12"
+                           TextColor="{DynamicResource AuraTextSecondary}" />
+                    <Button x:Name="BtnRunCellDiag"
+                            Text="Executar diagnóstico"
+                            Clicked="OnRunCellDiagnosticClicked"
+                            Style="{DynamicResource BtnGlass}"
+                            HorizontalOptions="Start" />
+                    <Label x:Name="CellDiagStatus"
+                           Text=""
+                           FontSize="12"
+                           TextColor="{DynamicResource AuraTextSecondary}"
+                           IsVisible="False" />
+                    <Label x:Name="CellDiagSummary"
+                           Text=""
+                           FontSize="12"
+                           TextColor="{DynamicResource AuraTextPrimary}"
+                           IsVisible="False"
+                           LineBreakMode="WordWrap" />
+                    <Button x:Name="BtnCellDetails"
+                            Text="Ver detalhes"
+                            Clicked="OnCellDetailsClicked"
+                            Style="{DynamicResource BtnGlass}"
+                            HorizontalOptions="Start"
+                            IsVisible="False" />
+                    <Button x:Name="BtnAnalyzeWithAi"
+                            Text="Analisar diagnóstico com IA"
+                            Clicked="OnAnalyzeWithAiClicked"
+                            Style="{DynamicResource BtnGlass}"
+                            HorizontalOptions="Start"
+                            IsEnabled="False" />
+                    <Label x:Name="AiDiagnosticStatus"
+                           Text="Execute o diagnóstico para habilitar a análise por IA."
+                           FontSize="12"
+                           TextColor="{DynamicResource AuraTextPrimary}"
+                           LineBreakMode="WordWrap" />
+                </VerticalStackLayout>
+            </Border>
+
             <!-- Status de conexão -->
+            <Label Text="Rede"
+                   FontSize="12"
+                   FontAttributes="Bold"
+                   TextColor="{DynamicResource AuraTextSecondary}" />
             <Border x:Name="ConnectionCard"
                     Style="{DynamicResource AuraGlassCard}"
                     Padding="16,12">
@@ -31,202 +80,171 @@
                     <Label x:Name="ConnectionLabel"
                            Text="Verificando conexão…"
                            FontSize="14"
-                           FontFamily="IBMPlexSans"
                            VerticalOptions="Center" />
                 </HorizontalStackLayout>
             </Border>
 
-            <!-- Grid de leituras (2 colunas) -->
+            <!-- Dispositivo / Recursos -->
+            <Label Text="Dispositivo"
+                   FontSize="12"
+                   FontAttributes="Bold"
+                   TextColor="{DynamicResource AuraTextSecondary}" />
             <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto"
                   ColumnSpacing="12" RowSpacing="12">
 
-                <!-- CPU -->
                 <Border Grid.Row="0" Grid.Column="0" Style="{DynamicResource AuraGlassCard}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="CPU"
                                FontSize="10"
                                FontAttributes="Bold"
-                               FontFamily="IBMPlexSans"
                                TextColor="{DynamicResource AuraTextMuted}" />
                         <Label x:Name="CpuValue"
                                Text="—"
                                FontSize="20"
-                               FontAttributes="Bold"
-                               FontFamily="IBMPlexSans" />
+                               FontAttributes="Bold" />
                         <Label x:Name="CpuDetail"
                                Text=""
                                FontSize="11"
-                               FontFamily="IBMPlexSans"
                                TextColor="{DynamicResource AuraTextMuted}" />
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- RAM -->
                 <Border Grid.Row="0" Grid.Column="1" Style="{DynamicResource AuraGlassCard}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="RAM"
                                FontSize="10"
                                FontAttributes="Bold"
-                               FontFamily="IBMPlexSans"
                                TextColor="{DynamicResource AuraTextMuted}" />
                         <Label x:Name="RamValue"
                                Text="—"
                                FontSize="20"
-                               FontAttributes="Bold"
-                               FontFamily="IBMPlexSans" />
+                               FontAttributes="Bold" />
                         <Label x:Name="RamDetail"
                                Text=""
                                FontSize="11"
-                               FontFamily="IBMPlexSans"
                                TextColor="{DynamicResource AuraTextMuted}" />
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- Disco -->
                 <Border Grid.Row="1" Grid.Column="0" Style="{DynamicResource AuraGlassCard}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="ARMAZENAMENTO"
                                FontSize="10"
                                FontAttributes="Bold"
-                               FontFamily="IBMPlexSans"
                                TextColor="{DynamicResource AuraTextMuted}" />
                         <Label x:Name="DiskValue"
                                Text="—"
                                FontSize="20"
-                               FontAttributes="Bold"
-                               FontFamily="IBMPlexSans" />
+                               FontAttributes="Bold" />
                         <Label x:Name="DiskDetail"
                                Text=""
                                FontSize="11"
-                               FontFamily="IBMPlexSans"
                                TextColor="{DynamicResource AuraTextMuted}" />
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- SO -->
                 <Border Grid.Row="1" Grid.Column="1" Style="{DynamicResource AuraGlassCard}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="SISTEMA"
                                FontSize="10"
                                FontAttributes="Bold"
-                               FontFamily="IBMPlexSans"
                                TextColor="{DynamicResource AuraTextMuted}" />
                         <Label x:Name="OsValue"
                                Text="—"
                                FontSize="16"
-                               FontAttributes="Bold"
-                               FontFamily="IBMPlexSans" />
+                               FontAttributes="Bold" />
                         <Label x:Name="OsDetail"
                                Text=""
                                FontSize="11"
-                               FontFamily="IBMPlexSans"
                                TextColor="{DynamicResource AuraTextMuted}" />
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- Núcleos -->
                 <Border Grid.Row="2" Grid.Column="0" Style="{DynamicResource AuraGlassCard}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="NÚCLEOS"
                                FontSize="10"
                                FontAttributes="Bold"
-                               FontFamily="IBMPlexSans"
                                TextColor="{DynamicResource AuraTextMuted}" />
                         <Label x:Name="CoresValue"
                                Text="—"
                                FontSize="20"
-                               FontAttributes="Bold"
-                               FontFamily="IBMPlexSans" />
+                               FontAttributes="Bold" />
                         <Label x:Name="CoresDetail"
                                Text=""
                                FontSize="11"
-                               FontFamily="IBMPlexSans"
                                TextColor="{DynamicResource AuraTextMuted}" />
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- Latência -->
                 <Border Grid.Row="2" Grid.Column="1" Style="{DynamicResource AuraGlassCard}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="LATÊNCIA"
                                FontSize="10"
                                FontAttributes="Bold"
-                               FontFamily="IBMPlexSans"
                                TextColor="{DynamicResource AuraTextMuted}" />
                         <Label x:Name="LatencyValue"
                                Text="—"
                                FontSize="20"
-                               FontAttributes="Bold"
-                               FontFamily="IBMPlexSans" />
+                               FontAttributes="Bold" />
                         <Label x:Name="LatencyDetail"
                                Text=""
                                FontSize="11"
-                               FontFamily="IBMPlexSans"
                                TextColor="{DynamicResource AuraTextMuted}" />
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- IP Local -->
                 <Border Grid.Row="3" Grid.Column="0" Style="{DynamicResource AuraGlassCard}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="IP LOCAL"
                                FontSize="10"
                                FontAttributes="Bold"
-                               FontFamily="IBMPlexSans"
                                TextColor="{DynamicResource AuraTextMuted}" />
                         <Label x:Name="IpValue"
                                Text="—"
                                FontSize="16"
-                               FontAttributes="Bold"
-                               FontFamily="IBMPlexSans" />
+                               FontAttributes="Bold" />
                         <Label x:Name="IpDetail"
                                Text=""
                                FontSize="11"
-                               FontFamily="IBMPlexSans"
                                TextColor="{DynamicResource AuraTextMuted}" />
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- Versão -->
                 <Border Grid.Row="3" Grid.Column="1" Style="{DynamicResource AuraGlassCard}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="VERSÃO AURA"
                                FontSize="10"
                                FontAttributes="Bold"
-                               FontFamily="IBMPlexSans"
                                TextColor="{DynamicResource AuraTextMuted}" />
                         <Label x:Name="VersionValue"
                                Text="—"
                                FontSize="14"
-                               FontAttributes="Bold"
-                               FontFamily="IBMPlexSans" />
+                               FontAttributes="Bold" />
                         <Label x:Name="VersionDetail"
                                Text=""
                                FontSize="11"
-                               FontFamily="IBMPlexSans"
                                TextColor="{DynamicResource AuraTextMuted}" />
                     </VerticalStackLayout>
                 </Border>
 
             </Grid>
 
-            <!-- Agentes disponíveis -->
+            <!-- Agentes -->
+            <Label Text="Agentes"
+                   FontSize="12"
+                   FontAttributes="Bold"
+                   TextColor="{DynamicResource AuraTextSecondary}" />
             <Border Style="{DynamicResource AuraGlassCard}" Padding="16,12">
                 <VerticalStackLayout Spacing="6">
-                    <Label Text="AGENTES DISPONÍVEIS"
-                           FontSize="10"
-                           FontAttributes="Bold"
-                           FontFamily="IBMPlexSans"
-                           TextColor="{DynamicResource AuraTextMuted}" />
                     <Label x:Name="AgentsLabel"
                            Text="…"
                            FontSize="13"
-                           FontFamily="IBMPlexSans"
                            TextColor="{DynamicResource AuraTextPrimary}" />
                 </VerticalStackLayout>
             </Border>
 
-            <Button Text="↻  Atualizar"
+            <Button Text="↻  Atualizar visão geral"
                     Clicked="OnRefreshClicked"
                     Style="{DynamicResource BtnGlass}"
                     HorizontalOptions="Start" />
