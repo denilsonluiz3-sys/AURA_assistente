@@ -1,13 +1,13 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
   "workflow": "CodeQL Advanced",
-  "run_id": "32597771158",
+  "run_id": "32597789961",
   "status": "completed",
   "conclusion": "cancelled",
   "branch": "main",
-  "commit": "4727db2bf730c26a756309874870b0ae32def428",
+  "commit": "1edc49f913e2fca31b61676cffc8cfcbead83163",
   "event": "push",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32597771158",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32597789961",
   "category": "Indeterminada — consultar o primeiro erro real do log.",
   "infra_only": false,
   "failed_jobs": [
@@ -16,16 +16,17 @@
   "failed_steps": [
     {
       "job": "Analyze (csharp)",
-      "step": "Checkout repository",
+      "step": "Manual build (csharp)",
       "conclusion": "cancelled"
     }
   ],
   "changed_files": [
+    "src/AURA.AI/AgentChat.cs",
     "src/AURA.AI/AgentSession.cs",
-    "src/AURA.Mobile/Pages/AgentPage.xaml.cs"
+    "src/AURA.AI/OpenRouterClient.cs"
   ],
   "associated_prs": [
-    73
+    72
   ],
-  "diagnostic_report": "docs/ai/ci-failures/32597771158.md"
+  "diagnostic_report": "docs/ai/ci-failures/32597789961.md"
 }
