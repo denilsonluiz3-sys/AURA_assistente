@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `997ddf1`
-- Data UTC: `2026-08-22 07:35:45 UTC`
+- Commit: `80080e8`
+- Data UTC: `2026-08-22 07:39:24 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -596,9 +596,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `80080e8` ci: fix workflow noise — artifact quota, diagnostics API, CodeQL soft-fail (#70) (2026-08-22)
+- `cc28fc7` docs(ai): sync README_AI with source tree (2026-08-22)
 - `997ddf1` ci: clean up old GitHub Actions artifacts (2026-08-22)
 - `fdc4c91` docs(ai): sync README_AI with source tree (2026-08-22)
 - `e11cc6b` fix: batch stability — AgentPage bubbles, JsonNode clone, TTS CTS, RunPage path (#69) (2026-08-22)
-- `da77614` docs(ai): sync README_AI with source tree (2026-08-22)
-- `b0870bd` ui(agent): prioritize conversation and one-time AI configuration (#68) (2026-08-22)
 <!-- AI-DOCS:END -->
