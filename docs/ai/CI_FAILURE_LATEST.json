@@ -1,13 +1,13 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
   "workflow": "AURA Android APK",
-  "run_id": "32605329261",
+  "run_id": "32605734811",
   "status": "completed",
   "conclusion": "failure",
   "branch": "main",
-  "commit": "0ce57cffcb6a3d15d7ed970d46e4a2f32b6d98d7",
+  "commit": "c109a0e6dc7e825eb676cf96fc183b7fe4285799",
   "event": "push",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32605329261",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32605734811",
   "category": "C# / compilação",
   "infra_only": false,
   "failed_jobs": [
@@ -21,15 +21,13 @@
     }
   ],
   "changed_files": [
-    "docs/ai/AURA_LOCAL_PLAYBOOK.md",
-    "src/AURA.Mobile/AURA.Mobile.csproj",
-    "src/AURA.Mobile/Pages/AgentPage.xaml.cs.fix",
-    "src/AURA.Mobile/Pages/AgentPage.xaml.cs.tmp",
-    "src/AURA.Mobile/Resources/Raw/.gitkeep",
-    "src/AURA.Mobile/Services/LocalPlaybook.cs"
+    "src/AURA.Agents/AuraOrchestrator.cs",
+    "src/AURA.Agents/IntentResolver.cs",
+    "src/AURA.Agents/PolicyGuard.cs",
+    "src/AURA.Agents/ToolResolver.cs"
   ],
   "associated_prs": [
-    79
+    82
   ],
-  "diagnostic_report": "docs/ai/ci-failures/32605329261.md"
+  "diagnostic_report": "docs/ai/ci-failures/32605734811.md"
 }
