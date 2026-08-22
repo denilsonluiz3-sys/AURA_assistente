@@ -100,10 +100,10 @@ namespace AURA.Agents
 
                 string cellId = "program-" + Guid.NewGuid().ToString("N");
                 IAuraCellContext context = _contextFactory.Create(cellId, ct);
-                CellProgramResult result = await _cellRunner.RunAsync(program, context, ct);
-                if (!result.IsSuccess) return "❌ " + result.Error;
+                CellProgramResult cellResult = await _cellRunner.RunAsync(program, context, ct);
+                if (!cellResult.IsSuccess) return "❌ " + cellResult.Error;
 
-                string serialized = JsonSerializer.Serialize(result.Data, new JsonSerializerOptions { WriteIndented = true });
+                string serialized = JsonSerializer.Serialize(cellResult.Data, new JsonSerializerOptions { WriteIndented = true });
                 Publish(processId, "Programa AURA", program.Name, "Concluído", "Programa executado", 1);
                 return serialized;
             }
