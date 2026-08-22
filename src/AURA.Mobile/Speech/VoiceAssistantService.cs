@@ -61,21 +61,18 @@ namespace AURA.Mobile.Speech
             LastUtterance = text ?? string.Empty;
         }
 
-        /// <summary>
-        /// FAB: se falando ou escutando → para; senão inicia STT + comando.
-        /// Sem STT disponível, cai no TTS da última resposta.
-        /// </summary>
         public async Task ToggleAsync()
         {
+            bool shouldStop;
             lock (_lock)
             {
-                if (_cts != null || _listening)
-                {
-                    _cts?.Cancel();
-                    _stt?.Cancel();
-                    _listening = false;
-                    return;
-                }
+                shouldStop = _cts != null || _listening;
+            }
+
+            if (shouldStop)
+            {
+                Stop();
+                return;
             }
 
             if (_stt != null && _stt.IsAvailable)
@@ -101,16 +98,22 @@ namespace AURA.Mobile.Speech
 
             Stop();
 
-            lock (_lock) { _listening = true; }
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            lock (_lock)
+            {
+                _listening = true;
+                _cts = cts;
+            }
             ListeningChanged?.Invoke(true);
 
             string? heard = null;
             try
             {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-                lock (_lock) { _cts = cts; }
-
                 heard = await _stt.ListenAsync(cts.Token).ConfigureAwait(false);
+            }
+            catch (ObjectDisposedException)
+            {
+                heard = null;
             }
             catch (OperationCanceledException)
             {
@@ -126,8 +129,10 @@ namespace AURA.Mobile.Speech
                 lock (_lock)
                 {
                     _listening = false;
-                    _cts = null;
+                    if (ReferenceEquals(_cts, cts))
+                        _cts = null;
                 }
+                try { cts.Dispose(); } catch { }
                 ListeningChanged?.Invoke(false);
             }
 
@@ -211,7 +216,6 @@ namespace AURA.Mobile.Speech
         private static string TruncateForSpeech(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return "Pronto.";
-            // Evita ler JSON longo em voz alta
             if (text.TrimStart().StartsWith('{') || text.TrimStart().StartsWith('['))
                 return "Diagnóstico concluído. Veja os detalhes na tela Sistema ou Programas.";
             if (text.Length > 280)
@@ -234,6 +238,7 @@ namespace AURA.Mobile.Speech
                 await _tts.InitializeAsync(cts.Token).ConfigureAwait(false);
                 await _tts.SpeakAsync(text, cts.Token).ConfigureAwait(false);
             }
+            catch (ObjectDisposedException) { }
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
@@ -246,10 +251,14 @@ namespace AURA.Mobile.Speech
                     if (ReferenceEquals(_cts, cts))
                         _cts = null;
                 }
-                cts.Dispose();
+                try { cts.Dispose(); } catch { }
             }
         }
 
+        /// <summary>
+        /// Cancela a operação em curso. O dono do CTS (Speak/Listen) faz Dispose.
+        /// Evita ObjectDisposedException por double-dispose no cancel do FAB.
+        /// </summary>
         public void Stop()
         {
             CancellationTokenSource? cts;
@@ -260,15 +269,15 @@ namespace AURA.Mobile.Speech
                 _listening = false;
             }
 
-            _stt?.Cancel();
+            try { _stt?.Cancel(); } catch { }
 
             if (cts != null)
             {
-                cts.Cancel();
-                cts.Dispose();
+                try { cts.Cancel(); }
+                catch (ObjectDisposedException) { }
             }
 
-            _ = _tts.StopAsync();
+            try { _ = _tts.StopAsync(); } catch { }
             ListeningChanged?.Invoke(false);
         }
     }

@@ -13,11 +13,6 @@ using AURA.AI.Providers;
 
 namespace AURA.AI
 {
-    /// <summary>
-    /// Configurações do provedor LLM. O mobile (AURA.AI) expõe o mesmo
-    /// provedor via MemoryService; aqui o cliente HTTP direto. Defaults seguem
-    /// o config do aichat (OpenRouter, qwen/qwen-plus).
-    /// </summary>
     public sealed class OpenRouterOptions
     {
         public string Provider { get; set; } = "openai";
@@ -28,16 +23,11 @@ namespace AURA.AI
         public int TimeoutSeconds { get; set; } = 90;
         public string? AppReference { get; set; }
 
-        // Usados por ApiKeyProviderResolver.ApplyToClient
         public string AuthHeaderName { get; set; } = "Authorization";
         public string AuthScheme { get; set; } = "Bearer ";
         public AiApiFormat ApiFormat { get; set; } = AiApiFormat.OpenAICompletions;
     }
 
-    /// <summary>
-    /// Cliente mínimo para OpenRouter chat completions. Construa a requisição
-    /// (testável sem rede) com BuildRequest; execute com ChatAsync.
-    /// </summary>
     public sealed class OpenRouterClient
     {
         private static readonly string[] BannedTokens = { "anthropic", "claude" };
@@ -53,10 +43,6 @@ namespace AURA.AI
             GuardAgainstBanned();
         }
 
-        /// <summary>
-        /// Trava de segurança: recusa qualquer provider/modelo/URL com token
-        /// banido (ex.: anthropic/claude). Lançado no ctor para impedir uso.
-        /// </summary>
         private void GuardAgainstBanned()
         {
             string hay =
@@ -76,15 +62,11 @@ namespace AURA.AI
         public HttpRequestMessage BuildRequest(string question, string? systemPrompt = null)
         {
             if (string.IsNullOrWhiteSpace(question))
-            {
                 throw new ArgumentException("A pergunta não pode ser vazia.", nameof(question));
-            }
 
             var messages = new List<object>();
             if (!string.IsNullOrWhiteSpace(systemPrompt))
-            {
                 messages.Add(new { role = "system", content = systemPrompt });
-            }
 
             messages.Add(new { role = "user", content = question });
 
@@ -132,9 +114,7 @@ namespace AURA.AI
             {
                 string detail = string.IsNullOrWhiteSpace(body) ? "(sem corpo)" : body;
                 if (detail.Length > 500)
-                {
                     detail = detail.Substring(0, 500);
-                }
 
                 _logger.Error("LLM: " + response.StatusCode + " " + detail);
                 throw new HttpRequestException(
@@ -158,11 +138,6 @@ namespace AURA.AI
             return body;
         }
 
-        /// <summary>
-        /// Rodada única de chat com suporte a ferramentas (function calling).
-        /// Devolve o texto final ou as chamadas de ferramenta solicitadas pelo
-        /// modelo; o AgentSession executa as chamadas e faz o loop.
-        /// </summary>
         public async Task<AgentChatResponse> ChatToolsAsync(
             List<AgentMessage> messages,
             List<AgentToolDefinition>? tools = null,
@@ -180,9 +155,7 @@ namespace AURA.AI
 
             var arr = new JsonArray();
             if (!string.IsNullOrWhiteSpace(systemPrompt))
-            {
                 arr.Add(new JsonObject { ["role"] = "system", ["content"] = systemPrompt });
-            }
 
             if (messages != null)
             {
@@ -190,14 +163,10 @@ namespace AURA.AI
                 {
                     var mo = new JsonObject { ["role"] = m.Role };
                     if (m.Content != null)
-                    {
                         mo["content"] = m.Content;
-                    }
 
                     if (m.ToolCallId != null)
-                    {
                         mo["tool_call_id"] = m.ToolCallId;
-                    }
 
                     if (m.ToolCalls is { Count: > 0 })
                     {
@@ -219,10 +188,11 @@ namespace AURA.AI
                         mo["tool_calls"] = calls;
                     }
 
+                    // DeepClone: JsonNode só pode ter um parent. O mesmo
+                    // ReasoningDetails reutilizado em rounds 2+ causava
+                    // "The node already has a parent".
                     if (m.ReasoningDetails != null)
-                    {
-                        mo["reasoning_details"] = m.ReasoningDetails;
-                    }
+                        mo["reasoning_details"] = m.ReasoningDetails.DeepClone();
 
                     arr.Add(mo);
                 }
@@ -250,10 +220,7 @@ namespace AURA.AI
                     {
                         var required = new JsonArray();
                         foreach (string r in t.Required)
-                        {
                             required.Add(r);
-                        }
-
                         schema["required"] = required;
                     }
 
@@ -318,9 +285,7 @@ namespace AURA.AI
             {
                 string detail = string.IsNullOrWhiteSpace(body) ? "(sem corpo)" : body;
                 if (detail.Length > 500)
-                {
                     detail = detail.Substring(0, 500);
-                }
 
                 _logger.Error("LLM: " + response.StatusCode + " " + detail);
                 return new AgentChatResponse
@@ -366,12 +331,9 @@ namespace AURA.AI
                             }
                         }
 
-                        // Ollama/Qwen pequeno pode retornar a chamada de ferramenta
-                        // como JSON no campo content, em vez de usar tool_calls.
                         if (calls.Count == 0)
                         {
                             List<AgentToolCall>? textCalls = TryParseTextToolCall(content);
-
                             if (textCalls is { Count: > 0 })
                             {
                                 return new AgentChatResponse
@@ -405,15 +367,11 @@ namespace AURA.AI
         {
             if (!msg.TryGetProperty("reasoning_details", out JsonElement rd) ||
                 rd.ValueKind != JsonValueKind.Array)
-            {
                 return null;
-            }
 
             var result = new JsonArray();
             foreach (JsonElement item in rd.EnumerateArray())
-            {
                 result.Add(item.Clone());
-            }
 
             return result;
         }
@@ -443,11 +401,7 @@ namespace AURA.AI
             if (string.Equals(Options.Provider, "ollama", StringComparison.OrdinalIgnoreCase))
             {
                 if (string.IsNullOrWhiteSpace(Options.BaseUrl))
-                {
-                    throw new InvalidOperationException(
-                        "Endpoint do Ollama não configurado.");
-                }
-
+                    throw new InvalidOperationException("Endpoint do Ollama não configurado.");
                 return;
             }
 
@@ -474,7 +428,6 @@ namespace AURA.AI
             };
         }
 
-
         private static List<AgentToolCall>? TryParseTextToolCall(string? content)
         {
             if (string.IsNullOrWhiteSpace(content))
@@ -482,12 +435,10 @@ namespace AURA.AI
 
             string text = content.Trim();
 
-            // Remove bloco Markdown ```json ... ```
             if (text.StartsWith("```"))
             {
                 int firstNewline = text.IndexOf('\n');
                 int lastFence = text.LastIndexOf("```");
-
                 if (firstNewline >= 0 && lastFence > firstNewline)
                     text = text.Substring(firstNewline + 1, lastFence - firstNewline - 1).Trim();
             }
@@ -507,21 +458,16 @@ namespace AURA.AI
                     return null;
 
                 string? name = nameEl.GetString();
-
                 if (string.IsNullOrWhiteSpace(name))
                     return null;
 
                 string arguments = "{}";
-
                 if (root.TryGetProperty("arguments", out JsonElement argsEl))
                 {
                     arguments = argsEl.GetRawText();
-
-                    // Alguns modelos retornam arguments como string JSON.
                     if (argsEl.ValueKind == JsonValueKind.String)
                     {
                         string? str = argsEl.GetString();
-
                         if (!string.IsNullOrWhiteSpace(str))
                             arguments = str;
                     }
@@ -546,24 +492,17 @@ namespace AURA.AI
         private static string? GetProp(JsonElement el, string name)
         {
             if (el.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.String)
-            {
                 return value.GetString();
-            }
-
             return null;
         }
 
         private static string? ReadContentString(JsonElement message)
         {
             if (!message.TryGetProperty("content", out JsonElement content))
-            {
                 return null;
-            }
 
             if (content.ValueKind == JsonValueKind.String)
-            {
                 return content.GetString();
-            }
 
             if (content.ValueKind == JsonValueKind.Array)
             {
@@ -572,9 +511,7 @@ namespace AURA.AI
                 {
                     if (part.TryGetProperty("text", out JsonElement text) &&
                         text.ValueKind == JsonValueKind.String)
-                    {
                         sb.Append(text.GetString());
-                    }
                 }
 
                 return sb.Length > 0 ? sb.ToString() : null;

@@ -19,6 +19,7 @@ public partial class AgentPage : ContentPage
     private readonly ShellExecutor _shell;
     private readonly ProcessRegistry _processes;
     private readonly AuraOrchestrator _orchestrator;
+    private readonly SemaphoreSlim _bubbleGate = new(1, 1);
     private AgentSession? _session;
     private string? _activeProcessId;
     private bool _configVisible;
@@ -102,7 +103,7 @@ public partial class AgentPage : ContentPage
         _session = new AgentSession(_client, tools, systemPrompt, memory: _memory);
         _session.Step += OnAgentStep;
 
-        AppendBubble("Pronto. Posso trabalhar no workspace e acompanhar processos em tempo real. O que deseja fazer?", user: false);
+        _ = AppendBubbleAsync("Pronto. Posso trabalhar no workspace e acompanhar processos em tempo real. O que deseja fazer?", user: false);
     }
 
     private async void OnLinkProjectClicked(object sender, EventArgs e)
@@ -111,13 +112,9 @@ public partial class AgentPage : ContentPage
         {
             string projectPath = "/storage/emulated/0/Download/AURA/AURA_assistente";
             if (Directory.Exists(projectPath))
-            {
                 await DisplayAlert("Sucesso", $"Projeto vinculado: {projectPath}", "OK");
-            }
             else
-            {
                 await DisplayAlert("Erro", $"Projeto não encontrado em: {projectPath}", "OK");
-            }
         }
         catch (Exception ex)
         {
@@ -132,7 +129,7 @@ public partial class AgentPage : ContentPage
             return;
 
         RuntimeConfig.Apply(_client);
-        AppendBubble(text, user: true);
+        await AppendBubbleAsync(text, user: true);
         CommandEditor.Text = string.Empty;
         RunButton.IsEnabled = false;
         BusyIndicator.IsRunning = true;
@@ -148,7 +145,7 @@ public partial class AgentPage : ContentPage
                 _processes.Update(process.Id, "Planejando", "Orquestrador analisando a tarefa", 0.15);
                 string answer = await _orchestrator.ExecuteAsync(text);
                 _processes.Complete(process.Id, "Resultado entregue");
-                AppendBubble(answer, user: false);
+                await AppendBubbleAsync(answer, user: false);
                 _voice?.SetLastUtterance(answer);
                 await SpeakAsync(answer);
                 return;
@@ -159,7 +156,7 @@ public partial class AgentPage : ContentPage
             if (string.IsNullOrWhiteSpace(RuntimeConfig.ApiKey) && string.IsNullOrWhiteSpace(_client.Options.ApiKey))
             {
                 _processes.Update(process.Id, "Pesquisando", "Buscando na web", 0.35);
-                AppendBubble("Buscando na web (Bing)...", user: false, isTool: true);
+                await AppendBubbleAsync("Buscando na web (Bing)...", user: false, isTool: true);
                 answerFromAgent = await WebSearchAnswer.SearchWithRefinementAsync(text);
             }
             else
@@ -168,7 +165,7 @@ public partial class AgentPage : ContentPage
                 if (readyError != null)
                 {
                     _processes.Fail(process.Id, readyError);
-                    AppendBubble(readyError, user: false, isError: true);
+                    await AppendBubbleAsync(readyError, user: false, isError: true);
                     return;
                 }
                 _session = null;
@@ -177,7 +174,7 @@ public partial class AgentPage : ContentPage
             }
 
             _processes.Complete(process.Id, "Resultado entregue");
-            AppendBubble(answerFromAgent, user: false);
+            await AppendBubbleAsync(answerFromAgent, user: false);
             _voice?.SetLastUtterance(answerFromAgent);
             await SpeakAsync(answerFromAgent);
 
@@ -186,13 +183,14 @@ public partial class AgentPage : ContentPage
                 _processes.Update(process.Id, "Sincronizando", "Atualizando projeto", 0.9);
                 int synced = await ProjectAccessService.SyncBackAsync();
                 _processes.Complete(process.Id, $"Concluído · {synced} arquivo(s) sincronizado(s)");
-                AppendBubble($"↥ Projeto sincronizado: {synced} arquivo(s) atualizado(s).", user: false, isTool: true);
+                await AppendBubbleAsync($"↥ Projeto sincronizado: {synced} arquivo(s) atualizado(s).", user: false, isTool: true);
             }
         }
         catch (Exception ex)
         {
-            _processes.Fail(process.Id, ex.Message);
-            AppendBubble("Erro: " + ex.Message, user: false, isError: true);
+            string userMsg = FriendlyLlmError(ex);
+            _processes.Fail(process.Id, userMsg);
+            await AppendBubbleAsync("Erro: " + userMsg, user: false, isError: true);
             AuraLog.Exception("AgentPage.OnRunClicked", ex);
         }
         finally
@@ -203,6 +201,25 @@ public partial class AgentPage : ContentPage
             BusyIndicator.IsRunning = false;
             BusyIndicator.IsVisible = false;
         }
+    }
+
+    private static string FriendlyLlmError(Exception ex)
+    {
+        string m = ex.Message ?? string.Empty;
+        if (m.Contains("401") || m.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase))
+            return "Chave de API inválida ou ausente. Configure na aba Assistente / Correções.";
+        if (m.Contains("402") || m.Contains("PaymentRequired", StringComparison.OrdinalIgnoreCase) || m.Contains("credits", StringComparison.OrdinalIgnoreCase))
+            return "Sem créditos no provedor LLM (ou max_tokens alto demais). Reduza tokens ou adicione créditos.";
+        if (m.Contains("429") || m.Contains("TooManyRequests", StringComparison.OrdinalIgnoreCase))
+            return "Limite de requisições (rate limit). Aguarde alguns segundos e tente de novo.";
+        if (m.Contains("404") || m.Contains("NotFound", StringComparison.OrdinalIgnoreCase))
+            return "Modelo ou endpoint não encontrado. Verifique o modelo configurado.";
+        if (m.Contains("node already has a parent", StringComparison.OrdinalIgnoreCase))
+            return "Erro interno ao montar a conversa com ferramentas. Tente de novo.";
+        // evita despejar JSON longo no bubble
+        if (m.Length > 280)
+            return m.Substring(0, 280) + "…";
+        return m;
     }
 
     private static bool ShouldOrchestrate(string text)
@@ -220,7 +237,7 @@ public partial class AgentPage : ContentPage
         string resultPreview = Shorten(step.Result, 140);
         if (!string.IsNullOrWhiteSpace(_activeProcessId))
             _processes.Update(_activeProcessId, "Executando", step.ToolName, 0.65);
-        AppendBubble("◆ " + step.ToolName + " " + argsPreview + "\n" + resultPreview, user: false, isTool: true);
+        _ = AppendBubbleAsync("◆ " + step.ToolName + " " + argsPreview + "\n" + resultPreview, user: false, isTool: true);
     }
 
     private async void OnProcessCardClicked(object sender, EventArgs e)
@@ -245,11 +262,15 @@ public partial class AgentPage : ContentPage
         }
     }
 
-    private void AppendBubble(string text, bool user, bool isTool = false, bool isError = false)
+    private async Task AppendBubbleAsync(string text, bool user, bool isTool = false, bool isError = false)
     {
-        MainThread.BeginInvokeOnMainThread(async () =>
+        bool entered = false;
+        try
         {
-            try
+            await _bubbleGate.WaitAsync().ConfigureAwait(false);
+            entered = true;
+
+            await MainThread.InvokeOnMainThreadAsync(async () =>
             {
                 Color background = user
                     ? Color.FromArgb("#1e2d54")
@@ -323,12 +344,17 @@ public partial class AgentPage : ContentPage
 
                 ConversationContainer.Children.Add(border);
                 await ConversationScroll.ScrollToAsync(border, ScrollToPosition.End, true);
-            }
-            catch (Exception ex)
-            {
-                AuraLog.Exception("AgentPage.AppendBubble", ex);
-            }
-        });
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("AgentPage.AppendBubbleAsync", ex);
+        }
+        finally
+        {
+            if (entered)
+                _bubbleGate.Release();
+        }
     }
 
     private static string Shorten(string? text, int max)
