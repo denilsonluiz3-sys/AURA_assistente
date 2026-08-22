@@ -45,12 +45,6 @@ namespace AURA.Agents
         public ITool Resolve(string intent)
         {
             if (_tools.TryGetValue(intent, out ITool? tool)) return tool;
-
-            // Durante a migração incremental, uma intenção sem ferramenta concreta
-            // segue pelo caminho conversacional já existente em vez de quebrar o fluxo.
-            if (_tools.TryGetValue("conversar", out ITool? conversationalTool))
-                return conversationalTool;
-
             return new DelegateTool("unknown", (_, _, _) => Task.FromResult(
                 new ToolResult(false, "Não sei como executar essa solicitação localmente.")));
         }

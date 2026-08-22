@@ -22,65 +22,6 @@ namespace AURA.Agents
         {
             string command = normalizedCommand ?? string.Empty;
 
-            // Navegação de UI (antes de regras genéricas)
-            if (ContainsAny(command,
-                "abra o terminal", "abrir terminal", "abre o terminal", "abrir o terminal",
-                "open terminal"))
-                return NavigateResult("Terminal", 0.95);
-
-            if (ContainsAny(command,
-                "abra programas", "abrir programas", "abre programas", "abrir programa",
-                "lista de programas", "catálogo de programas", "catalogo de programas"))
-                return NavigateResult("Programas", 0.95);
-
-            if (ContainsAny(command,
-                "abra o chat", "abrir chat", "abre o chat"))
-                return NavigateResult("Chat", 0.90);
-
-            if (ContainsAny(command,
-                "abra módulos", "abrir módulos", "abrir modulos", "abre módulos"))
-                return NavigateResult("Módulos", 0.90);
-
-            // Programas AURA devem vencer a regra genérica de "dispositivo".
-            if (ContainsAny(command,
-                "diagnóstico do aparelho",
-                "diagnostico do aparelho",
-                "informações do dispositivo",
-                "informacoes do dispositivo",
-                "como está o aparelho",
-                "como esta o aparelho",
-                "faça um diagnóstico",
-                "faca um diagnostico",
-                "fazer diagnóstico",
-                "fazer diagnostico",
-                "diagnostique",
-                "diagnostique meu celular",
-                "diagnostique o celular",
-                "rodar diagnóstico",
-                "rodar diagnostico",
-                "executar diagnóstico",
-                "executar diagnostico"))
-            {
-                return AndroidResult(command, "device-diagnostic", 0.95,
-                    "diagnóstico do aparelho",
-                    "diagnostico do aparelho",
-                    "informações do dispositivo",
-                    "informacoes do dispositivo",
-                    "como está o aparelho",
-                    "como esta o aparelho",
-                    "faça um diagnóstico",
-                    "faca um diagnostico",
-                    "fazer diagnóstico",
-                    "fazer diagnostico",
-                    "diagnostique",
-                    "diagnostique meu celular",
-                    "diagnostique o celular",
-                    "rodar diagnóstico",
-                    "rodar diagnostico",
-                    "executar diagnóstico",
-                    "executar diagnostico");
-            }
-
             if (ContainsAny(command, "pesquise", "busque", "procure", "search"))
                 return Result("search", 0.95, command, "pesquise", "busque", "procure", "search");
 
@@ -95,65 +36,18 @@ namespace AURA.Agents
                 return Result("list_files", 0.90, command, "liste", "listar", "ls");
 
             if (ContainsAny(command, "bateria", "battery"))
-                return AndroidResult(command, "battery", 0.85, "bateria", "battery");
+                return Result("android_battery", 0.85, command, "bateria", "battery");
 
-            if (ContainsAny(command, "sensor", "luz", "acelerometro", "acelerômetro", "giroscopio", "giroscópio", "magnetometro", "magnetômetro"))
-                return AndroidResult(command, "sensor", 0.80, "sensor", "luz", "acelerometro", "acelerômetro", "giroscopio", "giroscópio", "magnetometro", "magnetômetro");
+            if (ContainsAny(command, "sensor", "luz", "acelerometro", "acelerômetro"))
+                return Result("android_sensor", 0.80, command, "sensor", "luz", "acelerometro", "acelerômetro");
 
             if (ContainsAny(command, "gps", "localização", "localizacao"))
-                return AndroidResult(command, "location", 0.80, "gps", "localização", "localizacao");
+                return Result("android_location", 0.80, command, "gps", "localização", "localizacao");
 
             if (ContainsAny(command, "camera", "câmera"))
-                return AndroidResult(command, "camera", 0.80, "camera", "câmera");
-
-            if (ContainsAny(command, "bluetooth"))
-                return AndroidResult(command, "bluetooth", 0.80, "bluetooth");
-
-            if (ContainsAny(command, "clipboard", "área de transferência", "area de transferencia"))
-                return AndroidResult(command, "clipboard", 0.80, "clipboard", "área de transferência", "area de transferencia");
-
-            if (ContainsAny(command, "memória do dispositivo", "memoria do dispositivo"))
-                return AndroidResult(command, "memory", 0.80, "memória do dispositivo", "memoria do dispositivo");
-
-            if (ContainsAny(command, "armazenamento", "storage"))
-                return AndroidResult(command, "storage", 0.80, "armazenamento", "storage");
-
-            if (ContainsAny(command, "aplicativos instalados", "apps instalados"))
-                return AndroidResult(command, "apps", 0.80, "aplicativos instalados", "apps instalados");
-
-            if (ContainsAny(command, "dispositivo", "device", "propriedades android", "properties"))
-                return AndroidResult(command, "device", 0.75, "dispositivo", "device", "propriedades android", "properties");
+                return Result("android_camera", 0.80, command, "camera", "câmera");
 
             return new IntentResult("conversar", 0.50, new Dictionary<string, string>());
-        }
-
-        private static IntentResult NavigateResult(string pageLabel, double confidence)
-        {
-            return new IntentResult("navigate", confidence, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["page"] = pageLabel
-            });
-        }
-
-        private static IntentResult AndroidResult(string command, string action, double confidence, params string[] triggers)
-        {
-            var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["action"] = action
-            };
-
-            foreach (string trigger in triggers)
-            {
-                int index = command.IndexOf(trigger, StringComparison.OrdinalIgnoreCase);
-                if (index >= 0)
-                {
-                    string value = command.Substring(index + trigger.Length).Trim();
-                    if (!string.IsNullOrWhiteSpace(value)) parameters["query"] = value;
-                    break;
-                }
-            }
-
-            return new IntentResult("android", confidence, parameters);
         }
 
         private static IntentResult Result(string intent, double confidence, string command, params string[] triggers)
