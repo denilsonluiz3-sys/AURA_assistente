@@ -29,7 +29,7 @@ public static class AuraAndroidBridgeTest
         r.AppendLine($"PACKAGE={context.PackageName}");
         r.AppendLine($"ANDROID={Build.VERSION.Release}");
         r.AppendLine($"SDK={Build.VERSION.SdkInt}");
-        r.AppendLine($"ABI={Build.SupportedAbis?.Length > 0 ? Build.SupportedAbis[0] : "unknown"}");
+        r.AppendLine($"ABI={(Build.SupportedAbis?.Length > 0 ? Build.SupportedAbis[0] : "unknown")}");
         r.AppendLine();
 
         Test(r, "PackageManager", () =>
