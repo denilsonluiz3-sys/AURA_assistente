@@ -4,7 +4,8 @@ using AURA.Mobile.Diagnostics;
 namespace AURA.Mobile.Services;
 
 /// <summary>
-/// Camada sobre SolutionStore: resolve tarefas sem LLM quando já houve êxito.
+/// Camada fina sobre SolutionStore: tenta resolver a tarefa sem LLM.
+/// Se houver match, devolve a ação gravada (texto ou script aura-sh).
 /// </summary>
 public sealed class LocalPlaybook
 {
@@ -15,6 +16,10 @@ public sealed class LocalPlaybook
         _solutions = solutions ?? throw new ArgumentNullException(nameof(solutions));
     }
 
+    /// <summary>
+    /// null = precisa de IA ou ferramentas online.
+    /// string = resposta/ação local reutilizável.
+    /// </summary>
     public string? TryResolveWithoutLlm(string userText)
     {
         if (string.IsNullOrWhiteSpace(userText))
@@ -26,11 +31,13 @@ public sealed class LocalPlaybook
             if (match == null || string.IsNullOrWhiteSpace(match.ActionTaken))
                 return null;
 
-            AuraLog.Info("LocalPlaybook hit: " + match.Id);
-            string body = match.ActionTaken.Trim();
-            if (!string.IsNullOrWhiteSpace(match.ResultDetails))
-                body += "\n\n—\n" + match.ResultDetails.Trim();
-            return "[playbook local · sem IA]\n" + body;
+            AuraLog.Info("LocalPlaybook hit: " + match.Id + " score-task=" + match.TaskDescription);
+            return
+                "[playbook local · sem IA]\n" +
+                match.ActionTaken.Trim() +
+                (string.IsNullOrWhiteSpace(match.ResultDetails)
+                    ? string.Empty
+                    : "\n\n—\n" + match.ResultDetails.Trim());
         }
         catch (Exception ex)
         {
@@ -51,6 +58,7 @@ public sealed class LocalPlaybook
         }
     }
 
+    /// <summary>Extrai bloco ```aura-sh ... ``` se a IA (ou playbook) devolver script.</summary>
     public static string? ExtractAuraShell(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -64,7 +72,6 @@ public sealed class LocalPlaybook
         start++;
         int end = text.IndexOf("```", start, StringComparison.Ordinal);
         if (end < 0) return null;
-        string script = text[start..end].Trim();
-        return string.IsNullOrWhiteSpace(script) ? null : script;
+        return text[start..end].Trim();
     }
 }
