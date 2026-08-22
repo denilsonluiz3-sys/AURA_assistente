@@ -1,13 +1,13 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
   "workflow": "AURA Android APK",
-  "run_id": "32604753626",
+  "run_id": "32604806440",
   "status": "completed",
   "conclusion": "failure",
-  "branch": "main",
-  "commit": "4a6cb67d8a0b9a1559ce116556d54164d8094fb4",
-  "event": "push",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32604753626",
+  "branch": "feat/local-playbook-slim-apk",
+  "commit": "35b3d532e38f96d55a5a62fbaf1139b2b1102c6c",
+  "event": "pull_request",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32604806440",
   "category": "C# / compilação",
   "infra_only": false,
   "failed_jobs": [
@@ -21,18 +21,18 @@
     }
   ],
   "changed_files": [
-    "docs/ai/AURA_LOCAL_PLAYBOOK.md",
+    "README_AI.md",
+    "docs/ai/CI_FAILURE_LATEST.json",
+    "docs/ai/CI_FAILURE_LATEST.md",
+    "docs/ai/ci-failures/32604485050.md",
+    "docs/ai/ci-failures/32604485068.md",
+    "docs/ai/ci-failures/32604506385.md",
     "src/AURA.Mobile/AURA.Mobile.csproj",
     "src/AURA.Mobile/MauiProgram.cs",
-    "src/AURA.Mobile/Pages/AgentPage.xaml.cs",
-    "src/AURA.Mobile/Resources/Raw/kokoro-config.json",
-    "src/AURA.Mobile/Resources/Raw/lunar_bg.mp4",
-    "src/AURA.Mobile/Resources/Raw/pf_dora.f32",
-    "src/AURA.Mobile/Resources/Raw/solar_bg.mp4",
-    "src/AURA.Mobile/Services/LocalPlaybook.cs"
+    "src/AURA.Mobile/Pages/AgentPage.xaml.cs"
   ],
   "associated_prs": [
-    80
+    79
   ],
-  "diagnostic_report": "docs/ai/ci-failures/32604753626.md"
+  "diagnostic_report": "docs/ai/ci-failures/32604806440.md"
 }
