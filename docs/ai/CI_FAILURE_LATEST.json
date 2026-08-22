@@ -1,30 +1,38 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
-  "workflow": "CodeQL Advanced",
-  "run_id": "32604485068",
+  "workflow": "AURA Android APK",
+  "run_id": "32604753626",
   "status": "completed",
-  "conclusion": "cancelled",
-  "branch": "feat/local-playbook-slim-apk",
-  "commit": "bf3f7969f10d991eff754238de302ec1b865a4b9",
-  "event": "pull_request",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32604485068",
-  "category": "Indeterminada — consultar o primeiro erro real do log.",
+  "conclusion": "failure",
+  "branch": "main",
+  "commit": "4a6cb67d8a0b9a1559ce116556d54164d8094fb4",
+  "event": "push",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32604753626",
+  "category": "C# / compilação",
   "infra_only": false,
   "failed_jobs": [
-    "Analyze (csharp)"
+    "build-apk"
   ],
   "failed_steps": [
     {
-      "job": "Analyze (csharp)",
-      "step": "Perform CodeQL Analysis",
-      "conclusion": "cancelled"
+      "job": "build-apk",
+      "step": "Build APK",
+      "conclusion": "failure"
     }
   ],
   "changed_files": [
-    "src/AURA.Mobile/Resources/Raw/pf_dora.f32"
+    "docs/ai/AURA_LOCAL_PLAYBOOK.md",
+    "src/AURA.Mobile/AURA.Mobile.csproj",
+    "src/AURA.Mobile/MauiProgram.cs",
+    "src/AURA.Mobile/Pages/AgentPage.xaml.cs",
+    "src/AURA.Mobile/Resources/Raw/kokoro-config.json",
+    "src/AURA.Mobile/Resources/Raw/lunar_bg.mp4",
+    "src/AURA.Mobile/Resources/Raw/pf_dora.f32",
+    "src/AURA.Mobile/Resources/Raw/solar_bg.mp4",
+    "src/AURA.Mobile/Services/LocalPlaybook.cs"
   ],
   "associated_prs": [
-    79
+    80
   ],
-  "diagnostic_report": "docs/ai/ci-failures/32604485068.md"
+  "diagnostic_report": "docs/ai/ci-failures/32604753626.md"
 }
