@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.Core.Logging;
@@ -50,6 +51,57 @@ namespace AURA.AI
             _messages.RemoveRange(0, _messages.Count - MaxHistoryMessages);
         }
 
+        /// <summary>Monta o system prompt + resumo das últimas entradas persistidas.</summary>
+        private string BuildSystemPrompt()
+        {
+            var sb = new StringBuilder();
+            if (!string.IsNullOrWhiteSpace(_systemPrompt))
+                sb.Append(_systemPrompt.Trim());
+
+            if (_memory == null)
+                return sb.ToString();
+
+            try
+            {
+                var entries = _memory.Read(tail: 12);
+                sb.Append("\n\n## Memória persistente\n");
+                sb.Append("Você TEM memória persistente em ");
+                sb.Append(_memory.Path);
+                sb.Append(". Cada pergunta/resposta é gravada automaticamente. ");
+                sb.Append("Nunca diga que não tem memória. ");
+                sb.Append("Para criar notas extras use write_file em memory-notes.md no workspace.\n");
+
+                if (entries.Count == 0)
+                {
+                    sb.Append("(Ainda não há turnos gravados nesta instalação.)\n");
+                }
+                else
+                {
+                    sb.Append("Últimos turnos gravados:\n");
+                    foreach (var e in entries)
+                    {
+                        if (e.Kind != MemoryKind.Turn)
+                            continue;
+                        string role = string.IsNullOrWhiteSpace(e.Role) ? "?" : e.Role;
+                        string text = e.Text ?? string.Empty;
+                        if (text.Length > 180)
+                            text = text.Substring(0, 180) + "…";
+                        sb.Append("- [");
+                        sb.Append(role);
+                        sb.Append("] ");
+                        sb.Append(text);
+                        sb.Append('\n');
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warning("agent: não foi possível ler memória: " + ex.Message);
+            }
+
+            return sb.ToString();
+        }
+
         /// <summary>Emitido a cada ferramenta executada (para atualizar a UI).</summary>
         public event Action<AgentStep>? Step;
 
@@ -66,6 +118,8 @@ namespace AURA.AI
             _messages.Add(new AgentMessage { Role = "user", Content = userText });
             _memory?.Append(MemoryEntry.Question(userText));
 
+            string systemPrompt = BuildSystemPrompt();
+
             int round = 0;
             while (round++ < MaxRounds)
             {
@@ -76,7 +130,7 @@ namespace AURA.AI
                     _tools.Select(t => t.Definition).ToList(),
                     httpClient,
                     ct,
-                    _systemPrompt).ConfigureAwait(false);
+                    systemPrompt).ConfigureAwait(false);
 
                 if (!string.IsNullOrEmpty(response.Error))
                 {
@@ -90,7 +144,7 @@ namespace AURA.AI
                         Role = "assistant",
                         Content = null,
                         ToolCalls = response.ToolCalls,
-                        ReasoningDetails = response.ReasoningDetails
+                        ReasoningDetailsJson = response.ReasoningDetailsJson
                     });
 
                     foreach (AgentToolCall call in response.ToolCalls)

@@ -90,20 +90,25 @@ public partial class AgentPage : ContentPage
         };
 
         string systemPrompt =
-            "Você é o agente de arquivos da AURA, um assistente que trabalha " +
-            "no diretório de trabalho da AURA. Quando houver um projeto vinculado, " +
-            "o diretório é a própria pasta escolhida (acesso direto) ou uma cópia " +
-            "de trabalho sincronizada. Você PODE listar, ler, criar, editar e " +
-            "sobrescrever arquivos do diretório de trabalho e executar comandos shell " +
-            "(sh -c) nesse local. Prefira ferramentas a respostas vagas: quando o " +
-            "usuário pedir uma tarefa, use as ferramentas e confirme o que foi feito. " +
-            "Responda em português, de forma curta e objetiva. Caminhos são sempre " +
-            "relativos ao diretório de trabalho.";
+            "Você é o agente de arquivos da AURA. " +
+            "Você TEM memória persistente: cada pergunta e resposta é gravada em memory.json " +
+            "e reapresentada nas próximas sessões. Nunca diga que não tem memória. " +
+            "Se o usuário pedir para 'criar memória' ou anotar algo, confirme que já está " +
+            "sendo gravado automaticamente e, se quiser nota extra, use write_file em " +
+            "memory-notes.md no workspace. " +
+            "Você PODE listar, ler, criar, editar e sobrescrever arquivos do diretório de " +
+            "trabalho e executar comandos shell (sh -c). Prefira ferramentas a respostas vagas. " +
+            "Responda em português, curto e objetivo. Caminhos são relativos ao workspace.";
 
         _session = new AgentSession(_client, tools, systemPrompt, memory: _memory);
         _session.Step += OnAgentStep;
 
-        _ = AppendBubbleAsync("Pronto. Posso trabalhar no workspace e acompanhar processos em tempo real. O que deseja fazer?", user: false);
+        int memCount = 0;
+        try { memCount = _memory.Read(tail: 64).Count; } catch { /* ignore */ }
+        string welcome = memCount > 0
+            ? $"Pronto. Memória ativa ({memCount} registro(s)). Posso trabalhar no workspace. O que deseja fazer?"
+            : "Pronto. Memória persistente ligada (ainda vazia). Posso trabalhar no workspace. O que deseja fazer?";
+        _ = AppendBubbleAsync(welcome, user: false);
     }
 
     private async void OnLinkProjectClicked(object sender, EventArgs e)
@@ -214,9 +219,10 @@ public partial class AgentPage : ContentPage
             return "Limite de requisições (rate limit). Aguarde alguns segundos e tente de novo.";
         if (m.Contains("404") || m.Contains("NotFound", StringComparison.OrdinalIgnoreCase))
             return "Modelo ou endpoint não encontrado. Verifique o modelo configurado.";
+        if (m.Contains("hostname") || m.Contains("nor servname") || m.Contains("Name or service not known", StringComparison.OrdinalIgnoreCase))
+            return "Sem DNS/rede até o provedor LLM (openrouter.ai). Verifique Wi‑Fi/dados e tente de novo.";
         if (m.Contains("node already has a parent", StringComparison.OrdinalIgnoreCase))
-            return "Erro interno ao montar a conversa com ferramentas. Tente de novo.";
-        // evita despejar JSON longo no bubble
+            return "Erro interno ao montar a conversa com ferramentas. Atualize o APK e tente de novo.";
         if (m.Length > 280)
             return m.Substring(0, 280) + "…";
         return m;
