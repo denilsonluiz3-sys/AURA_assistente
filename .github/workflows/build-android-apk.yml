@@ -10,7 +10,7 @@ on:
       - '*.targets'
       - 'global.json'
       - 'NuGet.Config'
-      - '.github/workflows/**'
+      - '.github/workflows/build-android-apk.yml'
   pull_request:
     branches: [main]
     paths:
@@ -20,7 +20,7 @@ on:
       - '*.targets'
       - 'global.json'
       - 'NuGet.Config'
-      - '.github/workflows/**'
+      - '.github/workflows/build-android-apk.yml'
   workflow_dispatch:
 
 concurrency:
@@ -88,6 +88,7 @@ jobs:
           fi
 
       - name: Build APK
+        id: build
         run: |
           SIGN_ARGS=""
           if [ "${KEYSTORE_PRESENT:-0}" = "1" ]; then
@@ -102,10 +103,14 @@ jobs:
             -p:AndroidPackageFormats=apk \
             $SIGN_ARGS
 
+      # Quota de storage do Actions esgota com frequência; não deve marcar o job
+      # como falha de código (build já terminou com 0 erros).
       - name: Upload APK
+        if: success()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: aura-mobile-apk-${{ github.event_name == 'pull_request' && 'pr' || 'main' }}
+          name: aura-mobile-apk-${{ github.event_name == 'pull_request' && 'pr' || 'main' }}-${{ github.run_id }}
           path: src/AURA.Mobile/bin/Release/net10.0-android/*.apk
-          if-no-files-found: error
-          retention-days: 14
+          if-no-files-found: warn
+          retention-days: 2

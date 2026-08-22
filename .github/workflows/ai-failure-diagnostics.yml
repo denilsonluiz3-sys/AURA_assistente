@@ -1,12 +1,11 @@
 name: AURA AI Failure Diagnostics
 
 on:
+  # Só workflows de build/análise reais — evita cascata por docs/sync.
   workflow_run:
     workflows:
       - AURA Android APK
       - CodeQL Advanced
-      - AURA Sync Main
-      - AURA AI Documentation Sync
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -52,12 +51,10 @@ jobs:
 
           mkdir -p docs/ai/ci-failures
 
+          # Campo "artifacts" não existe em `gh run view --json` (API atual).
           gh run view "$RUN_ID" --repo "$REPOSITORY" --json \
-            databaseId,name,displayTitle,status,conclusion,headBranch,headSha,event,createdAt,updatedAt,url,workflowName \
+            databaseId,name,displayTitle,status,conclusion,headBranch,headSha,event,createdAt,updatedAt,url,workflowName,jobs \
             > /tmp/run.json
-
-          gh run view "$RUN_ID" --repo "$REPOSITORY" --json jobs,artifacts \
-            > /tmp/run-details.json
 
           gh run view "$RUN_ID" --repo "$REPOSITORY" --log-failed > /tmp/failed.log 2>&1 || true
 
@@ -70,7 +67,6 @@ jobs:
 
           repo = os.environ['REPOSITORY']
           run = json.loads(Path('/tmp/run.json').read_text())
-          details = json.loads(Path('/tmp/run-details.json').read_text())
           raw = Path('/tmp/failed.log').read_text(errors='replace')
 
           def gh_json(args):
@@ -80,7 +76,6 @@ jobs:
               except Exception:
                   return None
 
-          # Redact common secret-bearing values before anything is committed.
           redactions = [
               (r'(?i)(authorization:\s*bearer\s+)[^\s]+', r'\1[REDACTED]'),
               (r'(?i)(password\s*[=:]\s*)[^\s]+', r'\1[REDACTED]'),
@@ -92,6 +87,18 @@ jobs:
           for pattern, repl in redactions:
               raw = re.sub(pattern, repl, raw)
 
+          # Falhas de infraestrutura Actions (não são bugs de código).
+          infra_patterns = [
+              r'Artifact storage quota has been hit',
+              r'Unable to upload any new artifacts',
+              r'Code scanning is not enabled for this repository',
+              r'configuration error',
+              r'does not have permission to access the CodeQL',
+          ]
+          infra_only = any(re.search(p, raw, re.I) for p in infra_patterns) and not re.search(
+              r'\berror CS\d{4}\b|error XA\d+|error NETSDK\d+|error NU\d+', raw, re.I
+          )
+
           lines = raw.splitlines()
           error_re = re.compile(
               r'\b(error|failed|failure|exception|fatal|NETSDK\d+|CS\d{4}|XA\d+|NU\d{4}|MSB\d{4})\b',
@@ -100,7 +107,6 @@ jobs:
           error_indexes = [i for i, line in enumerate(lines) if error_re.search(line)]
 
           if error_indexes:
-              # Keep the first real failure plus nearby context and a compact tail.
               first = error_indexes[0]
               start = max(0, first - 8)
               end = min(len(lines), first + 40)
@@ -119,17 +125,18 @@ jobs:
           conclusion = run.get('conclusion') or 'unknown'
           branch = run.get('headBranch') or 'unknown'
           sha = run.get('headSha') or 'unknown'
-          short_sha = sha[:7] if sha != 'unknown' else sha
           run_id = str(run.get('databaseId') or os.environ.get('EVENT_RUN_ID') or 'unknown')
 
-          def classify(text):
+          def classify(text, infra):
+              if infra:
+                  return 'Infraestrutura GitHub Actions (quota/artifact/CodeQL config) — não é falha de código.'
               checks = [
                   ('C# / compilação', r'CS\d{4}|compil|namespace|does not exist|cannot be declared'),
                   ('XAML / source generator', r'XAML|SourceGen|sg\.cs|XamlGenerator'),
                   ('MAUI workload / SDK', r'NETSDK1147|maui-android|workload'),
                   ('Android SDK / NDK / Java', r'ANDROID|XA\d+|sdkmanager|NDK|JDK|Java'),
                   ('NuGet / restore', r'NU\d{4}|restore|NuGet|package'),
-                  ('GitHub Actions / configuração', r'workflow|permission|actions/|runner|YAML|yaml'),
+                  ('GitHub Actions / configuração', r'workflow|permission|actions/|runner|YAML|yaml|Artifact storage'),
                   ('CodeQL / segurança', r'CodeQL|code scanning|security'),
               ]
               for name, pattern in checks:
@@ -137,9 +144,9 @@ jobs:
                       return name
               return 'Indeterminada — consultar o primeiro erro real do log.'
 
-          category = classify(key)
+          category = classify(key, infra_only)
 
-          jobs = details.get('jobs') or []
+          jobs = run.get('jobs') or []
           failed_jobs = [j for j in jobs if j.get('conclusion') not in (None, 'success', 'skipped')]
           relevant_jobs = failed_jobs or jobs
 
@@ -161,12 +168,6 @@ jobs:
           if not step_lines:
               step_lines = ['- Nenhuma etapa com falha foi retornada. Consulte a URL da execução.']
 
-          artifacts = details.get('artifacts') or []
-          artifact_lines = [
-              f"- `{a.get('name', 'unknown')}` — size={a.get('sizeInBytes', 0)} bytes, expired={a.get('expired', False)}"
-              for a in artifacts
-          ] or ['- Nenhum artifact associado.']
-
           commit_files = gh_json([f'repos/{repo}/commits/{sha}']) if sha != 'unknown' else None
           changed_files = []
           if isinstance(commit_files, dict):
@@ -184,14 +185,16 @@ jobs:
           if not pr_lines:
               pr_lines = ['- Nenhum PR associado ao commit.']
 
+          skip_publish = infra_only
+          Path('/tmp/skip_publish').write_text('1' if skip_publish else '0')
+
           report = f'''# Falha CI — {workflow} — run {run_id}\n\n'''
-          report += f'''## Identidade da execução\n\n- Workflow: `{workflow}`\n- Run ID: `{run_id}`\n- Status: `{run.get('status', 'unknown')}`\n- Conclusão: `{conclusion}`\n- Branch: `{branch}`\n- Commit: `{sha}`\n- Evento: `{run.get('event', 'unknown')}`\n- Criado: `{run.get('createdAt', 'unknown')}`\n- Atualizado: `{run.get('updatedAt', 'unknown')}`\n- URL: {run.get('url', '')}\n- Categoria provável: **{category}**\n\n'''
+          report += f'''## Identidade da execução\n\n- Workflow: `{workflow}`\n- Run ID: `{run_id}`\n- Status: `{run.get('status', 'unknown')}`\n- Conclusão: `{conclusion}`\n- Branch: `{branch}`\n- Commit: `{sha}`\n- Evento: `{run.get('event', 'unknown')}`\n- Criado: `{run.get('createdAt', 'unknown')}`\n- Atualizado: `{run.get('updatedAt', 'unknown')}`\n- URL: {run.get('url', '')}\n- Categoria provável: **{category}**\n- Infra-only (não publicar commit): `{skip_publish}`\n\n'''
           report += '## Jobs relevantes\n\n' + '\n'.join(job_lines) + '\n\n'
           report += '## Etapas com falha\n\n' + '\n'.join(step_lines) + '\n\n'
           report += '## Pull requests associados\n\n' + '\n'.join(pr_lines) + '\n\n'
           report += '## Arquivos alterados no commit\n\n' + '\n'.join(changed_file_lines) + '\n\n'
-          report += '## Artifacts\n\n' + '\n'.join(artifact_lines) + '\n\n'
-          report += '''## Procedimento obrigatório para uma IA\n\n1. Trate o GitHub como fonte de verdade; não peça ao usuário para copiar logs que estejam disponíveis aqui.\n2. Leia `README_AI.md` antes de alterar código.\n3. Abra a execução, o job e a etapa indicados acima quando precisar de contexto adicional.\n4. Localize o primeiro erro causal; não corrija apenas erros em cascata.\n5. Inspecione o commit, os arquivos alterados, os `.csproj`, `global.json`, workflows e testes relacionados.\n6. Consulte `docs/ai/ci-failures/` para regressões semelhantes.\n7. Faça a menor correção comprovada e valide novamente no GitHub Actions.\n8. Se a correção precisar de um script para PRoot/Ubuntu, gere o script completo a partir do estado real do repositório.\n9. Nunca copie, publique ou invente segredos.\n\n'''
+          report += '''## Procedimento obrigatório para uma IA\n\n1. Trate o GitHub como fonte de verdade.\n2. Leia `README_AI.md` antes de alterar código.\n3. Ignore falhas de quota de artifact / CodeQL desabilitado — não são bugs de produto.\n4. Localize o primeiro erro causal de compilação/código.\n5. Faça a menor correção e valide no Actions.\n\n'''
           report += '## Evidência do log\n\n```text\n' + key[-18000:] + '\n```\n'
 
           latest = Path('docs/ai/CI_FAILURE_LATEST.md')
@@ -199,7 +202,6 @@ jobs:
           latest.write_text(report, encoding='utf-8')
           history.write_text(report, encoding='utf-8')
 
-          # Keep a small machine-readable pointer for agents that prefer JSON.
           context = {
               'repository': repo,
               'workflow': workflow,
@@ -211,6 +213,7 @@ jobs:
               'event': run.get('event'),
               'url': run.get('url'),
               'category': category,
+              'infra_only': skip_publish,
               'failed_jobs': [j.get('name') for j in failed_jobs],
               'failed_steps': [
                   {'job': j.get('name'), 'step': s.get('name'), 'conclusion': s.get('conclusion')}
@@ -232,6 +235,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [ "$(cat /tmp/skip_publish 2>/dev/null || echo 0)" = "1" ]; then
+            echo 'Falha de infraestrutura (quota/CodeQL config). Não publica commit no main.'
+            exit 0
+          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add docs/ai/CI_FAILURE_LATEST.md docs/ai/CI_FAILURE_LATEST.json docs/ai/ci-failures/
