@@ -103,7 +103,8 @@ public partial class AgentPage : ContentPage
         _session = new AgentSession(_client, tools, systemPrompt, memory: _memory);
         _session.Step += OnAgentStep;
 
-        AppendBubble("Pronto. Posso trabalhar no workspace e acompanhar processos em tempo real. O que deseja fazer?", user: false);
+        // fire-and-forget só na abertura; ainda serializado pelo gate
+        _ = AppendBubbleAsync("Pronto. Posso trabalhar no workspace e acompanhar processos em tempo real. O que deseja fazer?", user: false);
     }
 
     private async void OnLinkProjectClicked(object sender, EventArgs e)
@@ -133,7 +134,7 @@ public partial class AgentPage : ContentPage
             return;
 
         RuntimeConfig.Apply(_client);
-        AppendBubble(text, user: true);
+        await AppendBubbleAsync(text, user: true);
         CommandEditor.Text = string.Empty;
         RunButton.IsEnabled = false;
         BusyIndicator.IsRunning = true;
@@ -149,7 +150,7 @@ public partial class AgentPage : ContentPage
                 _processes.Update(process.Id, "Planejando", "Orquestrador analisando a tarefa", 0.15);
                 string answer = await _orchestrator.ExecuteAsync(text);
                 _processes.Complete(process.Id, "Resultado entregue");
-                AppendBubble(answer, user: false);
+                await AppendBubbleAsync(answer, user: false);
                 _voice?.SetLastUtterance(answer);
                 await SpeakAsync(answer);
                 return;
@@ -160,7 +161,7 @@ public partial class AgentPage : ContentPage
             if (string.IsNullOrWhiteSpace(RuntimeConfig.ApiKey) && string.IsNullOrWhiteSpace(_client.Options.ApiKey))
             {
                 _processes.Update(process.Id, "Pesquisando", "Buscando na web", 0.35);
-                AppendBubble("Buscando na web (Bing)...", user: false, isTool: true);
+                await AppendBubbleAsync("Buscando na web (Bing)...", user: false, isTool: true);
                 answerFromAgent = await WebSearchAnswer.SearchWithRefinementAsync(text);
             }
             else
@@ -169,7 +170,7 @@ public partial class AgentPage : ContentPage
                 if (readyError != null)
                 {
                     _processes.Fail(process.Id, readyError);
-                    AppendBubble(readyError, user: false, isError: true);
+                    await AppendBubbleAsync(readyError, user: false, isError: true);
                     return;
                 }
                 _session = null;
@@ -178,7 +179,7 @@ public partial class AgentPage : ContentPage
             }
 
             _processes.Complete(process.Id, "Resultado entregue");
-            AppendBubble(answerFromAgent, user: false);
+            await AppendBubbleAsync(answerFromAgent, user: false);
             _voice?.SetLastUtterance(answerFromAgent);
             await SpeakAsync(answerFromAgent);
 
@@ -187,13 +188,13 @@ public partial class AgentPage : ContentPage
                 _processes.Update(process.Id, "Sincronizando", "Atualizando projeto", 0.9);
                 int synced = await ProjectAccessService.SyncBackAsync();
                 _processes.Complete(process.Id, $"Concluído · {synced} arquivo(s) sincronizado(s)");
-                AppendBubble($"↥ Projeto sincronizado: {synced} arquivo(s) atualizado(s).", user: false, isTool: true);
+                await AppendBubbleAsync($"↥ Projeto sincronizado: {synced} arquivo(s) atualizado(s).", user: false, isTool: true);
             }
         }
         catch (Exception ex)
         {
             _processes.Fail(process.Id, ex.Message);
-            AppendBubble("Erro: " + ex.Message, user: false, isError: true);
+            await AppendBubbleAsync("Erro: " + ex.Message, user: false, isError: true);
             AuraLog.Exception("AgentPage.OnRunClicked", ex);
         }
         finally
@@ -221,7 +222,8 @@ public partial class AgentPage : ContentPage
         string resultPreview = Shorten(step.Result, 140);
         if (!string.IsNullOrWhiteSpace(_activeProcessId))
             _processes.Update(_activeProcessId, "Executando", step.ToolName, 0.65);
-        AppendBubble("◆ " + step.ToolName + " " + argsPreview + "\n" + resultPreview, user: false, isTool: true);
+        // mesma fila serializada; não usa BeginInvoke paralelo
+        _ = AppendBubbleAsync("◆ " + step.ToolName + " " + argsPreview + "\n" + resultPreview, user: false, isTool: true);
     }
 
     private async void OnProcessCardClicked(object sender, EventArgs e)
@@ -246,12 +248,17 @@ public partial class AgentPage : ContentPage
         }
     }
 
-    private async void AppendBubble(string text, bool user, bool isTool = false, bool isError = false)
+    /// <summary>
+    /// Insere um bubble na conversa de forma serializada na UI thread.
+    /// Evita IndexOutOfBoundsException em ViewGroup.AddView quando vários
+    /// AppendBubble corriam em paralelo via BeginInvokeOnMainThread.
+    /// </summary>
+    private async Task AppendBubbleAsync(string text, bool user, bool isTool = false, bool isError = false)
     {
         bool entered = false;
         try
         {
-            await _bubbleGate.WaitAsync();
+            await _bubbleGate.WaitAsync().ConfigureAwait(false);
             entered = true;
 
             await MainThread.InvokeOnMainThreadAsync(async () =>
@@ -328,11 +335,11 @@ public partial class AgentPage : ContentPage
 
                 ConversationContainer.Children.Add(border);
                 await ConversationScroll.ScrollToAsync(border, ScrollToPosition.End, true);
-            });
+            }).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            AuraLog.Exception("AgentPage.AppendBubble", ex);
+            AuraLog.Exception("AgentPage.AppendBubbleAsync", ex);
         }
         finally
         {
