@@ -1,31 +1,30 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
-  "workflow": "CodeQL Advanced",
-  "run_id": "32599585711",
+  "workflow": "AURA Android APK",
+  "run_id": "32602030166",
   "status": "completed",
   "conclusion": "cancelled",
   "branch": "main",
-  "commit": "61028044f074ec24d61958cb76c677c564740595",
+  "commit": "25858f516f542d4d2abe7b2a6edc2bdfe4b75a85",
   "event": "push",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32599585711",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32602030166",
   "category": "Indeterminada — consultar o primeiro erro real do log.",
   "infra_only": false,
   "failed_jobs": [
-    "Analyze (csharp)"
+    "build-apk"
   ],
   "failed_steps": [
     {
-      "job": "Analyze (csharp)",
-      "step": "Set up job",
+      "job": "build-apk",
+      "step": "Build APK",
       "conclusion": "cancelled"
     }
   ],
   "changed_files": [
-    "scripts/README_AURA_GIT.md",
-    "scripts/aura_git.py"
+    "src/AURA.Mobile/Pages/AgentPage.xaml.cs"
   ],
   "associated_prs": [
-    75
+    76
   ],
-  "diagnostic_report": "docs/ai/ci-failures/32599585711.md"
+  "diagnostic_report": "docs/ai/ci-failures/32602030166.md"
 }
