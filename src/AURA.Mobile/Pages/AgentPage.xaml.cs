@@ -233,44 +233,50 @@ public partial class AgentPage : ContentPage
 
     private void AppendBubble(string text, bool user, bool isTool = false, bool isError = false)
     {
-        Color background = user
-            ? Color.FromArgb("#1e2d54")
-            : isError
-                ? Color.FromArgb("#2a0f12")
-                : isTool
-                    ? Color.FromArgb("#0f1420")
-                    : Color.FromArgb("#13131d");
-
-        Color stroke = user
-            ? Color.FromArgb("#2a3a6a")
-            : isError
-                ? Color.FromArgb("#5a1f24")
-                : Color.FromArgb("#242438");
-
-        var border = new Border
-        {
-            BackgroundColor = background,
-            Stroke = stroke,
-            StrokeThickness = 1,
-            Padding = new Thickness(10, 7),
-            StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(10) },
-            HorizontalOptions = user ? LayoutOptions.End : LayoutOptions.Start,
-            MaximumWidthRequest = 900
-        };
-
-        border.Content = new Label
-        {
-            Text = text,
-            FontSize = 13,
-            TextColor = user ? Color.FromArgb("#dfe7ff") : Color.FromArgb("#e8e8f0"),
-            LineBreakMode = LineBreakMode.WordWrap
-        };
-
-        ConversationContainer.Children.Add(border);
         MainThread.BeginInvokeOnMainThread(async () =>
         {
-            try { await ConversationScroll.ScrollToAsync(border, ScrollToPosition.End, true); }
-            catch { }
+            try
+            {
+                Color background = user
+                    ? Color.FromArgb("#1e2d54")
+                    : isError
+                        ? Color.FromArgb("#2a0f12")
+                        : isTool
+                            ? Color.FromArgb("#0f1420")
+                            : Color.FromArgb("#13131d");
+
+                Color stroke = user
+                    ? Color.FromArgb("#2a3a6a")
+                    : isError
+                        ? Color.FromArgb("#5a1f24")
+                        : Color.FromArgb("#242438");
+
+                var border = new Border
+                {
+                    BackgroundColor = background,
+                    Stroke = stroke,
+                    StrokeThickness = 1,
+                    Padding = new Thickness(10, 7),
+                    StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(10) },
+                    HorizontalOptions = user ? LayoutOptions.End : LayoutOptions.Start,
+                    MaximumWidthRequest = 900
+                };
+
+                border.Content = new Label
+                {
+                    Text = text,
+                    FontSize = 13,
+                    TextColor = user ? Color.FromArgb("#dfe7ff") : Color.FromArgb("#e8e8f0"),
+                    LineBreakMode = LineBreakMode.WordWrap
+                };
+
+                ConversationContainer.Children.Add(border);
+                await ConversationScroll.ScrollToAsync(border, ScrollToPosition.End, true);
+            }
+            catch (Exception ex)
+            {
+                AuraLog.Exception("AgentPage.AppendBubble", ex);
+            }
         });
     }
 
