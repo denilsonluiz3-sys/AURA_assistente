@@ -15,24 +15,35 @@ namespace AURA.Mobile
             AuraLog.Info("MainPage.ctor BEGIN");
             _manager = manager;
             events.Subscribe<ModuleStateChangedEvent>(_ => MainThread.BeginInvokeOnMainThread(RebuildTabs));
+
+            // Seções alinhadas à unificação UI:
+            // HOME/Sistema · Assistente · Ferramentas · Apps
             _entries = new List<(string?, string, string, Page)>
             {
+                // Sistema — visão do dispositivo
                 (null, "Sistema", "Início", home),
                 (null, "Sistema", "Ecossistema", ecosystem),
                 ("system", "Sistema", "Diagnóstico", diagnostico),
-                ("logs", "Sistema", "Logs", logs),
                 ("logs", "Sistema", "Correções", fixes),
+
+                // Assistente — chat / agentes / memória
                 ("ai", "Assistente", "Chat", chat),
                 ("ai", "Assistente", "Agente", agent),
                 ("memory", "Assistente", "Memória", memory),
                 (null, "Assistente", "Navegador", browser),
+
+                // Ferramentas — terminal, executores, módulos, avançado
                 ("terminal", "Ferramentas", "Terminal", terminal),
                 ("executors", "Ferramentas", "Executores", executors),
                 (null, "Ferramentas", "Módulos", modules),
+                ("logs", "Ferramentas", "Logs", logs),
+
+                // Apps — programas e células
+                (null, "Apps", "Programas", programs),
                 ("cells", "Apps", "Células", cells),
-                ("cells", "Apps", "Rodar programa", run),
-                (null, "Apps", "Programas", programs)
+                ("cells", "Apps", "Rodar programa", run)
             };
+
             BarBackgroundColor = Color.FromArgb("#0c0c12");
             BarTextColor = Color.FromArgb("#e8e8f0");
             AuraLog.Info("MainPage.ctor OK");
