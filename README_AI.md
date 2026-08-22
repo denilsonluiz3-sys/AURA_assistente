@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `9d53157`
-- Data UTC: `2026-08-22 21:19:52 UTC`
+- Commit: `25858f5`
+- Data UTC: `2026-08-22 22:17:49 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -596,9 +596,9 @@ testes relacionados
 
 ### Últimos commits
 
-- `9d53157` fix(tests): align reasoning response property with AgentChatResponse (2026-08-22)
-- `836d046` docs(ai): sync README_AI with source tree (2026-08-22)
-- `d62a144` fix(tests): align reasoning response property with AgentChatResponse (2026-08-22)
-- `69faf9c` docs(ai): record CI failure context (2026-08-22)
-- `e68826b` docs(ai): record CI failure context (2026-08-22)
+- `25858f5` fix(mobile): AgentPage bubbles — remove BtnGhost dependency so replies show (#76) (2026-08-22)
+- `b3510ee` docs(ai): record CI failure context (2026-08-22)
+- `cf1e660` ci: make Actions cleanup immediate and pagination-safe (2026-08-22)
+- `9e8e4c0` ci: automate cleanup of old runs artifacts and caches (2026-08-22)
+- `6102804` feat(scripts): aura_git.py — status, snapshot, commit local seguro (#75) (2026-08-22)
 <!-- AI-DOCS:END -->
