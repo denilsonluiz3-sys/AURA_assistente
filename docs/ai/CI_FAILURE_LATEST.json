@@ -1,14 +1,14 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
   "workflow": "AURA Android APK",
-  "run_id": "32603893201",
+  "run_id": "32604188921",
   "status": "completed",
-  "conclusion": "failure",
-  "branch": "feat/local-playbook-slim-apk",
-  "commit": "aeb4ad02bbced599e26f26b59af4cc767334afa3",
+  "conclusion": "cancelled",
+  "branch": "feat/batch-playbook-slim-v1",
+  "commit": "5b5c727f962cda180494024d9d9c13d75d05bb5a",
   "event": "pull_request",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32603893201",
-  "category": "C# / compilação",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32604188921",
+  "category": "Indeterminada — consultar o primeiro erro real do log.",
   "infra_only": false,
   "failed_jobs": [
     "build-apk"
@@ -16,15 +16,15 @@
   "failed_steps": [
     {
       "job": "build-apk",
-      "step": "Build APK",
-      "conclusion": "failure"
+      "step": "Set up job",
+      "conclusion": "cancelled"
     }
   ],
   "changed_files": [
-    "src/AURA.Mobile/Resources/Raw/pf_dora.f32"
+    "src/AURA.Mobile/Resources/Raw/kokoro-config.json"
   ],
   "associated_prs": [
-    79
+    80
   ],
-  "diagnostic_report": "docs/ai/ci-failures/32603893201.md"
+  "diagnostic_report": "docs/ai/ci-failures/32604188921.md"
 }
