@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `6cb56de`
-- Data UTC: `2026-08-22 05:24:52 UTC`
+- Commit: `e180c2c`
+- Data UTC: `2026-08-22 07:19:32 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -295,7 +295,7 @@ testes relacionados
 - `src/AURA.Core`: 39 arquivos C#, 0 arquivos XAML
 - `src/AURA.Installer`: 17 arquivos C#, 0 arquivos XAML
 - `src/AURA.Memory`: 5 arquivos C#, 0 arquivos XAML
-- `src/AURA.Mobile`: 56 arquivos C#, 34 arquivos XAML
+- `src/AURA.Mobile`: 57 arquivos C#, 34 arquivos XAML
 - `src/AURA.Modules`: 23 arquivos C#, 0 arquivos XAML
 - `src/AURA.Network`: 2 arquivos C#, 0 arquivos XAML
 - `src/AURA.SystemInfo`: 2 arquivos C#, 0 arquivos XAML
@@ -497,6 +497,7 @@ testes relacionados
 - `src/AURA.Mobile/Controls/AiConfigView.cs`
 - `src/AURA.Mobile/DesignSystem.cs`
 - `src/AURA.Mobile/Diagnostics/AgentWorkspace.cs`
+- `src/AURA.Mobile/Diagnostics/AiDiagnosticsService.cs`
 - `src/AURA.Mobile/Diagnostics/FixProposal.cs`
 - `src/AURA.Mobile/Diagnostics/ProjectAccessService.cs`
 - `src/AURA.Mobile/Diagnostics/RuntimeConfig.cs`
@@ -594,9 +595,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `e180c2c` feat(mobile): connect logs, diagnostics and AI fixes (#67) (2026-08-22)
+- `a164b8a` docs(ai): sync README_AI with source tree (2026-08-22)
 - `6cb56de` fix(mobile): sync cells page with runtime events (#66) (2026-08-22)
 - `da33105` docs(ai): sync README_AI with source tree (2026-08-22)
 - `6c408aa` fix AgentPage bubble UI serialization (2026-08-22)
-- `d1c05ca` docs(ai): sync README_AI with source tree (2026-08-22)
-- `ac69435` tmp (2026-08-22)
 <!-- AI-DOCS:END -->
