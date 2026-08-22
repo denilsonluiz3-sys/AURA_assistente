@@ -1,5 +1,6 @@
 using AURA.AI;
 using AURA.Agents;
+using AURA.Abstractions.Execution;
 using AURA.Core.Events;
 using AURA.Memory;
 using AURA.Mobile.Diagnostics;
@@ -20,6 +21,7 @@ public partial class AgentPage : ContentPage
     private readonly ShellExecutor _shell;
     private readonly ProcessRegistry _processes;
     private readonly AuraOrchestrator _orchestrator;
+    private readonly LocalPlaybook? _playbook;
     private readonly SemaphoreSlim _bubbleGate = new(1, 1);
     private readonly List<string> _recentCommands = new();
     private AgentSession? _session;
@@ -28,7 +30,7 @@ public partial class AgentPage : ContentPage
 
     public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
         ShellExecutor shell, ProcessRegistry processes, AuraOrchestrator orchestrator,
-        VoiceAssistantService? voice = null)
+        LocalPlaybook? playbook = null, VoiceAssistantService? voice = null)
     {
         InitializeComponent();
         _client = client;
@@ -37,6 +39,7 @@ public partial class AgentPage : ContentPage
         _shell = shell;
         _processes = processes;
         _orchestrator = orchestrator;
+        _playbook = playbook;
         ProcessCards.BindingContext = _processes;
         _voice = voice;
         LoadRecentsFromPrefs();
@@ -64,10 +67,7 @@ public partial class AgentPage : ContentPage
         EnsureSession();
     }
 
-    private void OnConfigClicked(object sender, EventArgs e)
-    {
-        SetConfigVisible(!_configVisible);
-    }
+    private void OnConfigClicked(object sender, EventArgs e) => SetConfigVisible(!_configVisible);
 
     private void SetConfigVisible(bool visible)
     {
@@ -94,12 +94,12 @@ public partial class AgentPage : ContentPage
 
         string systemPrompt =
             "Você é o agente de arquivos da AURA. " +
-            "Você TEM memória persistente: cada pergunta e resposta é gravada em memory.json " +
-            "e reapresentada nas próximas sessões. Nunca diga que não tem memória. " +
-            "Você PODE listar, ler, criar, editar e sobrescrever arquivos do diretório de " +
-            "trabalho e executar comandos shell (sh -c). Prefira ferramentas a respostas vagas. " +
-            "Responda em português, curto e objetivo. Caminhos são relativos ao workspace. " +
-            "Evite loops longos de ferramentas: se já tiver informação suficiente, responda em texto.";
+            "Você TEM memória persistente. Prefira ferramentas (list/read/write/shell) a respostas vagas. " +
+            "Responda em português, curto. " +
+            "Se precisar de um script shell no workspace, devolva UM bloco assim:\n" +
+            "```aura-sh\ncomando1\ncomando2\n```\n" +
+            "O app executará o bloco no terminal. Não invente caminhos fora do workspace. " +
+            "Evite loops longos de ferramentas.";
 
         _session = new AgentSession(_client, tools, systemPrompt, memory: _memory);
         _session.Step += OnAgentStep;
@@ -107,12 +107,10 @@ public partial class AgentPage : ContentPage
         int memCount = 0;
         try { memCount = _memory.Read(tail: 64).Count; } catch { /* ignore */ }
         string welcome = memCount > 0
-            ? $"Pronto. Memória ativa ({memCount} registro(s)). O que deseja fazer?"
-            : "Pronto. Memória persistente ligada. O que deseja fazer?";
+            ? $"Pronto. Memória ({memCount}). Playbook local ativo — IA só se precisar."
+            : "Pronto. Playbook local ativo. Histórico / Prompts / digite.";
         _ = AppendBubbleAsync(welcome, user: false);
     }
-
-    // ── Projeto ──────────────────────────────────────────────────────────
 
     private async void OnProjectClicked(object sender, EventArgs e)
     {
@@ -120,235 +118,120 @@ public partial class AgentPage : ContentPage
         {
             string root = AgentWorkspace.ActiveRoot;
             int files = AgentWorkspace.CountFiles(root);
-            string status = ProjectAccessService.StatusText;
-            string msg =
-                $"Workspace:\n{root}\n\n" +
-                $"Arquivos: {files}\n" +
-                $"Status: {status}\n\n" +
-                "Vincular pasta padrão em Download/AURA/AURA_assistente?";
-
-            bool link = await DisplayAlert("Projeto", msg, "Vincular", "Fechar");
-            if (!link)
-                return;
-
-            string projectPath = "/storage/emulated/0/Download/AURA/AURA_assistente";
-            if (Directory.Exists(projectPath))
-                await DisplayAlert("Projeto", $"Pasta encontrada:\n{projectPath}\n\nUse o workspace ativo ou configure o acesso SAF nas configurações.", "OK");
-            else
-                await DisplayAlert("Projeto", $"Pasta não encontrada:\n{projectPath}", "OK");
+            string msg = $"Workspace:\n{root}\n\nArquivos: {files}\n{ProjectAccessService.StatusText}";
+            await DisplayAlert("Projeto", msg, "OK");
         }
         catch (Exception ex)
         {
             await DisplayAlert("Erro", ex.Message, "OK");
-            AuraLog.Exception("AgentPage.OnProjectClicked", ex);
         }
     }
-
-    // ── Histórico (memória persistente) ─────────────────────────────────
 
     private async void OnHistoryClicked(object sender, EventArgs e)
     {
         try
         {
-            var entries = _memory.Read(tail: 24);
-            var turns = entries
-                .Where(x => x.Kind == MemoryKind.Turn)
-                .TakeLast(12)
-                .ToList();
-
+            var turns = _memory.Read(tail: 24).Where(x => x.Kind == MemoryKind.Turn).TakeLast(12).ToList();
             if (turns.Count == 0)
             {
-                await DisplayAlert("Histórico", "Ainda não há conversas gravadas na memória.", "OK");
+                await DisplayAlert("Histórico", "Sem conversas gravadas.", "OK");
                 return;
             }
-
-            var lines = new List<string>();
-            foreach (var t in turns)
+            var lines = turns.Select(t =>
             {
-                string role = string.IsNullOrWhiteSpace(t.Role) ? "?" : t.Role;
-                string text = (t.Text ?? string.Empty).Replace('\n', ' ').Trim();
+                string text = (t.Text ?? "").Replace('\n', ' ');
                 if (text.Length > 90) text = text[..90] + "…";
-                lines.Add($"[{role}] {text}");
-            }
-
+                return $"[{t.Role ?? "?"}] {text}";
+            });
             string body = string.Join("\n\n", lines);
-            bool reload = await DisplayAlert(
-                "Conversas anteriores",
-                body.Length > 1800 ? body[..1800] + "…" : body,
-                "Recarregar no chat",
-                "Fechar");
-
-            if (!reload)
+            if (!await DisplayAlert("Conversas", body.Length > 1800 ? body[..1800] + "…" : body, "Recarregar", "Fechar"))
                 return;
-
             ConversationContainer.Children.Clear();
             foreach (var t in turns)
-            {
-                bool isUser = string.Equals(t.Role, "user", StringComparison.OrdinalIgnoreCase);
-                await AppendBubbleAsync(t.Text ?? string.Empty, user: isUser);
-            }
+                await AppendBubbleAsync(t.Text ?? "", user: string.Equals(t.Role, "user", StringComparison.OrdinalIgnoreCase));
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Histórico", "Falha ao ler memória: " + ex.Message, "OK");
-            AuraLog.Exception("AgentPage.OnHistoryClicked", ex);
+            await DisplayAlert("Histórico", ex.Message, "OK");
         }
     }
-
-    // ── Recentes (comandos locais) ───────────────────────────────────────
 
     private void LoadRecentsFromPrefs()
     {
         try
         {
-            string raw = Preferences.Default.Get("agent.recent_commands", string.Empty);
-            if (string.IsNullOrWhiteSpace(raw))
-                return;
-            foreach (var line in raw.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            {
-                if (!_recentCommands.Contains(line))
-                    _recentCommands.Add(line);
-            }
+            foreach (var line in Preferences.Default.Get("agent.recent_commands", "")
+                         .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                if (!_recentCommands.Contains(line)) _recentCommands.Add(line);
         }
-        catch { /* ignore */ }
+        catch { }
     }
 
     private void SaveRecentsToPrefs()
     {
-        try
-        {
-            Preferences.Default.Set("agent.recent_commands",
-                string.Join('\n', _recentCommands.Take(20)));
-        }
-        catch { /* ignore */ }
+        try { Preferences.Default.Set("agent.recent_commands", string.Join('\n', _recentCommands.Take(20))); }
+        catch { }
     }
 
     private void RememberCommand(string text)
     {
         text = text.Trim();
-        if (string.IsNullOrWhiteSpace(text))
-            return;
+        if (string.IsNullOrWhiteSpace(text)) return;
         _recentCommands.RemoveAll(x => string.Equals(x, text, StringComparison.OrdinalIgnoreCase));
         _recentCommands.Insert(0, text);
-        if (_recentCommands.Count > 20)
-            _recentCommands.RemoveRange(20, _recentCommands.Count - 20);
+        while (_recentCommands.Count > 20) _recentCommands.RemoveAt(_recentCommands.Count - 1);
         SaveRecentsToPrefs();
     }
 
     private async void OnRecentsClicked(object sender, EventArgs e)
     {
-        if (_recentCommands.Count == 0)
-        {
-            await DisplayAlert("Recentes", "Nenhum comando recente ainda.", "OK");
-            return;
-        }
-
-        string chosen = await DisplayActionSheet(
-            "Comandos recentes",
-            "Cancelar",
-            null,
-            _recentCommands.Take(10).ToArray());
-
-        if (string.IsNullOrWhiteSpace(chosen) || chosen == "Cancelar")
-            return;
-
-        CommandEditor.Text = chosen;
+        if (_recentCommands.Count == 0) { await DisplayAlert("Recentes", "Nenhum ainda.", "OK"); return; }
+        string chosen = await DisplayActionSheet("Recentes", "Cancelar", null, _recentCommands.Take(10).ToArray());
+        if (!string.IsNullOrWhiteSpace(chosen) && chosen != "Cancelar") CommandEditor.Text = chosen;
     }
-
-    // ── Prompts ──────────────────────────────────────────────────────────
 
     private async void OnPromptsClicked(object sender, EventArgs e)
     {
         try
         {
             var prompts = AgentPromptStore.LoadAll();
-            if (prompts.Count == 0)
-            {
-                await DisplayAlert("Prompts", "Nenhum prompt disponível.", "OK");
-                return;
-            }
-
-            string[] titles = prompts
-                .Select(p => (p.BuiltIn ? "✦ " : "☆ ") + p.Title)
-                .ToArray();
-
-            string chosen = await DisplayActionSheet("Prompts prontos", "Cancelar", null, titles);
-            if (string.IsNullOrWhiteSpace(chosen) || chosen == "Cancelar")
-                return;
-
+            string[] titles = prompts.Select(p => (p.BuiltIn ? "✦ " : "☆ ") + p.Title).ToArray();
+            string chosen = await DisplayActionSheet("Prompts", "Cancelar", null, titles);
+            if (string.IsNullOrWhiteSpace(chosen) || chosen == "Cancelar") return;
             int idx = Array.IndexOf(titles, chosen);
-            if (idx < 0 || idx >= prompts.Count)
-                return;
-
+            if (idx < 0) return;
             var item = prompts[idx];
-            string detail =
-                (string.IsNullOrWhiteSpace(item.Description) ? "(sem descrição)" : item.Description)
-                + "\n\n── Texto ──\n"
-                + item.Body;
-
-            bool use = await DisplayAlert(item.Title, detail, "Usar", "Fechar");
-            if (!use)
-                return;
-
-            CommandEditor.Text = item.Body;
+            if (await DisplayAlert(item.Title, item.Description + "\n\n" + item.Body, "Usar", "Fechar"))
+                CommandEditor.Text = item.Body;
         }
-        catch (Exception ex)
-        {
-            await DisplayAlert("Prompts", ex.Message, "OK");
-            AuraLog.Exception("AgentPage.OnPromptsClicked", ex);
-        }
+        catch (Exception ex) { await DisplayAlert("Prompts", ex.Message, "OK"); }
     }
 
     private async void OnAddPromptClicked(object sender, EventArgs e)
     {
-        try
-        {
-            string title = await DisplayPromptAsync("Novo prompt", "Título:", "Salvar", "Cancelar", maxLength: 60);
-            if (string.IsNullOrWhiteSpace(title))
-                return;
-
-            string description = await DisplayPromptAsync("Novo prompt", "Descrição curta:", "Salvar", "Cancelar", maxLength: 160)
-                ?? string.Empty;
-
-            string body = CommandEditor.Text?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(body))
-            {
-                body = await DisplayPromptAsync("Novo prompt", "Texto do prompt:", "Salvar", "Cancelar", maxLength: 500)
-                    ?? string.Empty;
-            }
-
-            if (string.IsNullOrWhiteSpace(body))
-            {
-                await DisplayAlert("Prompt", "Texto vazio — nada foi salvo.", "OK");
-                return;
-            }
-
-            AgentPromptStore.AddCustom(title, description, body);
-            await DisplayAlert("Prompt", $"Salvo: {title}", "OK");
-        }
-        catch (Exception ex)
-        {
-            await DisplayAlert("Prompt", ex.Message, "OK");
-            AuraLog.Exception("AgentPage.OnAddPromptClicked", ex);
-        }
+        string? title = await DisplayPromptAsync("Novo prompt", "Título:", "Salvar", "Cancelar", maxLength: 60);
+        if (string.IsNullOrWhiteSpace(title)) return;
+        string desc = await DisplayPromptAsync("Novo prompt", "Descrição:", "Salvar", "Cancelar", maxLength: 160) ?? "";
+        string body = CommandEditor.Text?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(body))
+            body = await DisplayPromptAsync("Novo prompt", "Texto:", "Salvar", "Cancelar", maxLength: 500) ?? "";
+        if (string.IsNullOrWhiteSpace(body)) { await DisplayAlert("Prompt", "Vazio.", "OK"); return; }
+        AgentPromptStore.AddCustom(title, desc, body);
+        await DisplayAlert("Prompt", "Salvo: " + title, "OK");
     }
 
     private async void OnClearChatClicked(object sender, EventArgs e)
     {
-        bool ok = await DisplayAlert("Limpar chat", "Apagar bolhas desta tela? (a memória persistente permanece)", "Limpar", "Cancelar");
-        if (!ok) return;
+        if (!await DisplayAlert("Limpar", "Limpar bolhas?", "Limpar", "Cancelar")) return;
         ConversationContainer.Children.Clear();
         _session = null;
         EnsureSession();
     }
 
-    // ── Run ──────────────────────────────────────────────────────────────
-
     private async void OnRunClicked(object sender, EventArgs e)
     {
         string text = CommandEditor.Text?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(text))
-            return;
+        if (string.IsNullOrWhiteSpace(text)) return;
 
         RememberCommand(text);
         RuntimeConfig.Apply(_client);
@@ -363,23 +246,37 @@ public partial class AgentPage : ContentPage
 
         try
         {
+            // 1) Playbook local — sem IA
+            string? local = _playbook?.TryResolveWithoutLlm(text);
+            if (!string.IsNullOrWhiteSpace(local))
+            {
+                _processes.Update(process.Id, "Playbook", "Resposta local", 0.5);
+                await AppendBubbleAsync(local, user: false);
+                await TryExecuteAuraShellAsync(local);
+                _processes.Complete(process.Id, "Playbook local");
+                _voice?.SetLastUtterance(local);
+                await SpeakAsync(local);
+                return;
+            }
+
             if (ShouldOrchestrate(text))
             {
-                _processes.Update(process.Id, "Planejando", "Orquestrador analisando a tarefa", 0.15);
+                _processes.Update(process.Id, "Planejando", "Orquestrador", 0.15);
                 string answer = await _orchestrator.ExecuteAsync(text);
-                _processes.Complete(process.Id, "Resultado entregue");
+                _playbook?.RememberSuccess(text, answer);
+                _processes.Complete(process.Id, "OK");
                 await AppendBubbleAsync(answer, user: false);
+                await TryExecuteAuraShellAsync(answer);
                 _voice?.SetLastUtterance(answer);
                 await SpeakAsync(answer);
                 return;
             }
 
-            _processes.Update(process.Id, "Executando", "Processando solicitação", 0.1);
+            _processes.Update(process.Id, "Executando", "Processando", 0.1);
             string answerFromAgent;
             if (string.IsNullOrWhiteSpace(RuntimeConfig.ApiKey) && string.IsNullOrWhiteSpace(_client.Options.ApiKey))
             {
-                _processes.Update(process.Id, "Pesquisando", "Buscando na web", 0.35);
-                await AppendBubbleAsync("Buscando na web (Bing)...", user: false, isTool: true);
+                await AppendBubbleAsync("Buscando na web...", user: false, isTool: true);
                 answerFromAgent = await WebSearchAnswer.SearchWithRefinementAsync(text);
             }
             else
@@ -396,17 +293,17 @@ public partial class AgentPage : ContentPage
                 answerFromAgent = await _session!.RunAsync(text);
             }
 
+            _playbook?.RememberSuccess(text, answerFromAgent);
             _processes.Complete(process.Id, "Resultado entregue");
             await AppendBubbleAsync(answerFromAgent, user: false);
+            await TryExecuteAuraShellAsync(answerFromAgent);
             _voice?.SetLastUtterance(answerFromAgent);
             await SpeakAsync(answerFromAgent);
 
             if (ProjectAccessService.IsLinked && !ProjectAccessService.IsDirect)
             {
-                _processes.Update(process.Id, "Sincronizando", "Atualizando projeto", 0.9);
                 int synced = await ProjectAccessService.SyncBackAsync();
-                _processes.Complete(process.Id, $"Concluído · {synced} arquivo(s) sincronizado(s)");
-                await AppendBubbleAsync($"↥ Projeto sincronizado: {synced} arquivo(s) atualizado(s).", user: false, isTool: true);
+                await AppendBubbleAsync($"↥ Sync: {synced} arquivo(s).", user: false, isTool: true);
             }
         }
         catch (Exception ex)
@@ -418,30 +315,50 @@ public partial class AgentPage : ContentPage
         }
         finally
         {
-            if (_activeProcessId == process.Id)
-                _activeProcessId = null;
+            if (_activeProcessId == process.Id) _activeProcessId = null;
             RunButton.IsEnabled = true;
             BusyIndicator.IsRunning = false;
             BusyIndicator.IsVisible = false;
         }
     }
 
+    private async Task TryExecuteAuraShellAsync(string answer)
+    {
+        string? script = LocalPlaybook.ExtractAuraShell(answer);
+        if (string.IsNullOrWhiteSpace(script))
+            return;
+
+        await AppendBubbleAsync("▶ Executando aura-sh…", user: false, isTool: true);
+        try
+        {
+            var req = new ExecutionRequest
+            {
+                Command = script,
+                WorkingDirectory = AgentWorkspace.ActiveRoot,
+                Timeout = TimeSpan.FromSeconds(60)
+            };
+            ExecutionResult result = await _shell.ExecuteAsync(req);
+            string outText = result.CombineOutput();
+            if (outText.Length > 2500) outText = outText[..2500] + "…";
+            string status = result.Success ? "OK" : "FALHA";
+            await AppendBubbleAsync($"[{status} exit={result.ExitCode}]\n{outText}", user: false, isTool: true);
+        }
+        catch (Exception ex)
+        {
+            await AppendBubbleAsync("Shell: " + ex.Message, user: false, isError: true);
+            AuraLog.Exception("AgentPage.aura-sh", ex);
+        }
+    }
+
     private static string FriendlyLlmError(Exception ex)
     {
-        string m = ex.Message ?? string.Empty;
-        if (m.Contains("401") || m.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase))
-            return "Chave de API inválida ou ausente. Configure na aba Assistente / Correções.";
-        if (m.Contains("402") || m.Contains("PaymentRequired", StringComparison.OrdinalIgnoreCase) || m.Contains("credits", StringComparison.OrdinalIgnoreCase))
-            return "Sem créditos no provedor LLM.";
-        if (m.Contains("429") || m.Contains("TooManyRequests", StringComparison.OrdinalIgnoreCase))
-            return "Rate limit. Aguarde e tente de novo.";
-        if (m.Contains("hostname") || m.Contains("nor servname"))
-            return "Sem DNS/rede até o provedor LLM.";
+        string m = ex.Message ?? "";
+        if (m.Contains("401")) return "API key inválida.";
+        if (m.Contains("402")) return "Sem créditos LLM.";
+        if (m.Contains("429")) return "Rate limit.";
         if (m.Contains("node already has a parent", StringComparison.OrdinalIgnoreCase))
-            return "Erro interno de ferramentas. Atualize o APK.";
-        if (m.Length > 280)
-            return m.Substring(0, 280) + "…";
-        return m;
+            return "Erro interno de tools. Atualize o APK.";
+        return m.Length > 280 ? m[..280] + "…" : m;
     }
 
     private static bool ShouldOrchestrate(string text)
@@ -454,80 +371,51 @@ public partial class AgentPage : ContentPage
 
     private void OnAgentStep(AURA.AI.AgentStep step)
     {
-        string argsPreview = Shorten(step.Arguments, 70);
-        string resultPreview = Shorten(step.Result, 140);
         if (!string.IsNullOrWhiteSpace(_activeProcessId))
             _processes.Update(_activeProcessId, "Executando", step.ToolName, 0.65);
-        _ = AppendBubbleAsync("◆ " + step.ToolName + " " + argsPreview + "\n" + resultPreview, user: false, isTool: true);
+        _ = AppendBubbleAsync("◆ " + step.ToolName + " " + Shorten(step.Arguments, 70) + "\n" + Shorten(step.Result, 140),
+            user: false, isTool: true);
     }
 
     private async void OnProcessCardClicked(object sender, EventArgs e)
     {
-        if (sender is not Button button || button.BindingContext is not ProcessInfo process)
-            return;
-
+        if (sender is not Button button || button.BindingContext is not ProcessInfo process) return;
         if (Application.Current?.MainPage is MainPage main)
             await main.NavigateToProcessAsync(process.Target);
     }
 
     private async Task SpeakAsync(string text)
     {
-        try
-        {
-            await _speech.InitializeAsync();
-            await _speech.SpeakAsync(text);
-        }
-        catch (NotSupportedException)
-        {
-            AuraLog.Info("TTS: fala pulada.");
-        }
+        try { await _speech.InitializeAsync(); await _speech.SpeakAsync(text); }
+        catch (NotSupportedException) { }
+        catch (Exception ex) { AuraLog.Exception("AgentPage.Speak", ex); }
     }
 
-    private static Button CreateCopyButton()
+    private static Button CreateCopyButton() => new()
     {
-        return new Button
-        {
-            Text = "Copiar",
-            FontSize = 10,
-            Padding = new Thickness(8, 3),
-            HeightRequest = 30,
-            HorizontalOptions = LayoutOptions.Start,
-            BackgroundColor = Colors.Transparent,
-            TextColor = Color.FromArgb("#9aa3b5"),
-            BorderColor = Color.FromArgb("#3a3a52"),
-            BorderWidth = 1,
-            CornerRadius = 8
-        };
-    }
+        Text = "Copiar",
+        FontSize = 10,
+        Padding = new Thickness(8, 3),
+        HeightRequest = 30,
+        HorizontalOptions = LayoutOptions.Start,
+        BackgroundColor = Colors.Transparent,
+        TextColor = Color.FromArgb("#9aa3b5"),
+        BorderColor = Color.FromArgb("#3a3a52"),
+        BorderWidth = 1,
+        CornerRadius = 8
+    };
 
     private void AttachLongPressCopy(View view, string text)
     {
-        string payload = text ?? string.Empty;
-        var longPress = new TapGestureRecognizer
-        {
-            NumberOfTapsRequired = 1,
-            Buttons = ButtonsMask.Primary
-        };
-        // MAUI: Gesture LongPress via Pointer/Touch — usamos long press nativo
-        var recognizer = new TapGestureRecognizer();
-        // Fallback: double-tap também copia (funciona em todas as plataformas MAUI)
+        string payload = text ?? "";
         var doubleTap = new TapGestureRecognizer { NumberOfTapsRequired = 2 };
         doubleTap.Tapped += async (_, _) =>
         {
-            try
-            {
-                await Clipboard.Default.SetTextAsync(payload);
-                await DisplayAlert("Copiado", "Texto da bolha copiado.", "OK");
-            }
-            catch (Exception ex)
-            {
-                AuraLog.Exception("AgentPage.DoubleTapCopy", ex);
-            }
+            try { await Clipboard.Default.SetTextAsync(payload); await DisplayAlert("Copiado", "OK", "OK"); }
+            catch (Exception ex) { AuraLog.Exception("Copy", ex); }
         };
         view.GestureRecognizers.Add(doubleTap);
-
 #if ANDROID
-        // Long-press nativo Android no ContentView wrapper
         view.HandlerChanged += (_, _) =>
         {
             if (view.Handler?.PlatformView is Android.Views.View native)
@@ -539,13 +427,9 @@ public partial class AgentPage : ContentPage
                     try
                     {
                         await Clipboard.Default.SetTextAsync(payload);
-                        await MainThread.InvokeOnMainThreadAsync(async () =>
-                            await DisplayAlert("Copiado", "Texto da bolha copiado.", "OK"));
+                        await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("Copiado", "OK", "OK"));
                     }
-                    catch (Exception ex)
-                    {
-                        AuraLog.Exception("AgentPage.LongPressCopy", ex);
-                    }
+                    catch (Exception ex) { AuraLog.Exception("LongPress", ex); }
                 };
             }
         };
@@ -559,22 +443,13 @@ public partial class AgentPage : ContentPage
         {
             await _bubbleGate.WaitAsync().ConfigureAwait(false);
             entered = true;
-
             await MainThread.InvokeOnMainThreadAsync(async () =>
             {
-                Color background = user
-                    ? Color.FromArgb("#1e2d54")
-                    : isError
-                        ? Color.FromArgb("#2a0f12")
-                        : isTool
-                            ? Color.FromArgb("#0f1420")
-                            : Color.FromArgb("#13131d");
-
-                Color stroke = user
-                    ? Color.FromArgb("#2a3a6a")
-                    : isError
-                        ? Color.FromArgb("#5a1f24")
-                        : Color.FromArgb("#242438");
+                Color background = user ? Color.FromArgb("#1e2d54")
+                    : isError ? Color.FromArgb("#2a0f12")
+                    : isTool ? Color.FromArgb("#0f1420") : Color.FromArgb("#13131d");
+                Color stroke = user ? Color.FromArgb("#2a3a6a")
+                    : isError ? Color.FromArgb("#5a1f24") : Color.FromArgb("#242438");
 
                 var border = new Border
                 {
@@ -586,87 +461,50 @@ public partial class AgentPage : ContentPage
                     HorizontalOptions = user ? LayoutOptions.End : LayoutOptions.Start,
                     MaximumWidthRequest = 900
                 };
-
                 var messageLabel = new Label
                 {
-                    Text = text ?? string.Empty,
+                    Text = text ?? "",
                     FontSize = 13,
-                    TextColor = user
-                        ? Color.FromArgb("#dfe7ff")
-                        : isError
-                            ? Color.FromArgb("#f0c0c4")
-                            : Color.FromArgb("#e8e8f0"),
+                    TextColor = user ? Color.FromArgb("#dfe7ff") : isError ? Color.FromArgb("#f0c0c4") : Color.FromArgb("#e8e8f0"),
                     LineBreakMode = LineBreakMode.WordWrap
                 };
-
-                // Resposta do assistente (não tool / não erro): texto + Copiar
                 if (!user && !isTool && !isError)
                 {
-                    var copyButton = CreateCopyButton();
-                    string payload = text ?? string.Empty;
-                    copyButton.Clicked += async (_, _) =>
+                    var copy = CreateCopyButton();
+                    string payload = text ?? "";
+                    copy.Clicked += async (_, _) =>
                     {
                         try
                         {
                             await Clipboard.Default.SetTextAsync(payload);
-                            copyButton.Text = "Copiado";
+                            copy.Text = "Copiado";
                             await Task.Delay(900);
-                            copyButton.Text = "Copiar";
+                            copy.Text = "Copiar";
                         }
-                        catch (Exception ex)
-                        {
-                            AuraLog.Exception("AgentPage.CopyResponse", ex);
-                        }
+                        catch { }
                     };
-
-                    border.Content = new VerticalStackLayout
-                    {
-                        Spacing = 5,
-                        Children = { messageLabel, copyButton }
-                    };
+                    border.Content = new VerticalStackLayout { Spacing = 5, Children = { messageLabel, copy } };
                 }
-                else
-                {
-                    border.Content = messageLabel;
-                }
+                else border.Content = messageLabel;
 
-                AttachLongPressCopy(border, text ?? string.Empty);
-
+                AttachLongPressCopy(border, text ?? "");
                 ConversationContainer.Children.Add(border);
                 await ConversationScroll.ScrollToAsync(border, ScrollToPosition.End, true);
             }).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            AuraLog.Exception("AgentPage.AppendBubbleAsync", ex);
-            try
-            {
-                await MainThread.InvokeOnMainThreadAsync(() =>
-                {
-                    ConversationContainer.Children.Add(new Label
-                    {
-                        Text = text ?? string.Empty,
-                        FontSize = 13,
-                        TextColor = Color.FromArgb("#e8e8f0"),
-                        Margin = new Thickness(14, 4)
-                    });
-                });
-            }
-            catch (Exception fallbackEx)
-            {
-                AuraLog.Exception("AgentPage.AppendBubbleAsync.Fallback", fallbackEx);
-            }
+            AuraLog.Exception("AppendBubbleAsync", ex);
         }
         finally
         {
-            if (entered)
-                _bubbleGate.Release();
+            if (entered) _bubbleGate.Release();
         }
     }
 
     private static string Shorten(string? text, int max)
     {
-        if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+        if (string.IsNullOrWhiteSpace(text)) return "";
         text = text.Replace("\r", " ").Replace("\n", " ").Trim();
         return text.Length <= max ? text : text[..max] + "…";
     }
