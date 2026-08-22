@@ -98,7 +98,8 @@ public partial class AgentPage : ContentPage
             "memory-notes.md no workspace. " +
             "Você PODE listar, ler, criar, editar e sobrescrever arquivos do diretório de " +
             "trabalho e executar comandos shell (sh -c). Prefira ferramentas a respostas vagas. " +
-            "Responda em português, curto e objetivo. Caminhos são relativos ao workspace.";
+            "Responda em português, curto e objetivo. Caminhos são relativos ao workspace. " +
+            "Evite loops longos de ferramentas: se já tiver informação suficiente, responda em texto.";
 
         _session = new AgentSession(_client, tools, systemPrompt, memory: _memory);
         _session.Step += OnAgentStep;
@@ -223,6 +224,8 @@ public partial class AgentPage : ContentPage
             return "Sem DNS/rede até o provedor LLM (openrouter.ai). Verifique Wi‑Fi/dados e tente de novo.";
         if (m.Contains("node already has a parent", StringComparison.OrdinalIgnoreCase))
             return "Erro interno ao montar a conversa com ferramentas. Atualize o APK e tente de novo.";
+        if (m.Contains("limite de", StringComparison.OrdinalIgnoreCase) && m.Contains("ferramentas", StringComparison.OrdinalIgnoreCase))
+            return "O agente usou demais as ferramentas sem fechar a resposta. Reformule o pedido de forma mais direta.";
         if (m.Length > 280)
             return m.Substring(0, 280) + "…";
         return m;
@@ -268,6 +271,28 @@ public partial class AgentPage : ContentPage
         }
     }
 
+    /// <summary>
+    /// Estilo ghost inline — NÃO usa Resources["BtnGhost"] (não existe no
+    /// ResourceDictionary da página e derrubava a bolha inteira).
+    /// </summary>
+    private static Button CreateCopyButton()
+    {
+        return new Button
+        {
+            Text = "Copiar",
+            FontSize = 10,
+            Padding = new Thickness(8, 3),
+            HeightRequest = 30,
+            MinimumHeightRequest = 28,
+            HorizontalOptions = LayoutOptions.Start,
+            BackgroundColor = Colors.Transparent,
+            TextColor = Color.FromArgb("#9aa3b5"),
+            BorderColor = Color.FromArgb("#3a3a52"),
+            BorderWidth = 1,
+            CornerRadius = 8
+        };
+    }
+
     private async Task AppendBubbleAsync(string text, bool user, bool isTool = false, bool isError = false)
     {
         bool entered = false;
@@ -305,28 +330,26 @@ public partial class AgentPage : ContentPage
 
                 var messageLabel = new Label
                 {
-                    Text = text,
+                    Text = text ?? string.Empty,
                     FontSize = 13,
-                    TextColor = user ? Color.FromArgb("#dfe7ff") : Color.FromArgb("#e8e8f0"),
+                    TextColor = user
+                        ? Color.FromArgb("#dfe7ff")
+                        : isError
+                            ? Color.FromArgb("#f0c0c4")
+                            : Color.FromArgb("#e8e8f0"),
                     LineBreakMode = LineBreakMode.WordWrap
                 };
 
+                // Resposta do assistente (não tool / não erro): texto + Copiar
                 if (!user && !isTool && !isError)
                 {
-                    var copyButton = new Button
-                    {
-                        Text = "Copiar",
-                        FontSize = 10,
-                        Padding = new Thickness(8, 3),
-                        HeightRequest = 30,
-                        HorizontalOptions = LayoutOptions.Start,
-                        Style = (Style)Resources["BtnGhost"]
-                    };
+                    var copyButton = CreateCopyButton();
+                    string payload = text ?? string.Empty;
                     copyButton.Clicked += async (_, _) =>
                     {
                         try
                         {
-                            await Clipboard.Default.SetTextAsync(text);
+                            await Clipboard.Default.SetTextAsync(payload);
                             copyButton.Text = "Copiado";
                             await Task.Delay(900);
                             copyButton.Text = "Copiar";
@@ -355,6 +378,24 @@ public partial class AgentPage : ContentPage
         catch (Exception ex)
         {
             AuraLog.Exception("AgentPage.AppendBubbleAsync", ex);
+            // Último recurso: tenta mostrar só o texto, sem botão
+            try
+            {
+                await MainThread.InvokeOnMainThreadAsync(() =>
+                {
+                    ConversationContainer.Children.Add(new Label
+                    {
+                        Text = text ?? string.Empty,
+                        FontSize = 13,
+                        TextColor = Color.FromArgb("#e8e8f0"),
+                        Margin = new Thickness(14, 4)
+                    });
+                });
+            }
+            catch (Exception fallbackEx)
+            {
+                AuraLog.Exception("AgentPage.AppendBubbleAsync.Fallback", fallbackEx);
+            }
         }
         finally
         {
