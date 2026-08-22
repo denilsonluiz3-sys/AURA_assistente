@@ -21,6 +21,7 @@ public partial class AgentPage : ContentPage
     private readonly AuraOrchestrator _orchestrator;
     private AgentSession? _session;
     private string? _activeProcessId;
+    private bool _configVisible;
 
     public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
         ShellExecutor shell, ProcessRegistry processes, AuraOrchestrator orchestrator,
@@ -48,6 +49,7 @@ public partial class AgentPage : ContentPage
             ConfigHost.Content = cfg;
         }
         cfg.Load(_client);
+        SetConfigVisible(_configVisible);
 
         string activeRoot = AgentWorkspace.ActiveRoot;
         WorkspaceLabel.Text = ProjectAccessService.StatusText + "\n" +
@@ -56,6 +58,18 @@ public partial class AgentPage : ContentPage
         ModelLabel.Text = $"Modelo: {_client.Options.Model} · {_client.Options.BaseUrl}";
 
         EnsureSession();
+    }
+
+    private void OnConfigClicked(object sender, EventArgs e)
+    {
+        SetConfigVisible(!_configVisible);
+    }
+
+    private void SetConfigVisible(bool visible)
+    {
+        _configVisible = visible;
+        ConfigHost.IsVisible = visible;
+        ConfigButton.Text = visible ? "×" : "⚙";
     }
 
     private void EnsureSession()
@@ -262,13 +276,50 @@ public partial class AgentPage : ContentPage
                     MaximumWidthRequest = 900
                 };
 
-                border.Content = new Label
+                var messageLabel = new Label
                 {
                     Text = text,
                     FontSize = 13,
                     TextColor = user ? Color.FromArgb("#dfe7ff") : Color.FromArgb("#e8e8f0"),
                     LineBreakMode = LineBreakMode.WordWrap
                 };
+
+                if (!user && !isTool && !isError)
+                {
+                    var copyButton = new Button
+                    {
+                        Text = "Copiar",
+                        FontSize = 10,
+                        Padding = new Thickness(8, 3),
+                        HeightRequest = 30,
+                        HorizontalOptions = LayoutOptions.Start,
+                        Style = (Style)Resources["BtnGhost"]
+                    };
+                    copyButton.Clicked += async (_, _) =>
+                    {
+                        try
+                        {
+                            await Clipboard.Default.SetTextAsync(text);
+                            copyButton.Text = "Copiado";
+                            await Task.Delay(900);
+                            copyButton.Text = "Copiar";
+                        }
+                        catch (Exception ex)
+                        {
+                            AuraLog.Exception("AgentPage.CopyResponse", ex);
+                        }
+                    };
+
+                    border.Content = new VerticalStackLayout
+                    {
+                        Spacing = 5,
+                        Children = { messageLabel, copyButton }
+                    };
+                }
+                else
+                {
+                    border.Content = messageLabel;
+                }
 
                 ConversationContainer.Children.Add(border);
                 await ConversationScroll.ScrollToAsync(border, ScrollToPosition.End, true);
