@@ -1,13 +1,13 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
   "workflow": "AURA Android APK",
-  "run_id": "32604806440",
+  "run_id": "32605329261",
   "status": "completed",
   "conclusion": "failure",
-  "branch": "feat/local-playbook-slim-apk",
-  "commit": "35b3d532e38f96d55a5a62fbaf1139b2b1102c6c",
-  "event": "pull_request",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32604806440",
+  "branch": "main",
+  "commit": "0ce57cffcb6a3d15d7ed970d46e4a2f32b6d98d7",
+  "event": "push",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32605329261",
   "category": "C# / compilação",
   "infra_only": false,
   "failed_jobs": [
@@ -21,18 +21,15 @@
     }
   ],
   "changed_files": [
-    "README_AI.md",
-    "docs/ai/CI_FAILURE_LATEST.json",
-    "docs/ai/CI_FAILURE_LATEST.md",
-    "docs/ai/ci-failures/32604485050.md",
-    "docs/ai/ci-failures/32604485068.md",
-    "docs/ai/ci-failures/32604506385.md",
+    "docs/ai/AURA_LOCAL_PLAYBOOK.md",
     "src/AURA.Mobile/AURA.Mobile.csproj",
-    "src/AURA.Mobile/MauiProgram.cs",
-    "src/AURA.Mobile/Pages/AgentPage.xaml.cs"
+    "src/AURA.Mobile/Pages/AgentPage.xaml.cs.fix",
+    "src/AURA.Mobile/Pages/AgentPage.xaml.cs.tmp",
+    "src/AURA.Mobile/Resources/Raw/.gitkeep",
+    "src/AURA.Mobile/Services/LocalPlaybook.cs"
   ],
   "associated_prs": [
     79
   ],
-  "diagnostic_report": "docs/ai/ci-failures/32604806440.md"
+  "diagnostic_report": "docs/ai/ci-failures/32605329261.md"
 }
