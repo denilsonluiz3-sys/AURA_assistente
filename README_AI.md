@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `80080e8`
-- Data UTC: `2026-08-22 07:39:24 UTC`
+- Commit: `4727db2`
+- Data UTC: `2026-08-22 20:49:03 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -596,9 +596,9 @@ testes relacionados
 
 ### Últimos commits
 
-- `80080e8` ci: fix workflow noise — artifact quota, diagnostics API, CodeQL soft-fail (#70) (2026-08-22)
-- `cc28fc7` docs(ai): sync README_AI with source tree (2026-08-22)
-- `997ddf1` ci: clean up old GitHub Actions artifacts (2026-08-22)
-- `fdc4c91` docs(ai): sync README_AI with source tree (2026-08-22)
-- `e11cc6b` fix: batch stability — AgentPage bubbles, JsonNode clone, TTS CTS, RunPage path (#69) (2026-08-22)
+- `4727db2` fix(agent): memória persistente explícita + anti-crash de UI no APK (#73) (2026-08-22)
+- `c50a1db` chore(ci): simplify codemagic.yaml to one clear APK workflow (#74) (2026-08-22)
+- `03f2e1e` docs(ai): record CI failure context (2026-08-22)
+- `42d95d4` chore(ci): update codemagic.yaml for net10 MAUI APK 2.1 (#71) (2026-08-22)
+- `330aaec` docs(ai): record CI failure context (2026-08-22)
 <!-- AI-DOCS:END -->
