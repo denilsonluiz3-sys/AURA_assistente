@@ -1,42 +1,31 @@
+# ÚNICO workflow da AURA — gere o APK Android aqui.
 workflows:
   aura-mobile-apk:
     name: AURA Mobile Android (APK)
     max_build_duration: 120
     instance_type: mac_mini_m2
-    integrations:
-      app_store_connect: none
     environment:
       vars:
         DOTNET_PATH: $CM_BUILD_DIR/dotnet
         DOTNET_BIN: $CM_BUILD_DIR/dotnet/dotnet
-        # Alinhado a global.json / AURA.Mobile.csproj
         DOTNET_VERSION: "10.0.110"
         ANDROID_TFM: net10.0-android
-        # Versão de exibição (ApplicationDisplayVersion no csproj = 2.1).
-        # ApplicationVersion (código inteiro) usa BUILD_NUMBER do Codemagic.
         AURA_DISPLAY_VERSION: "2.1"
-        # Assinatura release (opcional):
-        #   1) Code signing identities → upload da keystore .jks/.keystore
-        #   2) Descomente android_signing abaixo com o reference name
-        #   3) O script de publish detecta CM_KEYSTORE_PATH e assina
-      # android_signing:
-      #   - aura_release
     scripts:
-      - name: Instalar .NET SDK 10
+      - name: Install .NET 10
         script: |
           set -euo pipefail
-          wget -q https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
+          curl -fsSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
           chmod +x dotnet-install.sh
           ./dotnet-install.sh --install-dir "$DOTNET_PATH" --version "$DOTNET_VERSION"
           export PATH="$DOTNET_PATH:$PATH"
           "$DOTNET_BIN" --info
 
-      - name: Instalar workload MAUI Android
+      - name: Install MAUI Android workload
         script: |
           set -euo pipefail
           export PATH="$DOTNET_PATH:$PATH"
-          "$DOTNET_BIN" workload install maui-android --skip-manifest-update || \
-            "$DOTNET_BIN" workload install maui-android
+          "$DOTNET_BIN" workload install maui-android
 
       - name: Restore
         script: |
@@ -44,55 +33,31 @@ workflows:
           export PATH="$DOTNET_PATH:$PATH"
           "$DOTNET_BIN" restore src/AURA.Mobile/AURA.Mobile.csproj
 
-      - name: Instalar dependências do Android SDK (API 36)
+      - name: Install Android SDK deps
         script: |
           set -euo pipefail
           export PATH="$DOTNET_PATH:$PATH"
-          # macOS Codemagic: SDK costuma estar em /Users/builder/Library/Android/sdk
-          SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/share/android-sdk}}"
-          if [ ! -d "$SDK_DIR" ] && [ -d "$HOME/Library/Android/sdk" ]; then
-            SDK_DIR="$HOME/Library/Android/sdk"
-          fi
-          echo "AndroidSdkDirectory=$SDK_DIR"
+          SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
+          echo "SDK=$SDK_DIR"
           "$DOTNET_BIN" build src/AURA.Mobile/AURA.Mobile.csproj \
             -t:InstallAndroidDependencies \
             -f "$ANDROID_TFM" \
             -p:AndroidSdkDirectory="$SDK_DIR" \
             -p:AcceptAndroidSDKLicenses=True
 
-      - name: Publicar APK (Release)
+      - name: Publish APK
         script: |
           set -euo pipefail
           export PATH="$DOTNET_PATH:$PATH"
-          cd "$CM_BUILD_DIR"
-          mkdir -p artifacts
-
-          SIGN_ARGS=""
-          if [ -n "${CM_KEYSTORE_PATH:-}" ] && [ -f "${CM_KEYSTORE_PATH}" ]; then
-            echo "Assinatura release via Codemagic keystore"
-            SIGN_ARGS="-p:AndroidKeyStore=true \
-              -p:AndroidSigningKeyStore=$CM_KEYSTORE_PATH \
-              -p:AndroidSigningKeyAlias=$CM_KEY_ALIAS \
-              -p:AndroidSigningKeyPass=$CM_KEY_PASSWORD \
-              -p:AndroidSigningStorePass=$CM_KEYSTORE_PASSWORD \
-              -p:AndroidUseDebugSigning=false"
-          else
-            echo "Sem keystore Codemagic — APK com assinatura de debug (sideload)"
-          fi
-
-          # shellcheck disable=SC2086
+          mkdir -p "$CM_BUILD_DIR/artifacts"
           "$DOTNET_BIN" publish src/AURA.Mobile/AURA.Mobile.csproj \
             -f "$ANDROID_TFM" \
             -c Release \
             -p:AndroidPackageFormats=apk \
             -p:ApplicationVersion="${BUILD_NUMBER:-1}" \
-            -p:ApplicationDisplayVersion="${AURA_DISPLAY_VERSION}" \
-            $SIGN_ARGS \
+            -p:ApplicationDisplayVersion="$AURA_DISPLAY_VERSION" \
             -o "$CM_BUILD_DIR/artifacts"
-
-          echo "APKs gerados:"
-          find "$CM_BUILD_DIR/artifacts" -name '*.apk' -type f -print
+          find "$CM_BUILD_DIR/artifacts" -name '*.apk' -print
 
     artifacts:
       - artifacts/**/*.apk
-      - artifacts/*.apk
