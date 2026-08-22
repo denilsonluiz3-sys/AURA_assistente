@@ -379,6 +379,7 @@ public partial class AgentPage : ContentPage
                     LineBreakMode = LineBreakMode.WordWrap
                 };
 
+                // Resposta do assistente (não tool / não erro): texto + Copiar
                 if (!user && !isTool && !isError)
                 {
                     var copyButton = CreateCopyButton();
