@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `25858f5`
-- Data UTC: `2026-08-22 22:17:49 UTC`
+- Commit: `fdd18ee`
+- Data UTC: `2026-08-22 22:22:28 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -295,7 +295,7 @@ testes relacionados
 - `src/AURA.Core`: 39 arquivos C#, 0 arquivos XAML
 - `src/AURA.Installer`: 17 arquivos C#, 0 arquivos XAML
 - `src/AURA.Memory`: 5 arquivos C#, 0 arquivos XAML
-- `src/AURA.Mobile`: 57 arquivos C#, 34 arquivos XAML
+- `src/AURA.Mobile`: 58 arquivos C#, 34 arquivos XAML
 - `src/AURA.Modules`: 23 arquivos C#, 0 arquivos XAML
 - `src/AURA.Network`: 2 arquivos C#, 0 arquivos XAML
 - `src/AURA.SystemInfo`: 2 arquivos C#, 0 arquivos XAML
@@ -554,6 +554,7 @@ testes relacionados
 - `src/AURA.Mobile/ProcessInfo.cs`
 - `src/AURA.Mobile/ProcessRegistry.cs`
 - `src/AURA.Mobile/RoleToColorConverter.cs`
+- `src/AURA.Mobile/Services/AgentPromptStore.cs`
 - `src/AURA.Mobile/Services/AndroidCapabilityService.cs`
 - `src/AURA.Mobile/Services/AuraCellContext.cs`
 - `src/AURA.Mobile/Services/AuraCellContextFactory.cs`
@@ -596,9 +597,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `fdd18ee` feat(agent): histórico, projeto, recentes e prompts prontos (#77) (2026-08-22)
+- `e4978f6` docs(ai): sync README_AI with source tree (2026-08-22)
 - `25858f5` fix(mobile): AgentPage bubbles — remove BtnGhost dependency so replies show (#76) (2026-08-22)
 - `b3510ee` docs(ai): record CI failure context (2026-08-22)
 - `cf1e660` ci: make Actions cleanup immediate and pagination-safe (2026-08-22)
-- `9e8e4c0` ci: automate cleanup of old runs artifacts and caches (2026-08-22)
-- `6102804` feat(scripts): aura_git.py — status, snapshot, commit local seguro (#75) (2026-08-22)
 <!-- AI-DOCS:END -->
