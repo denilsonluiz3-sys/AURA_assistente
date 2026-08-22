@@ -1,13 +1,13 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
   "workflow": "AURA Android APK",
-  "run_id": "32604198975",
+  "run_id": "32604485050",
   "status": "completed",
   "conclusion": "failure",
-  "branch": "feat/batch-playbook-slim-v1",
-  "commit": "efd2daa8ee9b73caaa7ba49d8853c9993c2c4665",
+  "branch": "feat/local-playbook-slim-apk",
+  "commit": "bf3f7969f10d991eff754238de302ec1b865a4b9",
   "event": "pull_request",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32604198975",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32604485050",
   "category": "C# / compilação",
   "infra_only": false,
   "failed_jobs": [
@@ -21,10 +21,10 @@
     }
   ],
   "changed_files": [
-    "src/AURA.Mobile/Resources/Raw/solar_bg.mp4"
+    "src/AURA.Mobile/Resources/Raw/pf_dora.f32"
   ],
   "associated_prs": [
-    80
+    79
   ],
-  "diagnostic_report": "docs/ai/ci-failures/32604198975.md"
+  "diagnostic_report": "docs/ai/ci-failures/32604485050.md"
 }
