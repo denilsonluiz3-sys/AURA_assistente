@@ -19,6 +19,7 @@ public partial class AgentPage : ContentPage
     private readonly ShellExecutor _shell;
     private readonly ProcessRegistry _processes;
     private readonly AuraOrchestrator _orchestrator;
+    private readonly SemaphoreSlim _bubbleGate = new(1, 1);
     private AgentSession? _session;
     private string? _activeProcessId;
     private bool _configVisible;
@@ -245,11 +246,15 @@ public partial class AgentPage : ContentPage
         }
     }
 
-    private void AppendBubble(string text, bool user, bool isTool = false, bool isError = false)
+    private async void AppendBubble(string text, bool user, bool isTool = false, bool isError = false)
     {
-        MainThread.BeginInvokeOnMainThread(async () =>
+        bool entered = false;
+        try
         {
-            try
+            await _bubbleGate.WaitAsync();
+            entered = true;
+
+            await MainThread.InvokeOnMainThreadAsync(async () =>
             {
                 Color background = user
                     ? Color.FromArgb("#1e2d54")
@@ -323,12 +328,17 @@ public partial class AgentPage : ContentPage
 
                 ConversationContainer.Children.Add(border);
                 await ConversationScroll.ScrollToAsync(border, ScrollToPosition.End, true);
-            }
-            catch (Exception ex)
-            {
-                AuraLog.Exception("AgentPage.AppendBubble", ex);
-            }
-        });
+            });
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("AgentPage.AppendBubble", ex);
+        }
+        finally
+        {
+            if (entered)
+                _bubbleGate.Release();
+        }
     }
 
     private static string Shorten(string? text, int max)
