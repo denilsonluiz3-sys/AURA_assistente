@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `e180c2c`
-- Data UTC: `2026-08-22 07:19:32 UTC`
+- Commit: `b0870bd`
+- Data UTC: `2026-08-22 07:20:01 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -595,9 +595,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `b0870bd` ui(agent): prioritize conversation and one-time AI configuration (#68) (2026-08-22)
+- `4514a75` docs(ai): sync README_AI with source tree (2026-08-22)
 - `e180c2c` feat(mobile): connect logs, diagnostics and AI fixes (#67) (2026-08-22)
 - `a164b8a` docs(ai): sync README_AI with source tree (2026-08-22)
 - `6cb56de` fix(mobile): sync cells page with runtime events (#66) (2026-08-22)
-- `da33105` docs(ai): sync README_AI with source tree (2026-08-22)
-- `6c408aa` fix AgentPage bubble UI serialization (2026-08-22)
 <!-- AI-DOCS:END -->
