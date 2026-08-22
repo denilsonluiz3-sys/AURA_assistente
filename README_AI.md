@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `4d23bec`
-- Data UTC: `2026-08-21 23:46:22 UTC`
+- Commit: `66dcfdb`
+- Data UTC: `2026-08-22 02:25:02 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -295,7 +295,7 @@ testes relacionados
 - `src/AURA.Core`: 39 arquivos C#, 0 arquivos XAML
 - `src/AURA.Installer`: 17 arquivos C#, 0 arquivos XAML
 - `src/AURA.Memory`: 5 arquivos C#, 0 arquivos XAML
-- `src/AURA.Mobile`: 54 arquivos C#, 34 arquivos XAML
+- `src/AURA.Mobile`: 56 arquivos C#, 34 arquivos XAML
 - `src/AURA.Modules`: 23 arquivos C#, 0 arquivos XAML
 - `src/AURA.Network`: 2 arquivos C#, 0 arquivos XAML
 - `src/AURA.SystemInfo`: 2 arquivos C#, 0 arquivos XAML
@@ -556,8 +556,10 @@ testes relacionados
 - `src/AURA.Mobile/Services/AuraCellContext.cs`
 - `src/AURA.Mobile/Services/AuraCellContextFactory.cs`
 - `src/AURA.Mobile/Services/WebSearchService.cs`
+- `src/AURA.Mobile/Speech/AndroidSpeechRecognitionService.cs`
 - `src/AURA.Mobile/Speech/AndroidTtsSpeechService.cs`
 - `src/AURA.Mobile/Speech/HybridSpeechService.cs`
+- `src/AURA.Mobile/Speech/ISpeechRecognitionService.cs`
 - `src/AURA.Mobile/Speech/ISpeechService.cs`
 - `src/AURA.Mobile/Speech/VoiceAssistantService.cs`
 - `src/AURA.Mobile/ViewModels/ModuleRow.cs`
@@ -592,9 +594,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `66dcfdb` feat(ui): unificação da interface Mobile (Home · Sistema · Programas · Assistente · Ferramentas · Voz STT) (#64) (2026-08-21)
+- `b616a6c` docs(ai): sync README_AI with source tree (2026-08-21)
 - `4d23bec` Ai/improve ai context (#62) (2026-08-21)
 - `348786c` docs(ai): record CI failure diagnostics (2026-08-21)
 - `39999e4` docs(ai): record CI failure diagnostics (2026-08-21)
-- `2a1fe60` docs(ai): record CI failure diagnostics (2026-08-21)
-- `feee21b` docs(ai): sync README_AI with source tree (2026-08-21)
 <!-- AI-DOCS:END -->
