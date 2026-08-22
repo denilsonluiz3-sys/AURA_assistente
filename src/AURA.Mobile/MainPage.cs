@@ -9,36 +9,33 @@ namespace AURA.Mobile
         private readonly ModuleManager _manager;
         private readonly List<(string? ModuleId, string Section, string Label, Page Page)> _entries;
         private bool _permissionsAsked;
+        private CancellationTokenSource? _rebuildCts;
 
         public MainPage(EventBus events, ModuleManager manager, HomePage home, DiagnosticoPage diagnostico, ChatPage chat, AgentPage agent, MemoryPage memory, ExecutorsPage executors, ModulesPage modules, LogsPage logs, FixesPage fixes, TerminalPage terminal, BrowserPage browser, CellsPage cells, RunPage run, ProgramsPage programs, EcosystemPage ecosystem)
         {
             AuraLog.Info("MainPage.ctor BEGIN");
             _manager = manager;
-            events.Subscribe<ModuleStateChangedEvent>(_ => MainThread.BeginInvokeOnMainThread(RebuildTabs));
+            // Debounce: aplicar 7 módulos não deve reconstruir abas 7 vezes
+            events.Subscribe<ModuleStateChangedEvent>(_ =>
+                MainThread.BeginInvokeOnMainThread(ScheduleRebuildTabs));
 
-            // Seções alinhadas à unificação UI:
-            // HOME/Sistema · Assistente · Ferramentas · Apps
             _entries = new List<(string?, string, string, Page)>
             {
-                // Sistema — visão do dispositivo
                 (null, "Sistema", "Início", home),
                 (null, "Sistema", "Ecossistema", ecosystem),
                 ("system", "Sistema", "Diagnóstico", diagnostico),
                 ("logs", "Sistema", "Correções", fixes),
 
-                // Assistente — chat / agentes / memória
                 ("ai", "Assistente", "Chat", chat),
                 ("ai", "Assistente", "Agente", agent),
                 ("memory", "Assistente", "Memória", memory),
                 (null, "Assistente", "Navegador", browser),
 
-                // Ferramentas — terminal, executores, módulos, avançado
                 ("terminal", "Ferramentas", "Terminal", terminal),
                 ("executors", "Ferramentas", "Executores", executors),
                 (null, "Ferramentas", "Módulos", modules),
                 ("logs", "Ferramentas", "Logs", logs),
 
-                // Apps — programas e células
                 (null, "Apps", "Programas", programs),
                 ("cells", "Apps", "Células", cells),
                 ("cells", "Apps", "Rodar programa", run)
@@ -65,6 +62,24 @@ namespace AURA.Mobile
                 }
             }
             catch (Exception ex) { AuraLog.Info("Permissões de armazenamento: " + ex.Message); }
+        }
+
+        /// <summary>Agrupa vários Apply em um único RebuildTabs (~250 ms).</summary>
+        private void ScheduleRebuildTabs()
+        {
+            try { _rebuildCts?.Cancel(); } catch { /* ignore */ }
+            _rebuildCts = new CancellationTokenSource();
+            var token = _rebuildCts.Token;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(250, token);
+                    if (token.IsCancellationRequested) return;
+                    MainThread.BeginInvokeOnMainThread(RebuildTabs);
+                }
+                catch (TaskCanceledException) { /* coalesced */ }
+            });
         }
 
         public void RebuildTabs()
