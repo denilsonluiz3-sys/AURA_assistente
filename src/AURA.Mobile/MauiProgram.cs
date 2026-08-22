@@ -95,7 +95,19 @@ public static class MauiProgram
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<HomePage>();
         builder.Services.AddSingleton<EcosystemPage>();
-        builder.Services.AddSingleton<DiagnosticoPage>();
+        builder.Services.AddSingleton<DiagnosticoPage>(sp => new DiagnosticoPage(
+            sp.GetRequiredService<SystemAnalyzer>(),
+            sp.GetRequiredService<NetworkManager>(),
+            sp.GetRequiredService<AgentManager>(),
+#if ANDROID
+            sp.GetService<CellProgramRegistry>(),
+            sp.GetService<CellProgramRunner>(),
+            sp.GetService<IAuraCellContextFactory>(),
+            sp.GetService<ILogger>()
+#else
+            null, null, null, sp.GetService<ILogger>()
+#endif
+        ));
         builder.Services.AddSingleton<ChatPage>();
         builder.Services.AddSingleton<AgentPage>();
         builder.Services.AddSingleton<MemoryPage>();
