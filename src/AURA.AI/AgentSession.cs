@@ -18,7 +18,8 @@ namespace AURA.AI
     /// </summary>
     public sealed class AgentSession
     {
-        private const int MaxRounds = 8;
+        /// <summary>Máximo de rodadas tool→modelo antes de encerrar com resumo.</summary>
+        private const int MaxRounds = 16;
 
         private readonly OpenRouterClient _client;
         private readonly ILogger _logger;
@@ -47,7 +48,6 @@ namespace AURA.AI
             _messages.RemoveRange(0, _messages.Count - MaxHistoryMessages);
         }
 
-        /// <summary>System prompt + resumo das últimas entradas persistidas.</summary>
         private string BuildSystemPrompt()
         {
             var sb = new StringBuilder();
@@ -114,6 +114,7 @@ namespace AURA.AI
             _memory?.Append(MemoryEntry.Question(userText));
 
             string systemPrompt = BuildSystemPrompt();
+            var lastToolNotes = new List<string>();
 
             int round = 0;
             while (round++ < MaxRounds)
@@ -154,6 +155,11 @@ namespace AURA.AI
                         });
                         Step?.Invoke(new AgentStep(call.Name, call.ArgumentsJson, result));
                         _logger.Info("agent: ferramenta='" + call.Name + "'");
+
+                        string note = call.Name + ": " + Truncate(result, 200);
+                        lastToolNotes.Add(note);
+                        if (lastToolNotes.Count > 6)
+                            lastToolNotes.RemoveAt(0);
                     }
 
                     continue;
@@ -165,8 +171,26 @@ namespace AURA.AI
                 return final;
             }
 
-            throw new InvalidOperationException(
-                "O agente atingiu o limite de " + MaxRounds + " passos de ferramentas.");
+            // Soft stop: não explode a UI — devolve o que já foi obtido
+            string soft =
+                "Alcancei o limite de " + MaxRounds + " passos de ferramentas. " +
+                "Resumo parcial do que já executei:\n\n" +
+                (lastToolNotes.Count == 0
+                    ? "(nenhuma ferramenta concluída)"
+                    : string.Join("\n", lastToolNotes.Select(n => "• " + n))) +
+                "\n\nReformule o pedido de forma mais direta ou continue em outra mensagem.";
+
+            _messages.Add(new AgentMessage { Role = "assistant", Content = soft });
+            _memory?.Append(MemoryEntry.Answer(soft));
+            _logger.Warning("agent: soft-stop após " + MaxRounds + " rounds");
+            return soft;
+        }
+
+        private static string Truncate(string? s, int max)
+        {
+            if (string.IsNullOrEmpty(s)) return string.Empty;
+            s = s.Replace('\r', ' ').Replace('\n', ' ').Trim();
+            return s.Length <= max ? s : s.Substring(0, max) + "…";
         }
 
         private async Task<string> ExecuteToolAsync(AgentToolCall call, CancellationToken ct)
