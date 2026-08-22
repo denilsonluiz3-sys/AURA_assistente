@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `0ce57cf`
-- Data UTC: `2026-08-22 23:28:58 UTC`
+- Commit: `c109a0e`
+- Data UTC: `2026-08-22 23:37:58 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `c109a0e` Feat/local decision phase1 (#82) (2026-08-22)
+- `a69d206` Feat/local playbook slim apk (#84) (2026-08-22)
+- `ade1c53` docs(ai): record CI failure context (2026-08-22)
+- `5a0645f` docs(ai): sync README_AI with source tree (2026-08-22)
 - `0ce57cf` feat: playbook local (menos IA) + APK sem Kokoro/MP4 (#79) (2026-08-22)
-- `9741f2c` docs(ai): record CI failure context (2026-08-22)
-- `7154a46` docs(ai): record CI failure context (2026-08-22)
-- `9f884fa` docs(ai): sync README_AI with source tree (2026-08-22)
-- `4a6cb67` feat(batch): playbook local + aura-sh + APK slim 2.2 (1 compilação) (#80) (2026-08-22)
 <!-- AI-DOCS:END -->
