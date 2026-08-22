@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `fdd18ee`
-- Data UTC: `2026-08-22 22:22:28 UTC`
+- Commit: `778fa95`
+- Data UTC: `2026-08-22 22:33:27 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -597,9 +597,9 @@ testes relacionados
 
 ### Últimos commits
 
-- `fdd18ee` feat(agent): histórico, projeto, recentes e prompts prontos (#77) (2026-08-22)
-- `e4978f6` docs(ai): sync README_AI with source tree (2026-08-22)
-- `25858f5` fix(mobile): AgentPage bubbles — remove BtnGhost dependency so replies show (#76) (2026-08-22)
-- `b3510ee` docs(ai): record CI failure context (2026-08-22)
-- `cf1e660` ci: make Actions cleanup immediate and pagination-safe (2026-08-22)
+- `778fa95` fix: MaxRounds 16 + soft stop, long-press/copy, debounce abas (#78) (2026-08-22)
+- `2de34e3` docs(ai): record CI failure context (2026-08-22)
+- `139f8f9` docs(ai): record CI failure context (2026-08-22)
+- `3830f79` docs(ai): record CI failure context (2026-08-22)
+- `017314e` docs(ai): record CI failure context (2026-08-22)
 <!-- AI-DOCS:END -->

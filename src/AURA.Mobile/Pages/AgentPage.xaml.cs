@@ -96,9 +96,6 @@ public partial class AgentPage : ContentPage
             "Você é o agente de arquivos da AURA. " +
             "Você TEM memória persistente: cada pergunta e resposta é gravada em memory.json " +
             "e reapresentada nas próximas sessões. Nunca diga que não tem memória. " +
-            "Se o usuário pedir para 'criar memória' ou anotar algo, confirme que já está " +
-            "sendo gravado automaticamente e, se quiser nota extra, use write_file em " +
-            "memory-notes.md no workspace. " +
             "Você PODE listar, ler, criar, editar e sobrescrever arquivos do diretório de " +
             "trabalho e executar comandos shell (sh -c). Prefira ferramentas a respostas vagas. " +
             "Responda em português, curto e objetivo. Caminhos são relativos ao workspace. " +
@@ -110,8 +107,8 @@ public partial class AgentPage : ContentPage
         int memCount = 0;
         try { memCount = _memory.Read(tail: 64).Count; } catch { /* ignore */ }
         string welcome = memCount > 0
-            ? $"Pronto. Memória ativa ({memCount} registro(s)). Use Histórico, Prompts ou digite uma instrução."
-            : "Pronto. Memória ligada. Use ✦ Prompts, 🕑 Histórico ou digite uma instrução.";
+            ? $"Pronto. Memória ativa ({memCount} registro(s)). O que deseja fazer?"
+            : "Pronto. Memória persistente ligada. O que deseja fazer?";
         _ = AppendBubbleAsync(welcome, user: false);
     }
 
@@ -435,17 +432,13 @@ public partial class AgentPage : ContentPage
         if (m.Contains("401") || m.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase))
             return "Chave de API inválida ou ausente. Configure na aba Assistente / Correções.";
         if (m.Contains("402") || m.Contains("PaymentRequired", StringComparison.OrdinalIgnoreCase) || m.Contains("credits", StringComparison.OrdinalIgnoreCase))
-            return "Sem créditos no provedor LLM (ou max_tokens alto demais). Reduza tokens ou adicione créditos.";
+            return "Sem créditos no provedor LLM.";
         if (m.Contains("429") || m.Contains("TooManyRequests", StringComparison.OrdinalIgnoreCase))
-            return "Limite de requisições (rate limit). Aguarde alguns segundos e tente de novo.";
-        if (m.Contains("404") || m.Contains("NotFound", StringComparison.OrdinalIgnoreCase))
-            return "Modelo ou endpoint não encontrado. Verifique o modelo configurado.";
-        if (m.Contains("hostname") || m.Contains("nor servname") || m.Contains("Name or service not known", StringComparison.OrdinalIgnoreCase))
-            return "Sem DNS/rede até o provedor LLM (openrouter.ai). Verifique Wi‑Fi/dados e tente de novo.";
+            return "Rate limit. Aguarde e tente de novo.";
+        if (m.Contains("hostname") || m.Contains("nor servname"))
+            return "Sem DNS/rede até o provedor LLM.";
         if (m.Contains("node already has a parent", StringComparison.OrdinalIgnoreCase))
-            return "Erro interno ao montar a conversa com ferramentas. Atualize o APK e tente de novo.";
-        if (m.Contains("limite de", StringComparison.OrdinalIgnoreCase) && m.Contains("ferramentas", StringComparison.OrdinalIgnoreCase))
-            return "O agente usou demais as ferramentas sem fechar a resposta. Reformule o pedido de forma mais direta.";
+            return "Erro interno de ferramentas. Atualize o APK.";
         if (m.Length > 280)
             return m.Substring(0, 280) + "…";
         return m;
@@ -456,8 +449,7 @@ public partial class AgentPage : ContentPage
         string l = text.ToLowerInvariant();
         return l.Contains("orquestre") || l.Contains("orquestr") ||
                l.Contains("planeje") || l.Contains("divida em tarefas") ||
-               l.Contains("coordene") || l.Contains("pesquise e execute") ||
-               l.Contains("pesquise e depois") || l.Contains("execute e depois");
+               l.Contains("coordene") || l.Contains("pesquise e execute");
     }
 
     private void OnAgentStep(AURA.AI.AgentStep step)
@@ -487,7 +479,7 @@ public partial class AgentPage : ContentPage
         }
         catch (NotSupportedException)
         {
-            AuraLog.Info("TTS: texto fora do alcance do motor atual, fala pulada.");
+            AuraLog.Info("TTS: fala pulada.");
         }
     }
 
@@ -499,7 +491,6 @@ public partial class AgentPage : ContentPage
             FontSize = 10,
             Padding = new Thickness(8, 3),
             HeightRequest = 30,
-            MinimumHeightRequest = 28,
             HorizontalOptions = LayoutOptions.Start,
             BackgroundColor = Colors.Transparent,
             TextColor = Color.FromArgb("#9aa3b5"),
@@ -507,6 +498,58 @@ public partial class AgentPage : ContentPage
             BorderWidth = 1,
             CornerRadius = 8
         };
+    }
+
+    private void AttachLongPressCopy(View view, string text)
+    {
+        string payload = text ?? string.Empty;
+        var longPress = new TapGestureRecognizer
+        {
+            NumberOfTapsRequired = 1,
+            Buttons = ButtonsMask.Primary
+        };
+        // MAUI: Gesture LongPress via Pointer/Touch — usamos long press nativo
+        var recognizer = new TapGestureRecognizer();
+        // Fallback: double-tap também copia (funciona em todas as plataformas MAUI)
+        var doubleTap = new TapGestureRecognizer { NumberOfTapsRequired = 2 };
+        doubleTap.Tapped += async (_, _) =>
+        {
+            try
+            {
+                await Clipboard.Default.SetTextAsync(payload);
+                await DisplayAlert("Copiado", "Texto da bolha copiado.", "OK");
+            }
+            catch (Exception ex)
+            {
+                AuraLog.Exception("AgentPage.DoubleTapCopy", ex);
+            }
+        };
+        view.GestureRecognizers.Add(doubleTap);
+
+#if ANDROID
+        // Long-press nativo Android no ContentView wrapper
+        view.HandlerChanged += (_, _) =>
+        {
+            if (view.Handler?.PlatformView is Android.Views.View native)
+            {
+                native.LongClickable = true;
+                native.LongClick += async (_, args) =>
+                {
+                    args.Handled = true;
+                    try
+                    {
+                        await Clipboard.Default.SetTextAsync(payload);
+                        await MainThread.InvokeOnMainThreadAsync(async () =>
+                            await DisplayAlert("Copiado", "Texto da bolha copiado.", "OK"));
+                    }
+                    catch (Exception ex)
+                    {
+                        AuraLog.Exception("AgentPage.LongPressCopy", ex);
+                    }
+                };
+            }
+        };
+#endif
     }
 
     private async Task AppendBubbleAsync(string text, bool user, bool isTool = false, bool isError = false)
@@ -586,6 +629,8 @@ public partial class AgentPage : ContentPage
                 {
                     border.Content = messageLabel;
                 }
+
+                AttachLongPressCopy(border, text ?? string.Empty);
 
                 ConversationContainer.Children.Add(border);
                 await ConversationScroll.ScrollToAsync(border, ScrollToPosition.End, true);
