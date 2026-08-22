@@ -8,11 +8,13 @@ namespace AURA.Mobile.Pages;
 public partial class LogsPage : ContentPage
 {
     private readonly OpenRouterClient _client;
+    private readonly AiDiagnosticsService _diagnostics;
 
-    public LogsPage(OpenRouterClient client)
+    public LogsPage(OpenRouterClient client, AiDiagnosticsService diagnostics)
     {
         InitializeComponent();
         _client = client;
+        _diagnostics = diagnostics;
     }
 
     protected override void OnAppearing()
@@ -73,7 +75,6 @@ public partial class LogsPage : ContentPage
 
     private async void OnTestClicked(object sender, EventArgs e)
     {
-        RuntimeConfig.Apply(_client);
         TestButton.IsEnabled = false;
         BusyIndicator.IsRunning = true;
         BusyIndicator.IsVisible = true;
@@ -82,31 +83,33 @@ public partial class LogsPage : ContentPage
         var sb = new System.Text.StringBuilder();
         try
         {
-            var hasKey = !string.IsNullOrWhiteSpace(_client.Options.ApiKey);
-            sb.AppendLine($"Chave OpenRouter: {(hasKey ? "configurada (" + _client.Options.ApiKey.Length + " chars)" : "AUSENTE — defina na aba Assistente")}");
+            RuntimeConfig.Apply(_client);
+            string? readinessError = RuntimeConfig.EnsureReadyForRequest(_client);
+            sb.AppendLine($"Provedor: {_client.Options.Provider}");
             sb.AppendLine($"Modelo: {_client.Options.Model}");
             sb.AppendLine($"URL: {_client.Options.BaseUrl}");
+            sb.AppendLine($"Chave: {(string.IsNullOrWhiteSpace(_client.Options.ApiKey) ? "não configurada" : "configurada")}");
             sb.AppendLine();
 
-            if (!hasKey)
+            if (!string.IsNullOrWhiteSpace(readinessError))
             {
-                sb.AppendLine("RESULTADO: falha — nenhuma chave de API configurada.");
+                sb.AppendLine("RESULTADO: FALHA — " + readinessError);
                 LogViewer.Text = sb.ToString();
                 return;
             }
 
-            // 1. Conexão de rede local.
             var current = Connectivity.Current.NetworkAccess;
             sb.AppendLine($"1) Acesso à rede: {current}");
 
-            // 2. DNS/HTTPS até a base da OpenRouter.
             using var handler = new HttpClientHandler
             {
                 AllowAutoRedirect = true,
                 AutomaticDecompression = DecompressionMethods.All
             };
-            using var http = new HttpClient(handler);
-            http.Timeout = TimeSpan.FromSeconds(Math.Max(30, _client.Options.TimeoutSeconds));
+            using var http = new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromSeconds(Math.Max(30, _client.Options.TimeoutSeconds))
+            };
 
             var baseUri = new Uri(_client.Options.BaseUrl);
             sb.AppendLine($"2) Conectando a {baseUri.Host} (TLS)...");
@@ -116,7 +119,6 @@ public partial class LogsPage : ContentPage
                 sb.AppendLine($"   Resposta: HTTP {(int)ping.StatusCode} {ping.StatusCode}");
             }
 
-            // 3. Chamada real de chat (1-token) para verificar credenciais + modelo.
             sb.AppendLine("3) Chamada de teste ao LLM...");
             string modelEcho = await _client.ChatAsync(
                 "Responda apenas: OK",
@@ -137,8 +139,8 @@ public partial class LogsPage : ContentPage
         catch (TaskCanceledException)
         {
             sb.AppendLine();
-            sb.AppendLine("RESULTADO: FALHA — tempo esgotado (60s).");
-            sb.AppendLine("Dica: verifique se o Wi-Fi/dados está ativo e se o aparelho tem acesso à internet.");
+            sb.AppendLine("RESULTADO: FALHA — tempo esgotado.");
+            sb.AppendLine("Dica: verifique rede, endpoint e modelo selecionado.");
         }
         catch (Exception ex)
         {
@@ -147,53 +149,32 @@ public partial class LogsPage : ContentPage
             sb.AppendLine("Erro: " + ex);
             AuraLog.Exception("LogsPage.OnTestClicked", ex);
         }
-
-        LogViewer.Text = sb.ToString();
-        TestButton.IsEnabled = true;
-        BusyIndicator.IsRunning = false;
-        BusyIndicator.IsVisible = false;
+        finally
+        {
+            LogViewer.Text = sb.ToString();
+            TestButton.IsEnabled = true;
+            BusyIndicator.IsRunning = false;
+            BusyIndicator.IsVisible = false;
+        }
     }
 
     private async void OnAnalyzeClicked(object sender, EventArgs e)
     {
-        RuntimeConfig.Apply(_client);
-        string apiKey = _client.Options.ApiKey;
-        if (string.IsNullOrWhiteSpace(apiKey))
-        {
-            LogViewer.Text = "Configure a chave OpenRouter na aba Assistente primeiro.";
-            return;
-        }
-
-        string logContent = AuraLog.ReadRecentLog(RuntimeConfig.LogLinesForAnalysis);
-        if (string.IsNullOrWhiteSpace(logContent))
-        {
-            LogViewer.Text = "Log vazio — não há o que analisar.";
-            return;
-        }
-
         AnalyzeButton.IsEnabled = false;
         BusyIndicator.IsRunning = true;
         BusyIndicator.IsVisible = true;
-        LogViewer.Text = "Enviando log para análise da IA...\n\n" + logContent;
-
-        string systemPrompt =
-            "Você é o engenheiro de diagnóstico do app AURA (assistente de IA para Android, " +
-            "feito em .NET MAUI). Receba o log de execução do app e: " +
-            "1) identifique a causa raiz de qualquer exceção/erro; " +
-            "2) explique em português de forma clara e curta; " +
-            "3) sugira a correção exata (arquivo, linha e trecho de código quando possível). " +
-            "Se não houver erro, apenas resuma o que o log mostra. Responda de forma objetiva.";
+        LogViewer.Text = "Enviando diagnóstico consolidado para a IA...\n\n" +
+                         AuraLog.ReadRecentLog(RuntimeConfig.LogLinesForAnalysis);
 
         try
         {
-            string analysis = await _client.ChatAsync(logContent, systemPrompt: systemPrompt);
+            string analysis = await _diagnostics.AnalyzeAsync();
             LogViewer.Text = "=== ANÁLISE DA IA ===\n\n" + analysis;
-            AuraLog.Info("Análise IA concluída.");
         }
         catch (Exception ex)
         {
             LogViewer.Text = "Falha na análise: " + ex.Message +
-                "\n\nUse 'Testar conexão' para ver detalhes.";
+                "\n\nUse 'Testar conexão' para verificar o provedor.";
             AuraLog.Exception("LogsPage.OnAnalyzeClicked", ex);
         }
         finally
