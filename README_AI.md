@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `d62a144`
-- Data UTC: `2026-08-22 21:19:35 UTC`
+- Commit: `9d53157`
+- Data UTC: `2026-08-22 21:19:52 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -596,9 +596,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `9d53157` fix(tests): align reasoning response property with AgentChatResponse (2026-08-22)
+- `836d046` docs(ai): sync README_AI with source tree (2026-08-22)
 - `d62a144` fix(tests): align reasoning response property with AgentChatResponse (2026-08-22)
 - `69faf9c` docs(ai): record CI failure context (2026-08-22)
 - `e68826b` docs(ai): record CI failure context (2026-08-22)
-- `822387f` docs(ai): record CI failure context (2026-08-22)
-- `3250508` docs(ai): record CI failure context (2026-08-22)
 <!-- AI-DOCS:END -->
