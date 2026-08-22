@@ -19,7 +19,6 @@ public partial class HomePage : ContentPage
         doubleTap.Tapped += OnThemeDoubleTapped;
         BtnTheme.GestureRecognizers.Add(doubleTap);
 
-        // V16 - Teste nativo Android
         RunAndroidBridgeTest();
     }
 
@@ -46,12 +45,57 @@ public partial class HomePage : ContentPage
         UpdateThemeIcon();
         VersionLabel.Text = AURA.Core.VersionInfo.FullName;
         ApplyVideoBackground();
+        RefreshStatus();
     }
 
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
         PauseVideoBackground();
+    }
+
+    private void RefreshStatus()
+    {
+        try
+        {
+            StatusSistema.Text = "Sistema ✓";
+            StatusSistema.TextColor = Color.FromArgb("#3ec97a");
+
+            var access = Connectivity.Current.NetworkAccess;
+            bool online = access == NetworkAccess.Internet || access == NetworkAccess.ConstrainedInternet;
+            StatusRede.Text = online ? "Rede ✓" : "Rede ✗";
+            StatusRede.TextColor = online ? Color.FromArgb("#3ec97a") : Color.FromArgb("#e05560");
+
+#if ANDROID
+            try
+            {
+                var bm = (Android.OS.BatteryManager?)Android.App.Application.Context.GetSystemService(Android.Content.Context.BatteryService);
+                int level = bm?.GetIntProperty((int)Android.OS.BatteryProperty.Capacity) ?? -1;
+                if (level >= 0)
+                {
+                    StatusBateria.Text = $"Bateria {level}%";
+                    StatusBateria.TextColor = level > 20 ? Color.FromArgb("#3ec97a") : Color.FromArgb("#f0a050");
+                }
+                else
+                {
+                    StatusBateria.Text = "Bateria —";
+                    StatusBateria.TextColor = Color.FromArgb("#7a7a90");
+                }
+            }
+            catch
+            {
+                StatusBateria.Text = "Bateria —";
+                StatusBateria.TextColor = Color.FromArgb("#7a7a90");
+            }
+#else
+            StatusBateria.Text = "Bateria —";
+            StatusBateria.TextColor = Color.FromArgb("#7a7a90");
+#endif
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("HomePage.RefreshStatus", ex);
+        }
     }
 
     // ── Tema Solar / Lunar ─────────────────────────────────────────
@@ -134,6 +178,76 @@ public partial class HomePage : ContentPage
         catch { }
     }
 
+    // ── Command entry ─────────────────────────────────────────────
+
+    private async void OnCommandCompleted(object? sender, EventArgs e)
+    {
+        await SubmitCommandAsync();
+    }
+
+    private async void OnSendCommandClicked(object? sender, EventArgs e)
+    {
+        await SubmitCommandAsync();
+    }
+
+    private async Task SubmitCommandAsync()
+    {
+        string text = (CommandEntry?.Text ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(text)) return;
+
+        RecentActivityLabel.Text = $"Comando: {text}";
+        CommandEntry.Text = string.Empty;
+
+        // Navega para Chat (Assistente) — orquestração completa fica na próxima fase
+        await NavigateToLabelAsync("Chat");
+    }
+
+    // ── Quick actions ─────────────────────────────────────────────
+
+    private async void OnQuickDiagnostico(object? sender, TappedEventArgs e)
+    {
+        RecentActivityLabel.Text = "Ação: Diagnosticar";
+        await NavigateToLabelAsync("Diagnóstico");
+    }
+
+    private async void OnQuickProgramas(object? sender, TappedEventArgs e)
+    {
+        RecentActivityLabel.Text = "Ação: Programas";
+        await NavigateToLabelAsync("Programas");
+    }
+
+    private async void OnQuickTerminal(object? sender, TappedEventArgs e)
+    {
+        RecentActivityLabel.Text = "Ação: Terminal";
+        await NavigateToLabelAsync("Terminal");
+    }
+
+    private async void OnQuickChat(object? sender, TappedEventArgs e)
+    {
+        RecentActivityLabel.Text = "Ação: Perguntar à AURA";
+        await NavigateToLabelAsync("Chat");
+    }
+
+    private async Task NavigateToLabelAsync(string label)
+    {
+        if (Application.Current?.Windows?.FirstOrDefault()?.Page is MainPage main)
+        {
+            await main.NavigateToProcessAsync(label);
+            return;
+        }
+
+        // Fallback por seção conhecida
+        string section = label switch
+        {
+            "Diagnóstico" or "Logs" or "Correções" or "Ecossistema" => "Sistema",
+            "Chat" or "Agente" or "Memória" or "Navegador" => "Assistente",
+            "Terminal" or "Executores" or "Módulos" => "Ferramentas",
+            "Programas" or "Células" or "Rodar programa" => "Apps",
+            _ => "Sistema"
+        };
+        await NavigateToSectionAndPageAsync(section, label);
+    }
+
     // ── Bottom bar ──────────────────────────────────────────────────
 
     private async void OnInicioClicked(object? sender, EventArgs e)
@@ -144,19 +258,19 @@ public partial class HomePage : ContentPage
     private async void OnDiagnosticoClicked(object? sender, EventArgs e)
     {
         await PlayButtonFeedbackAsync(BtnDiagnostico);
-        await NavigateToSectionAndPageAsync("Sistema", "Diagnóstico");
+        await NavigateToLabelAsync("Diagnóstico");
     }
 
     private async void OnModulosClicked(object? sender, EventArgs e)
     {
         await PlayButtonFeedbackAsync(BtnModulos);
-        await NavigateToSectionAndPageAsync("Ferramentas", "Módulos");
+        await NavigateToLabelAsync("Módulos");
     }
 
     private async void OnAgentesClicked(object? sender, EventArgs e)
     {
         await PlayButtonFeedbackAsync(BtnAgentes);
-        await NavigateToSectionAndPageAsync("Assistente", "Agente");
+        await NavigateToLabelAsync("Agente");
     }
 
     private async void OnConfigClicked(object? sender, EventArgs e)
