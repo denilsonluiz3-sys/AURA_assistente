@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `ac69435`
-- Data UTC: `2026-08-22 04:53:02 UTC`
+- Commit: `6c408aa`
+- Data UTC: `2026-08-22 04:53:39 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -594,9 +594,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `6c408aa` fix AgentPage bubble UI serialization (2026-08-22)
+- `d1c05ca` docs(ai): sync README_AI with source tree (2026-08-22)
 - `ac69435` tmp (2026-08-22)
 - `5e44816` test (2026-08-22)
 - `adbb8da` fix(agents): resolve CS0136 result variable shadowing in AuraOrchestrator (#63) (2026-08-21)
-- `e02f688` docs(ai): sync README_AI with source tree (2026-08-22)
-- `66dcfdb` feat(ui): unificação da interface Mobile (Home · Sistema · Programas · Assistente · Ferramentas · Voz STT) (#64) (2026-08-21)
 <!-- AI-DOCS:END -->
