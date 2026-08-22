@@ -179,12 +179,12 @@ namespace AURA.Mobile.Speech
                 _onError = onError;
             }
 
-            public void OnReadyForSpeech(Bundle? params) { }
+            public void OnReadyForSpeech(Bundle? bundle) { }
             public void OnBeginningOfSpeech() { }
             public void OnRmsChanged(float rmsdB) { }
             public void OnBufferReceived(byte[]? buffer) { }
             public void OnEndOfSpeech() { }
-            public void OnEvent(int eventType, Bundle? params) { }
+            public void OnEvent(int eventType, Bundle? bundle) { }
             public void OnPartialResults(Bundle? partialResults) { }
 
             public void OnError(SpeechRecognizerError error) => _onError(error);
