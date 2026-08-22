@@ -19,7 +19,6 @@ using AURA.SystemInfo;
 using AURA.Mobile.Speech;
 using AURA.Mobile.Services;
 using AURA.Mobile.ViewModels;
-using CommunityToolkit.Maui;
 
 namespace AURA.Mobile;
 
@@ -29,7 +28,8 @@ public static class MauiProgram
     {
         AuraLog.Info("MauiProgram.CreateMauiApp BEGIN");
         var builder = MauiApp.CreateBuilder();
-        builder.UseMauiApp<App>().UseMauiCommunityToolkitMediaElement(isAndroidForegroundServiceEnabled: false);
+        // Sem MediaElement (vídeos Lunar/Solar removidos)
+        builder.UseMauiApp<App>();
 
 #if ANDROID
         builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Microsoft.Maui.Controls.WebView, AURA.Mobile.Platforms.Android.WebView.AuraWebViewHandler>());
@@ -85,7 +85,8 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new SimulationRuntime(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "cells"), new DirectoryCellBackend()) { Events = sp.GetRequiredService<EventBus>() });
         builder.Services.AddSingleton<Runner>();
         builder.Services.AddSingleton<ProcessRegistry>();
-        builder.Services.AddSingleton<SolutionStore>();
+        builder.Services.AddSingleton(sp => new SolutionStore(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "aura")));
+        builder.Services.AddSingleton<LocalPlaybook>();
         builder.Services.AddSingleton<FileTool>(sp => new FileTool(AgentWorkspace.ActiveRoot));
 
         builder.Services.AddSingleton<AuraOrchestrator>(sp => new AuraOrchestrator(
