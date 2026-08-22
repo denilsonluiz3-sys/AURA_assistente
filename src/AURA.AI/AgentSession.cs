@@ -14,9 +14,7 @@ namespace AURA.AI
     /// Loop agêntico sobre o OpenRouterClient: envia a conversa com as
     /// ferramentas registradas, executa as chamadas de ferramenta solicitadas
     /// pelo modelo, anexa os resultados e repete até o modelo responder texto
-    /// final (estilo opencode/agentes de terminal).
-    /// Quando um MemoryStore é fornecido, cada turno user/assistant é persistido
-    /// em ~/AURA/memory.json, garantindo continuidade de contexto entre sessões.
+    /// final. Com MemoryStore, cada turno é persistido em memory.json.
     /// </summary>
     public sealed class AgentSession
     {
@@ -27,8 +25,6 @@ namespace AURA.AI
         private readonly List<AgentTool> _tools;
         private readonly List<AgentMessage> _messages = new();
 
-        // Limite de segurança para impedir crescimento indefinido
-        // do contexto enviado ao modelo.
         private const int MaxHistoryMessages = 16;
         private readonly string? _systemPrompt;
         private readonly MemoryStore? _memory;
@@ -51,7 +47,7 @@ namespace AURA.AI
             _messages.RemoveRange(0, _messages.Count - MaxHistoryMessages);
         }
 
-        /// <summary>Monta o system prompt + resumo das últimas entradas persistidas.</summary>
+        /// <summary>System prompt + resumo das últimas entradas persistidas.</summary>
         private string BuildSystemPrompt()
         {
             var sb = new StringBuilder();
@@ -102,7 +98,6 @@ namespace AURA.AI
             return sb.ToString();
         }
 
-        /// <summary>Emitido a cada ferramenta executada (para atualizar a UI).</summary>
         public event Action<AgentStep>? Step;
 
         public IReadOnlyList<AgentMessage> Messages => _messages;
@@ -144,7 +139,7 @@ namespace AURA.AI
                         Role = "assistant",
                         Content = null,
                         ToolCalls = response.ToolCalls,
-                        ReasoningDetailsJson = response.ReasoningDetailsJson
+                        ReasoningDetails = response.ReasoningDetails
                     });
 
                     foreach (AgentToolCall call in response.ToolCalls)
