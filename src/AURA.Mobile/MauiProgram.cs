@@ -57,6 +57,7 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new ModuleManager(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "modules"), Path.Combine(configDir, "modules.json"), sp.GetRequiredService<EventBus>(), localPackageProvider: ReadEmbeddedModulePackageAsync));
         builder.Services.AddSingleton(sp => new MemoryStore(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "memory.json")));
         builder.Services.AddSingleton(sp => new OpenRouterClient(new OpenRouterOptions { ApiKey = Preferences.Default.Get("ai_api_key", string.Empty), BaseUrl = "https://openrouter.ai/api/v1/chat/completions", Model = "qwen/qwen-plus", MaxTokens = 1500 }, sp.GetRequiredService<ILogger>()));
+        builder.Services.AddSingleton<AiDiagnosticsService>();
         builder.Services.AddSingleton<AiAssistant>();
         builder.Services.AddSingleton<ISpeechService, HybridSpeechService>();
         builder.Services.AddSingleton<VoiceAssistantService>(sp => new VoiceAssistantService(
@@ -105,6 +106,7 @@ public static class MauiProgram
             sp.GetRequiredService<SystemAnalyzer>(),
             sp.GetRequiredService<NetworkManager>(),
             sp.GetRequiredService<AgentManager>(),
+            sp.GetRequiredService<AiDiagnosticsService>(),
 #if ANDROID
             sp.GetService<CellProgramRegistry>(),
             sp.GetService<CellProgramRunner>(),
