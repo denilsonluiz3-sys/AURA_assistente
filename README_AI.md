@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `e11cc6b`
-- Data UTC: `2026-08-22 07:20:29 UTC`
+- Commit: `997ddf1`
+- Data UTC: `2026-08-22 07:35:45 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -362,6 +362,7 @@ testes relacionados
 
 - `.github/workflows/ai-failure-diagnostics.yml`
 - `.github/workflows/build-android-apk.yml`
+- `.github/workflows/cleanup-artifacts.yml`
 - `.github/workflows/codeql.yml`
 - `.github/workflows/sync-main.yml`
 - `.github/workflows/update-ai-docs.yml`
@@ -595,9 +596,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `997ddf1` ci: clean up old GitHub Actions artifacts (2026-08-22)
+- `fdc4c91` docs(ai): sync README_AI with source tree (2026-08-22)
 - `e11cc6b` fix: batch stability — AgentPage bubbles, JsonNode clone, TTS CTS, RunPage path (#69) (2026-08-22)
 - `da77614` docs(ai): sync README_AI with source tree (2026-08-22)
 - `b0870bd` ui(agent): prioritize conversation and one-time AI configuration (#68) (2026-08-22)
-- `4514a75` docs(ai): sync README_AI with source tree (2026-08-22)
-- `e180c2c` feat(mobile): connect logs, diagnostics and AI fixes (#67) (2026-08-22)
 <!-- AI-DOCS:END -->
