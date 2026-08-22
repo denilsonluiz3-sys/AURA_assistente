@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `c109a0e`
-- Data UTC: `2026-08-22 23:37:58 UTC`
+- Commit: `620ad15`
+- Data UTC: `2026-08-22 23:56:14 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
-- `c109a0e` Feat/local decision phase1 (#82) (2026-08-22)
-- `a69d206` Feat/local playbook slim apk (#84) (2026-08-22)
-- `ade1c53` docs(ai): record CI failure context (2026-08-22)
-- `5a0645f` docs(ai): sync README_AI with source tree (2026-08-22)
-- `0ce57cf` feat: playbook local (menos IA) + APK sem Kokoro/MP4 (#79) (2026-08-22)
+- `620ad15` fix(agents): repair AuraOrchestrator compilation (2026-08-22)
+- `23cc589` docs(ai): record CI failure context (2026-08-22)
+- `2ca2d0f` docs(ai): record CI failure context (2026-08-22)
+- `9fae337` docs(ai): record CI failure context (2026-08-22)
+- `87069c4` docs(ai): record CI failure context (2026-08-22)
 <!-- AI-DOCS:END -->
