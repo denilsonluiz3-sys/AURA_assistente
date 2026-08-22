@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `778fa95`
-- Data UTC: `2026-08-22 22:33:27 UTC`
+- Commit: `4a6cb67`
+- Data UTC: `2026-08-22 23:16:11 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -295,7 +295,7 @@ testes relacionados
 - `src/AURA.Core`: 39 arquivos C#, 0 arquivos XAML
 - `src/AURA.Installer`: 17 arquivos C#, 0 arquivos XAML
 - `src/AURA.Memory`: 5 arquivos C#, 0 arquivos XAML
-- `src/AURA.Mobile`: 58 arquivos C#, 34 arquivos XAML
+- `src/AURA.Mobile`: 59 arquivos C#, 34 arquivos XAML
 - `src/AURA.Modules`: 23 arquivos C#, 0 arquivos XAML
 - `src/AURA.Network`: 2 arquivos C#, 0 arquivos XAML
 - `src/AURA.SystemInfo`: 2 arquivos C#, 0 arquivos XAML
@@ -558,6 +558,7 @@ testes relacionados
 - `src/AURA.Mobile/Services/AndroidCapabilityService.cs`
 - `src/AURA.Mobile/Services/AuraCellContext.cs`
 - `src/AURA.Mobile/Services/AuraCellContextFactory.cs`
+- `src/AURA.Mobile/Services/LocalPlaybook.cs`
 - `src/AURA.Mobile/Services/WebSearchService.cs`
 - `src/AURA.Mobile/Speech/AndroidSpeechRecognitionService.cs`
 - `src/AURA.Mobile/Speech/AndroidTtsSpeechService.cs`
@@ -597,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
-- `778fa95` fix: MaxRounds 16 + soft stop, long-press/copy, debounce abas (#78) (2026-08-22)
-- `2de34e3` docs(ai): record CI failure context (2026-08-22)
-- `139f8f9` docs(ai): record CI failure context (2026-08-22)
-- `3830f79` docs(ai): record CI failure context (2026-08-22)
-- `017314e` docs(ai): record CI failure context (2026-08-22)
+- `4a6cb67` feat(batch): playbook local + aura-sh + APK slim 2.2 (1 compilação) (#80) (2026-08-22)
+- `4eb7283` docs(ai): record CI failure context (2026-08-22)
+- `c05387c` docs(ai): record CI failure context (2026-08-22)
+- `3032b30` docs(ai): record CI failure context (2026-08-22)
+- `7a5b878` Fix/jsonnode parent hard (#81) (2026-08-22)
 <!-- AI-DOCS:END -->
