@@ -8,6 +8,7 @@
     <ScrollView>
         <VerticalStackLayout Padding="20,24,20,24" Spacing="16">
 
+            <!-- Header -->
             <VerticalStackLayout Spacing="4">
                 <Label Text="Sistema"
                        Style="{StaticResource Heading}"
@@ -17,6 +18,7 @@
                        TextColor="{DynamicResource AuraTextSecondary}" />
             </VerticalStackLayout>
 
+            <!-- Ação principal: Device Diagnostic via Cell Program -->
             <Border Style="{DynamicResource AuraGlassCard}" Padding="16,14">
                 <VerticalStackLayout Spacing="10">
                     <Label Text="DIAGNÓSTICO COMPLETO"
@@ -58,11 +60,11 @@
                            Text="Execute o diagnóstico para habilitar a análise por IA."
                            FontSize="12"
                            TextColor="{DynamicResource AuraTextPrimary}"
-                           IsVisible="True"
                            LineBreakMode="WordWrap" />
                 </VerticalStackLayout>
             </Border>
 
+            <!-- Status de conexão -->
             <Label Text="Rede"
                    FontSize="12"
                    FontAttributes="Bold"
@@ -82,6 +84,7 @@
                 </HorizontalStackLayout>
             </Border>
 
+            <!-- Dispositivo / Recursos -->
             <Label Text="Dispositivo"
                    FontSize="12"
                    FontAttributes="Bold"
@@ -91,70 +94,143 @@
 
                 <Border Grid.Row="0" Grid.Column="0" Style="{DynamicResource AuraGlassCard}">
                     <VerticalStackLayout Spacing="4">
-                        <Label Text="CPU" FontSize="10" FontAttributes="Bold" TextColor="{DynamicResource AuraTextMuted}" />
-                        <Label x:Name="CpuValue" Text="—" FontSize="20" FontAttributes="Bold" />
-                        <Label x:Name="CpuDetail" Text="" FontSize="11" TextColor="{DynamicResource AuraTextMuted}" />
+                        <Label Text="CPU"
+                               FontSize="10"
+                               FontAttributes="Bold"
+                               TextColor="{DynamicResource AuraTextMuted}" />
+                        <Label x:Name="CpuValue"
+                               Text="—"
+                               FontSize="20"
+                               FontAttributes="Bold" />
+                        <Label x:Name="CpuDetail"
+                               Text=""
+                               FontSize="11"
+                               TextColor="{DynamicResource AuraTextMuted}" />
                     </VerticalStackLayout>
                 </Border>
 
                 <Border Grid.Row="0" Grid.Column="1" Style="{DynamicResource AuraGlassCard}">
                     <VerticalStackLayout Spacing="4">
-                        <Label Text="RAM" FontSize="10" FontAttributes="Bold" TextColor="{DynamicResource AuraTextMuted}" />
-                        <Label x:Name="RamValue" Text="—" FontSize="20" FontAttributes="Bold" />
-                        <Label x:Name="RamDetail" Text="" FontSize="11" TextColor="{DynamicResource AuraTextMuted}" />
+                        <Label Text="RAM"
+                               FontSize="10"
+                               FontAttributes="Bold"
+                               TextColor="{DynamicResource AuraTextMuted}" />
+                        <Label x:Name="RamValue"
+                               Text="—"
+                               FontSize="20"
+                               FontAttributes="Bold" />
+                        <Label x:Name="RamDetail"
+                               Text=""
+                               FontSize="11"
+                               TextColor="{DynamicResource AuraTextMuted}" />
                     </VerticalStackLayout>
                 </Border>
 
                 <Border Grid.Row="1" Grid.Column="0" Style="{DynamicResource AuraGlassCard}">
                     <VerticalStackLayout Spacing="4">
-                        <Label Text="ARMAZENAMENTO" FontSize="10" FontAttributes="Bold" TextColor="{DynamicResource AuraTextMuted}" />
-                        <Label x:Name="DiskValue" Text="—" FontSize="20" FontAttributes="Bold" />
-                        <Label x:Name="DiskDetail" Text="" FontSize="11" TextColor="{DynamicResource AuraTextMuted}" />
+                        <Label Text="ARMAZENAMENTO"
+                               FontSize="10"
+                               FontAttributes="Bold"
+                               TextColor="{DynamicResource AuraTextMuted}" />
+                        <Label x:Name="DiskValue"
+                               Text="—"
+                               FontSize="20"
+                               FontAttributes="Bold" />
+                        <Label x:Name="DiskDetail"
+                               Text=""
+                               FontSize="11"
+                               TextColor="{DynamicResource AuraTextMuted}" />
                     </VerticalStackLayout>
                 </Border>
 
                 <Border Grid.Row="1" Grid.Column="1" Style="{DynamicResource AuraGlassCard}">
                     <VerticalStackLayout Spacing="4">
-                        <Label Text="SISTEMA" FontSize="10" FontAttributes="Bold" TextColor="{DynamicResource AuraTextMuted}" />
-                        <Label x:Name="OsValue" Text="—" FontSize="16" FontAttributes="Bold" />
-                        <Label x:Name="OsDetail" Text="" FontSize="11" TextColor="{DynamicResource AuraTextMuted}" />
+                        <Label Text="SISTEMA"
+                               FontSize="10"
+                               FontAttributes="Bold"
+                               TextColor="{DynamicResource AuraTextMuted}" />
+                        <Label x:Name="OsValue"
+                               Text="—"
+                               FontSize="16"
+                               FontAttributes="Bold" />
+                        <Label x:Name="OsDetail"
+                               Text=""
+                               FontSize="11"
+                               TextColor="{DynamicResource AuraTextMuted}" />
                     </VerticalStackLayout>
                 </Border>
 
                 <Border Grid.Row="2" Grid.Column="0" Style="{DynamicResource AuraGlassCard}">
                     <VerticalStackLayout Spacing="4">
-                        <Label Text="NÚCLEOS" FontSize="10" FontAttributes="Bold" TextColor="{DynamicResource AuraTextMuted}" />
-                        <Label x:Name="CoresValue" Text="—" FontSize="20" FontAttributes="Bold" />
-                        <Label x:Name="CoresDetail" Text="" FontSize="11" TextColor="{DynamicResource AuraTextMuted}" />
+                        <Label Text="NÚCLEOS"
+                               FontSize="10"
+                               FontAttributes="Bold"
+                               TextColor="{DynamicResource AuraTextMuted}" />
+                        <Label x:Name="CoresValue"
+                               Text="—"
+                               FontSize="20"
+                               FontAttributes="Bold" />
+                        <Label x:Name="CoresDetail"
+                               Text=""
+                               FontSize="11"
+                               TextColor="{DynamicResource AuraTextMuted}" />
                     </VerticalStackLayout>
                 </Border>
 
                 <Border Grid.Row="2" Grid.Column="1" Style="{DynamicResource AuraGlassCard}">
                     <VerticalStackLayout Spacing="4">
-                        <Label Text="LATÊNCIA" FontSize="10" FontAttributes="Bold" TextColor="{DynamicResource AuraTextMuted}" />
-                        <Label x:Name="LatencyValue" Text="—" FontSize="20" FontAttributes="Bold" />
-                        <Label x:Name="LatencyDetail" Text="" FontSize="11" TextColor="{DynamicResource AuraTextMuted}" />
+                        <Label Text="LATÊNCIA"
+                               FontSize="10"
+                               FontAttributes="Bold"
+                               TextColor="{DynamicResource AuraTextMuted}" />
+                        <Label x:Name="LatencyValue"
+                               Text="—"
+                               FontSize="20"
+                               FontAttributes="Bold" />
+                        <Label x:Name="LatencyDetail"
+                               Text=""
+                               FontSize="11"
+                               TextColor="{DynamicResource AuraTextMuted}" />
                     </VerticalStackLayout>
                 </Border>
 
                 <Border Grid.Row="3" Grid.Column="0" Style="{DynamicResource AuraGlassCard}">
                     <VerticalStackLayout Spacing="4">
-                        <Label Text="IP LOCAL" FontSize="10" FontAttributes="Bold" TextColor="{DynamicResource AuraTextMuted}" />
-                        <Label x:Name="IpValue" Text="—" FontSize="16" FontAttributes="Bold" />
-                        <Label x:Name="IpDetail" Text="" FontSize="11" TextColor="{DynamicResource AuraTextMuted}" />
+                        <Label Text="IP LOCAL"
+                               FontSize="10"
+                               FontAttributes="Bold"
+                               TextColor="{DynamicResource AuraTextMuted}" />
+                        <Label x:Name="IpValue"
+                               Text="—"
+                               FontSize="16"
+                               FontAttributes="Bold" />
+                        <Label x:Name="IpDetail"
+                               Text=""
+                               FontSize="11"
+                               TextColor="{DynamicResource AuraTextMuted}" />
                     </VerticalStackLayout>
                 </Border>
 
                 <Border Grid.Row="3" Grid.Column="1" Style="{DynamicResource AuraGlassCard}">
                     <VerticalStackLayout Spacing="4">
-                        <Label Text="VERSÃO AURA" FontSize="10" FontAttributes="Bold" TextColor="{DynamicResource AuraTextMuted}" />
-                        <Label x:Name="VersionValue" Text="—" FontSize="14" FontAttributes="Bold" />
-                        <Label x:Name="VersionDetail" Text="" FontSize="11" TextColor="{DynamicResource AuraTextMuted}" />
+                        <Label Text="VERSÃO AURA"
+                               FontSize="10"
+                               FontAttributes="Bold"
+                               TextColor="{DynamicResource AuraTextMuted}" />
+                        <Label x:Name="VersionValue"
+                               Text="—"
+                               FontSize="14"
+                               FontAttributes="Bold" />
+                        <Label x:Name="VersionDetail"
+                               Text=""
+                               FontSize="11"
+                               TextColor="{DynamicResource AuraTextMuted}" />
                     </VerticalStackLayout>
                 </Border>
 
             </Grid>
 
+            <!-- Agentes -->
             <Label Text="Agentes"
                    FontSize="12"
                    FontAttributes="Bold"
