@@ -50,6 +50,17 @@
                             Style="{DynamicResource BtnGlass}"
                             HorizontalOptions="Start"
                             IsVisible="False" />
+                    <Button x:Name="BtnAnalyzeWithAi"
+                            Text="Analisar diagnóstico com IA"
+                            Clicked="OnAnalyzeWithAiClicked"
+                            Style="{DynamicResource BtnGlass}"
+                            HorizontalOptions="Start"
+                            IsEnabled="False" />
+                    <Label x:Name="AiDiagnosticStatus"
+                           Text="Execute o diagnóstico para habilitar a análise por IA."
+                           FontSize="12"
+                           TextColor="{DynamicResource AuraTextPrimary}"
+                           LineBreakMode="WordWrap" />
                 </VerticalStackLayout>
             </Border>
 

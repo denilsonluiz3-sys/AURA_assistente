@@ -4,6 +4,7 @@ using AURA.Abstractions;
 using AURA.Network;
 using AURA.SystemInfo;
 using AURA.Core.Logging;
+using AURA.Mobile.Diagnostics;
 
 namespace AURA.Mobile.Pages;
 
@@ -12,17 +13,20 @@ public partial class DiagnosticoPage : ContentPage
     private readonly SystemAnalyzer _systemAnalyzer;
     private readonly NetworkManager _networkManager;
     private readonly AgentManager _agentManager;
+    private readonly AiDiagnosticsService _diagnostics;
     private readonly CellProgramRegistry? _registry;
     private readonly CellProgramRunner? _runner;
     private readonly IAuraCellContextFactory? _contextFactory;
     private readonly ILogger? _logger;
     private string? _lastCellJson;
     private bool _cellRunning;
+    private bool _aiRunning;
 
     public DiagnosticoPage(
         SystemAnalyzer systemAnalyzer,
         NetworkManager networkManager,
         AgentManager agentManager,
+        AiDiagnosticsService diagnostics,
         CellProgramRegistry? registry = null,
         CellProgramRunner? runner = null,
         IAuraCellContextFactory? contextFactory = null,
@@ -32,6 +36,7 @@ public partial class DiagnosticoPage : ContentPage
         _systemAnalyzer = systemAnalyzer;
         _networkManager = networkManager;
         _agentManager = agentManager;
+        _diagnostics = diagnostics;
         _registry = registry;
         _runner = runner;
         _contextFactory = contextFactory;
@@ -96,12 +101,14 @@ public partial class DiagnosticoPage : ContentPage
                 _lastCellJson = System.Text.Json.JsonSerializer.Serialize(
                     result.Data,
                     new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                _diagnostics.CaptureDiagnosticContext(_lastCellJson);
 
                 CellDiagStatus.Text = "Concluído";
                 CellDiagStatus.TextColor = Color.FromArgb("#3ec97a");
                 CellDiagSummary.Text = BuildSummary(result.Data);
                 CellDiagSummary.IsVisible = true;
                 BtnCellDetails.IsVisible = true;
+                BtnAnalyzeWithAi.IsEnabled = true;
             }
             else
             {
@@ -124,7 +131,34 @@ public partial class DiagnosticoPage : ContentPage
         {
             _cellRunning = false;
             BtnRunCellDiag.Text = "Executar diagnóstico";
-            BtnRunCellDiag.IsEnabled = true;
+            BtnRunCellDiag.IsEnabled = _registry != null && _runner != null && _contextFactory != null;
+        }
+    }
+
+    private async void OnAnalyzeWithAiClicked(object? sender, EventArgs e)
+    {
+        if (_aiRunning)
+            return;
+
+        _aiRunning = true;
+        BtnAnalyzeWithAi.IsEnabled = false;
+        AiDiagnosticStatus.IsVisible = true;
+        AiDiagnosticStatus.Text = "Analisando log + diagnóstico do dispositivo com IA…";
+
+        try
+        {
+            string analysis = await _diagnostics.AnalyzeAsync();
+            AiDiagnosticStatus.Text = analysis;
+        }
+        catch (Exception ex)
+        {
+            AiDiagnosticStatus.Text = "Falha na análise IA: " + ex.Message;
+            AuraLog.Exception("DiagnosticoPage.OnAnalyzeWithAiClicked", ex);
+        }
+        finally
+        {
+            _aiRunning = false;
+            BtnAnalyzeWithAi.IsEnabled = true;
         }
     }
 
@@ -148,7 +182,7 @@ public partial class DiagnosticoPage : ContentPage
             var root = doc.RootElement;
             var parts = new List<string>();
 
-            if (root.TryGetProperty("Device", out var dev))
+            if (root.TryGetProperty("Device", out _))
                 parts.Add("Dispositivo OK");
             if (root.TryGetProperty("Battery", out _))
                 parts.Add("Bateria OK");

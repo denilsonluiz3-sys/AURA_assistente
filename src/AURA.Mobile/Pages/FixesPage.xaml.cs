@@ -6,12 +6,14 @@ namespace AURA.Mobile.Pages;
 public partial class FixesPage : ContentPage
 {
     private readonly OpenRouterClient _client;
+    private readonly AiDiagnosticsService _diagnostics;
     private List<FixProposal> _pending = new();
 
-    public FixesPage(OpenRouterClient client)
+    public FixesPage(OpenRouterClient client, AiDiagnosticsService diagnostics)
     {
         InitializeComponent();
         _client = client;
+        _diagnostics = diagnostics;
     }
 
     protected override void OnAppearing()
@@ -19,6 +21,15 @@ public partial class FixesPage : ContentPage
         base.OnAppearing();
         RuntimeConfig.Apply(_client);
         ShowCurrentConfig();
+
+        if (_diagnostics.LastProposals.Count > 0)
+        {
+            _pending = _diagnostics.LastProposals.ToList();
+            FixesView.ItemsSource = _pending;
+            StatusLabel.Text =
+                $"{_pending.Count} correção(ões) já propostas pela IA. " +
+                "Revise e toque em Aplicar.\n\nConfiguração atual:\n" + ShowCurrentConfigRaw();
+        }
     }
 
     private void ShowCurrentConfig()
@@ -38,58 +49,40 @@ public partial class FixesPage : ContentPage
 
     private async void OnAnalyzeClicked(object sender, EventArgs e)
     {
-        string apiKey = _client.Options.ApiKey;
-        if (string.IsNullOrWhiteSpace(apiKey))
-        {
-            StatusLabel.Text = "Configure a chave de API na aba Assistente primeiro.";
-            return;
-        }
-
         AnalyzeButton.IsEnabled = false;
         BusyIndicator.IsRunning = true;
         BusyIndicator.IsVisible = true;
-        StatusLabel.Text = "Analisando log e configuração...";
-
-        string log = AuraLog.ReadRecentLog(RuntimeConfig.LogLinesForAnalysis);
-        string systemPrompt =
-            "Você é o engenheiro de manutenção do app AURA (.NET MAUI para Android). " +
-            "Receba o log de execução e a configuração atual do app. Identifique problemas " +
-            "e proponha correções que possam ser aplicadas em tempo de execução " +
-            "(sem recompilar o APK). Responda EXCLUSIVAMENTE com um JSON válido " +
-            "no formato: {\"fixes\":[{\"key\":\"...\",\"label\":\"...\",\"current\":\"...\"," +
-            "\"suggested\":\"...\",\"reason\":\"...\"}]}. " +
-            "Keys aceitas: model, provider, max_tokens, timeout_seconds, log_lines, api_key. " +
-            "Use model/provider exatamente como estão no catálogo (ex.: qwen/qwen-plus, " +
-            "openrouter/free, openai/gpt-oss-20b:free, google/gemma-4-26b-a4b-it:free, " +
-            "llama-3.3-70b-versatile, gemini-2.5-flash). " +
-            "Se não houver correção necessária, retorne {\"fixes\":[]}.";
-
-        string question =
-            "LOG:\n" + (string.IsNullOrWhiteSpace(log) ? "(vazio)" : log) +
-            "\n\nCONFIGURAÇÃO ATUAL:\n" + ShowCurrentConfigRaw();
+        StatusLabel.Text = "Analisando log, diagnóstico e configuração...";
 
         try
         {
-            string answer = await _client.ChatAsync(question, systemPrompt: systemPrompt);
-            _pending = FixProposalParser.Parse(answer);
+            string? readinessError = RuntimeConfig.EnsureReadyForRequest(_client);
+            if (!string.IsNullOrWhiteSpace(readinessError))
+            {
+                StatusLabel.Text = readinessError;
+                return;
+            }
+
+            _pending = await _diagnostics.ProposeFixesAsync();
+            FixesView.ItemsSource = null;
+            FixesView.ItemsSource = _pending;
 
             if (_pending.Count == 0)
             {
                 StatusLabel.Text =
-                    "Nenhuma correção identificada pela IA.\n\n" +
-                    "Resposta da IA:\n" + answer;
-                FixesView.ItemsSource = null;
+                    "Nenhuma correção determinística identificada pela IA.\n\n" +
+                    "Análise anterior:\n" +
+                    (_diagnostics.LastAnalysis.Length > 3000
+                        ? _diagnostics.LastAnalysis.Substring(0, 3000) + "\n…"
+                        : _diagnostics.LastAnalysis);
             }
             else
             {
-                FixesView.ItemsSource = null;
-                FixesView.ItemsSource = _pending;
                 StatusLabel.Text =
-                    $"{_pending.Count} correção(ões) proposta(s) pela IA. Marque as desejadas e toque em Aplicar.\n\n" +
+                    $"{_pending.Count} correção(ões) proposta(s) pela IA. " +
+                    "Marque as desejadas e toque em Aplicar.\n\n" +
                     "Configuração atual:\n" + ShowCurrentConfigRaw();
             }
-
-            AuraLog.Info("Correções propostas: " + _pending.Count);
         }
         catch (Exception ex)
         {
@@ -112,7 +105,7 @@ public partial class FixesPage : ContentPage
             $"max_tokens: {_client.Options.MaxTokens}\n" +
             $"timeout_seconds: {_client.Options.TimeoutSeconds}\n" +
             $"log_lines: {RuntimeConfig.LogLinesForAnalysis}\n" +
-            $"api_key: {(string.IsNullOrWhiteSpace(_client.Options.ApiKey) ? "(vazio)" : "(configurada)")}";
+            $"api_key: {(string.IsNullOrWhiteSpace(_client.Options.ApiKey) ? "(vazio)" : "(configurada)" )}";
     }
 
     private void OnApplyClicked(object sender, EventArgs e)
@@ -124,68 +117,14 @@ public partial class FixesPage : ContentPage
             return;
         }
 
-        int applied = 0;
-        int ignoredKeyFixes = 0;
-        foreach (FixProposal fix in selected)
-        {
-            try
-            {
-                switch (fix.Key)
-                {
-                    case "model":
-                        RuntimeConfig.Model = fix.Suggested;
-                        _client.Options.Model = fix.Suggested;
-                        break;
-                    case "provider":
-                        RuntimeConfig.Provider = fix.Suggested;
-                        break;
-                    case "max_tokens":
-                        if (int.TryParse(fix.Suggested, out int tokens) && tokens > 0)
-                        {
-                            RuntimeConfig.MaxTokens = tokens;
-                            _client.Options.MaxTokens = tokens;
-                        }
-                        break;
-                    case "timeout_seconds":
-                        if (int.TryParse(fix.Suggested, out int to) && to > 0)
-                        {
-                            RuntimeConfig.TimeoutSeconds = to;
-                            _client.Options.TimeoutSeconds = to;
-                        }
-                        break;
-                    case "log_lines":
-                        if (int.TryParse(fix.Suggested, out int lines) && lines > 0)
-                        {
-                            RuntimeConfig.LogLinesForAnalysis = lines;
-                        }
-                        break;
-                    case "api_key":
-                        ignoredKeyFixes++;
-                        continue;
-                    default:
-                        continue;
-                }
-
-                applied++;
-            }
-            catch (Exception ex)
-            {
-                AuraLog.Exception("FixesPage.Apply '" + fix.Key + "'", ex);
-            }
-        }
-
-        // Reaplica tudo (caso provider tenha mudado o modelo/base).
+        int applied = _diagnostics.Apply(selected);
         RuntimeConfig.Apply(_client);
         ShowCurrentConfig();
 
-        string ignoredNote = ignoredKeyFixes > 0
-            ? $"\n{ignoredKeyFixes} sugestão(ões) de chave de API ignorada(s): digite a chave manualmente na aba Assistente."
-            : string.Empty;
-
         StatusLabel.Text =
             $"Aplicadas {applied} de {selected.Count} correção(ões).\n\n" +
-            "Configuração atual:\n" + ShowCurrentConfigRaw() + ignoredNote;
-        AuraLog.Info("Correções aplicadas: " + applied + "/" + selected.Count);
+            "Configuração atual:\n" + ShowCurrentConfigRaw();
+        AuraLog.Info("Correções aplicadas pela UI: " + applied + "/" + selected.Count);
     }
 
     private void OnResetClicked(object sender, EventArgs e)

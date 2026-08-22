@@ -99,7 +99,6 @@ public sealed class AiConfigView : ContentView
         };
     }
 
-    /// <summary>Carrega a configuração salva e aplica no client.</summary>
     public void Load(OpenRouterClient client)
     {
         _client = client;
@@ -167,10 +166,6 @@ public sealed class AiConfigView : ContentView
         TryAutoDetect();
     }
 
-    /// <summary>
-    /// Detecção determinística pelo formato da chave (sem rede). Se um único
-    /// provedor for reconhecido de forma confiável, já seleciona e persiste.
-    /// </summary>
     private void TryAutoDetect()
     {
         string key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
@@ -202,11 +197,6 @@ public sealed class AiConfigView : ContentView
         SelectProvider(detected.Name);
     }
 
-    /// <summary>
-    /// Validação real da credencial (autorizada pelo clique do usuário).
-    /// Testa apenas provedores compatíveis quando o formato é ambíguo e
-    /// configura o client com provedor/base/modelo detectados.
-    /// </summary>
     private async void OnDetectClicked(object sender, EventArgs e)
     {
         if (_client == null)
@@ -343,26 +333,21 @@ public sealed class AiConfigView : ContentView
 
         RuntimeConfig.Provider = provider.Name;
         Preferences.Default.Set("ai_provider", provider.Name);
-        client.Options.BaseUrl = provider.BaseUrl;
 
         if (_modelPicker.SelectedItem is ProviderModel pm)
         {
             RuntimeConfig.Model = pm.Id;
             Preferences.Default.Set("ai_model", pm.Id);
-            client.Options.Model = pm.Id;
         }
 
         string apiKey = _apiKeyEntry.Text?.Trim() ?? string.Empty;
         RuntimeConfig.ApiKey = apiKey;
         Preferences.Default.Set("ai_api_key", apiKey);
-        client.Options.ApiKey = apiKey;
 
-        client.Options.MaxTokens = RuntimeConfig.MaxTokens;
-        client.Options.TimeoutSeconds = RuntimeConfig.TimeoutSeconds;
         ApplyToClient();
     }
 
-    /// <summary>Aplica a configuração atual no client (sem persistir).</summary>
+    /// <summary>Aplica a configuração completa, incluindo provider e autenticação.</summary>
     public void ApplyToClient()
     {
         if (_client == null)
@@ -370,18 +355,6 @@ public sealed class AiConfigView : ContentView
             return;
         }
 
-        if (_providerPicker.SelectedItem is ProviderInfo provider)
-        {
-            _client.Options.BaseUrl = provider.BaseUrl;
-        }
-
-        if (_modelPicker.SelectedItem is ProviderModel pm)
-        {
-            _client.Options.Model = pm.Id;
-        }
-
-        _client.Options.MaxTokens = RuntimeConfig.MaxTokens;
-        _client.Options.TimeoutSeconds = RuntimeConfig.TimeoutSeconds;
-        _client.Options.ApiKey = RuntimeConfig.ApiKey;
+        RuntimeConfig.Apply(_client);
     }
 }
