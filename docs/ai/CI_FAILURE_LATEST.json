@@ -1,30 +1,30 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
-  "workflow": "AURA Android APK",
-  "run_id": "32604506385",
+  "workflow": "CodeQL Advanced",
+  "run_id": "32604485068",
   "status": "completed",
-  "conclusion": "failure",
-  "branch": "feat/batch-playbook-slim-v1",
-  "commit": "5a287827fa14c12fb8e3cd030b7e3ff20c07fece",
+  "conclusion": "cancelled",
+  "branch": "feat/local-playbook-slim-apk",
+  "commit": "bf3f7969f10d991eff754238de302ec1b865a4b9",
   "event": "pull_request",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32604506385",
-  "category": "C# / compilação",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32604485068",
+  "category": "Indeterminada — consultar o primeiro erro real do log.",
   "infra_only": false,
   "failed_jobs": [
-    "build-apk"
+    "Analyze (csharp)"
   ],
   "failed_steps": [
     {
-      "job": "build-apk",
-      "step": "Build APK",
-      "conclusion": "failure"
+      "job": "Analyze (csharp)",
+      "step": "Perform CodeQL Analysis",
+      "conclusion": "cancelled"
     }
   ],
   "changed_files": [
-    "src/AURA.Mobile/Resources/Raw/solar_bg.mp4"
+    "src/AURA.Mobile/Resources/Raw/pf_dora.f32"
   ],
   "associated_prs": [
-    80
+    79
   ],
-  "diagnostic_report": "docs/ai/ci-failures/32604506385.md"
+  "diagnostic_report": "docs/ai/ci-failures/32604485068.md"
 }
