@@ -3,43 +3,96 @@ workflows:
     name: AURA Mobile Android (APK)
     max_build_duration: 120
     instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: none
     environment:
       vars:
         DOTNET_PATH: $CM_BUILD_DIR/dotnet
         DOTNET_BIN: $CM_BUILD_DIR/dotnet/dotnet
-        # Para assinar com sua própria keystore (instalação sobre o APK antigo):
-        #   1) Suba a keystore em "Code signing identities" (Codemagic).
-        #   2) Adicione abaixo `android_signing: [ <reference-name> ]`.
-        #   3) Passe -p:AndroidKeyStore=True e os -p:AndroidSigning* (CM_KEYSTORE_PATH,
-        #      CM_KEY_ALIAS, CM_KEY_PASSWORD, CM_KEYSTORE_PASSWORD).
-        # Sem isso, o APK sai assinado com a keystore de debug (instala por sideload).
+        # Alinhado a global.json / AURA.Mobile.csproj
+        DOTNET_VERSION: "10.0.110"
+        ANDROID_TFM: net10.0-android
+        # Versão de exibição (ApplicationDisplayVersion no csproj = 2.1).
+        # ApplicationVersion (código inteiro) usa BUILD_NUMBER do Codemagic.
+        AURA_DISPLAY_VERSION: "2.1"
+        # Assinatura release (opcional):
+        #   1) Code signing identities → upload da keystore .jks/.keystore
+        #   2) Descomente android_signing abaixo com o reference name
+        #   3) O script de publish detecta CM_KEYSTORE_PATH e assina
+      # android_signing:
+      #   - aura_release
     scripts:
       - name: Instalar .NET SDK 10
         script: |
-          wget https://dot.net/v1/dotnet-install.sh
+          set -euo pipefail
+          wget -q https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
           chmod +x dotnet-install.sh
-          # Versão fixada pelo global.json do repositório (10.0.110).
-          ./dotnet-install.sh --install-dir $DOTNET_PATH --version 10.0.110
-          $DOTNET_BIN --version
+          ./dotnet-install.sh --install-dir "$DOTNET_PATH" --version "$DOTNET_VERSION"
+          export PATH="$DOTNET_PATH:$PATH"
+          "$DOTNET_BIN" --info
+
       - name: Instalar workload MAUI Android
         script: |
-          $DOTNET_BIN workload install maui-android
+          set -euo pipefail
+          export PATH="$DOTNET_PATH:$PATH"
+          "$DOTNET_BIN" workload install maui-android --skip-manifest-update || \
+            "$DOTNET_BIN" workload install maui-android
+
+      - name: Restore
+        script: |
+          set -euo pipefail
+          export PATH="$DOTNET_PATH:$PATH"
+          "$DOTNET_BIN" restore src/AURA.Mobile/AURA.Mobile.csproj
+
       - name: Instalar dependências do Android SDK (API 36)
         script: |
-          $DOTNET_BIN build src/AURA.Mobile/AURA.Mobile.csproj \
+          set -euo pipefail
+          export PATH="$DOTNET_PATH:$PATH"
+          # macOS Codemagic: SDK costuma estar em /Users/builder/Library/Android/sdk
+          SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/share/android-sdk}}"
+          if [ ! -d "$SDK_DIR" ] && [ -d "$HOME/Library/Android/sdk" ]; then
+            SDK_DIR="$HOME/Library/Android/sdk"
+          fi
+          echo "AndroidSdkDirectory=$SDK_DIR"
+          "$DOTNET_BIN" build src/AURA.Mobile/AURA.Mobile.csproj \
             -t:InstallAndroidDependencies \
-            -f net10.0-android \
-            -p:AndroidSdkDirectory=/usr/local/share/android-sdk \
+            -f "$ANDROID_TFM" \
+            -p:AndroidSdkDirectory="$SDK_DIR" \
             -p:AcceptAndroidSDKLicenses=True
+
       - name: Publicar APK (Release)
         script: |
-          cd $CM_BUILD_DIR
-          $DOTNET_BIN publish src/AURA.Mobile/AURA.Mobile.csproj \
-            -f net10.0-android \
+          set -euo pipefail
+          export PATH="$DOTNET_PATH:$PATH"
+          cd "$CM_BUILD_DIR"
+          mkdir -p artifacts
+
+          SIGN_ARGS=""
+          if [ -n "${CM_KEYSTORE_PATH:-}" ] && [ -f "${CM_KEYSTORE_PATH}" ]; then
+            echo "Assinatura release via Codemagic keystore"
+            SIGN_ARGS="-p:AndroidKeyStore=true \
+              -p:AndroidSigningKeyStore=$CM_KEYSTORE_PATH \
+              -p:AndroidSigningKeyAlias=$CM_KEY_ALIAS \
+              -p:AndroidSigningKeyPass=$CM_KEY_PASSWORD \
+              -p:AndroidSigningStorePass=$CM_KEYSTORE_PASSWORD \
+              -p:AndroidUseDebugSigning=false"
+          else
+            echo "Sem keystore Codemagic — APK com assinatura de debug (sideload)"
+          fi
+
+          # shellcheck disable=SC2086
+          "$DOTNET_BIN" publish src/AURA.Mobile/AURA.Mobile.csproj \
+            -f "$ANDROID_TFM" \
             -c Release \
             -p:AndroidPackageFormats=apk \
-            -p:ApplicationVersion=$BUILD_NUMBER \
-            -p:ApplicationDisplayVersion="1.0.0" \
-            -o $CM_BUILD_DIR/artifacts
+            -p:ApplicationVersion="${BUILD_NUMBER:-1}" \
+            -p:ApplicationDisplayVersion="${AURA_DISPLAY_VERSION}" \
+            $SIGN_ARGS \
+            -o "$CM_BUILD_DIR/artifacts"
+
+          echo "APKs gerados:"
+          find "$CM_BUILD_DIR/artifacts" -name '*.apk' -type f -print
+
     artifacts:
+      - artifacts/**/*.apk
       - artifacts/*.apk
