@@ -1,14 +1,14 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
   "workflow": "CodeQL Advanced",
-  "run_id": "32597751380",
+  "run_id": "32599063416",
   "status": "completed",
-  "conclusion": "cancelled",
-  "branch": "main",
-  "commit": "c50a1dbc2d4c649354554c67e3c18b27f05b38c9",
-  "event": "push",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32597751380",
-  "category": "Indeterminada — consultar o primeiro erro real do log.",
+  "conclusion": "failure",
+  "branch": "feat/aura-git-python-script",
+  "commit": "5420c8b73b865a480a238fc39b3ba059bca4edba",
+  "event": "pull_request",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32599063416",
+  "category": "C# / compilação",
   "infra_only": false,
   "failed_jobs": [
     "Analyze (csharp)"
@@ -16,15 +16,16 @@
   "failed_steps": [
     {
       "job": "Analyze (csharp)",
-      "step": "Initialize CodeQL",
-      "conclusion": "cancelled"
+      "step": "Manual build (csharp)",
+      "conclusion": "failure"
     }
   ],
   "changed_files": [
-    "codemagic.yaml"
+    "scripts/README_AURA_GIT.md",
+    "scripts/aura_git.py"
   ],
   "associated_prs": [
-    74
+    75
   ],
-  "diagnostic_report": "docs/ai/ci-failures/32597751380.md"
+  "diagnostic_report": "docs/ai/ci-failures/32599063416.md"
 }
