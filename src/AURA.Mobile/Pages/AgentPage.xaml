@@ -62,11 +62,12 @@
                 <ContentView x:Name="ConfigHost" IsVisible="False" />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                     <Border Grid.Column="0" BackgroundColor="{DynamicResource AuraSurface2}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,6" StrokeShape="RoundRectangle 12,12,12,12">
-                        <Editor x:Name="CommandEditor" MinimumHeightRequest="40" MaximumHeightRequest="120" Placeholder="Instrua o agente…" AutoSize="TextChanges" BackgroundColor="Transparent" />
+                        <Editor x:Name="CommandEditor" MinimumHeightRequest="40" MaximumHeightRequest="120" Placeholder="Instrua o agente…" AutoSize="TextChanges" BackgroundColor="Transparent" Completed="OnEditorCompleted" />
                     </Border>
-                    <Grid Grid.Column="1" WidthRequest="52" HeightRequest="52" VerticalOptions="End" ZIndex="100" InputTransparent="False">
-                        <Button x:Name="RunButton" Text="▶" Clicked="OnRunClicked" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="26" FontSize="16" Padding="0" WidthRequest="52" HeightRequest="52" InputTransparent="False" ZIndex="101" />
-                        <ActivityIndicator x:Name="BusyIndicator" IsRunning="False" IsVisible="False" InputTransparent="True" Color="White" WidthRequest="22" HeightRequest="22" HorizontalOptions="Center" VerticalOptions="Center" ZIndex="102" />
+                    <!-- Botão ▶ por cima do indicador; indicador nunca bloqueia toque -->
+                    <Grid Grid.Column="1" WidthRequest="56" HeightRequest="56" VerticalOptions="End">
+                        <ActivityIndicator x:Name="BusyIndicator" IsRunning="False" IsVisible="False" InputTransparent="True" Color="White" WidthRequest="22" HeightRequest="22" HorizontalOptions="Center" VerticalOptions="Center" />
+                        <Button x:Name="RunButton" Text="▶" Clicked="OnRunClicked" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="28" FontSize="18" Padding="0" WidthRequest="56" HeightRequest="56" />
                     </Grid>
                 </Grid>
             </VerticalStackLayout>
