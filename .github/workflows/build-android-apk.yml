@@ -126,12 +126,14 @@ jobs:
             -p:AndroidPackageFormats=apk \
             $SIGN_ARGS
 
+      # APKs are retained only from main builds. PR validation should not consume
+      # artifact storage unless a release candidate is actually produced.
       - name: Upload APK
-        if: success()
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: aura-mobile-apk-${{ github.event_name == 'pull_request' && 'pr' || 'main' }}-${{ github.run_id }}
+          name: aura-mobile-apk-main-${{ github.run_id }}
           path: src/AURA.Mobile/bin/Release/net10.0-android/*.apk
           if-no-files-found: warn
-          retention-days: 2
+          retention-days: 1
