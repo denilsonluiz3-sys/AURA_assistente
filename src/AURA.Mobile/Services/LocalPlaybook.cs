@@ -1,16 +1,24 @@
+using System.Text.Json;
 using AURA.Memory;
 using AURA.Mobile.Diagnostics;
 
 namespace AURA.Mobile.Services;
 
 /// <summary>
-/// Camada fina sobre SolutionStore + MemoryStore: tenta resolver a tarefa sem LLM.
-/// Ordem: (1) soluções procedurais, (2) pares pergunta/resposta já gravados, (3) null = precisa IA.
+/// Resolve tarefas sem LLM, reutilizando o que já existe.
+/// Ordem: SolutionStore → MemoryStore (turnos) → process-log.json no workspace → null (IA).
+/// process-log.json é artefato opcional criado pelo agente; não é a memória oficial.
+/// Hits nele são promovidos ao SolutionStore.
 /// </summary>
 public sealed class LocalPlaybook
 {
     private readonly SolutionStore _solutions;
     private readonly MemoryStore? _memory;
+
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     public LocalPlaybook(SolutionStore solutions, MemoryStore? memory = null)
     {
@@ -31,25 +39,31 @@ public sealed class LocalPlaybook
 
         try
         {
-            // 1) Memória procedural (comandos/soluções bem-sucedidas)
+            // 1) Memória procedural oficial
             var match = _solutions.FindBestMatch(query, threshold: 72);
             if (match != null && !string.IsNullOrWhiteSpace(match.ActionTaken))
             {
                 AuraLog.Info("LocalPlaybook hit SolutionStore: " + match.Id);
-                return
-                    "[memória local · sem IA]\n" +
-                    match.ActionTaken.Trim() +
-                    (string.IsNullOrWhiteSpace(match.ResultDetails)
-                        ? string.Empty
-                        : "\n\n—\n" + match.ResultDetails.Trim());
+                return FormatLocal(match.ActionTaken, match.ResultDetails, "memória local · sem IA");
             }
 
-            // 2) Turnos anteriores (pergunta do usuário ≈ comando atual → resposta do assistente)
+            // 2) Turnos do MemoryStore (conversas do app)
             string? fromTurns = FindInConversationTurns(query);
             if (!string.IsNullOrWhiteSpace(fromTurns))
             {
                 AuraLog.Info("LocalPlaybook hit MemoryStore turn");
-                return "[memória local · conversa anterior · sem IA]\n" + fromTurns.Trim();
+                // Promove para SolutionStore (próximas buscas mais rápidas)
+                RememberSuccess(query, fromTurns!);
+                return FormatLocal(fromTurns!, null, "memória local · conversa anterior · sem IA");
+            }
+
+            // 3) process-log.json no workspace (se o agente criou)
+            string? fromLog = FindInProcessLog(query);
+            if (!string.IsNullOrWhiteSpace(fromLog))
+            {
+                AuraLog.Info("LocalPlaybook hit process-log.json");
+                RememberSuccess(query, fromLog!);
+                return FormatLocal(fromLog!, null, "memória local · process-log · sem IA");
             }
 
             return null;
@@ -61,9 +75,14 @@ public sealed class LocalPlaybook
         }
     }
 
-    /// <summary>
-    /// Percorre turnos recentes: se um turno user for similar ao comando, devolve o próximo assistant.
-    /// </summary>
+    private static string FormatLocal(string action, string? details, string tag)
+    {
+        string body = action.Trim();
+        if (!string.IsNullOrWhiteSpace(details))
+            body += "\n\n—\n" + details.Trim();
+        return "[" + tag + "]\n" + body;
+    }
+
     private string? FindInConversationTurns(string query)
     {
         if (_memory == null)
@@ -100,7 +119,6 @@ public sealed class LocalPlaybook
             if (score < 70 || score <= bestScore)
                 continue;
 
-            // Próximo turno assistant
             string? answer = null;
             for (int j = i + 1; j < entries.Count && j <= i + 3; j++)
             {
@@ -113,15 +131,12 @@ public sealed class LocalPlaybook
                     answer = next.Text;
                     break;
                 }
-                // se aparecer outro user antes, para
                 if (string.Equals(next.Role, "user", StringComparison.OrdinalIgnoreCase))
                     break;
             }
 
             if (string.IsNullOrWhiteSpace(answer))
                 continue;
-
-            // Evita devolver respostas de erro/vazias
             if (answer.StartsWith("Erro:", StringComparison.OrdinalIgnoreCase)
                 || answer.StartsWith("(sem texto", StringComparison.OrdinalIgnoreCase))
                 continue;
@@ -133,7 +148,96 @@ public sealed class LocalPlaybook
         return bestAnswer;
     }
 
-    /// <summary>Similaridade leve: Levenshtein se existir, senão overlap de palavras.</summary>
+    /// <summary>
+    /// Lê process-log.json no workspace ativo (e fallback workspace privado).
+    /// Formato esperado: { "sessions": [ { "prompt", "response", "status" } ] }
+    /// </summary>
+    private string? FindInProcessLog(string query)
+    {
+        foreach (string root in CandidateRoots())
+        {
+            string path = Path.Combine(root, "process-log.json");
+            if (!File.Exists(path))
+                continue;
+
+            try
+            {
+                string json = File.ReadAllText(path);
+                using var doc = JsonDocument.Parse(json);
+                if (!doc.RootElement.TryGetProperty("sessions", out var sessions)
+                    || sessions.ValueKind != JsonValueKind.Array)
+                    continue;
+
+                string q = query.ToLowerInvariant();
+                string? best = null;
+                int bestScore = 0;
+
+                foreach (var session in sessions.EnumerateArray())
+                {
+                    string status = session.TryGetProperty("status", out var st)
+                        ? (st.GetString() ?? "")
+                        : "completed";
+                    if (status.Equals("failed", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    string prompt = session.TryGetProperty("prompt", out var p)
+                        ? (p.GetString() ?? "")
+                        : "";
+                    string response = session.TryGetProperty("response", out var r)
+                        ? (r.GetString() ?? "")
+                        : "";
+
+                    if (string.IsNullOrWhiteSpace(prompt) || string.IsNullOrWhiteSpace(response))
+                        continue;
+
+                    int score = ScoreSimilarity(q, prompt.Trim().ToLowerInvariant());
+                    if (score < 70 || score <= bestScore)
+                        continue;
+
+                    bestScore = score;
+                    best = response;
+                }
+
+                if (!string.IsNullOrWhiteSpace(best))
+                    return best;
+            }
+            catch (Exception ex)
+            {
+                AuraLog.Info("LocalPlaybook process-log skip " + path + ": " + ex.Message);
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> CandidateRoots()
+    {
+        // Workspace ativo (projeto vinculado ou privado)
+        string active;
+        try { active = AgentWorkspace.ActiveRoot; }
+        catch { active = string.Empty; }
+        if (!string.IsNullOrWhiteSpace(active))
+            yield return active;
+
+        string privateWs;
+        try { privateWs = AgentWorkspace.WorkspaceRoot; }
+        catch { privateWs = string.Empty; }
+        if (!string.IsNullOrWhiteSpace(privateWs)
+            && !string.Equals(privateWs, active, StringComparison.OrdinalIgnoreCase))
+            yield return privateWs;
+
+        // App data (caso o arquivo tenha sido gravado na raiz do app)
+        try
+        {
+            string app = FileSystem.AppDataDirectory;
+            if (!string.IsNullOrWhiteSpace(app)
+                && !string.Equals(app, active, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(app, privateWs, StringComparison.OrdinalIgnoreCase))
+                yield return app;
+        }
+        catch { /* ignore */ }
+    }
+
     private static int ScoreSimilarity(string a, string b)
     {
         if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b))
@@ -141,7 +245,6 @@ public sealed class LocalPlaybook
         if (a == b)
             return 100;
 
-        // Reusa o Levenshtein do SolutionStore quando possível
         try
         {
             return Levenshtein.SimilarityPercent(a, b);
