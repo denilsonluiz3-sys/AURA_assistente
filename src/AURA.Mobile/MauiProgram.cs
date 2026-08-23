@@ -30,7 +30,7 @@ public static class MauiProgram
         AuraLog.Info("MauiProgram.CreateMauiApp BEGIN");
         var builder = MauiApp.CreateBuilder();
         builder.UseMauiApp<App>()
-               .UseMauiCommunityToolkitMediaElement();
+               .UseMauiCommunityToolkitMediaElement(isAndroidForegroundServiceEnabled: true);
 
 #if ANDROID
         builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Microsoft.Maui.Controls.WebView, AURA.Mobile.Platforms.Android.WebView.AuraWebViewHandler>());
