@@ -15,11 +15,6 @@ public sealed class LocalPlaybook
     private readonly SolutionStore _solutions;
     private readonly MemoryStore? _memory;
 
-    private static readonly JsonSerializerOptions JsonOpts = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
-
     public LocalPlaybook(SolutionStore solutions, MemoryStore? memory = null)
     {
         _solutions = solutions ?? throw new ArgumentNullException(nameof(solutions));
@@ -52,7 +47,6 @@ public sealed class LocalPlaybook
             if (!string.IsNullOrWhiteSpace(fromTurns))
             {
                 AuraLog.Info("LocalPlaybook hit MemoryStore turn");
-                // Promove para SolutionStore (próximas buscas mais rápidas)
                 RememberSuccess(query, fromTurns!);
                 return FormatLocal(fromTurns!, null, "memória local · conversa anterior · sem IA");
             }
@@ -210,32 +204,35 @@ public sealed class LocalPlaybook
         return null;
     }
 
-    private static IEnumerable<string> CandidateRoots()
+    /// <summary>Lista de raízes candidatas — sem yield dentro de try/catch (CS1626).</summary>
+    private static List<string> CandidateRoots()
     {
-        // Workspace ativo (projeto vinculado ou privado)
-        string active;
-        try { active = AgentWorkspace.ActiveRoot; }
-        catch { active = string.Empty; }
-        if (!string.IsNullOrWhiteSpace(active))
-            yield return active;
+        var roots = new List<string>();
 
-        string privateWs;
-        try { privateWs = AgentWorkspace.WorkspaceRoot; }
-        catch { privateWs = string.Empty; }
+        string active = string.Empty;
+        try { active = AgentWorkspace.ActiveRoot ?? string.Empty; }
+        catch { /* ignore */ }
+        if (!string.IsNullOrWhiteSpace(active))
+            roots.Add(active);
+
+        string privateWs = string.Empty;
+        try { privateWs = AgentWorkspace.WorkspaceRoot ?? string.Empty; }
+        catch { /* ignore */ }
         if (!string.IsNullOrWhiteSpace(privateWs)
             && !string.Equals(privateWs, active, StringComparison.OrdinalIgnoreCase))
-            yield return privateWs;
+            roots.Add(privateWs);
 
-        // App data (caso o arquivo tenha sido gravado na raiz do app)
         try
         {
-            string app = FileSystem.AppDataDirectory;
+            string app = FileSystem.AppDataDirectory ?? string.Empty;
             if (!string.IsNullOrWhiteSpace(app)
                 && !string.Equals(app, active, StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(app, privateWs, StringComparison.OrdinalIgnoreCase))
-                yield return app;
+                roots.Add(app);
         }
         catch { /* ignore */ }
+
+        return roots;
     }
 
     private static int ScoreSimilarity(string a, string b)
