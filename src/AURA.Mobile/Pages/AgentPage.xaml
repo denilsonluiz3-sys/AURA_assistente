@@ -33,13 +33,13 @@
             </HorizontalStackLayout>
         </ScrollView>
 
-        <!-- Process cards -->
-        <Border Grid.Row="2" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="10,7">
-            <CollectionView x:Name="ProcessCards" ItemsSource="{Binding Processes}" ItemsLayout="HorizontalList" HeightRequest="92" SelectionMode="None">
+        <!-- Process cards: oculto quando vazio (não ocupa o meio da tela) -->
+        <Border x:Name="ProcessCardsHost" Grid.Row="2" IsVisible="False" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="10,7">
+            <CollectionView x:Name="ProcessCards" ItemsSource="{Binding Processes}" ItemsLayout="HorizontalList" HeightRequest="72" SelectionMode="None">
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
-                        <Border WidthRequest="190" Margin="0,0,8,0" BackgroundColor="{DynamicResource AuraSurface2}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" StrokeShape="RoundRectangle 12">
-                            <Grid Padding="10,7" RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
+                        <Border WidthRequest="170" Margin="0,0,8,0" BackgroundColor="{DynamicResource AuraSurface2}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" StrokeShape="RoundRectangle 12">
+                            <Grid Padding="10,6" RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
                                 <Label Grid.ColumnSpan="2" Text="{Binding Title}" FontSize="11" FontAttributes="Bold" TextColor="{DynamicResource AuraTextPrimary}" LineBreakMode="TailTruncation" />
                                 <Label Grid.Row="1" Text="{Binding Status}" FontSize="10" TextColor="{DynamicResource AuraAccent}" />
                                 <Button Grid.Row="1" Grid.Column="1" Text="Abrir" Clicked="OnProcessCardClicked" FontSize="9" Padding="7,2" HeightRequest="25" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
@@ -56,16 +56,15 @@
             <VerticalStackLayout x:Name="ConversationContainer" Spacing="6" Padding="14,12" />
         </ScrollView>
 
-        <!-- Input -->
-        <Border Grid.Row="4" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,10">
+        <!-- Input: ZIndex alto para não perder toques -->
+        <Border Grid.Row="4" ZIndex="50" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,10">
             <VerticalStackLayout Spacing="8">
                 <ContentView x:Name="ConfigHost" IsVisible="False" />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                     <Border Grid.Column="0" BackgroundColor="{DynamicResource AuraSurface2}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,6" StrokeShape="RoundRectangle 12,12,12,12">
                         <Editor x:Name="CommandEditor" MinimumHeightRequest="40" MaximumHeightRequest="120" Placeholder="Instrua o agente…" AutoSize="TextChanges" BackgroundColor="Transparent" Completed="OnEditorCompleted" />
                     </Border>
-                    <!-- Botão ▶ por cima do indicador; indicador nunca bloqueia toque -->
-                    <Grid Grid.Column="1" WidthRequest="56" HeightRequest="56" VerticalOptions="End">
+                    <Grid Grid.Column="1" WidthRequest="56" HeightRequest="56" VerticalOptions="End" ZIndex="51">
                         <ActivityIndicator x:Name="BusyIndicator" IsRunning="False" IsVisible="False" InputTransparent="True" Color="White" WidthRequest="22" HeightRequest="22" HorizontalOptions="Center" VerticalOptions="Center" />
                         <Button x:Name="RunButton" Text="▶" Clicked="OnRunClicked" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="28" FontSize="18" Padding="0" WidthRequest="56" HeightRequest="56" />
                     </Grid>
