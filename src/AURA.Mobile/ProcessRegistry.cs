@@ -43,9 +43,17 @@ public sealed class ProcessRegistry
         return process;
     }
 
-    public void Complete(string id, string message = "Concluído") => Update(id, "Concluído", message, 1);
+    public void Complete(string id, string message = "Concluído")
+    {
+        Update(id, "Concluído", message, 1);
+        ScheduleRemove(id, 1800);
+    }
 
-    public void Fail(string id, string message = "Falhou") => Update(id, "Falhou", message, 1);
+    public void Fail(string id, string message = "Falhou")
+    {
+        Update(id, "Falhou", message, 1);
+        ScheduleRemove(id, 2200);
+    }
 
     public void Retry(string id, string message = "Tentando novamente") => Update(id, "Tentando novamente", message, 0);
 
@@ -63,6 +71,47 @@ public sealed class ProcessRegistry
             process.Status = status;
             process.Message = message;
             process.Progress = Math.Clamp(progress, 0, 1);
+        });
+    }
+
+    /// <summary>Remove o card após delay (ms). Só remove se ainda estiver no estado terminal.</summary>
+    private void ScheduleRemove(string id, int delayMs)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(delayMs).ConfigureAwait(false);
+                ProcessInfo? process;
+                lock (_sync)
+                    _byId.TryGetValue(id, out process);
+
+                if (process == null)
+                    return;
+
+                string s = process.Status ?? "";
+                bool terminal = s.Equals("Concluído", StringComparison.OrdinalIgnoreCase)
+                    || s.Equals("Falhou", StringComparison.OrdinalIgnoreCase);
+                if (!terminal)
+                    return;
+
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    lock (_sync)
+                    {
+                        if (_byId.Remove(id))
+                        {
+                            var item = Processes.FirstOrDefault(p => p.Id == id);
+                            if (item != null)
+                                Processes.Remove(item);
+                        }
+                    }
+                });
+            }
+            catch
+            {
+                // nunca quebra o app por limpeza de card
+            }
         });
     }
 
@@ -108,6 +157,11 @@ public sealed class ProcessRegistry
             process.Message = evt.Message;
             process.Progress = Math.Clamp(evt.Progress, 0, 1);
         });
+
+        string st = evt.Status ?? "";
+        if (st.Equals("Concluído", StringComparison.OrdinalIgnoreCase)
+            || st.Equals("Falhou", StringComparison.OrdinalIgnoreCase))
+            ScheduleRemove(evt.Id, 1800);
     }
 
     private void OnCellStateChanged(CellStateChangedEvent evt)
@@ -128,6 +182,8 @@ public sealed class ProcessRegistry
             _ => state
         };
 
+        // Só cria card de célula quando está realmente ativa (evita poluição)
+        bool isActive = status == "Executando" || status == "Pausado";
         string processId = "cell:" + evt.CellId;
         ProcessInfo? process;
         lock (_sync)
@@ -135,6 +191,9 @@ public sealed class ProcessRegistry
 
         if (process == null)
         {
+            if (!isActive)
+                return; // não cria card para célula já terminada
+
             process = new ProcessInfo
             {
                 Id = processId,
@@ -143,7 +202,7 @@ public sealed class ProcessRegistry
                 Target = "Cells",
                 Status = status,
                 Message = state,
-                Progress = status == "Concluído" || status == "Falhou" ? 1 : 0,
+                Progress = 0,
                 StartedAt = evt.OccurredAt
             };
 
@@ -160,11 +219,13 @@ public sealed class ProcessRegistry
         }
 
         Update(process.Id, status, state, status == "Concluído" || status == "Falhou" ? 1 : process.Progress);
+        if (status == "Concluído" || status == "Falhou")
+            ScheduleRemove(process.Id, 1800);
     }
 
     private void Trim()
     {
-        while (Processes.Count > 8)
+        while (Processes.Count > 6)
         {
             var last = Processes[^1];
             Processes.RemoveAt(Processes.Count - 1);

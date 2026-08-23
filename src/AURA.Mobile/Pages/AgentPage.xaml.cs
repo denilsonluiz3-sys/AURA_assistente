@@ -55,7 +55,13 @@ public partial class AgentPage : ContentPage
 
     private void UpdateProcessCardsVisibility()
     {
-        bool show = _processes.Processes.Count > 0;
+        // Só mostra a faixa se existir processo ainda ativo (não concluído/falho)
+        bool show = _processes.Processes.Any(p =>
+        {
+            string s = p.Status ?? "";
+            return !s.Equals("Concluído", StringComparison.OrdinalIgnoreCase)
+                && !s.Equals("Falhou", StringComparison.OrdinalIgnoreCase);
+        });
         ProcessCardsHost.IsVisible = show;
     }
 
@@ -107,14 +113,18 @@ public partial class AgentPage : ContentPage
             new WebFetchTool()
         };
 
+        // Uso máximo de ferramentas: instrução forte e explícita
         string systemPrompt =
-            "Você é o agente de arquivos da AURA. " +
-            "Você TEM memória persistente. Prefira ferramentas (list/read/write/shell) a respostas vagas. " +
-            "Responda em português, curto. " +
+            "Você é o agente de arquivos e execução da AURA. " +
+            "REGRA PRINCIPAL: use ferramentas sempre que possível. " +
+            "Prefira list_dir, read_file, write_file, edit_file, shell e web_fetch a respostas vagas ou inventadas. " +
+            "Se a tarefa envolver arquivos, diretórios, comandos ou informação externa, CHAME a ferramenta antes de responder. " +
+            "Você TEM memória persistente — nunca diga que não tem memória. " +
+            "Responda em português, curto e objetivo. " +
             "Se precisar de um script shell no workspace, devolva UM bloco assim:\n" +
             "```aura-sh\ncomando1\ncomando2\n```\n" +
             "O app executará o bloco no terminal. Não invente caminhos fora do workspace. " +
-            "Evite loops longos de ferramentas.";
+            "Evite loops desnecessários; use o mínimo de rodadas de ferramenta que resolva a tarefa.";
 
         _session = new AgentSession(_client, tools, systemPrompt, memory: _memory);
         _session.Step += OnAgentStep;
@@ -122,8 +132,8 @@ public partial class AgentPage : ContentPage
         int memCount = 0;
         try { memCount = _memory.Read(tail: 64).Count; } catch { /* ignore */ }
         string welcome = memCount > 0
-            ? $"Pronto. Memória ({memCount}). Playbook local ativo — IA só se precisar."
-            : "Pronto. Playbook local ativo. Histórico / Prompts / digite.";
+            ? $"Pronto. Memória ({memCount}). Playbook local ativo — ferramentas prioritárias."
+            : "Pronto. Playbook local ativo. Ferramentas prioritárias. Histórico / Prompts / digite.";
         _ = AppendBubbleAsync(welcome, user: false);
     }
 
@@ -276,7 +286,7 @@ public partial class AgentPage : ContentPage
             await AppendBubbleAsync(text, user: true);
             CommandEditor.Text = string.Empty;
 
-            var process = _processes.Begin(text, "Assistente", "Entendendo solicitação");
+            var process = _processes.Begin(Shorten(text, 40), "Assistente", "Entendendo solicitação");
             processId = process.Id;
             _activeProcessId = process.Id;
 
@@ -285,11 +295,7 @@ public partial class AgentPage : ContentPage
             if (!string.IsNullOrWhiteSpace(local))
             {
                 _processes.Update(process.Id, "Playbook", "Resposta local", 0.5);
-                await AppendBubbleAsync(local, user: false);
-                await TryExecuteAuraShellAsync(local);
-                _processes.Complete(process.Id, "Playbook local");
-                _voice?.SetLastUtterance(local);
-                await SpeakAsync(local);
+                await DeliverAnswerAsync(local, process.Id, "Playbook local");
                 return;
             }
 
@@ -298,11 +304,7 @@ public partial class AgentPage : ContentPage
                 _processes.Update(process.Id, "Planejando", "Orquestrador", 0.15);
                 string answer = await _orchestrator.ExecuteAsync(text);
                 _playbook?.RememberSuccess(text, answer);
-                _processes.Complete(process.Id, "OK");
-                await AppendBubbleAsync(answer, user: false);
-                await TryExecuteAuraShellAsync(answer);
-                _voice?.SetLastUtterance(answer);
-                await SpeakAsync(answer);
+                await DeliverAnswerAsync(answer, process.Id, "OK");
                 return;
             }
 
@@ -328,11 +330,7 @@ public partial class AgentPage : ContentPage
             }
 
             _playbook?.RememberSuccess(text, answerFromAgent);
-            _processes.Complete(process.Id, "Resultado entregue");
-            await AppendBubbleAsync(answerFromAgent, user: false);
-            await TryExecuteAuraShellAsync(answerFromAgent);
-            _voice?.SetLastUtterance(answerFromAgent);
-            await SpeakAsync(answerFromAgent);
+            await DeliverAnswerAsync(answerFromAgent, process.Id, "Resultado entregue");
 
             if (ProjectAccessService.IsLinked && !ProjectAccessService.IsDirect)
             {
@@ -356,6 +354,24 @@ public partial class AgentPage : ContentPage
             BusyIndicator.IsVisible = false;
             _runInFlight = false;
         }
+    }
+
+    /// <summary>
+    /// Entrega texto na bolha primeiro, depois TTS. Garante que a resposta nunca fique só em áudio.
+    /// </summary>
+    private async Task DeliverAnswerAsync(string answer, string processId, string completeMessage)
+    {
+        string text = string.IsNullOrWhiteSpace(answer) ? "(sem texto na resposta)" : answer.Trim();
+
+        // 1) Sempre mostra o texto
+        await AppendBubbleAsync(text, user: false);
+        await TryExecuteAuraShellAsync(text);
+
+        _processes.Complete(processId, completeMessage);
+        _voice?.SetLastUtterance(text);
+
+        // 2) Áudio depois do texto estar na tela
+        await SpeakAsync(text);
     }
 
     private async Task TryExecuteAuraShellAsync(string answer)
@@ -422,6 +438,8 @@ public partial class AgentPage : ContentPage
 
     private async Task SpeakAsync(string text)
     {
+        if (string.IsNullOrWhiteSpace(text))
+            return;
         try { await _speech.InitializeAsync(); await _speech.SpeakAsync(text); }
         catch (NotSupportedException) { }
         catch (Exception ex) { AuraLog.Exception("AgentPage.Speak", ex); }
@@ -439,7 +457,6 @@ public partial class AgentPage : ContentPage
             try
             {
                 await Clipboard.Default.SetTextAsync(payload);
-                // Feedback mínimo, sem modal no meio da tela
                 AuraLog.Info("AgentPage: texto copiado (duplo toque)");
             }
             catch (Exception ex) { AuraLog.Exception("Copy", ex); }
@@ -481,7 +498,6 @@ public partial class AgentPage : ContentPage
                 Color stroke = user ? Color.FromArgb("#2a3a6a")
                     : isError ? Color.FromArgb("#5a1f24") : Color.FromArgb("#242438");
 
-                // Bolhas compactas — não atravessam o meio da tela
                 double maxW = 0;
                 try
                 {
@@ -509,10 +525,25 @@ public partial class AgentPage : ContentPage
                 };
                 border.Content = messageLabel;
 
-                // Sem botão "Copiar" visível — só gesto sutil
                 AttachSubtleCopy(border, text ?? "");
                 ConversationContainer.Children.Add(border);
-                await ConversationScroll.ScrollToAsync(border, ScrollToPosition.End, true);
+
+                // Scroll robusto para baixo: espera layout e força End
+                await Task.Delay(40);
+                try
+                {
+                    await ConversationScroll.ScrollToAsync(border, ScrollToPosition.End, animated: false);
+                }
+                catch
+                {
+                    // fallback: scroll pela altura do conteúdo
+                    try
+                    {
+                        double y = Math.Max(0, ConversationContainer.Height - ConversationScroll.Height);
+                        await ConversationScroll.ScrollToAsync(0, y, animated: false);
+                    }
+                    catch { /* ignore */ }
+                }
             }).ConfigureAwait(false);
         }
         catch (Exception ex)
