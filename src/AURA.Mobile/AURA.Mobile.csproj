@@ -18,27 +18,24 @@
     <PublishTrimmed>false</PublishTrimmed>
     <RunAOTCompilation>false</RunAOTCompilation>
     <AndroidPackageFormats>apk</AndroidPackageFormats>
-    <!-- minSdk 24 mantido; OnnxRuntime removido (Kokoro fora) -->
     <SupportedOSPlatformVersion>24</SupportedOSPlatformVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.60" />
-    <!-- Kokoro/ONNX e MediaElement (vídeos de fundo) removidos — TTS = Android nativo -->
+    <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
     <MauiFont Include="Resources\Fonts\*" />
   </ItemGroup>
 
-  <!-- Raw opcional (sem kokoro / sem mp4). Pasta pode ficar vazia. -->
   <ItemGroup>
     <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" Condition="Exists('Resources\Raw')" />
   </ItemGroup>
 
   <ItemGroup>
-    <MauiAsset Include="..\..\modules\packages\**\module.json"
-               LogicalName="modulepkgs/%(RecursiveDir)module.json" />
+    <MauiAsset Include="..\..\modules\packages\**\module.json" LogicalName="modulepkgs/%(RecursiveDir)module.json" />
   </ItemGroup>
 
   <ItemGroup>
