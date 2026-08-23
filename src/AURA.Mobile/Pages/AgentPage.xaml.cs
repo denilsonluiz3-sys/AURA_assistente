@@ -9,6 +9,7 @@ using AURA.Mobile.Speech;
 using AURA.Modules.Executors;
 using AURA.Mobile.Controls;
 using Microsoft.Maui.Controls.Shapes;
+using System.Collections.Specialized;
 
 namespace AURA.Mobile.Pages;
 
@@ -44,6 +45,18 @@ public partial class AgentPage : ContentPage
         ProcessCards.BindingContext = _processes;
         _voice = voice;
         LoadRecentsFromPrefs();
+
+        _processes.Processes.CollectionChanged += OnProcessesChanged;
+        UpdateProcessCardsVisibility();
+    }
+
+    private void OnProcessesChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        => MainThread.BeginInvokeOnMainThread(UpdateProcessCardsVisibility);
+
+    private void UpdateProcessCardsVisibility()
+    {
+        bool show = _processes.Processes.Count > 0;
+        ProcessCardsHost.IsVisible = show;
     }
 
     protected override void OnAppearing()
@@ -65,6 +78,7 @@ public partial class AgentPage : ContentPage
             $" ({AgentWorkspace.CountFiles(activeRoot)} arquivo(s))";
         ModelLabel.Text = $"Modelo: {_client.Options.Model} · {_client.Options.BaseUrl}";
 
+        UpdateProcessCardsVisibility();
         EnsureSession();
     }
 
@@ -413,27 +427,21 @@ public partial class AgentPage : ContentPage
         catch (Exception ex) { AuraLog.Exception("AgentPage.Speak", ex); }
     }
 
-    private static Button CreateCopyButton() => new()
-    {
-        Text = "Copiar",
-        FontSize = 10,
-        Padding = new Thickness(8, 3),
-        HeightRequest = 30,
-        HorizontalOptions = LayoutOptions.Start,
-        BackgroundColor = Colors.Transparent,
-        TextColor = Color.FromArgb("#9aa3b5"),
-        BorderColor = Color.FromArgb("#3a3a52"),
-        BorderWidth = 1,
-        CornerRadius = 8
-    };
-
-    private void AttachLongPressCopy(View view, string text)
+    /// <summary>
+    /// Cópia sutil: long-press (Android) ou duplo toque — sem botão "Copiar" no meio da bolha.
+    /// </summary>
+    private void AttachSubtleCopy(View view, string text)
     {
         string payload = text ?? "";
         var doubleTap = new TapGestureRecognizer { NumberOfTapsRequired = 2 };
         doubleTap.Tapped += async (_, _) =>
         {
-            try { await Clipboard.Default.SetTextAsync(payload); await DisplayAlert("Copiado", "OK", "OK"); }
+            try
+            {
+                await Clipboard.Default.SetTextAsync(payload);
+                // Feedback mínimo, sem modal no meio da tela
+                AuraLog.Info("AgentPage: texto copiado (duplo toque)");
+            }
             catch (Exception ex) { AuraLog.Exception("Copy", ex); }
         };
         view.GestureRecognizers.Add(doubleTap);
@@ -449,7 +457,7 @@ public partial class AgentPage : ContentPage
                     try
                     {
                         await Clipboard.Default.SetTextAsync(payload);
-                        await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("Copiado", "OK", "OK"));
+                        AuraLog.Info("AgentPage: texto copiado (long-press)");
                     }
                     catch (Exception ex) { AuraLog.Exception("LongPress", ex); }
                 };
@@ -473,6 +481,15 @@ public partial class AgentPage : ContentPage
                 Color stroke = user ? Color.FromArgb("#2a3a6a")
                     : isError ? Color.FromArgb("#5a1f24") : Color.FromArgb("#242438");
 
+                // Bolhas compactas — não atravessam o meio da tela
+                double maxW = 0;
+                try
+                {
+                    var w = Width > 0 ? Width : DeviceDisplay.MainDisplayInfo.Width / DeviceDisplay.MainDisplayInfo.Density;
+                    maxW = Math.Max(200, w * 0.88);
+                }
+                catch { maxW = 320; }
+
                 var border = new Border
                 {
                     BackgroundColor = background,
@@ -481,7 +498,7 @@ public partial class AgentPage : ContentPage
                     Padding = new Thickness(10, 7),
                     StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(10) },
                     HorizontalOptions = user ? LayoutOptions.End : LayoutOptions.Start,
-                    MaximumWidthRequest = 900
+                    MaximumWidthRequest = maxW
                 };
                 var messageLabel = new Label
                 {
@@ -490,26 +507,10 @@ public partial class AgentPage : ContentPage
                     TextColor = user ? Color.FromArgb("#dfe7ff") : isError ? Color.FromArgb("#f0c0c4") : Color.FromArgb("#e8e8f0"),
                     LineBreakMode = LineBreakMode.WordWrap
                 };
-                if (!user && !isTool && !isError)
-                {
-                    var copy = CreateCopyButton();
-                    string payload = text ?? "";
-                    copy.Clicked += async (_, _) =>
-                    {
-                        try
-                        {
-                            await Clipboard.Default.SetTextAsync(payload);
-                            copy.Text = "Copiado";
-                            await Task.Delay(900);
-                            copy.Text = "Copiar";
-                        }
-                        catch { }
-                    };
-                    border.Content = new VerticalStackLayout { Spacing = 5, Children = { messageLabel, copy } };
-                }
-                else border.Content = messageLabel;
+                border.Content = messageLabel;
 
-                AttachLongPressCopy(border, text ?? "");
+                // Sem botão "Copiar" visível — só gesto sutil
+                AttachSubtleCopy(border, text ?? "");
                 ConversationContainer.Children.Add(border);
                 await ConversationScroll.ScrollToAsync(border, ScrollToPosition.End, true);
             }).ConfigureAwait(false);
