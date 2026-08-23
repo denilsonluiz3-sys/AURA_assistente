@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `a0dc788`
-- Data UTC: `2026-08-23 01:47:00 UTC`
+- Commit: `e72ff7d`
+- Data UTC: `2026-08-23 01:48:19 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `e72ff7d` fix(agent): OnRunClicked — Unfocus + feedback se vazio + try/finally completo (2026-08-22)
+- `10439de` docs(ai): sync README_AI with source tree (2026-08-23)
 - `a0dc788` fix(agent): enviar ▶ — Editor Completed + hit target mais confiável (2026-08-22)
 - `ebad1c0` docs(ai): record CI failure context (2026-08-23)
 - `7f25cbf` docs(ai): sync README_AI with source tree (2026-08-23)
-- `f782e67` ci: reduce APK artifact retention and skip PR uploads (2026-08-22)
-- `36e2aaf` ci: aggressively reclaim Actions artifact storage (2026-08-22)
 <!-- AI-DOCS:END -->
