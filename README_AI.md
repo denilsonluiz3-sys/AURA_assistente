@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `ae6afb3`
-- Data UTC: `2026-08-23 13:26:36 UTC`
+- Commit: `1832ead`
+- Data UTC: `2026-08-23 13:43:53 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `1832ead` feat(memory): LocalPlaybook lê process-log.json do workspace e promove hits ao SolutionStore (2026-08-23)
+- `101b9f4` docs(ai): record CI failure context (2026-08-23)
+- `b0f1b8b` docs(ai): record CI failure context (2026-08-23)
+- `94e616d` docs(ai): sync README_AI with source tree (2026-08-23)
 - `ae6afb3` fix(di): LocalPlaybook recebe MemoryStore explicitamente (2026-08-23)
-- `7897539` docs(ai): sync README_AI with source tree (2026-08-23)
-- `ef4715e` feat(memory): LocalPlaybook consulta MemoryStore antes da IA (mínimo código) (2026-08-23)
-- `4b326d2` docs(ai): record CI failure context (2026-08-23)
-- `1dfb16c` docs(ai): sync README_AI with source tree (2026-08-23)
 <!-- AI-DOCS:END -->
