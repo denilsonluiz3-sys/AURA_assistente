@@ -1,14 +1,14 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
   "workflow": "CodeQL Advanced",
-  "run_id": "32655143004",
+  "run_id": "32655277317",
   "status": "completed",
-  "conclusion": "cancelled",
+  "conclusion": "failure",
   "branch": "main",
-  "commit": "04a20b0a8db0cb8ef08f8cbba5b2a0f217495fe1",
+  "commit": "118d6db2972ae5c9755e926736e18711933e750b",
   "event": "push",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32655143004",
-  "category": "Indeterminada — consultar o primeiro erro real do log.",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32655277317",
+  "category": "C# / compilação",
   "infra_only": false,
   "failed_jobs": [
     "Analyze (csharp)"
@@ -21,8 +21,8 @@
     }
   ],
   "changed_files": [
-    "src/AURA.AI/OpenRouterClient.cs"
+    "src/AURA.Mobile/AURA.Mobile.csproj"
   ],
   "associated_prs": [],
-  "diagnostic_report": "docs/ai/ci-failures/32655143004.md"
+  "diagnostic_report": "docs/ai/ci-failures/32655277317.md"
 }
