@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `7a52b87`
-- Data UTC: `2026-08-23 00:59:31 UTC`
+- Commit: `27fb8ea`
+- Data UTC: `2026-08-23 01:20:16 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `27fb8ea` fix mobile agent send button hit testing (2026-08-22)
+- `2da58e8` docs(ai): record CI failure context (2026-08-23)
+- `828a387` docs(ai): sync README_AI with source tree (2026-08-23)
 - `7a52b87` fix(android): use correct MediaElement foreground service parameter (2026-08-22)
 - `aea767f` docs(ai): record CI failure context (2026-08-23)
-- `526e4bc` docs(ai): record CI failure context (2026-08-23)
-- `681beb3` docs(ai): record CI failure context (2026-08-23)
-- `6edda67` docs(ai): record CI failure context (2026-08-23)
 <!-- AI-DOCS:END -->
