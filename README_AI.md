@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `9e7d542`
-- Data UTC: `2026-08-23 02:01:15 UTC`
+- Commit: `4e2848d`
+- Data UTC: `2026-08-23 03:40:50 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
-- `9e7d542` fix(agent): copiar só long-press/duplo toque; bolhas estreitas; cards só com processos (2026-08-22)
-- `a653d10` docs(ai): sync README_AI with source tree (2026-08-23)
-- `0b64362` fix(agent): faixa de processos colapsável + input com ZIndex alto (2026-08-22)
-- `aa08d39` docs(ai): record CI failure context (2026-08-23)
-- `d758cb0` docs(ai): record CI failure context (2026-08-23)
+- `4e2848d` fix(agent): texto sempre visível, scroll para baixo, cards só ativos, uso máximo de ferramentas (2026-08-23)
+- `486477e` docs(ai): record CI failure context (2026-08-23)
+- `9f68712` docs(ai): record CI failure context (2026-08-23)
+- `cc4d73f` docs(ai): record CI failure context (2026-08-23)
+- `deae086` docs(ai): sync README_AI with source tree (2026-08-23)
 <!-- AI-DOCS:END -->
