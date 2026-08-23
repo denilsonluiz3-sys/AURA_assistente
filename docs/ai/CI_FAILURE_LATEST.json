@@ -1,28 +1,28 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
-  "workflow": "AURA Android APK",
-  "run_id": "32655142961",
+  "workflow": "CodeQL Advanced",
+  "run_id": "32655143004",
   "status": "completed",
   "conclusion": "cancelled",
   "branch": "main",
   "commit": "04a20b0a8db0cb8ef08f8cbba5b2a0f217495fe1",
   "event": "push",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32655142961",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32655143004",
   "category": "Indeterminada — consultar o primeiro erro real do log.",
   "infra_only": false,
   "failed_jobs": [
-    "build-apk"
+    "Analyze (csharp)"
   ],
   "failed_steps": [
     {
-      "job": "build-apk",
-      "step": "Build APK",
-      "conclusion": "cancelled"
+      "job": "Analyze (csharp)",
+      "step": "Manual build (csharp)",
+      "conclusion": "failure"
     }
   ],
   "changed_files": [
     "src/AURA.AI/OpenRouterClient.cs"
   ],
   "associated_prs": [],
-  "diagnostic_report": "docs/ai/ci-failures/32655142961.md"
+  "diagnostic_report": "docs/ai/ci-failures/32655143004.md"
 }
