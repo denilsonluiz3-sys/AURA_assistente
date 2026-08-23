@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `04a20b0`
-- Data UTC: `2026-08-23 17:32:10 UTC`
+- Commit: `118d6db`
+- Data UTC: `2026-08-23 17:34:42 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `118d6db` chore(android): versionCode 22 (Display 2.2) para updates e diagnóstico de conflito de assinatura (2026-08-23)
+- `1cb3b57` docs(ai): sync README_AI with source tree (2026-08-23)
 - `04a20b0` fix(ai): ChatToolsAsync sem JsonNode reutilizado (node already has a parent) (2026-08-23)
 - `e7163fe` docs(ai): record CI failure context (2026-08-23)
 - `b7af077` docs(ai): sync README_AI with source tree (2026-08-23)
-- `0c6a5ee` fix(build): CandidateRoots sem yield em try/catch (CS1626) (2026-08-23)
-- `453caa7` docs(ai): record CI failure context (2026-08-23)
 <!-- AI-DOCS:END -->
