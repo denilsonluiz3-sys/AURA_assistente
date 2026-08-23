@@ -1,13 +1,13 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
   "workflow": "CodeQL Advanced",
-  "run_id": "32610102178",
+  "run_id": "32610492860",
   "status": "completed",
   "conclusion": "failure",
   "branch": "main",
-  "commit": "27fb8eae9d55019fd03599780a5f3b473a5a9851",
+  "commit": "f782e67be2687771429784ddb21a49ccde195a33",
   "event": "push",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32610102178",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32610492860",
   "category": "C# / compilação",
   "infra_only": false,
   "failed_jobs": [
@@ -21,8 +21,8 @@
     }
   ],
   "changed_files": [
-    "src/AURA.Mobile/Pages/AgentPage.xaml"
+    ".github/workflows/build-android-apk.yml"
   ],
   "associated_prs": [],
-  "diagnostic_report": "docs/ai/ci-failures/32610102178.md"
+  "diagnostic_report": "docs/ai/ci-failures/32610492860.md"
 }
