@@ -1,28 +1,15 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:Class="AURA.Mobile.Pages.HomePage"
              Title="Início"
              BackgroundColor="{DynamicResource AuraBackground}">
 
     <Grid RowDefinitions="*,Auto" Padding="0">
 
-        <!-- Fundo de vídeo (Lua/aurora = Lunar, Sol/aurora = Solar). Ocupa a tela inteira. -->
-        <toolkit:MediaElement x:Name="BgVideo"
-                              Grid.RowSpan="2"
-                              Aspect="AspectFill"
-                              ShouldAutoPlay="True"
-                              ShouldLoopPlayback="True"
-                              ShouldMute="True"
-                              Volume="0"
-                              HorizontalOptions="Fill"
-                              VerticalOptions="Fill" />
-
         <ScrollView Grid.Row="0" Padding="0" VerticalOptions="Fill">
             <VerticalStackLayout Spacing="0" Padding="0,0,0,12">
 
-                <!-- Header -->
                 <Grid ColumnDefinitions="*,Auto" Padding="20,24,20,12"
                       VerticalOptions="Start" BackgroundColor="Transparent">
                     <VerticalStackLayout Grid.Column="0" Spacing="2">
@@ -47,7 +34,6 @@
                             Clicked="OnThemeToggleClicked" />
                 </Grid>
 
-                <!-- Command entry -->
                 <Border Margin="16,4,16,12"
                         BackgroundColor="{DynamicResource AuraSurface}"
                         Stroke="{DynamicResource AuraBorder}"
@@ -80,74 +66,39 @@
                     </Grid>
                 </Border>
 
-                <!-- Quick actions -->
                 <Label Text="Ações rápidas"
                        Margin="20,4,20,8"
                        FontSize="12"
                        FontAttributes="Bold"
                        TextColor="{DynamicResource AuraTextSecondary}" />
-                <Grid Margin="16,0,16,16"
-                      ColumnDefinitions="*,*,*,*"
-                      ColumnSpacing="8">
-                    <Border Grid.Column="0"
-                            BackgroundColor="{DynamicResource AuraSurface}"
-                            Stroke="{DynamicResource AuraBorder}"
-                            StrokeThickness="1"
-                            Padding="8,12">
-                        <Border.StrokeShape>
-                            <RoundRectangle CornerRadius="12" />
-                        </Border.StrokeShape>
-                        <Border.GestureRecognizers>
-                            <TapGestureRecognizer Tapped="OnQuickDiagnostico" />
-                        </Border.GestureRecognizers>
+                <Grid Margin="16,0,16,16" ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+                    <Border Grid.Column="0" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="8,12">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="12" /></Border.StrokeShape>
+                        <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnQuickDiagnostico" /></Border.GestureRecognizers>
                         <VerticalStackLayout Spacing="6" HorizontalOptions="Center">
                             <Label Text="◎" FontSize="22" TextColor="{DynamicResource AuraAccent}" HorizontalTextAlignment="Center" />
                             <Label Text="Diagnosticar" FontSize="10" TextColor="{DynamicResource AuraTextPrimary}" HorizontalTextAlignment="Center" LineBreakMode="WordWrap" />
                         </VerticalStackLayout>
                     </Border>
-                    <Border Grid.Column="1"
-                            BackgroundColor="{DynamicResource AuraSurface}"
-                            Stroke="{DynamicResource AuraBorder}"
-                            StrokeThickness="1"
-                            Padding="8,12">
-                        <Border.StrokeShape>
-                            <RoundRectangle CornerRadius="12" />
-                        </Border.StrokeShape>
-                        <Border.GestureRecognizers>
-                            <TapGestureRecognizer Tapped="OnQuickProgramas" />
-                        </Border.GestureRecognizers>
+                    <Border Grid.Column="1" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="8,12">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="12" /></Border.StrokeShape>
+                        <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnQuickProgramas" /></Border.GestureRecognizers>
                         <VerticalStackLayout Spacing="6" HorizontalOptions="Center">
                             <Label Text="▷" FontSize="22" TextColor="{DynamicResource AuraAccent}" HorizontalTextAlignment="Center" />
                             <Label Text="Programa" FontSize="10" TextColor="{DynamicResource AuraTextPrimary}" HorizontalTextAlignment="Center" LineBreakMode="WordWrap" />
                         </VerticalStackLayout>
                     </Border>
-                    <Border Grid.Column="2"
-                            BackgroundColor="{DynamicResource AuraSurface}"
-                            Stroke="{DynamicResource AuraBorder}"
-                            StrokeThickness="1"
-                            Padding="8,12">
-                        <Border.StrokeShape>
-                            <RoundRectangle CornerRadius="12" />
-                        </Border.StrokeShape>
-                        <Border.GestureRecognizers>
-                            <TapGestureRecognizer Tapped="OnQuickTerminal" />
-                        </Border.GestureRecognizers>
+                    <Border Grid.Column="2" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="8,12">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="12" /></Border.StrokeShape>
+                        <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnQuickTerminal" /></Border.GestureRecognizers>
                         <VerticalStackLayout Spacing="6" HorizontalOptions="Center">
                             <Label Text=">_" FontSize="22" TextColor="{DynamicResource AuraAccent}" HorizontalTextAlignment="Center" />
                             <Label Text="Terminal" FontSize="10" TextColor="{DynamicResource AuraTextPrimary}" HorizontalTextAlignment="Center" LineBreakMode="WordWrap" />
                         </VerticalStackLayout>
                     </Border>
-                    <Border Grid.Column="3"
-                            BackgroundColor="{DynamicResource AuraSurface}"
-                            Stroke="{DynamicResource AuraBorder}"
-                            StrokeThickness="1"
-                            Padding="8,12">
-                        <Border.StrokeShape>
-                            <RoundRectangle CornerRadius="12" />
-                        </Border.StrokeShape>
-                        <Border.GestureRecognizers>
-                            <TapGestureRecognizer Tapped="OnQuickChat" />
-                        </Border.GestureRecognizers>
+                    <Border Grid.Column="3" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="8,12">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="12" /></Border.StrokeShape>
+                        <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnQuickChat" /></Border.GestureRecognizers>
                         <VerticalStackLayout Spacing="6" HorizontalOptions="Center">
                             <Label Text="◉" FontSize="22" TextColor="{DynamicResource AuraAccent}" HorizontalTextAlignment="Center" />
                             <Label Text="Perguntar" FontSize="10" TextColor="{DynamicResource AuraTextPrimary}" HorizontalTextAlignment="Center" LineBreakMode="WordWrap" />
@@ -155,20 +106,9 @@
                     </Border>
                 </Grid>
 
-                <!-- Estado -->
-                <Label Text="Estado"
-                       Margin="20,4,20,8"
-                       FontSize="12"
-                       FontAttributes="Bold"
-                       TextColor="{DynamicResource AuraTextSecondary}" />
-                <Border Margin="16,0,16,16"
-                        BackgroundColor="{DynamicResource AuraSurface}"
-                        Stroke="{DynamicResource AuraBorder}"
-                        StrokeThickness="1"
-                        Padding="14,12">
-                    <Border.StrokeShape>
-                        <RoundRectangle CornerRadius="12" />
-                    </Border.StrokeShape>
+                <Label Text="Estado" Margin="20,4,20,8" FontSize="12" FontAttributes="Bold" TextColor="{DynamicResource AuraTextSecondary}" />
+                <Border Margin="16,0,16,16" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="14,12">
+                    <Border.StrokeShape><RoundRectangle CornerRadius="12" /></Border.StrokeShape>
                     <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
                         <VerticalStackLayout Grid.Column="0" Spacing="2" HorizontalOptions="Center">
                             <Label x:Name="StatusSistema" Text="Sistema ✓" FontSize="12" TextColor="{DynamicResource AuraSuccess}" HorizontalTextAlignment="Center" />
@@ -182,111 +122,37 @@
                     </Grid>
                 </Border>
 
-                <!-- Atividade recente -->
-                <Label Text="Atividade recente"
-                       Margin="20,4,20,8"
-                       FontSize="12"
-                       FontAttributes="Bold"
-                       TextColor="{DynamicResource AuraTextSecondary}" />
-                <Border Margin="16,0,16,8"
-                        BackgroundColor="{DynamicResource AuraSurface}"
-                        Stroke="{DynamicResource AuraBorder}"
-                        StrokeThickness="1"
-                        Padding="14,12">
-                    <Border.StrokeShape>
-                        <RoundRectangle CornerRadius="12" />
-                    </Border.StrokeShape>
-                    <Label x:Name="RecentActivityLabel"
-                           Text="Nenhuma atividade recente."
-                           FontSize="12"
-                           TextColor="{DynamicResource AuraTextMuted}"
-                           LineBreakMode="WordWrap" />
+                <Label Text="Atividade recente" Margin="20,4,20,8" FontSize="12" FontAttributes="Bold" TextColor="{DynamicResource AuraTextSecondary}" />
+                <Border Margin="16,0,16,8" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="14,12">
+                    <Border.StrokeShape><RoundRectangle CornerRadius="12" /></Border.StrokeShape>
+                    <Label x:Name="RecentActivityLabel" Text="Nenhuma atividade recente." FontSize="12" TextColor="{DynamicResource AuraTextMuted}" LineBreakMode="WordWrap" />
                 </Border>
 
             </VerticalStackLayout>
         </ScrollView>
 
-        <!-- Bottom bar glass -->
-        <Border Grid.Row="1"
-                Style="{StaticResource AuraGlassBar}"
-                Margin="12,0,12,12">
+        <Border Grid.Row="1" Style="{StaticResource AuraGlassBar}" Margin="12,0,12,12">
             <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="4">
-
                 <VerticalStackLayout Grid.Column="0" Spacing="2" HorizontalOptions="Center">
-                    <Button x:Name="BtnInicio"
-                            Text="⌂"
-                            FontSize="18"
-                            BackgroundColor="Transparent"
-                            TextColor="{DynamicResource AuraCyan}"
-                            Padding="0"
-                            HeightRequest="36"
-                            Clicked="OnInicioClicked" />
-                    <Label Text="Início"
-                           FontSize="9"
-                           TextColor="{DynamicResource AuraCyan}"
-                           HorizontalTextAlignment="Center" />
+                    <Button x:Name="BtnInicio" Text="⌂" FontSize="18" BackgroundColor="Transparent" TextColor="{DynamicResource AuraCyan}" Padding="0" HeightRequest="36" Clicked="OnInicioClicked" />
+                    <Label Text="Início" FontSize="9" TextColor="{DynamicResource AuraCyan}" HorizontalTextAlignment="Center" />
                 </VerticalStackLayout>
-
                 <VerticalStackLayout Grid.Column="1" Spacing="2" HorizontalOptions="Center">
-                    <Button x:Name="BtnDiagnostico"
-                            Text="◎"
-                            FontSize="18"
-                            BackgroundColor="Transparent"
-                            TextColor="{DynamicResource AuraTextPrimary}"
-                            Padding="0"
-                            HeightRequest="36"
-                            Clicked="OnDiagnosticoClicked" />
-                    <Label Text="Diagnóstico"
-                           FontSize="9"
-                           TextColor="{DynamicResource AuraTextSecondary}"
-                           HorizontalTextAlignment="Center" />
+                    <Button x:Name="BtnDiagnostico" Text="◎" FontSize="18" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextPrimary}" Padding="0" HeightRequest="36" Clicked="OnDiagnosticoClicked" />
+                    <Label Text="Diagnóstico" FontSize="9" TextColor="{DynamicResource AuraTextSecondary}" HorizontalTextAlignment="Center" />
                 </VerticalStackLayout>
-
                 <VerticalStackLayout Grid.Column="2" Spacing="2" HorizontalOptions="Center">
-                    <Button x:Name="BtnModulos"
-                            Text="⊞"
-                            FontSize="18"
-                            BackgroundColor="Transparent"
-                            TextColor="{DynamicResource AuraTextPrimary}"
-                            Padding="0"
-                            HeightRequest="36"
-                            Clicked="OnModulosClicked" />
-                    <Label Text="Módulos"
-                           FontSize="9"
-                           TextColor="{DynamicResource AuraTextSecondary}"
-                           HorizontalTextAlignment="Center" />
+                    <Button x:Name="BtnModulos" Text="⊞" FontSize="18" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextPrimary}" Padding="0" HeightRequest="36" Clicked="OnModulosClicked" />
+                    <Label Text="Módulos" FontSize="9" TextColor="{DynamicResource AuraTextSecondary}" HorizontalTextAlignment="Center" />
                 </VerticalStackLayout>
-
                 <VerticalStackLayout Grid.Column="3" Spacing="2" HorizontalOptions="Center">
-                    <Button x:Name="BtnAgentes"
-                            Text="◆"
-                            FontSize="18"
-                            BackgroundColor="Transparent"
-                            TextColor="{DynamicResource AuraTextPrimary}"
-                            Padding="0"
-                            HeightRequest="36"
-                            Clicked="OnAgentesClicked" />
-                    <Label Text="Agentes"
-                           FontSize="9"
-                           TextColor="{DynamicResource AuraTextSecondary}"
-                           HorizontalTextAlignment="Center" />
+                    <Button x:Name="BtnAgentes" Text="◆" FontSize="18" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextPrimary}" Padding="0" HeightRequest="36" Clicked="OnAgentesClicked" />
+                    <Label Text="Agentes" FontSize="9" TextColor="{DynamicResource AuraTextSecondary}" HorizontalTextAlignment="Center" />
                 </VerticalStackLayout>
-
                 <VerticalStackLayout Grid.Column="4" Spacing="2" HorizontalOptions="Center">
-                    <Button x:Name="BtnConfig"
-                            Text="⚙"
-                            FontSize="18"
-                            BackgroundColor="Transparent"
-                            TextColor="{DynamicResource AuraTextPrimary}"
-                            Padding="0"
-                            HeightRequest="36"
-                            Clicked="OnConfigClicked" />
-                    <Label Text="Config"
-                           FontSize="9"
-                           TextColor="{DynamicResource AuraTextSecondary}"
-                           HorizontalTextAlignment="Center" />
+                    <Button x:Name="BtnConfig" Text="⚙" FontSize="18" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextPrimary}" Padding="0" HeightRequest="36" Clicked="OnConfigClicked" />
+                    <Label Text="Config" FontSize="9" TextColor="{DynamicResource AuraTextSecondary}" HorizontalTextAlignment="Center" />
                 </VerticalStackLayout>
-
             </Grid>
         </Border>
 
