@@ -25,7 +25,8 @@ public sealed class CellProgramRunner
         if (program is null) throw new ArgumentNullException(nameof(program));
         if (context is null) throw new ArgumentNullException(nameof(context));
 
-        var authorization = _policyGuard.Authorize(program.RequiredCapabilities, program.Name);
+        string capabilities = string.Join(", ", program.RequiredCapabilities);
+        var authorization = _policyGuard.Authorize(capabilities, program.Name);
         if (authorization.Decision == AuthorizationDecision.Blocked)
             return CellProgramResult.Fail(authorization.Message);
         if (authorization.Decision == AuthorizationDecision.RequiresConfirmation)
