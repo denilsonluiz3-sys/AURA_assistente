@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "17 3 * * *"
+    - cron: "17 */6 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -27,11 +27,11 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const artifactDays = 2;
-            const runDays = 7;
-            const cacheDays = 7;
+            // Aggressive storage policy: remove every existing artifact.
+            // GitHub recalculates storage usage after deletion; this can take 6-12 hours.
+            const runDays = 1;
+            const cacheDays = 1;
             const now = Date.now();
-            const artifactCutoff = now - artifactDays * 24 * 60 * 60 * 1000;
             const runCutoff = now - runDays * 24 * 60 * 60 * 1000;
             const cacheCutoff = now - cacheDays * 24 * 60 * 60 * 1000;
             const currentRunId = context.runId;
@@ -40,7 +40,6 @@ jobs:
             let runsDeleted = 0;
             let cachesDeleted = 0;
 
-            // Fetch first, then delete, so pagination cannot skip entries after deletion.
             const artifacts = [];
             for (let page = 1; ; page++) {
               const { data } = await github.rest.actions.listArtifactsForRepo({
@@ -51,13 +50,10 @@ jobs:
             }
 
             for (const artifact of artifacts) {
-              const created = new Date(artifact.created_at).getTime();
-              if (!artifact.expired && created < artifactCutoff) {
-                await github.rest.actions.deleteArtifact({
-                  owner, repo, artifact_id: artifact.id
-                });
-                artifactsDeleted++;
-              }
+              await github.rest.actions.deleteArtifact({
+                owner, repo, artifact_id: artifact.id
+              });
+              artifactsDeleted++;
             }
 
             const runs = [];
@@ -104,9 +100,9 @@ jobs:
               .addHeading('AURA Actions cleanup')
               .addTable([
                 [{data:'Resource',header:true},{data:'Policy',header:true},{data:'Deleted',header:true}],
-                ['Artifacts','older than 2 days',String(artifactsDeleted)],
-                ['Workflow runs','older than 7 days',String(runsDeleted)],
-                ['Caches','unused for 7 days',String(cachesDeleted)]
+                ['Artifacts','all existing artifacts',String(artifactsDeleted)],
+                ['Workflow runs','older than 1 day',String(runsDeleted)],
+                ['Caches','unused for 1 day',String(cachesDeleted)]
               ])
               .write();
 
