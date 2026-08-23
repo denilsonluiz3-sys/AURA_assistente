@@ -19,6 +19,7 @@ using AURA.SystemInfo;
 using AURA.Mobile.Speech;
 using AURA.Mobile.Services;
 using AURA.Mobile.ViewModels;
+using CommunityToolkit.Maui;
 
 namespace AURA.Mobile;
 
@@ -28,8 +29,8 @@ public static class MauiProgram
     {
         AuraLog.Info("MauiProgram.CreateMauiApp BEGIN");
         var builder = MauiApp.CreateBuilder();
-        // Sem MediaElement (vídeos Lunar/Solar removidos)
-        builder.UseMauiApp<App>();
+        builder.UseMauiApp<App>()
+               .UseMauiCommunityToolkitMediaElement(enableForegroundService: false);
 
 #if ANDROID
         builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Microsoft.Maui.Controls.WebView, AURA.Mobile.Platforms.Android.WebView.AuraWebViewHandler>());
@@ -60,11 +61,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<AiDiagnosticsService>();
         builder.Services.AddSingleton<AiAssistant>();
         builder.Services.AddSingleton<ISpeechService, HybridSpeechService>();
-        builder.Services.AddSingleton<VoiceAssistantService>(sp => new VoiceAssistantService(
-            sp.GetRequiredService<ISpeechService>(),
-            sp.GetService<ISpeechRecognitionService>(),
-            sp.GetService<IOrchestrator>(),
-            sp.GetService<IIntentResolver>()));
+        builder.Services.AddSingleton<VoiceAssistantService>(sp => new VoiceAssistantService(sp.GetRequiredService<ISpeechService>(), sp.GetService<ISpeechRecognitionService>(), sp.GetService<IOrchestrator>(), sp.GetService<IIntentResolver>()));
         builder.Services.AddSingleton(sp => new AgentManager(sp.GetRequiredService<ILogger>()) { Events = sp.GetRequiredService<EventBus>() });
         builder.Services.AddSingleton<SystemAnalyzer>();
         builder.Services.AddSingleton<NetworkManager>();
@@ -89,33 +86,16 @@ public static class MauiProgram
         builder.Services.AddSingleton<LocalPlaybook>();
         builder.Services.AddSingleton<FileTool>(sp => new FileTool(AgentWorkspace.ActiveRoot));
 
-        builder.Services.AddSingleton<AuraOrchestrator>(sp => new AuraOrchestrator(
-            sp.GetRequiredService<ILogger>(),
-            sp.GetRequiredService<SolutionStore>(),
-            sp.GetRequiredService<Runner>(),
-            sp.GetRequiredService<SimulationRuntime>(),
-            sp.GetRequiredService<IToolExecutor>(),
-            sp.GetRequiredService<AURA.Core.Abstractions.IWebSearch>(),
-            sp.GetRequiredService<OpenRouterClient>(),
-            events: sp.GetRequiredService<EventBus>(),
-            intentResolver: sp.GetRequiredService<IIntentResolver>(),
-            policyGuard: sp.GetRequiredService<PolicyGuard>()));
+        builder.Services.AddSingleton<AuraOrchestrator>(sp => new AuraOrchestrator(sp.GetRequiredService<ILogger>(), sp.GetRequiredService<SolutionStore>(), sp.GetRequiredService<Runner>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetRequiredService<IToolExecutor>(), sp.GetRequiredService<AURA.Core.Abstractions.IWebSearch>(), sp.GetRequiredService<OpenRouterClient>(), events: sp.GetRequiredService<EventBus>(), intentResolver: sp.GetRequiredService<IIntentResolver>(), policyGuard: sp.GetRequiredService<PolicyGuard>()));
         builder.Services.AddSingleton<IOrchestrator>(sp => sp.GetRequiredService<AuraOrchestrator>());
         builder.Services.AddSingleton<AURA.Abstractions.Process.IProcessOrchestrator>(sp => new AURA.Agents.LegalProcessEngine(sp.GetRequiredService<ILogger>(), sp.GetServices<AURA.Core.Abstractions.IAgent>(), sp.GetRequiredService<IOrchestrator>(), sp.GetRequiredService<EventBus>()));
 
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<HomePage>();
         builder.Services.AddSingleton<EcosystemPage>();
-        builder.Services.AddSingleton<DiagnosticoPage>(sp => new DiagnosticoPage(
-            sp.GetRequiredService<SystemAnalyzer>(),
-            sp.GetRequiredService<NetworkManager>(),
-            sp.GetRequiredService<AgentManager>(),
-            sp.GetRequiredService<AiDiagnosticsService>(),
+        builder.Services.AddSingleton<DiagnosticoPage>(sp => new DiagnosticoPage(sp.GetRequiredService<SystemAnalyzer>(), sp.GetRequiredService<NetworkManager>(), sp.GetRequiredService<AgentManager>(), sp.GetRequiredService<AiDiagnosticsService>(),
 #if ANDROID
-            sp.GetService<CellProgramRegistry>(),
-            sp.GetService<CellProgramRunner>(),
-            sp.GetService<IAuraCellContextFactory>(),
-            sp.GetService<ILogger>()
+            sp.GetService<CellProgramRegistry>(), sp.GetService<CellProgramRunner>(), sp.GetService<IAuraCellContextFactory>(), sp.GetService<ILogger>()
 #else
             null, null, null, sp.GetService<ILogger>()
 #endif
