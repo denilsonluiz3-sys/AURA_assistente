@@ -4,11 +4,9 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.Core.Logging;
-using AURA.Memory;
 using AURA.AI.Providers;
 
 namespace AURA.AI
@@ -31,6 +29,11 @@ namespace AURA.AI
     public sealed class OpenRouterClient
     {
         private static readonly string[] BannedTokens = { "anthropic", "claude" };
+
+        private static readonly JsonSerializerOptions SerializeOpts = new()
+        {
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        };
 
         private readonly ILogger _logger;
 
@@ -147,21 +150,28 @@ namespace AURA.AI
         {
             EnsureValidApiKey();
 
-            var payload = new JsonObject
-            {
-                ["model"] = Options.Model,
-                ["max_tokens"] = Options.MaxTokens
-            };
+            // Payload sem JsonNode: evita "The node already has a parent" ao reenviar
+            // tool_calls / reasoning_details em rodadas seguintes do AgentSession.
+            var messageList = new List<Dictionary<string, object?>>();
 
-            var arr = new JsonArray();
             if (!string.IsNullOrWhiteSpace(systemPrompt))
-                arr.Add(new JsonObject { ["role"] = "system", ["content"] = systemPrompt });
+            {
+                messageList.Add(new Dictionary<string, object?>
+                {
+                    ["role"] = "system",
+                    ["content"] = systemPrompt
+                });
+            }
 
             if (messages != null)
             {
                 foreach (AgentMessage m in messages)
                 {
-                    var mo = new JsonObject { ["role"] = m.Role };
+                    var mo = new Dictionary<string, object?>
+                    {
+                        ["role"] = m.Role
+                    };
+
                     if (m.Content != null)
                         mo["content"] = m.Content;
 
@@ -170,17 +180,17 @@ namespace AURA.AI
 
                     if (m.ToolCalls is { Count: > 0 })
                     {
-                        var calls = new JsonArray();
+                        var calls = new List<Dictionary<string, object?>>();
                         foreach (AgentToolCall tc in m.ToolCalls)
                         {
-                            calls.Add(new JsonObject
+                            calls.Add(new Dictionary<string, object?>
                             {
                                 ["id"] = tc.Id,
                                 ["type"] = "function",
-                                ["function"] = new JsonObject
+                                ["function"] = new Dictionary<string, object?>
                                 {
                                     ["name"] = tc.Name,
-                                    ["arguments"] = tc.ArgumentsJson
+                                    ["arguments"] = tc.ArgumentsJson ?? "{}"
                                 }
                             });
                         }
@@ -188,55 +198,58 @@ namespace AURA.AI
                         mo["tool_calls"] = calls;
                     }
 
-                    // Parse fresco a cada request — nunca reutiliza JsonNode com parent.
+                    // reasoning_details: incluir como JsonElement clonado (valor, não árvore com parent)
                     if (!string.IsNullOrWhiteSpace(m.ReasoningDetailsJson))
                     {
                         try
                         {
-                            JsonNode? rd = JsonNode.Parse(m.ReasoningDetailsJson);
-                            if (rd != null)
-                                mo["reasoning_details"] = rd;
+                            using var rdDoc = JsonDocument.Parse(m.ReasoningDetailsJson);
+                            mo["reasoning_details"] = rdDoc.RootElement.Clone();
                         }
                         catch (JsonException)
                         {
-                            // ignora reasoning inválido; preferível a quebrar o turno
+                            // ignora reasoning inválido
                         }
                     }
 
-                    arr.Add(mo);
+                    messageList.Add(mo);
                 }
             }
 
-            payload["messages"] = arr;
+            var payload = new Dictionary<string, object?>
+            {
+                ["model"] = Options.Model,
+                ["max_tokens"] = Options.MaxTokens,
+                ["messages"] = messageList
+            };
 
             if (tools is { Count: > 0 })
             {
-                var toolsArray = new JsonArray();
+                var toolsArray = new List<Dictionary<string, object?>>();
                 foreach (AgentToolDefinition t in tools)
                 {
-                    var props = new JsonObject();
+                    var props = new Dictionary<string, object?>();
                     foreach (KeyValuePair<string, AgentToolParameter> p in t.Parameters)
                     {
-                        props[p.Key] = new JsonObject
+                        props[p.Key] = new Dictionary<string, object?>
                         {
                             ["type"] = p.Value.Type,
                             ["description"] = p.Value.Description
                         };
                     }
 
-                    var schema = new JsonObject { ["type"] = "object", ["properties"] = props };
-                    if (t.Required.Count > 0)
+                    var schema = new Dictionary<string, object?>
                     {
-                        var required = new JsonArray();
-                        foreach (string r in t.Required)
-                            required.Add(r);
-                        schema["required"] = required;
-                    }
+                        ["type"] = "object",
+                        ["properties"] = props
+                    };
+                    if (t.Required.Count > 0)
+                        schema["required"] = t.Required.ToList();
 
-                    toolsArray.Add(new JsonObject
+                    toolsArray.Add(new Dictionary<string, object?>
                     {
                         ["type"] = "function",
-                        ["function"] = new JsonObject
+                        ["function"] = new Dictionary<string, object?>
                         {
                             ["name"] = t.Name,
                             ["description"] = t.Description,
@@ -248,7 +261,7 @@ namespace AURA.AI
                 payload["tools"] = toolsArray;
             }
 
-            string json = payload.ToJsonString();
+            string json = JsonSerializer.Serialize(payload, SerializeOpts);
             HttpClient client = httpClient ?? ResolveClient();
             var request = new HttpRequestMessage(HttpMethod.Post, Options.BaseUrl);
 
