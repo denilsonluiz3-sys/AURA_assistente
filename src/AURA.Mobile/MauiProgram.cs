@@ -83,7 +83,10 @@ public static class MauiProgram
         builder.Services.AddSingleton<Runner>();
         builder.Services.AddSingleton<ProcessRegistry>();
         builder.Services.AddSingleton(sp => new SolutionStore(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "aura")));
-        builder.Services.AddSingleton<LocalPlaybook>();
+        // LocalPlaybook: SolutionStore + MemoryStore — consulta local antes da IA
+        builder.Services.AddSingleton(sp => new LocalPlaybook(
+            sp.GetRequiredService<SolutionStore>(),
+            sp.GetRequiredService<MemoryStore>()));
         builder.Services.AddSingleton<FileTool>(sp => new FileTool(AgentWorkspace.ActiveRoot));
 
         builder.Services.AddSingleton<AuraOrchestrator>(sp => new AuraOrchestrator(sp.GetRequiredService<ILogger>(), sp.GetRequiredService<SolutionStore>(), sp.GetRequiredService<Runner>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetRequiredService<IToolExecutor>(), sp.GetRequiredService<AURA.Core.Abstractions.IWebSearch>(), sp.GetRequiredService<OpenRouterClient>(), events: sp.GetRequiredService<EventBus>(), intentResolver: sp.GetRequiredService<IIntentResolver>(), policyGuard: sp.GetRequiredService<PolicyGuard>()));
