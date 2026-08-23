@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `897f5d7`
-- Data UTC: `2026-08-23 00:06:09 UTC`
+- Commit: `5a4a7b4`
+- Data UTC: `2026-08-23 00:14:23 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
-- `897f5d7` ci: configure Android SDK components explicitly (2026-08-22)
-- `9336ac0` docs(ai): record CI failure context (2026-08-23)
-- `d9a846d` docs(ai): record CI failure context (2026-08-23)
-- `69a7654` docs(ai): sync README_AI with source tree (2026-08-23)
-- `d788246` fix: adapt cell capabilities to PolicyGuard authorization (2026-08-22)
+- `5a4a7b4` fix(mobile): remove obsolete CommunityToolkit video code (2026-08-22)
+- `841eba0` fix(mobile): remove obsolete MediaElement from HomePage (2026-08-22)
+- `14296a7` docs(ai): record CI failure context (2026-08-23)
+- `23c5d72` docs(ai): record CI failure context (2026-08-23)
+- `b9dc916` docs(ai): sync README_AI with source tree (2026-08-23)
 <!-- AI-DOCS:END -->
