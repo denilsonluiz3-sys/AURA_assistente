@@ -27,6 +27,7 @@ public partial class AgentPage : ContentPage
     private AgentSession? _session;
     private string? _activeProcessId;
     private bool _configVisible;
+    private bool _runInFlight;
 
     public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
         ShellExecutor shell, ProcessRegistry processes, AuraOrchestrator orchestrator,
@@ -228,24 +229,43 @@ public partial class AgentPage : ContentPage
         EnsureSession();
     }
 
-    private async void OnRunClicked(object sender, EventArgs e)
+    /// <summary>Enter no teclado (Completed) dispara o mesmo fluxo do ▶.</summary>
+    private void OnEditorCompleted(object? sender, EventArgs e) => OnRunClicked(sender ?? RunButton, e);
+
+    private async void OnRunClicked(object? sender, EventArgs e)
     {
+        if (_runInFlight)
+            return;
+
+        // Android/MAUI: Text do Editor às vezes só sincroniza após Unfocus.
+        try { CommandEditor.Unfocus(); } catch { /* ignore */ }
+
         string text = CommandEditor.Text?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(text)) return;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            await DisplayAlert("Agente", "Digite uma instrução antes de enviar.", "OK");
+            return;
+        }
 
-        RememberCommand(text);
-        RuntimeConfig.Apply(_client);
-        await AppendBubbleAsync(text, user: true);
-        CommandEditor.Text = string.Empty;
-        RunButton.IsEnabled = false;
-        BusyIndicator.IsRunning = true;
-        BusyIndicator.IsVisible = true;
-
-        var process = _processes.Begin(text, "Assistente", "Entendendo solicitação");
-        _activeProcessId = process.Id;
+        _runInFlight = true;
+        string? processId = null;
 
         try
         {
+            RememberCommand(text);
+            RuntimeConfig.Apply(_client);
+
+            RunButton.IsEnabled = false;
+            BusyIndicator.IsRunning = true;
+            BusyIndicator.IsVisible = true;
+
+            await AppendBubbleAsync(text, user: true);
+            CommandEditor.Text = string.Empty;
+
+            var process = _processes.Begin(text, "Assistente", "Entendendo solicitação");
+            processId = process.Id;
+            _activeProcessId = process.Id;
+
             // 1) Playbook local — sem IA
             string? local = _playbook?.TryResolveWithoutLlm(text);
             if (!string.IsNullOrWhiteSpace(local))
@@ -309,16 +329,18 @@ public partial class AgentPage : ContentPage
         catch (Exception ex)
         {
             string userMsg = FriendlyLlmError(ex);
-            _processes.Fail(process.Id, userMsg);
+            if (!string.IsNullOrEmpty(processId))
+                _processes.Fail(processId, userMsg);
             await AppendBubbleAsync("Erro: " + userMsg, user: false, isError: true);
             AuraLog.Exception("AgentPage.OnRunClicked", ex);
         }
         finally
         {
-            if (_activeProcessId == process.Id) _activeProcessId = null;
+            if (_activeProcessId == processId) _activeProcessId = null;
             RunButton.IsEnabled = true;
             BusyIndicator.IsRunning = false;
             BusyIndicator.IsVisible = false;
+            _runInFlight = false;
         }
     }
 
