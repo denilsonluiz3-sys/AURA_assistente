@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `8e1fcb0`
-- Data UTC: `2026-08-22 23:56:28 UTC`
+- Commit: `d788246`
+- Data UTC: `2026-08-23 00:01:34 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
-- `8e1fcb0` fix(mobile): align AuraOrchestrator DI constructor (2026-08-22)
-- `0746d01` docs(ai): sync README_AI with source tree (2026-08-22)
-- `620ad15` fix(agents): repair AuraOrchestrator compilation (2026-08-22)
-- `23cc589` docs(ai): record CI failure context (2026-08-22)
-- `2ca2d0f` docs(ai): record CI failure context (2026-08-22)
+- `d788246` fix: adapt cell capabilities to PolicyGuard authorization (2026-08-22)
+- `a785318` docs(ai): record CI failure context (2026-08-22)
+- `39757ee` docs(ai): record CI failure context (2026-08-22)
+- `78801da` docs(ai): record CI failure context (2026-08-22)
+- `9ea4b25` docs(ai): record CI failure context (2026-08-22)
 <!-- AI-DOCS:END -->
