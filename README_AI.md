@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `1832ead`
-- Data UTC: `2026-08-23 13:43:53 UTC`
+- Commit: `0c6a5ee`
+- Data UTC: `2026-08-23 13:59:50 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `0c6a5ee` fix(build): CandidateRoots sem yield em try/catch (CS1626) (2026-08-23)
+- `453caa7` docs(ai): record CI failure context (2026-08-23)
+- `76ee3d3` docs(ai): record CI failure context (2026-08-23)
+- `2652dc9` docs(ai): sync README_AI with source tree (2026-08-23)
 - `1832ead` feat(memory): LocalPlaybook lê process-log.json do workspace e promove hits ao SolutionStore (2026-08-23)
-- `101b9f4` docs(ai): record CI failure context (2026-08-23)
-- `b0f1b8b` docs(ai): record CI failure context (2026-08-23)
-- `94e616d` docs(ai): sync README_AI with source tree (2026-08-23)
-- `ae6afb3` fix(di): LocalPlaybook recebe MemoryStore explicitamente (2026-08-23)
 <!-- AI-DOCS:END -->
