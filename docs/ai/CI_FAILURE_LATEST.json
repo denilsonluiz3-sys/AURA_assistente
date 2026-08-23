@@ -1,28 +1,28 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
-  "workflow": "CodeQL Advanced",
-  "run_id": "32611244447",
+  "workflow": "AURA Android APK",
+  "run_id": "32611708696",
   "status": "completed",
-  "conclusion": "failure",
+  "conclusion": "cancelled",
   "branch": "main",
-  "commit": "e72ff7d9bceb8b4a79cf9bdb9729ccd48c54e56a",
+  "commit": "0b64362eb5cac4c17ed6669215c6d510a6dbb1be",
   "event": "push",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32611244447",
-  "category": "C# / compilação",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32611708696",
+  "category": "Indeterminada — consultar o primeiro erro real do log.",
   "infra_only": false,
   "failed_jobs": [
-    "Analyze (csharp)"
+    "build-apk"
   ],
   "failed_steps": [
     {
-      "job": "Analyze (csharp)",
-      "step": "Manual build (csharp)",
-      "conclusion": "failure"
+      "job": "build-apk",
+      "step": "Install MAUI Android workload",
+      "conclusion": "cancelled"
     }
   ],
   "changed_files": [
-    "src/AURA.Mobile/Pages/AgentPage.xaml.cs"
+    "src/AURA.Mobile/Pages/AgentPage.xaml"
   ],
   "associated_prs": [],
-  "diagnostic_report": "docs/ai/ci-failures/32611244447.md"
+  "diagnostic_report": "docs/ai/ci-failures/32611708696.md"
 }
