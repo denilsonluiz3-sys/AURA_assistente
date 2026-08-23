@@ -1,28 +1,28 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
-  "workflow": "CodeQL Advanced",
-  "run_id": "32642349275",
+  "workflow": "AURA Android APK",
+  "run_id": "32643230598",
   "status": "completed",
   "conclusion": "failure",
   "branch": "main",
-  "commit": "ae6afb36320973df8c6e51ae64faeec6bceb33f7",
+  "commit": "1832ead122537e3baae948c2663cdb39ab499415",
   "event": "push",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32642349275",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32643230598",
   "category": "C# / compilação",
   "infra_only": false,
   "failed_jobs": [
-    "Analyze (csharp)"
+    "build-apk"
   ],
   "failed_steps": [
     {
-      "job": "Analyze (csharp)",
-      "step": "Manual build (csharp)",
+      "job": "build-apk",
+      "step": "Build APK",
       "conclusion": "failure"
     }
   ],
   "changed_files": [
-    "src/AURA.Mobile/MauiProgram.cs"
+    "src/AURA.Mobile/Services/LocalPlaybook.cs"
   ],
   "associated_prs": [],
-  "diagnostic_report": "docs/ai/ci-failures/32642349275.md"
+  "diagnostic_report": "docs/ai/ci-failures/32643230598.md"
 }
