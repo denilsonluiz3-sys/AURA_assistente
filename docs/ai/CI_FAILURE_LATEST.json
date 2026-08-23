@@ -1,13 +1,13 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
   "workflow": "CodeQL Advanced",
-  "run_id": "32608682201",
+  "run_id": "32609247105",
   "status": "completed",
   "conclusion": "failure",
   "branch": "main",
-  "commit": "bceab31d1f9d78169b865ab5aa641d5529588b90",
+  "commit": "7a52b87c589128a2bda12023ff9365fd4f73ac87",
   "event": "push",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32608682201",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32609247105",
   "category": "C# / compilação",
   "infra_only": false,
   "failed_jobs": [
@@ -24,5 +24,5 @@
     "src/AURA.Mobile/MauiProgram.cs"
   ],
   "associated_prs": [],
-  "diagnostic_report": "docs/ai/ci-failures/32608682201.md"
+  "diagnostic_report": "docs/ai/ci-failures/32609247105.md"
 }
