@@ -1,4 +1,3 @@
-using CommunityToolkit.Maui.Views;
 #if ANDROID
 using AURA.Mobile.Platforms.Android;
 #endif
@@ -7,8 +6,6 @@ namespace AURA.Mobile.Pages;
 
 public partial class HomePage : ContentPage
 {
-    private const string VideoBgPrefKey = "aura_video_bg";
-
     public HomePage()
     {
         InitializeComponent();
@@ -44,14 +41,7 @@ public partial class HomePage : ContentPage
         base.OnAppearing();
         UpdateThemeIcon();
         VersionLabel.Text = AURA.Core.VersionInfo.FullName;
-        ApplyVideoBackground();
         RefreshStatus();
-    }
-
-    protected override void OnDisappearing()
-    {
-        base.OnDisappearing();
-        PauseVideoBackground();
     }
 
     private void RefreshStatus()
@@ -98,8 +88,6 @@ public partial class HomePage : ContentPage
         }
     }
 
-    // ── Tema Solar / Lunar ─────────────────────────────────────────
-
     private void OnThemeToggleClicked(object? sender, EventArgs e)
     {
         App.ToggleTheme();
@@ -107,11 +95,7 @@ public partial class HomePage : ContentPage
 
     private void OnThemeChanged()
     {
-        MainThread.BeginInvokeOnMainThread(() =>
-        {
-            UpdateThemeIcon();
-            ApplyVideoBackground();
-        });
+        MainThread.BeginInvokeOnMainThread(UpdateThemeIcon);
     }
 
     private void UpdateThemeIcon()
@@ -120,51 +104,9 @@ public partial class HomePage : ContentPage
         BtnTheme.Text = App.IsSolar ? "☾" : "☀";
     }
 
-    // ── Vídeo de fundo ────────────────────────────────────────────
-
-    private bool IsVideoBgEnabled => Preferences.Default.Get(VideoBgPrefKey, true);
-
     private void OnThemeDoubleTapped(object? sender, TappedEventArgs e)
     {
-        bool next = !IsVideoBgEnabled;
-        Preferences.Default.Set(VideoBgPrefKey, next);
-        AuraLog.Info($"Vídeo de fundo {(next ? "ativado" : "desativado")}");
-        ApplyVideoBackground();
         _ = PlayButtonFeedbackAsync(BtnTheme);
-    }
-
-    private async void ApplyVideoBackground()
-    {
-        if (BgVideo is null) return;
-
-        if (!IsVideoBgEnabled)
-        {
-            PauseVideoBackground();
-            BgVideo.IsVisible = false;
-            return;
-        }
-
-        try
-        {
-            string resource = App.IsSolar ? "solar_bg.mp4" : "lunar_bg.mp4";
-            await BgVideo.FadeTo(0, 150, Easing.Linear);
-            BgVideo.Stop();
-            BgVideo.Source = MediaSource.FromResource(resource);
-            BgVideo.IsVisible = true;
-            await BgVideo.FadeTo(1, 300, Easing.Linear);
-            BgVideo.Play();
-        }
-        catch (Exception ex)
-        {
-            AuraLog.Exception("HomePage.ApplyVideoBackground", ex);
-            BgVideo.IsVisible = true;
-            BgVideo.Play();
-        }
-    }
-
-    private void PauseVideoBackground()
-    {
-        try { BgVideo?.Pause(); } catch { }
     }
 
     private static async Task PlayButtonFeedbackAsync(View? button)
@@ -177,8 +119,6 @@ public partial class HomePage : ContentPage
         }
         catch { }
     }
-
-    // ── Command entry ─────────────────────────────────────────────
 
     private async void OnCommandCompleted(object? sender, EventArgs e)
     {
@@ -197,12 +137,8 @@ public partial class HomePage : ContentPage
 
         RecentActivityLabel.Text = $"Comando: {text}";
         CommandEntry.Text = string.Empty;
-
-        // Navega para Chat (Assistente) — orquestração completa fica na próxima fase
         await NavigateToLabelAsync("Chat");
     }
-
-    // ── Quick actions ─────────────────────────────────────────────
 
     private async void OnQuickDiagnostico(object? sender, TappedEventArgs e)
     {
@@ -236,7 +172,6 @@ public partial class HomePage : ContentPage
             return;
         }
 
-        // Fallback por seção conhecida
         string section = label switch
         {
             "Diagnóstico" or "Logs" or "Correções" or "Ecossistema" => "Sistema",
@@ -247,8 +182,6 @@ public partial class HomePage : ContentPage
         };
         await NavigateToSectionAndPageAsync(section, label);
     }
-
-    // ── Bottom bar ──────────────────────────────────────────────────
 
     private async void OnInicioClicked(object? sender, EventArgs e)
     {
