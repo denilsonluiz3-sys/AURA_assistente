@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `ef4715e`
-- Data UTC: `2026-08-23 13:25:46 UTC`
+- Commit: `ae6afb3`
+- Data UTC: `2026-08-23 13:26:36 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `ae6afb3` fix(di): LocalPlaybook recebe MemoryStore explicitamente (2026-08-23)
+- `7897539` docs(ai): sync README_AI with source tree (2026-08-23)
 - `ef4715e` feat(memory): LocalPlaybook consulta MemoryStore antes da IA (mínimo código) (2026-08-23)
 - `4b326d2` docs(ai): record CI failure context (2026-08-23)
 - `1dfb16c` docs(ai): sync README_AI with source tree (2026-08-23)
-- `4e2848d` fix(agent): texto sempre visível, scroll para baixo, cards só ativos, uso máximo de ferramentas (2026-08-23)
-- `486477e` docs(ai): record CI failure context (2026-08-23)
 <!-- AI-DOCS:END -->
