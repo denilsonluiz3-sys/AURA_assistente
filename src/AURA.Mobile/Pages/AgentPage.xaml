@@ -7,11 +7,7 @@
 
     <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
         <!-- Header -->
-        <Border Grid.Row="0"
-                BackgroundColor="{DynamicResource AuraSurface}"
-                Stroke="{DynamicResource AuraBorder}"
-                StrokeThickness="1"
-                Padding="16,12">
+        <Border Grid.Row="0" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="16,12">
             <Grid ColumnDefinitions="*,Auto,Auto">
                 <VerticalStackLayout Spacing="2">
                     <HorizontalStackLayout Spacing="6">
@@ -21,74 +17,33 @@
                     <Label x:Name="WorkspaceLabel" FontSize="11" TextColor="{DynamicResource AuraTextSecondary}" LineBreakMode="TailTruncation" />
                     <Label x:Name="ModelLabel" FontSize="10" TextColor="{DynamicResource AuraTextMuted}" LineBreakMode="TailTruncation" />
                 </VerticalStackLayout>
-                <Button Grid.Column="1" x:Name="ConfigButton" Text="⚙"
-                        Clicked="OnConfigClicked"
-                        VerticalOptions="Center" Padding="10,6" FontSize="16"
-                        BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
-                <Button Grid.Column="2" x:Name="ProjectButton" Text="📁 Projeto"
-                        Clicked="OnProjectClicked"
-                        VerticalOptions="Center" Padding="10,6" FontSize="12"
-                        BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
+                <Button Grid.Column="1" x:Name="ConfigButton" Text="⚙" Clicked="OnConfigClicked" VerticalOptions="Center" Padding="10,6" FontSize="16" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
+                <Button Grid.Column="2" x:Name="ProjectButton" Text="📁 Projeto" Clicked="OnProjectClicked" VerticalOptions="Center" Padding="10,6" FontSize="12" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
             </Grid>
         </Border>
 
-        <!-- Atalhos: histórico / recentes / prompts -->
+        <!-- Atalhos -->
         <ScrollView Grid.Row="1" Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
             <HorizontalStackLayout Spacing="8" Padding="12,8,12,4">
-                <Button Text="🕑 Histórico" Clicked="OnHistoryClicked"
-                        FontSize="11" Padding="12,6" HeightRequest="34"
-                        BackgroundColor="{DynamicResource AuraSurface2}"
-                        TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
-                <Button Text="⚡ Recentes" Clicked="OnRecentsClicked"
-                        FontSize="11" Padding="12,6" HeightRequest="34"
-                        BackgroundColor="{DynamicResource AuraSurface2}"
-                        TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
-                <Button Text="✦ Prompts" Clicked="OnPromptsClicked"
-                        FontSize="11" Padding="12,6" HeightRequest="34"
-                        BackgroundColor="{DynamicResource AuraSurface2}"
-                        TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
-                <Button Text="＋ Prompt" Clicked="OnAddPromptClicked"
-                        FontSize="11" Padding="12,6" HeightRequest="34"
-                        BackgroundColor="{DynamicResource AuraSurface2}"
-                        TextColor="{DynamicResource AuraAccent}" CornerRadius="17" />
-                <Button Text="🗑 Limpar chat" Clicked="OnClearChatClicked"
-                        FontSize="11" Padding="12,6" HeightRequest="34"
-                        BackgroundColor="{DynamicResource AuraSurface2}"
-                        TextColor="{DynamicResource AuraTextMuted}" CornerRadius="17" />
+                <Button Text="🕑 Histórico" Clicked="OnHistoryClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
+                <Button Text="⚡ Recentes" Clicked="OnRecentsClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
+                <Button Text="✦ Prompts" Clicked="OnPromptsClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
+                <Button Text="＋ Prompt" Clicked="OnAddPromptClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="17" />
+                <Button Text="🗑 Limpar chat" Clicked="OnClearChatClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextMuted}" CornerRadius="17" />
             </HorizontalStackLayout>
         </ScrollView>
 
         <!-- Process cards -->
-        <Border Grid.Row="2" BackgroundColor="{DynamicResource AuraSurface}"
-                Stroke="{DynamicResource AuraBorder}" StrokeThickness="1"
-                Padding="10,7">
-            <CollectionView x:Name="ProcessCards"
-                            ItemsSource="{Binding Processes}"
-                            ItemsLayout="HorizontalList"
-                            HeightRequest="92"
-                            SelectionMode="None">
+        <Border Grid.Row="2" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="10,7">
+            <CollectionView x:Name="ProcessCards" ItemsSource="{Binding Processes}" ItemsLayout="HorizontalList" HeightRequest="92" SelectionMode="None">
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
-                        <Border WidthRequest="190" Margin="0,0,8,0"
-                                BackgroundColor="{DynamicResource AuraSurface2}"
-                                Stroke="{DynamicResource AuraBorder}" StrokeThickness="1"
-                                StrokeShape="RoundRectangle 12">
+                        <Border WidthRequest="190" Margin="0,0,8,0" BackgroundColor="{DynamicResource AuraSurface2}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" StrokeShape="RoundRectangle 12">
                             <Grid Padding="10,7" RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
-                                <Label Grid.ColumnSpan="2" Text="{Binding Title}"
-                                       FontSize="11" FontAttributes="Bold"
-                                       TextColor="{DynamicResource AuraTextPrimary}"
-                                       LineBreakMode="TailTruncation" />
-                                <Label Grid.Row="1" Text="{Binding Status}"
-                                       FontSize="10" TextColor="{DynamicResource AuraAccent}" />
-                                <Button Grid.Row="1" Grid.Column="1" Text="Abrir"
-                                        Clicked="OnProcessCardClicked" FontSize="9"
-                                        Padding="7,2" HeightRequest="25"
-                                        BackgroundColor="Transparent"
-                                        TextColor="{DynamicResource AuraTextSecondary}" />
-                                <ProgressBar Grid.Row="2" Grid.ColumnSpan="2"
-                                             Progress="{Binding Progress}"
-                                             HeightRequest="3"
-                                             ProgressColor="{DynamicResource AuraAccent}" />
+                                <Label Grid.ColumnSpan="2" Text="{Binding Title}" FontSize="11" FontAttributes="Bold" TextColor="{DynamicResource AuraTextPrimary}" LineBreakMode="TailTruncation" />
+                                <Label Grid.Row="1" Text="{Binding Status}" FontSize="10" TextColor="{DynamicResource AuraAccent}" />
+                                <Button Grid.Row="1" Grid.Column="1" Text="Abrir" Clicked="OnProcessCardClicked" FontSize="9" Padding="7,2" HeightRequest="25" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
+                                <ProgressBar Grid.Row="2" Grid.ColumnSpan="2" Progress="{Binding Progress}" HeightRequest="3" ProgressColor="{DynamicResource AuraAccent}" />
                             </Grid>
                         </Border>
                     </DataTemplate>
@@ -102,25 +57,16 @@
         </ScrollView>
 
         <!-- Input -->
-        <Border Grid.Row="4" BackgroundColor="{DynamicResource AuraSurface}"
-                Stroke="{DynamicResource AuraBorder}" StrokeThickness="1"
-                Padding="12,10">
+        <Border Grid.Row="4" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,10">
             <VerticalStackLayout Spacing="8">
                 <ContentView x:Name="ConfigHost" IsVisible="False" />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                    <Border BackgroundColor="{DynamicResource AuraSurface2}"
-                            Stroke="{DynamicResource AuraBorder}" StrokeThickness="1"
-                            Padding="12,6" StrokeShape="RoundRectangle 12,12,12,12">
-                        <Editor x:Name="CommandEditor" MinimumHeightRequest="40" MaximumHeightRequest="120"
-                                Placeholder="Instrua o agente…" AutoSize="TextChanges" BackgroundColor="Transparent" />
+                    <Border Grid.Column="0" BackgroundColor="{DynamicResource AuraSurface2}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,6" StrokeShape="RoundRectangle 12,12,12,12">
+                        <Editor x:Name="CommandEditor" MinimumHeightRequest="40" MaximumHeightRequest="120" Placeholder="Instrua o agente…" AutoSize="TextChanges" BackgroundColor="Transparent" />
                     </Border>
-                    <Grid Grid.Column="1" WidthRequest="44" HeightRequest="44" VerticalOptions="End">
-                        <Button x:Name="RunButton" Text="▶" Clicked="OnRunClicked"
-                                BackgroundColor="{DynamicResource AuraAccent}" TextColor="White"
-                                CornerRadius="22" FontSize="16" Padding="0" WidthRequest="44" HeightRequest="44" />
-                        <ActivityIndicator x:Name="BusyIndicator" IsRunning="False" IsVisible="False"
-                                           Color="White" WidthRequest="22" HeightRequest="22"
-                                           HorizontalOptions="Center" VerticalOptions="Center" />
+                    <Grid Grid.Column="1" WidthRequest="52" HeightRequest="52" VerticalOptions="End" ZIndex="100" InputTransparent="False">
+                        <Button x:Name="RunButton" Text="▶" Clicked="OnRunClicked" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="26" FontSize="16" Padding="0" WidthRequest="52" HeightRequest="52" InputTransparent="False" ZIndex="101" />
+                        <ActivityIndicator x:Name="BusyIndicator" IsRunning="False" IsVisible="False" InputTransparent="True" Color="White" WidthRequest="22" HeightRequest="22" HorizontalOptions="Center" VerticalOptions="Center" ZIndex="102" />
                     </Grid>
                 </Grid>
             </VerticalStackLayout>
