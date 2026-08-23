@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `d788246`
-- Data UTC: `2026-08-23 00:01:34 UTC`
+- Commit: `897f5d7`
+- Data UTC: `2026-08-23 00:06:09 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `897f5d7` ci: configure Android SDK components explicitly (2026-08-22)
+- `9336ac0` docs(ai): record CI failure context (2026-08-23)
+- `d9a846d` docs(ai): record CI failure context (2026-08-23)
+- `69a7654` docs(ai): sync README_AI with source tree (2026-08-23)
 - `d788246` fix: adapt cell capabilities to PolicyGuard authorization (2026-08-22)
-- `a785318` docs(ai): record CI failure context (2026-08-22)
-- `39757ee` docs(ai): record CI failure context (2026-08-22)
-- `78801da` docs(ai): record CI failure context (2026-08-22)
-- `9ea4b25` docs(ai): record CI failure context (2026-08-22)
 <!-- AI-DOCS:END -->
