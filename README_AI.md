@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `bceab31`
-- Data UTC: `2026-08-23 00:45:51 UTC`
+- Commit: `7a52b87`
+- Data UTC: `2026-08-23 00:59:31 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
-- `bceab31` fix: restore MauiProgram and MediaElement registration (2026-08-22)
-- `eafac9d` docs(ai): sync README_AI with source tree (2026-08-23)
-- `52d32b7` fix: align MediaElement initialization with package API (2026-08-22)
-- `0ffbc64` docs(ai): record CI failure context (2026-08-23)
-- `a84b69d` docs(ai): record CI failure context (2026-08-23)
+- `7a52b87` fix(android): use correct MediaElement foreground service parameter (2026-08-22)
+- `aea767f` docs(ai): record CI failure context (2026-08-23)
+- `526e4bc` docs(ai): record CI failure context (2026-08-23)
+- `681beb3` docs(ai): record CI failure context (2026-08-23)
+- `6edda67` docs(ai): record CI failure context (2026-08-23)
 <!-- AI-DOCS:END -->
