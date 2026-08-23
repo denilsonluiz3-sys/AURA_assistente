@@ -1,13 +1,13 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
   "workflow": "CodeQL Advanced",
-  "run_id": "32611777161",
+  "run_id": "32615946766",
   "status": "completed",
   "conclusion": "failure",
   "branch": "main",
-  "commit": "9e7d54272d62e26d916d2c89f72029143cd81ea2",
+  "commit": "4e2848d684f3b51404aa9b059fb9ad6611852295",
   "event": "push",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32611777161",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32615946766",
   "category": "C# / compilação",
   "infra_only": false,
   "failed_jobs": [
@@ -21,8 +21,9 @@
     }
   ],
   "changed_files": [
-    "src/AURA.Mobile/Pages/AgentPage.xaml.cs"
+    "src/AURA.Mobile/Pages/AgentPage.xaml.cs",
+    "src/AURA.Mobile/ProcessRegistry.cs"
   ],
   "associated_prs": [],
-  "diagnostic_report": "docs/ai/ci-failures/32611777161.md"
+  "diagnostic_report": "docs/ai/ci-failures/32615946766.md"
 }
