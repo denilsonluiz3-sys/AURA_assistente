@@ -1,14 +1,14 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
   "workflow": "CodeQL Advanced",
-  "run_id": "32611708752",
+  "run_id": "32611777161",
   "status": "completed",
-  "conclusion": "cancelled",
+  "conclusion": "failure",
   "branch": "main",
-  "commit": "0b64362eb5cac4c17ed6669215c6d510a6dbb1be",
+  "commit": "9e7d54272d62e26d916d2c89f72029143cd81ea2",
   "event": "push",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32611708752",
-  "category": "Indeterminada — consultar o primeiro erro real do log.",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32611777161",
+  "category": "C# / compilação",
   "infra_only": false,
   "failed_jobs": [
     "Analyze (csharp)"
@@ -17,12 +17,12 @@
     {
       "job": "Analyze (csharp)",
       "step": "Manual build (csharp)",
-      "conclusion": "cancelled"
+      "conclusion": "failure"
     }
   ],
   "changed_files": [
-    "src/AURA.Mobile/Pages/AgentPage.xaml"
+    "src/AURA.Mobile/Pages/AgentPage.xaml.cs"
   ],
   "associated_prs": [],
-  "diagnostic_report": "docs/ai/ci-failures/32611708752.md"
+  "diagnostic_report": "docs/ai/ci-failures/32611777161.md"
 }
