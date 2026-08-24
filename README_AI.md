@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `9592388`
-- Data UTC: `2026-08-24 13:27:31 UTC`
+- Commit: `8766e42`
+- Data UTC: `2026-08-24 14:03:58 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -599,9 +599,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `8766e42` revert: remove LocalCommandRecipes (volta playbook só memória) (2026-08-24)
+- `7d96fbb` docs(ai): record CI failure context (2026-08-24)
+- `e7edde0` docs(ai): sync README_AI with source tree (2026-08-24)
 - `9592388` feat(local): receitas sem API key — objetivo → aura-sh → execução (2026-08-24)
 - `ef071cd` docs(ai): record CI failure context (2026-08-24)
-- `b37b3e5` docs(ai): sync README_AI with source tree (2026-08-24)
-- `3943170` fix(agent): não reinicia sessão a cada mensagem; prompt Android realista (2026-08-24)
-- `01de0d3` docs(ai): record CI failure context (2026-08-23)
 <!-- AI-DOCS:END -->
