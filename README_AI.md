@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `8766e42`
-- Data UTC: `2026-08-24 14:03:58 UTC`
+- Commit: `c39309a`
+- Data UTC: `2026-08-24 14:04:31 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -295,7 +295,7 @@ testes relacionados
 - `src/AURA.Core`: 39 arquivos C#, 0 arquivos XAML
 - `src/AURA.Installer`: 17 arquivos C#, 0 arquivos XAML
 - `src/AURA.Memory`: 5 arquivos C#, 0 arquivos XAML
-- `src/AURA.Mobile`: 60 arquivos C#, 34 arquivos XAML
+- `src/AURA.Mobile`: 59 arquivos C#, 34 arquivos XAML
 - `src/AURA.Modules`: 23 arquivos C#, 0 arquivos XAML
 - `src/AURA.Network`: 2 arquivos C#, 0 arquivos XAML
 - `src/AURA.SystemInfo`: 2 arquivos C#, 0 arquivos XAML
@@ -558,7 +558,6 @@ testes relacionados
 - `src/AURA.Mobile/Services/AndroidCapabilityService.cs`
 - `src/AURA.Mobile/Services/AuraCellContext.cs`
 - `src/AURA.Mobile/Services/AuraCellContextFactory.cs`
-- `src/AURA.Mobile/Services/LocalCommandRecipes.cs`
 - `src/AURA.Mobile/Services/LocalPlaybook.cs`
 - `src/AURA.Mobile/Services/WebSearchService.cs`
 - `src/AURA.Mobile/Speech/AndroidSpeechRecognitionService.cs`
@@ -599,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `c39309a` revert: apaga LocalCommandRecipes.cs (código morto após remoção do playbook) (2026-08-24)
+- `f435e92` docs(ai): sync README_AI with source tree (2026-08-24)
 - `8766e42` revert: remove LocalCommandRecipes (volta playbook só memória) (2026-08-24)
 - `7d96fbb` docs(ai): record CI failure context (2026-08-24)
 - `e7edde0` docs(ai): sync README_AI with source tree (2026-08-24)
-- `9592388` feat(local): receitas sem API key — objetivo → aura-sh → execução (2026-08-24)
-- `ef071cd` docs(ai): record CI failure context (2026-08-24)
 <!-- AI-DOCS:END -->
