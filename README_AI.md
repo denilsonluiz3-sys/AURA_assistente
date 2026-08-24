@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `118d6db`
-- Data UTC: `2026-08-23 17:34:42 UTC`
+- Commit: `3943170`
+- Data UTC: `2026-08-24 13:16:33 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
-- `118d6db` chore(android): versionCode 22 (Display 2.2) para updates e diagnóstico de conflito de assinatura (2026-08-23)
-- `1cb3b57` docs(ai): sync README_AI with source tree (2026-08-23)
-- `04a20b0` fix(ai): ChatToolsAsync sem JsonNode reutilizado (node already has a parent) (2026-08-23)
-- `e7163fe` docs(ai): record CI failure context (2026-08-23)
-- `b7af077` docs(ai): sync README_AI with source tree (2026-08-23)
+- `3943170` fix(agent): não reinicia sessão a cada mensagem; prompt Android realista (2026-08-24)
+- `01de0d3` docs(ai): record CI failure context (2026-08-23)
+- `3fd239f` docs(ai): record CI failure context (2026-08-23)
+- `4b94287` docs(ai): record CI failure context (2026-08-23)
+- `32abf87` docs(ai): sync README_AI with source tree (2026-08-23)
 <!-- AI-DOCS:END -->
