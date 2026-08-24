@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `3943170`
-- Data UTC: `2026-08-24 13:16:33 UTC`
+- Commit: `9592388`
+- Data UTC: `2026-08-24 13:27:31 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -295,7 +295,7 @@ testes relacionados
 - `src/AURA.Core`: 39 arquivos C#, 0 arquivos XAML
 - `src/AURA.Installer`: 17 arquivos C#, 0 arquivos XAML
 - `src/AURA.Memory`: 5 arquivos C#, 0 arquivos XAML
-- `src/AURA.Mobile`: 59 arquivos C#, 34 arquivos XAML
+- `src/AURA.Mobile`: 60 arquivos C#, 34 arquivos XAML
 - `src/AURA.Modules`: 23 arquivos C#, 0 arquivos XAML
 - `src/AURA.Network`: 2 arquivos C#, 0 arquivos XAML
 - `src/AURA.SystemInfo`: 2 arquivos C#, 0 arquivos XAML
@@ -558,6 +558,7 @@ testes relacionados
 - `src/AURA.Mobile/Services/AndroidCapabilityService.cs`
 - `src/AURA.Mobile/Services/AuraCellContext.cs`
 - `src/AURA.Mobile/Services/AuraCellContextFactory.cs`
+- `src/AURA.Mobile/Services/LocalCommandRecipes.cs`
 - `src/AURA.Mobile/Services/LocalPlaybook.cs`
 - `src/AURA.Mobile/Services/WebSearchService.cs`
 - `src/AURA.Mobile/Speech/AndroidSpeechRecognitionService.cs`
@@ -598,9 +599,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `9592388` feat(local): receitas sem API key — objetivo → aura-sh → execução (2026-08-24)
+- `ef071cd` docs(ai): record CI failure context (2026-08-24)
+- `b37b3e5` docs(ai): sync README_AI with source tree (2026-08-24)
 - `3943170` fix(agent): não reinicia sessão a cada mensagem; prompt Android realista (2026-08-24)
 - `01de0d3` docs(ai): record CI failure context (2026-08-23)
-- `3fd239f` docs(ai): record CI failure context (2026-08-23)
-- `4b94287` docs(ai): record CI failure context (2026-08-23)
-- `32abf87` docs(ai): sync README_AI with source tree (2026-08-23)
 <!-- AI-DOCS:END -->
