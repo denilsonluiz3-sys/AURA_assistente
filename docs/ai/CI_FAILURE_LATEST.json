@@ -1,29 +1,28 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
-  "workflow": "CodeQL Advanced",
-  "run_id": "32732791260",
+  "workflow": "AURA Android APK",
+  "run_id": "32736374788",
   "status": "completed",
-  "conclusion": "failure",
+  "conclusion": "cancelled",
   "branch": "main",
-  "commit": "9592388de66a2591512fb87a4705c661ea8e7a6c",
+  "commit": "8766e42b70bb22940e9d9b9b41700ebb10e6d634",
   "event": "push",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32732791260",
-  "category": "C# / compilação",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32736374788",
+  "category": "Indeterminada — consultar o primeiro erro real do log.",
   "infra_only": false,
   "failed_jobs": [
-    "Analyze (csharp)"
+    "build-apk"
   ],
   "failed_steps": [
     {
-      "job": "Analyze (csharp)",
-      "step": "Manual build (csharp)",
-      "conclusion": "failure"
+      "job": "build-apk",
+      "step": "Install required Android SDK components",
+      "conclusion": "cancelled"
     }
   ],
   "changed_files": [
-    "src/AURA.Mobile/Services/LocalCommandRecipes.cs",
     "src/AURA.Mobile/Services/LocalPlaybook.cs"
   ],
   "associated_prs": [],
-  "diagnostic_report": "docs/ai/ci-failures/32732791260.md"
+  "diagnostic_report": "docs/ai/ci-failures/32736374788.md"
 }
