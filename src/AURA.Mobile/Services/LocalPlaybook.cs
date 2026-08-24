@@ -6,9 +6,7 @@ namespace AURA.Mobile.Services;
 
 /// <summary>
 /// Resolve tarefas sem LLM, reutilizando o que já existe.
-/// Ordem: SolutionStore → MemoryStore (turnos) → process-log.json no workspace → null (IA).
-/// process-log.json é artefato opcional criado pelo agente; não é a memória oficial.
-/// Hits nele são promovidos ao SolutionStore.
+/// Ordem: SolutionStore → MemoryStore → process-log → receitas locais → null (IA/web).
 /// </summary>
 public sealed class LocalPlaybook
 {
@@ -23,7 +21,7 @@ public sealed class LocalPlaybook
 
     /// <summary>
     /// null = precisa de IA ou ferramentas online.
-    /// string = resposta/ação local reutilizável.
+    /// string = resposta/ação local reutilizável (pode incluir ```aura-sh```).
     /// </summary>
     public string? TryResolveWithoutLlm(string userText)
     {
@@ -42,7 +40,7 @@ public sealed class LocalPlaybook
                 return FormatLocal(match.ActionTaken, match.ResultDetails, "memória local · sem IA");
             }
 
-            // 2) Turnos do MemoryStore (conversas do app)
+            // 2) Turnos do MemoryStore
             string? fromTurns = FindInConversationTurns(query);
             if (!string.IsNullOrWhiteSpace(fromTurns))
             {
@@ -51,13 +49,22 @@ public sealed class LocalPlaybook
                 return FormatLocal(fromTurns!, null, "memória local · conversa anterior · sem IA");
             }
 
-            // 3) process-log.json no workspace (se o agente criou)
+            // 3) process-log.json no workspace
             string? fromLog = FindInProcessLog(query);
             if (!string.IsNullOrWhiteSpace(fromLog))
             {
                 AuraLog.Info("LocalPlaybook hit process-log.json");
                 RememberSuccess(query, fromLog!);
                 return FormatLocal(fromLog!, null, "memória local · process-log · sem IA");
+            }
+
+            // 4) Receitas fixas (objetivo → comandos Android) — sem API / sem web
+            string? recipe = LocalCommandRecipes.TryResolve(query);
+            if (!string.IsNullOrWhiteSpace(recipe))
+            {
+                AuraLog.Info("LocalPlaybook hit LocalCommandRecipes");
+                RememberSuccess(query, recipe!);
+                return recipe;
             }
 
             return null;
@@ -142,10 +149,6 @@ public sealed class LocalPlaybook
         return bestAnswer;
     }
 
-    /// <summary>
-    /// Lê process-log.json no workspace ativo (e fallback workspace privado).
-    /// Formato esperado: { "sessions": [ { "prompt", "response", "status" } ] }
-    /// </summary>
     private string? FindInProcessLog(string query)
     {
         foreach (string root in CandidateRoots())
@@ -204,7 +207,6 @@ public sealed class LocalPlaybook
         return null;
     }
 
-    /// <summary>Lista de raízes candidatas — sem yield dentro de try/catch (CS1626).</summary>
     private static List<string> CandidateRoots()
     {
         var roots = new List<string>();
@@ -278,7 +280,6 @@ public sealed class LocalPlaybook
         }
     }
 
-    /// <summary>Extrai bloco ```aura-sh ... ``` se a IA (ou playbook) devolver script.</summary>
     public static string? ExtractAuraShell(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
