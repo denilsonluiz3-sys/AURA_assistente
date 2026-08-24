@@ -6,7 +6,7 @@ namespace AURA.Mobile.Services;
 
 /// <summary>
 /// Resolve tarefas sem LLM, reutilizando o que já existe.
-/// Ordem: SolutionStore → MemoryStore → process-log → receitas locais → null (IA/web).
+/// Ordem: SolutionStore → MemoryStore (turnos) → process-log.json no workspace → null (IA/web).
 /// </summary>
 public sealed class LocalPlaybook
 {
@@ -21,7 +21,7 @@ public sealed class LocalPlaybook
 
     /// <summary>
     /// null = precisa de IA ou ferramentas online.
-    /// string = resposta/ação local reutilizável (pode incluir ```aura-sh```).
+    /// string = resposta/ação local reutilizável.
     /// </summary>
     public string? TryResolveWithoutLlm(string userText)
     {
@@ -56,15 +56,6 @@ public sealed class LocalPlaybook
                 AuraLog.Info("LocalPlaybook hit process-log.json");
                 RememberSuccess(query, fromLog!);
                 return FormatLocal(fromLog!, null, "memória local · process-log · sem IA");
-            }
-
-            // 4) Receitas fixas (objetivo → comandos Android) — sem API / sem web
-            string? recipe = LocalCommandRecipes.TryResolve(query);
-            if (!string.IsNullOrWhiteSpace(recipe))
-            {
-                AuraLog.Info("LocalPlaybook hit LocalCommandRecipes");
-                RememberSuccess(query, recipe!);
-                return recipe;
             }
 
             return null;
