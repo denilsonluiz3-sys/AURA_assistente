@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `c39309a`
-- Data UTC: `2026-08-24 14:04:31 UTC`
+- Commit: `e8be00c`
+- Data UTC: `2026-08-24 15:13:32 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `e8be00c` fix(memory): memória procedural grava/reusa comandos, não prosa (2026-08-24)
+- `7497a37` docs(ai): record CI failure context (2026-08-24)
+- `39560bb` docs(ai): record CI failure context (2026-08-24)
+- `d10fd90` docs(ai): sync README_AI with source tree (2026-08-24)
 - `c39309a` revert: apaga LocalCommandRecipes.cs (código morto após remoção do playbook) (2026-08-24)
-- `f435e92` docs(ai): sync README_AI with source tree (2026-08-24)
-- `8766e42` revert: remove LocalCommandRecipes (volta playbook só memória) (2026-08-24)
-- `7d96fbb` docs(ai): record CI failure context (2026-08-24)
-- `e7edde0` docs(ai): sync README_AI with source tree (2026-08-24)
 <!-- AI-DOCS:END -->
