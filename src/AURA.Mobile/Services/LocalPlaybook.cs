@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using AURA.Memory;
 using AURA.Mobile.Diagnostics;
@@ -5,8 +6,9 @@ using AURA.Mobile.Diagnostics;
 namespace AURA.Mobile.Services;
 
 /// <summary>
-/// Resolve tarefas sem LLM, reutilizando o que já existe.
-/// Ordem: SolutionStore → MemoryStore (turnos) → process-log.json no workspace → null (IA/web).
+/// Memória procedural: reutiliza COMANDOS/ações bem-sucedidas, não prosa de chat.
+/// Ordem: SolutionStore (só se executável) → process-log (só se executável) → null.
+/// Turnos de conversa NÃO são usados como atalho (evita só repetir a resposta anterior).
 /// </summary>
 public sealed class LocalPlaybook
 {
@@ -21,7 +23,7 @@ public sealed class LocalPlaybook
 
     /// <summary>
     /// null = precisa de IA ou ferramentas online.
-    /// string = resposta/ação local reutilizável.
+    /// string = ação reutilizável (preferencialmente com ```aura-sh``` para reexecutar).
     /// </summary>
     public string? TryResolveWithoutLlm(string userText)
     {
@@ -32,31 +34,26 @@ public sealed class LocalPlaybook
 
         try
         {
-            // 1) Memória procedural oficial
+            // 1) Memória procedural — só se a ação for executável (não prosa)
             var match = _solutions.FindBestMatch(query, threshold: 72);
-            if (match != null && !string.IsNullOrWhiteSpace(match.ActionTaken))
+            if (match != null && IsExecutableAction(match.ActionTaken))
             {
-                AuraLog.Info("LocalPlaybook hit SolutionStore: " + match.Id);
-                return FormatLocal(match.ActionTaken, match.ResultDetails, "memória local · sem IA");
+                AuraLog.Info("LocalPlaybook hit SolutionStore (executável): " + match.Id);
+                string action = EnsureAuraShBlock(match.ActionTaken!);
+                return "[memória procedural · reexecutar · sem IA]\n" + action;
             }
 
-            // 2) Turnos do MemoryStore
-            string? fromTurns = FindInConversationTurns(query);
-            if (!string.IsNullOrWhiteSpace(fromTurns))
-            {
-                AuraLog.Info("LocalPlaybook hit MemoryStore turn");
-                RememberSuccess(query, fromTurns!);
-                return FormatLocal(fromTurns!, null, "memória local · conversa anterior · sem IA");
-            }
-
-            // 3) process-log.json no workspace
-            string? fromLog = FindInProcessLog(query);
+            // 2) process-log — só se a resposta gravada tiver ação executável
+            string? fromLog = FindExecutableInProcessLog(query);
             if (!string.IsNullOrWhiteSpace(fromLog))
             {
-                AuraLog.Info("LocalPlaybook hit process-log.json");
-                RememberSuccess(query, fromLog!);
-                return FormatLocal(fromLog!, null, "memória local · process-log · sem IA");
+                AuraLog.Info("LocalPlaybook hit process-log (executável)");
+                RememberExecutable(query, fromLog!);
+                return "[memória procedural · process-log · sem IA]\n" + EnsureAuraShBlock(fromLog!);
             }
+
+            // Turnos de conversa deliberadamente NÃO são usados aqui:
+            // isso só repetia a resposta anterior em vez de reexecutar o processo.
 
             return null;
         }
@@ -67,80 +64,123 @@ public sealed class LocalPlaybook
         }
     }
 
-    private static string FormatLocal(string action, string? details, string tag)
+    /// <summary>
+    /// Grava só ação executável. Prosa de chat é ignorada.
+    /// </summary>
+    public void RememberSuccess(string task, string actionTaken, string? details = null)
     {
-        string body = action.Trim();
-        if (!string.IsNullOrWhiteSpace(details))
-            body += "\n\n—\n" + details.Trim();
-        return "[" + tag + "]\n" + body;
+        if (!IsExecutableAction(actionTaken))
+        {
+            AuraLog.Info("LocalPlaybook.RememberSuccess ignorado (não é ação executável)");
+            return;
+        }
+
+        RememberExecutable(task, actionTaken!, details);
     }
 
-    private string? FindInConversationTurns(string query)
+    /// <summary>
+    /// Preferência: bloco aura-sh da resposta; senão comandos run_shell da rodada.
+    /// </summary>
+    public void RememberFromRun(string task, IReadOnlyList<string>? shellCommands, string? answerText)
     {
-        if (_memory == null)
-            return null;
+        string? aura = ExtractAuraShell(answerText);
+        if (!string.IsNullOrWhiteSpace(aura))
+        {
+            RememberExecutable(task, "```aura-sh\n" + aura.Trim() + "\n```");
+            return;
+        }
 
-        IReadOnlyList<MemoryEntry> entries;
+        if (shellCommands is { Count: > 0 })
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("```aura-sh");
+            foreach (string c in shellCommands)
+            {
+                if (!string.IsNullOrWhiteSpace(c))
+                    sb.AppendLine(c.Trim());
+            }
+            sb.Append("```");
+            RememberExecutable(task, sb.ToString());
+            return;
+        }
+
+        AuraLog.Info("LocalPlaybook.RememberFromRun: nada executável para gravar");
+    }
+
+    private void RememberExecutable(string task, string actionTaken, string? details = null)
+    {
         try
         {
-            entries = _memory.Read(tail: 80);
+            string action = EnsureAuraShBlock(actionTaken);
+            _solutions.Record(task, action, details ?? string.Empty, success: true);
+            AuraLog.Info("LocalPlaybook gravou ação procedural para: " + Shorten(task, 60));
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            AuraLog.Exception("LocalPlaybook.RememberExecutable", ex);
         }
-
-        if (entries.Count == 0)
-            return null;
-
-        string q = query.ToLowerInvariant();
-        string? bestAnswer = null;
-        int bestScore = 0;
-
-        for (int i = 0; i < entries.Count; i++)
-        {
-            var e = entries[i];
-            if (e.Kind != MemoryKind.Turn)
-                continue;
-            if (!string.Equals(e.Role, "user", StringComparison.OrdinalIgnoreCase))
-                continue;
-            if (string.IsNullOrWhiteSpace(e.Text))
-                continue;
-
-            int score = ScoreSimilarity(q, e.Text.Trim().ToLowerInvariant());
-            if (score < 70 || score <= bestScore)
-                continue;
-
-            string? answer = null;
-            for (int j = i + 1; j < entries.Count && j <= i + 3; j++)
-            {
-                var next = entries[j];
-                if (next.Kind != MemoryKind.Turn)
-                    continue;
-                if (string.Equals(next.Role, "assistant", StringComparison.OrdinalIgnoreCase)
-                    && !string.IsNullOrWhiteSpace(next.Text))
-                {
-                    answer = next.Text;
-                    break;
-                }
-                if (string.Equals(next.Role, "user", StringComparison.OrdinalIgnoreCase))
-                    break;
-            }
-
-            if (string.IsNullOrWhiteSpace(answer))
-                continue;
-            if (answer.StartsWith("Erro:", StringComparison.OrdinalIgnoreCase)
-                || answer.StartsWith("(sem texto", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            bestScore = score;
-            bestAnswer = answer;
-        }
-
-        return bestAnswer;
     }
 
-    private string? FindInProcessLog(string query)
+    /// <summary>True se parece comando/script reutilizável, não só texto de chat.</summary>
+    public static bool IsExecutableAction(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        if (ExtractAuraShell(text) != null)
+            return true;
+
+        string t = text.Trim();
+        // linhas que parecem shell (evita gravar ensaios)
+        string[] lines = t.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        int shellish = 0;
+        foreach (string line in lines)
+        {
+            if (line.StartsWith("```", StringComparison.Ordinal))
+                continue;
+            if (LooksLikeShellLine(line))
+                shellish++;
+        }
+
+        return shellish > 0 && shellish >= Math.Max(1, lines.Length / 3);
+    }
+
+    private static bool LooksLikeShellLine(string line)
+    {
+        if (line.Length < 2 || line.Length > 300)
+            return false;
+
+        // rejeita frases longas em português típicas de chat
+        if (line.Contains(' ') && line.Split(' ').Length > 12)
+            return false;
+
+        string[] starters =
+        {
+            "ls", "cd", "pwd", "cat", "echo", "grep", "find", "sed", "df", "du",
+            "ps", "date", "getprop", "mkdir", "rm", "cp", "mv", "chmod", "head",
+            "tail", "wc", "sh ", "sh\t", "./"
+        };
+        string lower = line.ToLowerInvariant();
+        foreach (string s in starters)
+        {
+            if (lower.StartsWith(s, StringComparison.Ordinal) ||
+                lower.StartsWith(s + " ", StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static string EnsureAuraShBlock(string action)
+    {
+        if (ExtractAuraShell(action) != null)
+            return action.Trim();
+
+        // envolve linhas shell soltas
+        return "```aura-sh\n" + action.Trim() + "\n```";
+    }
+
+    private string? FindExecutableInProcessLog(string query)
     {
         foreach (string root in CandidateRoots())
         {
@@ -175,7 +215,7 @@ public sealed class LocalPlaybook
                         ? (r.GetString() ?? "")
                         : "";
 
-                    if (string.IsNullOrWhiteSpace(prompt) || string.IsNullOrWhiteSpace(response))
+                    if (string.IsNullOrWhiteSpace(prompt) || !IsExecutableAction(response))
                         continue;
 
                     int score = ScoreSimilarity(q, prompt.Trim().ToLowerInvariant());
@@ -259,16 +299,11 @@ public sealed class LocalPlaybook
         return union == 0 ? 0 : (int)(100.0 * inter / union);
     }
 
-    public void RememberSuccess(string task, string actionTaken, string? details = null)
+    private static string Shorten(string? text, int max)
     {
-        try
-        {
-            _solutions.Record(task, actionTaken, details ?? string.Empty, success: true);
-        }
-        catch (Exception ex)
-        {
-            AuraLog.Exception("LocalPlaybook.RememberSuccess", ex);
-        }
+        if (string.IsNullOrWhiteSpace(text)) return "";
+        text = text.Trim();
+        return text.Length <= max ? text : text[..max] + "…";
     }
 
     public static string? ExtractAuraShell(string? text)

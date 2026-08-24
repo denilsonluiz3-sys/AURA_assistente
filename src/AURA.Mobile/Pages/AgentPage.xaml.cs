@@ -10,6 +10,7 @@ using AURA.Modules.Executors;
 using AURA.Mobile.Controls;
 using Microsoft.Maui.Controls.Shapes;
 using System.Collections.Specialized;
+using System.Text.Json;
 
 namespace AURA.Mobile.Pages;
 
@@ -25,6 +26,8 @@ public partial class AgentPage : ContentPage
     private readonly LocalPlaybook? _playbook;
     private readonly SemaphoreSlim _bubbleGate = new(1, 1);
     private readonly List<string> _recentCommands = new();
+    /// <summary>Comandos run_shell desta execução — para memória procedural.</summary>
+    private readonly List<string> _runShellCommands = new();
     private AgentSession? _session;
     private string? _activeProcessId;
     private bool _configVisible;
@@ -112,8 +115,6 @@ public partial class AgentPage : ContentPage
             new WebFetchTool()
         };
 
-        // Ambiente real: Android sandbox (sem root, sem apt/pip).
-        // Continuidade: a mesma AgentSession é reutilizada entre mensagens.
         string systemPrompt =
             "Você é o agente de arquivos e execução da AURA no Android. " +
             "REGRA PRINCIPAL: use ferramentas (list_dir, read_file, write_file, edit_file, run_shell, web_fetch) em vez de inventar. " +
@@ -121,10 +122,9 @@ public partial class AgentPage : ContentPage
             "SHELL REALISTA: o shell é /bin/sh do Android (toybox). NÃO existe apt, apt-get, yum, pip, npm, node, python3 completo, git (salvo se um teste anterior provar o contrário). " +
             "Se um comando falhar com 'not found' / 'No such file', NÃO tente instalar o pacote nem repita a mesma família de comandos. Use alternativa com ls, cat, grep, sed, find, sh, ou as ferramentas de arquivo. " +
             "Prefira list_dir/read_file/write_file a shell quando for só ler/escrever arquivos. " +
-            "Você TEM memória persistente — nunca diga que não tem memória. " +
+            "Você TEM memória persistente de AÇÕES (comandos), não só de texto. " +
+            "Quando resolver com shell, inclua um bloco ```aura-sh\ncomandos\n``` para a memória poder reexecutar depois. " +
             "Responda em português, curto e objetivo. " +
-            "Se precisar de um script shell no workspace, devolva UM bloco:\n" +
-            "```aura-sh\ncomando1\ncomando2\n```\n" +
             "Não invente caminhos fora do workspace. Use o mínimo de rodadas de ferramenta.";
 
         _session = new AgentSession(_client, tools, systemPrompt, memory: _memory);
@@ -133,8 +133,8 @@ public partial class AgentPage : ContentPage
         int memCount = 0;
         try { memCount = _memory.Read(tail: 64).Count; } catch { /* ignore */ }
         string welcome = memCount > 0
-            ? $"Pronto. Memória ({memCount}). Sessão contínua — ferramentas prioritárias."
-            : "Pronto. Sessão contínua. Ferramentas prioritárias. Histórico / Prompts / digite.";
+            ? $"Pronto. Memória ({memCount}). Sessão contínua — ações procedural prioritárias."
+            : "Pronto. Sessão contínua. Ações (comandos) são lembradas, não só o texto.";
         _ = AppendBubbleAsync(welcome, user: false);
     }
 
@@ -272,6 +272,7 @@ public partial class AgentPage : ContentPage
 
         _runInFlight = true;
         string? processId = null;
+        _runShellCommands.Clear();
 
         try
         {
@@ -289,12 +290,12 @@ public partial class AgentPage : ContentPage
             processId = process.Id;
             _activeProcessId = process.Id;
 
-            // 1) Playbook local — sem IA
+            // 1) Playbook procedural — reexecuta comandos, não prosa
             string? local = _playbook?.TryResolveWithoutLlm(text);
             if (!string.IsNullOrWhiteSpace(local))
             {
-                _processes.Update(process.Id, "Playbook", "Resposta local", 0.5);
-                await DeliverAnswerAsync(local, process.Id, "Playbook local");
+                _processes.Update(process.Id, "Playbook", "Ação local", 0.5);
+                await DeliverAnswerAsync(local, process.Id, "Memória procedural");
                 return;
             }
 
@@ -302,7 +303,7 @@ public partial class AgentPage : ContentPage
             {
                 _processes.Update(process.Id, "Planejando", "Orquestrador", 0.15);
                 string answer = await _orchestrator.ExecuteAsync(text);
-                _playbook?.RememberSuccess(text, answer);
+                _playbook?.RememberFromRun(text, _runShellCommands, answer);
                 await DeliverAnswerAsync(answer, process.Id, "OK");
                 return;
             }
@@ -323,12 +324,12 @@ public partial class AgentPage : ContentPage
                     await AppendBubbleAsync(readyError, user: false, isError: true);
                     return;
                 }
-                // IMPORTANTE: reutiliza a mesma sessão — não zera o histórico de tools
                 EnsureSession();
                 answerFromAgent = await _session!.RunAsync(text);
             }
 
-            _playbook?.RememberSuccess(text, answerFromAgent);
+            // Grava só comandos/ações, não a resposta em prosa
+            _playbook?.RememberFromRun(text, _runShellCommands, answerFromAgent);
             await DeliverAnswerAsync(answerFromAgent, process.Id, "Resultado entregue");
 
             if (ProjectAccessService.IsLinked && !ProjectAccessService.IsDirect)
@@ -419,8 +420,35 @@ public partial class AgentPage : ContentPage
     {
         if (!string.IsNullOrWhiteSpace(_activeProcessId))
             _processes.Update(_activeProcessId, "Executando", step.ToolName, 0.65);
+
+        // Acumula comandos shell reais da rodada (memória procedural)
+        if (string.Equals(step.ToolName, "run_shell", StringComparison.OrdinalIgnoreCase))
+        {
+            string? cmd = TryExtractShellCommand(step.Arguments);
+            if (!string.IsNullOrWhiteSpace(cmd))
+                _runShellCommands.Add(cmd);
+        }
+
         _ = AppendBubbleAsync("◆ " + step.ToolName + " " + Shorten(step.Arguments, 70) + "\n" + Shorten(step.Result, 140),
             user: false, isTool: true);
+    }
+
+    private static string? TryExtractShellCommand(string? argumentsJson)
+    {
+        if (string.IsNullOrWhiteSpace(argumentsJson))
+            return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(argumentsJson);
+            if (doc.RootElement.TryGetProperty("command", out var c) &&
+                c.ValueKind == JsonValueKind.String)
+                return c.GetString();
+        }
+        catch
+        {
+            // ignore
+        }
+        return null;
     }
 
     private async void OnProcessCardClicked(object sender, EventArgs e)
