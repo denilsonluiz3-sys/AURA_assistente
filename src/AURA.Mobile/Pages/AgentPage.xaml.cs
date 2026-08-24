@@ -55,7 +55,6 @@ public partial class AgentPage : ContentPage
 
     private void UpdateProcessCardsVisibility()
     {
-        // Só mostra a faixa se existir processo ainda ativo (não concluído/falho)
         bool show = _processes.Processes.Any(p =>
         {
             string s = p.Status ?? "";
@@ -113,18 +112,20 @@ public partial class AgentPage : ContentPage
             new WebFetchTool()
         };
 
-        // Uso máximo de ferramentas: instrução forte e explícita
+        // Ambiente real: Android sandbox (sem root, sem apt/pip).
+        // Continuidade: a mesma AgentSession é reutilizada entre mensagens.
         string systemPrompt =
-            "Você é o agente de arquivos e execução da AURA. " +
-            "REGRA PRINCIPAL: use ferramentas sempre que possível. " +
-            "Prefira list_dir, read_file, write_file, edit_file, shell e web_fetch a respostas vagas ou inventadas. " +
-            "Se a tarefa envolver arquivos, diretórios, comandos ou informação externa, CHAME a ferramenta antes de responder. " +
+            "Você é o agente de arquivos e execução da AURA no Android. " +
+            "REGRA PRINCIPAL: use ferramentas (list_dir, read_file, write_file, edit_file, run_shell, web_fetch) em vez de inventar. " +
+            "CONTINUIDADE: se a conversa já tem resultados de ferramentas, CONTINUE de onde parou — não reinicie a tarefa do zero. " +
+            "SHELL REALISTA: o shell é /bin/sh do Android (toybox). NÃO existe apt, apt-get, yum, pip, npm, node, python3 completo, git (salvo se um teste anterior provar o contrário). " +
+            "Se um comando falhar com 'not found' / 'No such file', NÃO tente instalar o pacote nem repita a mesma família de comandos. Use alternativa com ls, cat, grep, sed, find, sh, ou as ferramentas de arquivo. " +
+            "Prefira list_dir/read_file/write_file a shell quando for só ler/escrever arquivos. " +
             "Você TEM memória persistente — nunca diga que não tem memória. " +
             "Responda em português, curto e objetivo. " +
-            "Se precisar de um script shell no workspace, devolva UM bloco assim:\n" +
+            "Se precisar de um script shell no workspace, devolva UM bloco:\n" +
             "```aura-sh\ncomando1\ncomando2\n```\n" +
-            "O app executará o bloco no terminal. Não invente caminhos fora do workspace. " +
-            "Evite loops desnecessários; use o mínimo de rodadas de ferramenta que resolva a tarefa.";
+            "Não invente caminhos fora do workspace. Use o mínimo de rodadas de ferramenta.";
 
         _session = new AgentSession(_client, tools, systemPrompt, memory: _memory);
         _session.Step += OnAgentStep;
@@ -132,8 +133,8 @@ public partial class AgentPage : ContentPage
         int memCount = 0;
         try { memCount = _memory.Read(tail: 64).Count; } catch { /* ignore */ }
         string welcome = memCount > 0
-            ? $"Pronto. Memória ({memCount}). Playbook local ativo — ferramentas prioritárias."
-            : "Pronto. Playbook local ativo. Ferramentas prioritárias. Histórico / Prompts / digite.";
+            ? $"Pronto. Memória ({memCount}). Sessão contínua — ferramentas prioritárias."
+            : "Pronto. Sessão contínua. Ferramentas prioritárias. Histórico / Prompts / digite.";
         _ = AppendBubbleAsync(welcome, user: false);
     }
 
@@ -247,13 +248,12 @@ public partial class AgentPage : ContentPage
 
     private async void OnClearChatClicked(object sender, EventArgs e)
     {
-        if (!await DisplayAlert("Limpar", "Limpar bolhas?", "Limpar", "Cancelar")) return;
+        if (!await DisplayAlert("Limpar", "Limpar bolhas e reiniciar sessão do agente?", "Limpar", "Cancelar")) return;
         ConversationContainer.Children.Clear();
         _session = null;
         EnsureSession();
     }
 
-    /// <summary>Enter no teclado (Completed) dispara o mesmo fluxo do ▶.</summary>
     private void OnEditorCompleted(object? sender, EventArgs e) => OnRunClicked(sender ?? RunButton, e);
 
     private async void OnRunClicked(object? sender, EventArgs e)
@@ -261,7 +261,6 @@ public partial class AgentPage : ContentPage
         if (_runInFlight)
             return;
 
-        // Android/MAUI: Text do Editor às vezes só sincroniza após Unfocus.
         try { CommandEditor.Unfocus(); } catch { /* ignore */ }
 
         string text = CommandEditor.Text?.Trim() ?? string.Empty;
@@ -324,7 +323,7 @@ public partial class AgentPage : ContentPage
                     await AppendBubbleAsync(readyError, user: false, isError: true);
                     return;
                 }
-                _session = null;
+                // IMPORTANTE: reutiliza a mesma sessão — não zera o histórico de tools
                 EnsureSession();
                 answerFromAgent = await _session!.RunAsync(text);
             }
@@ -356,21 +355,16 @@ public partial class AgentPage : ContentPage
         }
     }
 
-    /// <summary>
-    /// Entrega texto na bolha primeiro, depois TTS. Garante que a resposta nunca fique só em áudio.
-    /// </summary>
     private async Task DeliverAnswerAsync(string answer, string processId, string completeMessage)
     {
         string text = string.IsNullOrWhiteSpace(answer) ? "(sem texto na resposta)" : answer.Trim();
 
-        // 1) Sempre mostra o texto
         await AppendBubbleAsync(text, user: false);
         await TryExecuteAuraShellAsync(text);
 
         _processes.Complete(processId, completeMessage);
         _voice?.SetLastUtterance(text);
 
-        // 2) Áudio depois do texto estar na tela
         await SpeakAsync(text);
     }
 
@@ -445,9 +439,6 @@ public partial class AgentPage : ContentPage
         catch (Exception ex) { AuraLog.Exception("AgentPage.Speak", ex); }
     }
 
-    /// <summary>
-    /// Cópia sutil: long-press (Android) ou duplo toque — sem botão "Copiar" no meio da bolha.
-    /// </summary>
     private void AttachSubtleCopy(View view, string text)
     {
         string payload = text ?? "";
@@ -528,7 +519,6 @@ public partial class AgentPage : ContentPage
                 AttachSubtleCopy(border, text ?? "");
                 ConversationContainer.Children.Add(border);
 
-                // Scroll robusto para baixo: espera layout e força End
                 await Task.Delay(40);
                 try
                 {
@@ -536,7 +526,6 @@ public partial class AgentPage : ContentPage
                 }
                 catch
                 {
-                    // fallback: scroll pela altura do conteúdo
                     try
                     {
                         double y = Math.Max(0, ConversationContainer.Height - ConversationScroll.Height);

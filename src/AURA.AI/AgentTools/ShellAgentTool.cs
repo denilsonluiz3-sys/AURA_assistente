@@ -8,9 +8,8 @@ using AURA.Abstractions.Execution;
 namespace AURA.AI
 {
     /// <summary>
-    /// Adaptador cognitivo para execução de shell.
-    /// Schema e apresentação ao LLM ficam aqui; a criação real do processo
-    /// fica em <see cref="IToolExecutor"/> (ex.: ShellExecutor / ProcessExecutorBase).
+    /// Adaptador cognitivo para execução de shell no workspace.
+    /// No Android: /bin/sh (toybox) — sem apt/pip/git por padrão.
     /// </summary>
     public sealed class ShellAgentTool : AgentTool
     {
@@ -20,8 +19,6 @@ namespace AURA.AI
         private readonly string _workspaceRoot;
         private readonly IToolExecutor _executor;
 
-        /// <param name="workspaceRoot">Diretório de trabalho do shell (workspace do agente).</param>
-        /// <param name="executor">Executor de processo (tipicamente <c>ShellExecutor</c>). Obrigatório.</param>
         public ShellAgentTool(string workspaceRoot, IToolExecutor executor)
         {
             _workspaceRoot = workspaceRoot ?? throw new ArgumentNullException(nameof(workspaceRoot));
@@ -31,14 +28,17 @@ namespace AURA.AI
         public override AgentToolDefinition Definition => new AgentToolDefinition
         {
             Name = "run_shell",
-            Description = "Executa um comando shell (sh -c) no diretório do workspace. " +
-                "Use para git status/add/commit, dotnet build, grep, ls, etc. Timeout de 30s.",
+            Description =
+                "Executa um comando no /bin/sh do dispositivo (workspace). " +
+                "Comandos úteis: ls, cat, grep, sed, find, echo, pwd, du, df, date, ps. " +
+                "NÃO use apt, apt-get, yum, pip, npm, node, python3 ou git a menos que um comando anterior tenha confirmado que existem. " +
+                "Se receber 'not found', pare de tentar instalar e use outra abordagem. Timeout 30s.",
             Parameters =
             {
                 ["command"] = new AgentToolParameter
                 {
                     Type = "string",
-                    Description = "Comando shell completo (ex.: 'git status --short')."
+                    Description = "Comando shell completo (ex.: 'ls -la' ou 'cat arquivo.txt')."
                 }
             },
             Required = { "command" }
@@ -73,11 +73,6 @@ namespace AURA.AI
             return FormatForLlm(result);
         }
 
-        /// <summary>
-        /// Classifica pelo exit code real do processo (não pela convenção "ERRO:"):
-        /// sucesso = exit 0 e sem cancelamento. O texto devolvido é idêntico ao de
-        /// <see cref="ExecuteAsync"/>.
-        /// </summary>
         public override async Task<AgentToolResult> ExecuteStructuredAsync(
             string argumentsJson, CancellationToken ct = default)
         {
@@ -112,10 +107,6 @@ namespace AURA.AI
                 : AgentToolResult.Error(FormatForLlm(result));
         }
 
-        /// <summary>
-        /// Converte <see cref="ExecutionResult"/> no formato de string esperado pelo
-        /// <see cref="AgentSession"/> e pelo protocolo de mensagens tool.
-        /// </summary>
         public static string FormatForLlm(ExecutionResult result)
         {
             if (result == null)
@@ -123,7 +114,6 @@ namespace AURA.AI
                 return "ERRO: resultado de execução nulo.";
             }
 
-            // Timeout / cancelamento do ProcessExecutorBase
             if (!string.IsNullOrWhiteSpace(result.StandardError) &&
                 result.StandardError.IndexOf("[AURA] Execução cancelada", StringComparison.Ordinal) >= 0)
             {
@@ -143,7 +133,6 @@ namespace AURA.AI
                 sb.Append("stderr: ").AppendLine(result.StandardError.TrimEnd());
             }
 
-            // Só "exit=N\n" sem saída útil
             string header = "exit=" + result.ExitCode + "\n";
             if (sb.Length <= header.Length)
             {
