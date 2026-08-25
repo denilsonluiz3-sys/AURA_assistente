@@ -10,12 +10,16 @@ using AURA.Modules.Executors;
 using AURA.Mobile.Controls;
 using Microsoft.Maui.Controls.Shapes;
 using System.Collections.Specialized;
+using System.Text;
 using System.Text.Json;
 
 namespace AURA.Mobile.Pages;
 
 public partial class AgentPage : ContentPage
 {
+    private const string UrlDeepSeek = "https://chat.deepseek.com";
+    private const string UrlChatGpt = "https://chatgpt.com";
+
     private readonly OpenRouterClient _client;
     private readonly MemoryStore _memory;
     private readonly ISpeechService _speech;
@@ -26,12 +30,15 @@ public partial class AgentPage : ContentPage
     private readonly LocalPlaybook? _playbook;
     private readonly SemaphoreSlim _bubbleGate = new(1, 1);
     private readonly List<string> _recentCommands = new();
-    /// <summary>Comandos run_shell desta execução — para memória procedural.</summary>
     private readonly List<string> _runShellCommands = new();
     private AgentSession? _session;
     private string? _activeProcessId;
     private bool _configVisible;
     private bool _runInFlight;
+    private bool _webMode;
+    private bool _webLoaded;
+    private string? _lastUserGoal;
+    private string? _lastAssistantText;
 
     public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
         ShellExecutor shell, ProcessRegistry processes, AuraOrchestrator orchestrator,
@@ -51,6 +58,7 @@ public partial class AgentPage : ContentPage
 
         _processes.Processes.CollectionChanged += OnProcessesChanged;
         UpdateProcessCardsVisibility();
+        ApplyModeUi();
     }
 
     private void OnProcessesChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -89,6 +97,156 @@ public partial class AgentPage : ContentPage
         UpdateProcessCardsVisibility();
         EnsureSession();
     }
+
+    // ─── Ponte Agente ↔ Web AI ───────────────────────────────────────────
+
+    private void OnModeAgentClicked(object sender, EventArgs e)
+    {
+        _webMode = false;
+        ApplyModeUi();
+    }
+
+    private void OnModeWebClicked(object sender, EventArgs e)
+    {
+        _webMode = true;
+        ApplyModeUi();
+        if (!_webLoaded)
+        {
+            BridgeWebView.Source = UrlDeepSeek;
+            _webLoaded = true;
+        }
+    }
+
+    private void ApplyModeUi()
+    {
+        AgentPane.IsVisible = !_webMode;
+        WebPane.IsVisible = _webMode;
+
+        ModeAgentBtn.BackgroundColor = _webMode
+            ? (Color)Application.Current!.Resources["AuraSurface2"]
+            : (Color)Application.Current!.Resources["AuraAccent"];
+        ModeAgentBtn.TextColor = _webMode
+            ? (Color)Application.Current!.Resources["AuraTextPrimary"]
+            : Colors.White;
+
+        ModeWebBtn.BackgroundColor = _webMode
+            ? (Color)Application.Current!.Resources["AuraAccent"]
+            : (Color)Application.Current!.Resources["AuraSurface2"];
+        ModeWebBtn.TextColor = _webMode
+            ? Colors.White
+            : (Color)Application.Current!.Resources["AuraTextPrimary"];
+    }
+
+    private void OnWebDeepSeekClicked(object sender, EventArgs e)
+    {
+        BridgeWebView.Source = UrlDeepSeek;
+        _webLoaded = true;
+    }
+
+    private void OnWebChatGptClicked(object sender, EventArgs e)
+    {
+        BridgeWebView.Source = UrlChatGpt;
+        _webLoaded = true;
+    }
+
+    private void OnWebReloadClicked(object sender, EventArgs e)
+    {
+        try { BridgeWebView.Reload(); }
+        catch (Exception ex) { AuraLog.Exception("BridgeWeb.Reload", ex); }
+    }
+
+    private async void OnCopyContextClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            string pack = BuildContextPack();
+            await Clipboard.Default.SetTextAsync(pack);
+            await AppendBubbleAsync(
+                "📋 Contexto copiado. Vá em Web AI, cole no chat e peça comandos em ```aura-sh.\n\n" +
+                Shorten(pack, 400),
+                user: false, isTool: true);
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Contexto", ex.Message, "OK");
+        }
+    }
+
+    private string BuildContextPack()
+    {
+        string root = "";
+        int files = 0;
+        try
+        {
+            root = AgentWorkspace.ActiveRoot ?? "";
+            files = AgentWorkspace.CountFiles(root);
+        }
+        catch { /* ignore */ }
+
+        string goal = !string.IsNullOrWhiteSpace(_lastUserGoal)
+            ? _lastUserGoal!
+            : (CommandEditor.Text?.Trim() ?? "(defina o objetivo)");
+
+        var sb = new StringBuilder();
+        sb.AppendLine("### AURA_CONTEXT");
+        sb.AppendLine("Objetivo: " + goal);
+        sb.AppendLine("Workspace: " + root);
+        sb.AppendLine("Arquivos no workspace: " + files);
+        sb.AppendLine("Shell: Android /bin/sh (toybox)");
+        sb.AppendLine("Evitar: apt, apt-get, pip, npm, git (salvo se confirmado no aparelho)");
+        if (!string.IsNullOrWhiteSpace(_lastAssistantText))
+        {
+            sb.AppendLine("Última saída do agente:");
+            sb.AppendLine(Shorten(_lastAssistantText, 500));
+        }
+        sb.AppendLine("### PEDIDO À IA WEB");
+        sb.AppendLine("Responda em português, curto.");
+        sb.AppendLine("1) Análise em até 3 linhas");
+        sb.AppendLine("2) UM bloco ```aura-sh com comandos seguros para o shell acima");
+        sb.AppendLine("Não invente caminhos fora do workspace.");
+        return sb.ToString().TrimEnd();
+    }
+
+    private async void OnPastePlanClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            string? clip = await Clipboard.Default.GetTextAsync();
+            if (string.IsNullOrWhiteSpace(clip))
+            {
+                await DisplayAlert("Colar plano", "Clipboard vazio. Copie a resposta da Web AI e tente de novo.", "OK");
+                return;
+            }
+
+            string text = clip.Trim();
+            string? shell = LocalPlaybook.ExtractAuraShell(text);
+
+            // Garante modo Agente para ver resultado
+            _webMode = false;
+            ApplyModeUi();
+
+            if (!string.IsNullOrWhiteSpace(shell))
+            {
+                await AppendBubbleAsync("▶ Plano da web (aura-sh) — executando…", user: false, isTool: true);
+                await AppendBubbleAsync(text, user: false);
+                await TryExecuteAuraShellAsync(text);
+                _playbook?.RememberFromRun(_lastUserGoal ?? "plano web", null, text);
+                return;
+            }
+
+            // Sem bloco: coloca no editor para revisar e enviar
+            CommandEditor.Text = text;
+            await AppendBubbleAsync(
+                "📋 Texto da web colado no editor (sem ```aura-sh). Revise e toque ▶ se quiser que o agente trate.",
+                user: false, isTool: true);
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Colar plano", ex.Message, "OK");
+        }
+    }
+
+    // ─── Resto do agente ─────────────────────────────────────────────────
 
     private void OnConfigClicked(object sender, EventArgs e) => SetConfigVisible(!_configVisible);
 
@@ -133,8 +291,8 @@ public partial class AgentPage : ContentPage
         int memCount = 0;
         try { memCount = _memory.Read(tail: 64).Count; } catch { /* ignore */ }
         string welcome = memCount > 0
-            ? $"Pronto. Memória ({memCount}). Sessão contínua — ações procedural prioritárias."
-            : "Pronto. Sessão contínua. Ações (comandos) são lembradas, não só o texto.";
+            ? $"Pronto. Memória ({memCount}). Use 📋 Contexto → Web AI → ▶ Colar plano para economizar tokens."
+            : "Pronto. 📋 Contexto copia o pacote; Web AI abre DeepSeek/ChatGPT; ▶ Colar plano executa aura-sh.";
         _ = AppendBubbleAsync(welcome, user: false);
     }
 
@@ -273,6 +431,14 @@ public partial class AgentPage : ContentPage
         _runInFlight = true;
         string? processId = null;
         _runShellCommands.Clear();
+        _lastUserGoal = text;
+
+        // Garante painel agente ao rodar
+        if (_webMode)
+        {
+            _webMode = false;
+            ApplyModeUi();
+        }
 
         try
         {
@@ -290,7 +456,6 @@ public partial class AgentPage : ContentPage
             processId = process.Id;
             _activeProcessId = process.Id;
 
-            // 1) Playbook procedural — reexecuta comandos, não prosa
             string? local = _playbook?.TryResolveWithoutLlm(text);
             if (!string.IsNullOrWhiteSpace(local))
             {
@@ -328,7 +493,6 @@ public partial class AgentPage : ContentPage
                 answerFromAgent = await _session!.RunAsync(text);
             }
 
-            // Grava só comandos/ações, não a resposta em prosa
             _playbook?.RememberFromRun(text, _runShellCommands, answerFromAgent);
             await DeliverAnswerAsync(answerFromAgent, process.Id, "Resultado entregue");
 
@@ -359,6 +523,7 @@ public partial class AgentPage : ContentPage
     private async Task DeliverAnswerAsync(string answer, string processId, string completeMessage)
     {
         string text = string.IsNullOrWhiteSpace(answer) ? "(sem texto na resposta)" : answer.Trim();
+        _lastAssistantText = text;
 
         await AppendBubbleAsync(text, user: false);
         await TryExecuteAuraShellAsync(text);
@@ -405,6 +570,9 @@ public partial class AgentPage : ContentPage
         if (m.Contains("429")) return "Rate limit.";
         if (m.Contains("node already has a parent", StringComparison.OrdinalIgnoreCase))
             return "Erro interno de tools. Atualize o APK.";
+        if (m.Contains("Invalid JSON in tool call", StringComparison.OrdinalIgnoreCase)
+            || m.Contains("tool arguments must be", StringComparison.OrdinalIgnoreCase))
+            return "Argumentos de ferramenta inválidos (JSON). Atualize o APK ou reformule o pedido.";
         return m.Length > 280 ? m[..280] + "…" : m;
     }
 
@@ -421,7 +589,6 @@ public partial class AgentPage : ContentPage
         if (!string.IsNullOrWhiteSpace(_activeProcessId))
             _processes.Update(_activeProcessId, "Executando", step.ToolName, 0.65);
 
-        // Acumula comandos shell reais da rodada (memória procedural)
         if (string.Equals(step.ToolName, "run_shell", StringComparison.OrdinalIgnoreCase))
         {
             string? cmd = TryExtractShellCommand(step.Arguments);
@@ -444,10 +611,7 @@ public partial class AgentPage : ContentPage
                 c.ValueKind == JsonValueKind.String)
                 return c.GetString();
         }
-        catch
-        {
-            // ignore
-        }
+        catch { /* ignore */ }
         return null;
     }
 
@@ -535,6 +699,7 @@ public partial class AgentPage : ContentPage
                     HorizontalOptions = user ? LayoutOptions.End : LayoutOptions.Start,
                     MaximumWidthRequest = maxW
                 };
+
                 var messageLabel = new Label
                 {
                     Text = text ?? "",
@@ -542,9 +707,36 @@ public partial class AgentPage : ContentPage
                     TextColor = user ? Color.FromArgb("#dfe7ff") : isError ? Color.FromArgb("#f0c0c4") : Color.FromArgb("#e8e8f0"),
                     LineBreakMode = LineBreakMode.WordWrap
                 };
-                border.Content = messageLabel;
 
-                AttachSubtleCopy(border, text ?? "");
+                // Botão Copiar visível (além de long-press / duplo toque)
+                var copyBtn = new Button
+                {
+                    Text = "📋",
+                    FontSize = 11,
+                    Padding = new Thickness(6, 2),
+                    HeightRequest = 28,
+                    WidthRequest = 36,
+                    BackgroundColor = Colors.Transparent,
+                    TextColor = Color.FromArgb("#8a9bb8"),
+                    HorizontalOptions = LayoutOptions.End
+                };
+                string payload = text ?? "";
+                copyBtn.Clicked += async (_, _) =>
+                {
+                    try
+                    {
+                        await Clipboard.Default.SetTextAsync(payload);
+                        AuraLog.Info("AgentPage: texto copiado (botão)");
+                    }
+                    catch (Exception ex) { AuraLog.Exception("CopyBtn", ex); }
+                };
+
+                var stack = new VerticalStackLayout { Spacing = 4 };
+                stack.Children.Add(messageLabel);
+                stack.Children.Add(copyBtn);
+                border.Content = stack;
+
+                AttachSubtleCopy(border, payload);
                 ConversationContainer.Children.Add(border);
 
                 await Task.Delay(40);
