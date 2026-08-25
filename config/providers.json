@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "description": "AURA LLM provider catalog",
+  "providers": [
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "baseUrl": "https://api.openai.com/v1/chat/completions",
+      "modelsUrl": "https://api.openai.com/v1/models",
+      "needsKey": true,
+      "keyEnv": "OPENAI_API_KEY",
+      "keyHint": "OPENAI_API_KEY",
+      "defaultModelId": "gpt-5-mini",
+      "authHeaderName": "Authorization",
+      "authScheme": "Bearer ",
+      "apiFormat": "OpenAICompletions",
+      "keyPrefixesList": ["sk-"],
+      "models": [
+        { "id": "gpt-5", "label": "GPT-5", "category": "Flagship", "isFree": false },
+        { "id": "gpt-5-mini", "label": "GPT-5 Mini", "category": "Eficiente", "isFree": false }
+      ]
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "baseUrl": "https://openrouter.ai/api/v1/chat/completions",
+      "modelsUrl": "https://openrouter.ai/api/v1/models",
+      "needsKey": true,
+      "keyEnv": "OPENROUTER_API_KEY",
+      "keyHint": "OPENROUTER_API_KEY",
+      "defaultModelId": "qwen/qwen-plus",
+      "authHeaderName": "Authorization",
+      "authScheme": "Bearer ",
+      "apiFormat": "OpenAICompletions",
+      "keyPrefixesList": ["sk-or-"],
+      "models": [
+        { "id": "qwen/qwen-plus", "label": "Qwen Plus", "category": "Razoável", "isFree": false },
+        { "id": "openrouter/free", "label": "Auto grátis", "category": "Grátis", "isFree": true }
+      ]
+    },
+    {
+      "id": "opencode-zen",
+      "name": "OpenCode Zen",
+      "baseUrl": "https://opencode.ai/zen/v1/chat/completions",
+      "modelsUrl": "https://opencode.ai/zen/v1/models",
+      "needsKey": true,
+      "keyEnv": "OPENCODE_API_KEY",
+      "keyHint": "OPENCODE_API_KEY",
+      "defaultModelId": "kimi-k2.7-code",
+      "authHeaderName": "Authorization",
+      "authScheme": "Bearer ",
+      "apiFormat": "OpenAICompletions",
+      "keyPrefixesList": [],
+      "models": [
+        { "id": "kimi-k2.7-code", "label": "Kimi K2.7 Code", "category": "Coding", "isFree": false },
+        { "id": "deepseek-v4-pro", "label": "DeepSeek V4 Pro", "category": "Coding", "isFree": false },
+        { "id": "deepseek-v4-flash", "label": "DeepSeek V4 Flash", "category": "Eficiente", "isFree": false },
+        { "id": "glm-5.2", "label": "GLM 5.2", "category": "Coding", "isFree": false },
+        { "id": "minimax-m3", "label": "MiniMax M3", "category": "Coding", "isFree": false },
+        { "id": "big-pickle", "label": "Big Pickle", "category": "Grátis", "isFree": true },
+        { "id": "x-preview-f-free", "label": "Ox Alpha Free", "category": "Grátis", "isFree": true },
+        { "id": "mimo-v2.5-free", "label": "MiMo-V2.5 Free", "category": "Grátis", "isFree": true },
+        { "id": "hy3-free", "label": "Hy3 Free", "category": "Grátis", "isFree": true },
+        { "id": "nemotron-3-ultra-free", "label": "Nemotron 3 Ultra Free", "category": "Grátis", "isFree": true },
+        { "id": "nemotron-3.5-lightning-free", "label": "Nemotron 3.5 Lightning Free", "category": "Grátis", "isFree": true }
+      ]
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama (local)",
+      "baseUrl": "http://127.0.0.1:11434/v1/chat/completions",
+      "modelsUrl": "http://127.0.0.1:11434/v1/models",
+      "needsKey": false,
+      "defaultModelId": "qwen2.5-coder:1.5b",
+      "authHeaderName": "Authorization",
+      "authScheme": "Bearer ",
+      "apiFormat": "OpenAICompletions",
+      "models": [
+        { "id": "qwen2.5-coder:1.5b", "label": "Qwen 2.5 Coder 1.5B", "category": "Local", "isFree": true }
+      ]
+    },
+    {
+      "id": "groq",
+      "name": "Groq (grátis)",
+      "baseUrl": "https://api.groq.com/openai/v1/chat/completions",
+      "modelsUrl": "https://api.groq.com/openai/v1/models",
+      "needsKey": true,
+      "keyEnv": "GROQ_API_KEY",
+      "keyHint": "GROQ_API_KEY",
+      "defaultModelId": "llama-3.3-70b-versatile",
+      "authHeaderName": "Authorization",
+      "authScheme": "Bearer ",
+      "apiFormat": "OpenAICompletions",
+      "keyPrefixesList": ["gsk_"],
+      "models": [
+        { "id": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B", "category": "Grátis", "isFree": true },
+        { "id": "llama-3.1-8b-instant", "label": "Llama 3.1 8B", "category": "Grátis", "isFree": true }
+      ]
+    },
+    {
+      "id": "gemini",
+      "name": "Google Gemini",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      "modelsUrl": "https://generativelanguage.googleapis.com/v1beta/openai/models",
+      "needsKey": true,
+      "keyEnv": "GEMINI_API_KEY",
+      "keyHint": "GEMINI_API_KEY",
+      "defaultModelId": "gemini-2.5-flash",
+      "authHeaderName": "Authorization",
+      "authScheme": "Bearer ",
+      "apiFormat": "OpenAICompletions",
+      "keyPrefixesList": ["AIza", "AQ."],
+      "models": [
+        { "id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash", "category": "Grátis", "isFree": true },
+        { "id": "gemini-2.5-flash-lite", "label": "Gemini 2.5 Flash-Lite", "category": "Grátis", "isFree": true }
+      ]
+    }
+  ]
+}
