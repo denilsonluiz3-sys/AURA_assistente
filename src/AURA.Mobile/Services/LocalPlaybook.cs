@@ -131,7 +131,6 @@ public sealed class LocalPlaybook
             return true;
 
         string t = text.Trim();
-        // linhas que parecem shell (evita gravar ensaios)
         string[] lines = t.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         int shellish = 0;
         foreach (string line in lines)
@@ -150,7 +149,6 @@ public sealed class LocalPlaybook
         if (line.Length < 2 || line.Length > 300)
             return false;
 
-        // rejeita frases longas em português típicas de chat
         if (line.Contains(' ') && line.Split(' ').Length > 12)
             return false;
 
@@ -176,7 +174,6 @@ public sealed class LocalPlaybook
         if (ExtractAuraShell(action) != null)
             return action.Trim();
 
-        // envolve linhas shell soltas
         return "```aura-sh\n" + action.Trim() + "\n```";
     }
 
@@ -190,7 +187,8 @@ public sealed class LocalPlaybook
 
             try
             {
-                string json = File.ReadAllText(path);
+                string raw = File.ReadAllText(path);
+                string json = SanitizeProcessLogJson(raw);
                 using var doc = JsonDocument.Parse(json);
                 if (!doc.RootElement.TryGetProperty("sessions", out var sessions)
                     || sessions.ValueKind != JsonValueKind.Array)
@@ -236,6 +234,62 @@ public sealed class LocalPlaybook
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// process-log no dispositivo às vezes começa com ',' ou lixo antes do '{'.
+    /// Tenta recuperar; se impossível, devolve objeto vazio válido.
+    /// </summary>
+    internal static string SanitizeProcessLogJson(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return "{\"sessions\":[]}";
+
+        string s = raw.Trim();
+
+        // Remove BOM
+        if (s.Length > 0 && s[0] == '\uFEFF')
+            s = s[1..].Trim();
+
+        // Pula lixo antes do primeiro '{'
+        int brace = s.IndexOf('{');
+        if (brace < 0)
+            return "{\"sessions\":[]}";
+        if (brace > 0)
+            s = s[brace..].Trim();
+
+        // Vírgulas soltas no início (caso clássico do log do aparelho)
+        while (s.StartsWith(','))
+            s = s[1..].Trim();
+
+        if (!s.StartsWith('{'))
+            return "{\"sessions\":[]}";
+
+        try
+        {
+            using var doc = JsonDocument.Parse(s);
+            if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                return s;
+        }
+        catch (JsonException)
+        {
+            // tenta fechar array/objeto truncado de forma conservadora
+            try
+            {
+                string candidate = s.TrimEnd();
+                if (!candidate.EndsWith('}'))
+                    candidate += "]}";
+                using var doc2 = JsonDocument.Parse(candidate);
+                if (doc2.RootElement.ValueKind == JsonValueKind.Object)
+                    return candidate;
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
+        return "{\"sessions\":[]}";
     }
 
     private static List<string> CandidateRoots()
