@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `88d00c2`
-- Data UTC: `2026-08-25 01:26:30 UTC`
+- Commit: `98fb752`
+- Data UTC: `2026-08-25 01:28:02 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `98fb752` feat(agent): code-behind da ponte Web AI + Copiar em bolhas (2026-08-24)
+- `b6e1a48` docs(ai): sync README_AI with source tree (2026-08-25)
 - `88d00c2` feat(agent): ponte Agente↔Web AI — contexto, colar plano, painel web (2026-08-24)
 - `9acc925` docs(ai): record CI failure context (2026-08-25)
 - `05a5c1f` docs(ai): record CI failure context (2026-08-25)
-- `e48f239` docs(ai): sync README_AI with source tree (2026-08-25)
-- `3eaf559` feat(agent): ponte Agente↔Web AI — copiar, contexto, painel web (2026-08-24)
 <!-- AI-DOCS:END -->
