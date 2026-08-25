@@ -28,6 +28,7 @@ public partial class AgentPage : ContentPage
     private readonly ProcessRegistry _processes;
     private readonly AuraOrchestrator _orchestrator;
     private readonly LocalPlaybook? _playbook;
+    private readonly SolutionStore? _solutions;
     private readonly SemaphoreSlim _bubbleGate = new(1, 1);
     private readonly List<string> _recentCommands = new();
     private readonly List<string> _runShellCommands = new();
@@ -42,7 +43,8 @@ public partial class AgentPage : ContentPage
 
     public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
         ShellExecutor shell, ProcessRegistry processes, AuraOrchestrator orchestrator,
-        LocalPlaybook? playbook = null, VoiceAssistantService? voice = null)
+        LocalPlaybook? playbook = null, VoiceAssistantService? voice = null,
+        SolutionStore? solutions = null)
     {
         InitializeComponent();
         _client = client;
@@ -52,6 +54,7 @@ public partial class AgentPage : ContentPage
         _processes = processes;
         _orchestrator = orchestrator;
         _playbook = playbook;
+        _solutions = solutions;
         ProcessCards.BindingContext = _processes;
         _voice = voice;
         LoadRecentsFromPrefs();
@@ -98,7 +101,35 @@ public partial class AgentPage : ContentPage
         EnsureSession();
     }
 
-    // ─── Ponte Agente ↔ Web AI ───────────────────────────────────────────
+    private async Task SafeAlertAsync(string title, string message, string cancel = "OK")
+    {
+        try
+        {
+            if (Handler == null)
+            {
+                AuraLog.Info($"ALERT [{title}]: {message}");
+                return;
+            }
+
+            await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                try
+                {
+                    await DisplayAlert(title, message, cancel);
+                }
+                catch (Exception ex)
+                {
+                    AuraLog.Exception("SafeAlert.inner", ex);
+                    AuraLog.Info($"ALERT [{title}]: {message}");
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("SafeAlert", ex);
+            AuraLog.Info($"ALERT [{title}]: {message}");
+        }
+    }
 
     private void OnModeAgentClicked(object sender, EventArgs e)
     {
@@ -168,7 +199,7 @@ public partial class AgentPage : ContentPage
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Contexto", ex.Message, "OK");
+            await SafeAlertAsync("Contexto", ex.Message);
         }
     }
 
@@ -214,14 +245,13 @@ public partial class AgentPage : ContentPage
             string? clip = await Clipboard.Default.GetTextAsync();
             if (string.IsNullOrWhiteSpace(clip))
             {
-                await DisplayAlert("Colar plano", "Clipboard vazio. Copie a resposta da Web AI e tente de novo.", "OK");
+                await SafeAlertAsync("Colar plano", "Clipboard vazio. Copie a resposta da Web AI e tente de novo.");
                 return;
             }
 
             string text = clip.Trim();
             string? shell = LocalPlaybook.ExtractAuraShell(text);
 
-            // Garante modo Agente para ver resultado
             _webMode = false;
             ApplyModeUi();
 
@@ -234,7 +264,6 @@ public partial class AgentPage : ContentPage
                 return;
             }
 
-            // Sem bloco: coloca no editor para revisar e enviar
             CommandEditor.Text = text;
             await AppendBubbleAsync(
                 "📋 Texto da web colado no editor (sem ```aura-sh). Revise e toque ▶ se quiser que o agente trate.",
@@ -242,11 +271,9 @@ public partial class AgentPage : ContentPage
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Colar plano", ex.Message, "OK");
+            await SafeAlertAsync("Colar plano", ex.Message);
         }
     }
-
-    // ─── Resto do agente ─────────────────────────────────────────────────
 
     private void OnConfigClicked(object sender, EventArgs e) => SetConfigVisible(!_configVisible);
 
@@ -273,10 +300,15 @@ public partial class AgentPage : ContentPage
             new WebFetchTool()
         };
 
+        // Liga o agente à memória procedural do app (SolutionStore)
+        if (_solutions != null)
+            tools.Add(new SearchMemoryTool(_solutions));
+
         string systemPrompt =
             "Você é o agente de arquivos e execução da AURA no Android. " +
-            "REGRA PRINCIPAL: use ferramentas (list_dir, read_file, write_file, edit_file, run_shell, web_fetch) em vez de inventar. " +
+            "REGRA PRINCIPAL: use ferramentas (list_dir, read_file, write_file, edit_file, run_shell, web_fetch, search_memory) em vez de inventar. " +
             "CONTINUIDADE: se a conversa já tem resultados de ferramentas, CONTINUE de onde parou — não reinicie a tarefa do zero. " +
+            "Antes de inventar comandos, use search_memory para ver se já existe ação executável salva. " +
             "SHELL REALISTA: o shell é /bin/sh do Android (toybox). NÃO existe apt, apt-get, yum, pip, npm, node, python3 completo, git (salvo se um teste anterior provar o contrário). " +
             "Se um comando falhar com 'not found' / 'No such file', NÃO tente instalar o pacote nem repita a mesma família de comandos. Use alternativa com ls, cat, grep, sed, find, sh, ou as ferramentas de arquivo. " +
             "Prefira list_dir/read_file/write_file a shell quando for só ler/escrever arquivos. " +
@@ -303,11 +335,11 @@ public partial class AgentPage : ContentPage
             string root = AgentWorkspace.ActiveRoot;
             int files = AgentWorkspace.CountFiles(root);
             string msg = $"Workspace:\n{root}\n\nArquivos: {files}\n{ProjectAccessService.StatusText}";
-            await DisplayAlert("Projeto", msg, "OK");
+            await SafeAlertAsync("Projeto", msg);
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Erro", ex.Message, "OK");
+            await SafeAlertAsync("Erro", ex.Message);
         }
     }
 
@@ -318,7 +350,7 @@ public partial class AgentPage : ContentPage
             var turns = _memory.Read(tail: 24).Where(x => x.Kind == MemoryKind.Turn).TakeLast(12).ToList();
             if (turns.Count == 0)
             {
-                await DisplayAlert("Histórico", "Sem conversas gravadas.", "OK");
+                await SafeAlertAsync("Histórico", "Sem conversas gravadas.");
                 return;
             }
             var lines = turns.Select(t =>
@@ -328,7 +360,16 @@ public partial class AgentPage : ContentPage
                 return $"[{t.Role ?? "?"}] {text}";
             });
             string body = string.Join("\n\n", lines);
-            if (!await DisplayAlert("Conversas", body.Length > 1800 ? body[..1800] + "…" : body, "Recarregar", "Fechar"))
+            bool reload = false;
+            try
+            {
+                reload = await DisplayAlert("Conversas", body.Length > 1800 ? body[..1800] + "…" : body, "Recarregar", "Fechar");
+            }
+            catch (Exception ex)
+            {
+                AuraLog.Exception("OnHistory.DisplayAlert", ex);
+            }
+            if (!reload)
                 return;
             ConversationContainer.Children.Clear();
             foreach (var t in turns)
@@ -336,7 +377,7 @@ public partial class AgentPage : ContentPage
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Histórico", ex.Message, "OK");
+            await SafeAlertAsync("Histórico", ex.Message);
         }
     }
 
@@ -369,7 +410,7 @@ public partial class AgentPage : ContentPage
 
     private async void OnRecentsClicked(object sender, EventArgs e)
     {
-        if (_recentCommands.Count == 0) { await DisplayAlert("Recentes", "Nenhum ainda.", "OK"); return; }
+        if (_recentCommands.Count == 0) { await SafeAlertAsync("Recentes", "Nenhum ainda."); return; }
         string chosen = await DisplayActionSheet("Recentes", "Cancelar", null, _recentCommands.Take(10).ToArray());
         if (!string.IsNullOrWhiteSpace(chosen) && chosen != "Cancelar") CommandEditor.Text = chosen;
     }
@@ -388,7 +429,7 @@ public partial class AgentPage : ContentPage
             if (await DisplayAlert(item.Title, item.Description + "\n\n" + item.Body, "Usar", "Fechar"))
                 CommandEditor.Text = item.Body;
         }
-        catch (Exception ex) { await DisplayAlert("Prompts", ex.Message, "OK"); }
+        catch (Exception ex) { await SafeAlertAsync("Prompts", ex.Message); }
     }
 
     private async void OnAddPromptClicked(object sender, EventArgs e)
@@ -399,14 +440,22 @@ public partial class AgentPage : ContentPage
         string body = CommandEditor.Text?.Trim() ?? "";
         if (string.IsNullOrWhiteSpace(body))
             body = await DisplayPromptAsync("Novo prompt", "Texto:", "Salvar", "Cancelar", maxLength: 500) ?? "";
-        if (string.IsNullOrWhiteSpace(body)) { await DisplayAlert("Prompt", "Vazio.", "OK"); return; }
+        if (string.IsNullOrWhiteSpace(body)) { await SafeAlertAsync("Prompt", "Vazio."); return; }
         AgentPromptStore.AddCustom(title, desc, body);
-        await DisplayAlert("Prompt", "Salvo: " + title, "OK");
+        await SafeAlertAsync("Prompt", "Salvo: " + title);
     }
 
     private async void OnClearChatClicked(object sender, EventArgs e)
     {
-        if (!await DisplayAlert("Limpar", "Limpar bolhas e reiniciar sessão do agente?", "Limpar", "Cancelar")) return;
+        try
+        {
+            if (!await DisplayAlert("Limpar", "Limpar bolhas e reiniciar sessão do agente?", "Limpar", "Cancelar")) return;
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("OnClearChat", ex);
+            return;
+        }
         ConversationContainer.Children.Clear();
         _session = null;
         EnsureSession();
@@ -424,7 +473,7 @@ public partial class AgentPage : ContentPage
         string text = CommandEditor.Text?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(text))
         {
-            await DisplayAlert("Agente", "Digite uma instrução antes de enviar.", "OK");
+            await SafeAlertAsync("Agente", "Digite uma instrução antes de enviar.");
             return;
         }
 
@@ -433,7 +482,6 @@ public partial class AgentPage : ContentPage
         _runShellCommands.Clear();
         _lastUserGoal = text;
 
-        // Garante painel agente ao rodar
         if (_webMode)
         {
             _webMode = false;
@@ -566,13 +614,13 @@ public partial class AgentPage : ContentPage
     {
         string m = ex.Message ?? "";
         if (m.Contains("401")) return "API key inválida.";
-        if (m.Contains("402")) return "Sem créditos LLM.";
+        if (m.Contains("402")) return "Sem créditos LLM. Use Web AI (📋 Contexto) ou reduza max_tokens.";
         if (m.Contains("429")) return "Rate limit.";
         if (m.Contains("node already has a parent", StringComparison.OrdinalIgnoreCase))
             return "Erro interno de tools. Atualize o APK.";
         if (m.Contains("Invalid JSON in tool call", StringComparison.OrdinalIgnoreCase)
             || m.Contains("tool arguments must be", StringComparison.OrdinalIgnoreCase))
-            return "Argumentos de ferramenta inválidos (JSON). Atualize o APK ou reformule o pedido.";
+            return "Argumentos de ferramenta inválidos (JSON). Reformule o pedido.";
         return m.Length > 280 ? m[..280] + "…" : m;
     }
 
@@ -708,7 +756,6 @@ public partial class AgentPage : ContentPage
                     LineBreakMode = LineBreakMode.WordWrap
                 };
 
-                // Botão Copiar visível (além de long-press / duplo toque)
                 var copyBtn = new Button
                 {
                     Text = "📋",
