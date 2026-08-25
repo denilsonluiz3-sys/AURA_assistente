@@ -150,8 +150,6 @@ namespace AURA.AI
         {
             EnsureValidApiKey();
 
-            // Payload sem JsonNode: evita "The node already has a parent" ao reenviar
-            // tool_calls / reasoning_details em rodadas seguintes do AgentSession.
             var messageList = new List<Dictionary<string, object?>>();
 
             if (!string.IsNullOrWhiteSpace(systemPrompt))
@@ -172,7 +170,10 @@ namespace AURA.AI
                         ["role"] = m.Role
                     };
 
-                    if (m.Content != null)
+                    // OpenAI/OpenRouter: assistant+tool_calls costuma exigir content null explícito
+                    if (m.ToolCalls is { Count: > 0 })
+                        mo["content"] = m.Content; // pode ser null
+                    else if (m.Content != null)
                         mo["content"] = m.Content;
 
                     if (m.ToolCallId != null)
@@ -183,14 +184,18 @@ namespace AURA.AI
                         var calls = new List<Dictionary<string, object?>>();
                         foreach (AgentToolCall tc in m.ToolCalls)
                         {
+                            // OBRIGATÓRIO: arguments = string com JSON de objeto (não objeto aninhado)
+                            string argsStr = NormalizeArgumentsJson(tc.ArgumentsJson);
                             calls.Add(new Dictionary<string, object?>
                             {
-                                ["id"] = tc.Id,
+                                ["id"] = string.IsNullOrWhiteSpace(tc.Id)
+                                    ? "call_" + Guid.NewGuid().ToString("N")
+                                    : tc.Id,
                                 ["type"] = "function",
                                 ["function"] = new Dictionary<string, object?>
                                 {
-                                    ["name"] = tc.Name,
-                                    ["arguments"] = tc.ArgumentsJson ?? "{}"
+                                    ["name"] = tc.Name ?? string.Empty,
+                                    ["arguments"] = argsStr
                                 }
                             });
                         }
@@ -198,7 +203,6 @@ namespace AURA.AI
                         mo["tool_calls"] = calls;
                     }
 
-                    // reasoning_details: incluir como JsonElement clonado (valor, não árvore com parent)
                     if (!string.IsNullOrWhiteSpace(m.ReasoningDetailsJson))
                     {
                         try
@@ -341,12 +345,18 @@ namespace AURA.AI
                                 if (call.TryGetProperty("function", out JsonElement fn))
                                 {
                                     name = GetProp(fn, "name") ?? string.Empty;
-                                    argumentsJson = GetProp(fn, "arguments") ?? "{}";
+                                    argumentsJson = ReadArgumentsJson(fn);
                                 }
+
+                                // Descarta tool_call sem nome
+                                if (string.IsNullOrWhiteSpace(name))
+                                    continue;
 
                                 calls.Add(new AgentToolCall
                                 {
-                                    Id = id,
+                                    Id = string.IsNullOrWhiteSpace(id)
+                                        ? "call_" + Guid.NewGuid().ToString("N")
+                                        : id,
                                     Name = name,
                                     ArgumentsJson = argumentsJson
                                 });
@@ -385,7 +395,76 @@ namespace AURA.AI
             }
         }
 
-        /// <summary>Extrai reasoning_details como texto JSON bruto (sem JsonNode).</summary>
+        /// <summary>
+        /// Lê function.arguments: string JSON ou objeto; devolve sempre string de objeto válido.
+        /// </summary>
+        private static string ReadArgumentsJson(JsonElement functionElement)
+        {
+            if (!functionElement.TryGetProperty("arguments", out JsonElement args))
+                return "{}";
+
+            if (args.ValueKind == JsonValueKind.String)
+                return NormalizeArgumentsJson(args.GetString());
+
+            if (args.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
+                return NormalizeArgumentsJson(args.GetRawText());
+
+            if (args.ValueKind == JsonValueKind.Null || args.ValueKind == JsonValueKind.Undefined)
+                return "{}";
+
+            // número/bool inesperado
+            return NormalizeArgumentsJson(args.GetRawText());
+        }
+
+        /// <summary>
+        /// Garante string cujo parse é um JSON object (ou {}). Nunca devolve JSON inválido.
+        /// </summary>
+        internal static string NormalizeArgumentsJson(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return "{}";
+
+            string s = raw.Trim();
+
+            // Alguns modelos envelopam em markdown
+            if (s.StartsWith("```", StringComparison.Ordinal))
+            {
+                int firstNl = s.IndexOf('\n');
+                int lastFence = s.LastIndexOf("```", StringComparison.Ordinal);
+                if (firstNl >= 0 && lastFence > firstNl)
+                    s = s.Substring(firstNl + 1, lastFence - firstNl - 1).Trim();
+            }
+
+            try
+            {
+                using var doc = JsonDocument.Parse(s);
+                JsonElement root = doc.RootElement;
+
+                if (root.ValueKind == JsonValueKind.Object)
+                    return root.GetRawText();
+
+                // Se veio array ou valor solto, embrulha — ainda é JSON válido
+                if (root.ValueKind == JsonValueKind.Array)
+                    return root.GetRawText();
+
+                // string/number/bool → objeto mínimo
+                return "{}";
+            }
+            catch (JsonException)
+            {
+                // Tentativa: às vezes vem com aspas simples ou texto solto
+                try
+                {
+                    // se parecer path=... sem JSON, desiste
+                    return "{}";
+                }
+                catch
+                {
+                    return "{}";
+                }
+            }
+        }
+
         private static string? ReadReasoningDetailsJson(JsonElement msg)
         {
             if (!msg.TryGetProperty("reasoning_details", out JsonElement rd) ||
@@ -483,13 +562,10 @@ namespace AURA.AI
                 string arguments = "{}";
                 if (root.TryGetProperty("arguments", out JsonElement argsEl))
                 {
-                    arguments = argsEl.GetRawText();
                     if (argsEl.ValueKind == JsonValueKind.String)
-                    {
-                        string? str = argsEl.GetString();
-                        if (!string.IsNullOrWhiteSpace(str))
-                            arguments = str;
-                    }
+                        arguments = NormalizeArgumentsJson(argsEl.GetString());
+                    else
+                        arguments = NormalizeArgumentsJson(argsEl.GetRawText());
                 }
 
                 return new List<AgentToolCall>
