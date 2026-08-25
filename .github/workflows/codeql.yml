@@ -1,6 +1,4 @@
 # CodeQL Advanced — análise C#
-# Se code scanning não estiver habilitado nas settings do repo, o job
-# conclui com aviso (continue-on-error) para não poluir o status do PR/main.
 name: "CodeQL Advanced"
 
 on:
@@ -26,7 +24,7 @@ concurrency:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     permissions:
       security-events: write
       packages: read
@@ -44,11 +42,38 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Setup .NET
-      if: matrix.language == 'csharp'
+    - name: Setup .NET 10
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '10.0.x'
+
+    - name: Setup JDK 17
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '17'
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        cmdline-tools-version: 12266719
+        accept-android-sdk-licenses: true
+        packages: tools platform-tools
+
+    - name: Install Android SDK components
+      shell: bash
+      run: |
+        set -euo pipefail
+        yes | sdkmanager --licenses >/dev/null || true
+        sdkmanager --install \
+          "platform-tools" \
+          "platforms;android-36" \
+          "build-tools;35.0.0" \
+          "ndk;26.3.11579264" \
+          "cmdline-tools;latest"
+
+    - name: Install MAUI Android workload
+      run: dotnet workload install maui-android
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
@@ -56,13 +81,13 @@ jobs:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
 
+    - name: Restore Mobile
+      run: dotnet restore src/AURA.Mobile/AURA.Mobile.csproj
+
     - name: Manual build (csharp)
       if: matrix.build-mode == 'manual'
       shell: bash
-      run: |
-        # Solution completa pode falhar por projetos Windows; prioriza Mobile + libs
-        dotnet build src/AURA.Mobile/AURA.Mobile.csproj -c Release || \
-          dotnet build AURA.sln -c Release
+      run: dotnet build src/AURA.Mobile/AURA.Mobile.csproj -c Release --no-restore
 
     - name: Perform CodeQL Analysis
       continue-on-error: true
