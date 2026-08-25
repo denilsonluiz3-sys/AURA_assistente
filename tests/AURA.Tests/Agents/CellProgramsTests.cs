@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.Abstractions;
@@ -23,25 +22,31 @@ public sealed class CellProgramsTests
     }
 
     [Fact]
-    public void Policy_AllowsKnownReadCapabilities()
+    public void Policy_AllowsKnownReadIntent()
     {
         var policy = new PolicyGuard();
 
-        var result = policy.Authorize(
-            new[] { "android.device.read", "android.battery.read", "android.network.read" },
-            "diagnóstico do aparelho");
+        var result = policy.Authorize("android.device.read", "diagnóstico do aparelho");
 
         Assert.Equal(AuthorizationDecision.Allowed, result.Decision);
     }
 
     [Fact]
-    public void Policy_BlocksUnknownCapability()
+    public void Policy_RequiresConfirmationForShell()
     {
         var policy = new PolicyGuard();
 
-        var result = policy.Authorize(
-            new[] { "android.shell.execute" },
-            "diagnóstico do aparelho");
+        var result = policy.Authorize("shell", "diagnóstico do aparelho");
+
+        Assert.Equal(AuthorizationDecision.RequiresConfirmation, result.Decision);
+    }
+
+    [Fact]
+    public void Policy_BlocksExplicitlyBlockedIntent()
+    {
+        var policy = new PolicyGuard();
+
+        var result = policy.Authorize("blocked", "diagnóstico do aparelho");
 
         Assert.Equal(AuthorizationDecision.Blocked, result.Decision);
     }
@@ -60,7 +65,7 @@ public sealed class CellProgramsTests
     {
         public StubProgram(string name) => Name = name;
         public string Name { get; }
-        public IReadOnlyCollection<string> RequiredCapabilities { get; } = new[] { "android.device.read" };
+        public System.Collections.Generic.IReadOnlyCollection<string> RequiredCapabilities { get; } = new[] { "android.device.read" };
 
         public Task<CellProgramResult> ExecuteAsync(IAuraCellContext context, CancellationToken ct = default)
             => Task.FromResult(CellProgramResult.Ok("ok"));
