@@ -51,30 +51,26 @@ jobs:
           end = s.index('        private static void Ask(', start)
           method = '''        private static OpenRouterClient EnsureAiClient(string? model = null)
         {
-            string provider = Environment.GetEnvironmentVariable("AURA_PROVIDER") ?? "openrouter";
-            string configuredModel = Environment.GetEnvironmentVariable("AURA_MODEL");
-            string selectedModel = !string.IsNullOrWhiteSpace(model)
-                ? model
-                : (!string.IsNullOrWhiteSpace(configuredModel) ? configuredModel : "nvidia/nemotron-3-ultra:free");
+            string provider = Environment.GetEnvironmentVariable("AURA_PROVIDER") ?? string.Empty;
+            string configuredModel = Environment.GetEnvironmentVariable("AURA_MODEL") ?? string.Empty;
+            string baseUrl = Environment.GetEnvironmentVariable("AURA_BASE_URL") ?? string.Empty;
+            string selectedModel = !string.IsNullOrWhiteSpace(model) ? model : configuredModel;
+
+            if (string.IsNullOrWhiteSpace(provider))
+                throw new InvalidOperationException("Provider LLM não configurado. Defina AURA_PROVIDER.");
+            if (string.IsNullOrWhiteSpace(selectedModel))
+                throw new InvalidOperationException("Modelo LLM não configurado. Escolha um modelo com AURA_MODEL.");
+            if (string.IsNullOrWhiteSpace(baseUrl))
+                throw new InvalidOperationException("Endpoint LLM não configurado. Defina AURA_BASE_URL.");
 
             string apiKey = ReadAiKey();
 
             if (_aiClient != null)
             {
-                if (!string.IsNullOrWhiteSpace(model))
-                {
-                    _aiClient.Options.Model = model;
-                }
-                else if (!string.IsNullOrWhiteSpace(configuredModel))
-                {
-                    _aiClient.Options.Model = configuredModel;
-                }
-
-                if (!string.IsNullOrWhiteSpace(apiKey) && string.IsNullOrWhiteSpace(_aiClient.Options.ApiKey))
-                {
-                    _aiClient.Options.ApiKey = apiKey;
-                }
-
+                _aiClient.Options.Provider = provider;
+                _aiClient.Options.BaseUrl = baseUrl;
+                _aiClient.Options.Model = selectedModel;
+                if (!string.IsNullOrWhiteSpace(apiKey)) _aiClient.Options.ApiKey = apiKey;
                 return _aiClient;
             }
 
@@ -82,7 +78,7 @@ jobs:
             {
                 Provider = provider,
                 ApiKey = apiKey,
-                BaseUrl = "https://openrouter.ai/api/v1/chat/completions",
+                BaseUrl = baseUrl,
                 Model = selectedModel,
                 AppReference = "AURA CLI"
             }, _logger);
@@ -92,16 +88,15 @@ jobs:
 
         private static void PrintModels()
         {
-            string current = Environment.GetEnvironmentVariable("AURA_MODEL") ?? "nvidia/nemotron-3-ultra:free";
-            Console.WriteLine("Modelos AURA / OpenRouter:");
-            Console.WriteLine("  [ATUAL] " + current);
-            Console.WriteLine("  [FREE]  nvidia/nemotron-3-ultra:free");
-            Console.WriteLine("  [FREE]  openai/gpt-oss-20b:free");
-            Console.WriteLine("  [FREE]  google/gemma-4-26b-a4b-it:free");
-            Console.WriteLine("  [FREE]  qwen/qwen-plus");
+            string current = Environment.GetEnvironmentVariable("AURA_MODEL") ?? "(não definido)";
+            Console.WriteLine("Modelos AURA:");
+            Console.WriteLine("  Modelo atual: " + current);
+            Console.WriteLine("  nvidia/nemotron-3-ultra:free");
+            Console.WriteLine("  openai/gpt-oss-20b:free");
+            Console.WriteLine("  google/gemma-4-26b-a4b-it:free");
             Console.WriteLine();
-            Console.WriteLine("Para alterar nesta sessão: export AURA_MODEL=\"modelo\"");
-            Console.WriteLine("O AURA também lê AURA_MODEL automaticamente.");
+            Console.WriteLine("Escolha o padrão com: AURA_MODEL=\"modelo\"");
+            Console.WriteLine("Nenhum modelo é imposto pelo AURA.");
         }
 
 '''
@@ -119,11 +114,18 @@ jobs:
 
           q = Path("src/AURA.AI/OpenRouterClient.cs")
           t = q.read_text(encoding="utf-8")
-          t = t.replace('public string Provider { get; set; } = "openai";', 'public string Provider { get; set; } = "openrouter";', 1)
-          t = t.replace('public string BaseUrl { get; set; } = "https://api.openai.com/v1/chat/completions";', 'public string BaseUrl { get; set; } = "https://openrouter.ai/api/v1/chat/completions";', 1)
+          t = t.replace('public string Provider { get; set; } = "openai";', 'public string Provider { get; set; } = string.Empty;', 1)
+          t = t.replace('public string BaseUrl { get; set; } = "https://api.openai.com/v1/chat/completions";', 'public string BaseUrl { get; set; } = string.Empty;', 1)
+          t = t.replace('public string Model { get; set; } = "qwen/qwen-plus";', 'public string Model { get; set; } = string.Empty;', 1)
           q.write_text(t, encoding="utf-8")
 
-      - name: Configure persistent shell defaults
+      - name: Validate no forbidden defaults
+        shell: bash
+        run: |
+          ! grep -R -n 'qwen/qwen-plus' src/AURA.CLI src/AURA.AI
+          ! grep -R -n 'https://api.openai.com/v1/chat/completions' src/AURA.CLI src/AURA.AI
+
+      - name: Configure persistent selection helper
         shell: bash
         run: |
           test -f scripts/configurar-aura-llm.sh
@@ -138,5 +140,5 @@ jobs:
             echo "No changes to commit"
             exit 0
           fi
-          git commit -m "feat(cli): persist OpenRouter provider and model selection"
+          git commit -m "feat(cli): make LLM provider and model explicit"
           git push origin HEAD:fix/cli-model-runtime
