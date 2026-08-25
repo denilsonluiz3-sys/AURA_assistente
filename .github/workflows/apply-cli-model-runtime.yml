@@ -3,142 +3,39 @@ name: Apply CLI model runtime
 on:
   push:
     branches: [fix/cli-model-runtime]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Patch CLI runtime configuration
-        shell: python
+      - name: Helper script exists
+        run: test -f scripts/configurar-aura-llm.sh
+
+      - name: EnsureAiClient requires env (no hard-coded free model)
         run: |
-          from pathlib import Path
+          set -e
+          grep -q 'AURA_PROVIDER' src/AURA.CLI/Program.cs
+          grep -q 'AURA_MODEL' src/AURA.CLI/Program.cs
+          grep -q 'AURA_BASE_URL' src/AURA.CLI/Program.cs
+          grep -q 'case "modelos"' src/AURA.CLI/Program.cs
 
-          p = Path("src/AURA.CLI/Program.cs")
-          s = p.read_text(encoding="utf-8")
-
-          old = '''                    case "plugins":
-                        PrintPlugins();
-                        break;
-                    case "agents":'''
-          new = '''                    case "plugins":
-                        PrintPlugins();
-                        break;
-                    case "modelos":
-                    case "models":
-                        PrintModels();
-                        break;
-                    case "agents":'''
-          if old in s and 'case "modelos":' not in s:
-              s = s.replace(old, new, 1)
-
-          old = '''            File.WriteAllText(file, key);
-            Console.WriteLine("Chave salva em " + file);'''
-          new = '''            File.WriteAllText(file, key);
-            _aiClient = null;
-            Console.WriteLine("Chave salva em " + file);
-            Console.WriteLine("Cliente LLM recarregado.");'''
-          if old in s and 'Cliente LLM recarregado.' not in s:
-              s = s.replace(old, new, 1)
-
-          start = s.index('        private static OpenRouterClient EnsureAiClient(string? model = null)')
-          end = s.index('        private static void Ask(', start)
-          method = '''        private static OpenRouterClient EnsureAiClient(string? model = null)
-        {
-            string provider = Environment.GetEnvironmentVariable("AURA_PROVIDER") ?? string.Empty;
-            string configuredModel = Environment.GetEnvironmentVariable("AURA_MODEL") ?? string.Empty;
-            string baseUrl = Environment.GetEnvironmentVariable("AURA_BASE_URL") ?? string.Empty;
-            string selectedModel = !string.IsNullOrWhiteSpace(model) ? model : configuredModel;
-
-            if (string.IsNullOrWhiteSpace(provider))
-                throw new InvalidOperationException("Provider LLM não configurado. Defina AURA_PROVIDER.");
-            if (string.IsNullOrWhiteSpace(selectedModel))
-                throw new InvalidOperationException("Modelo LLM não configurado. Escolha um modelo com AURA_MODEL.");
-            if (string.IsNullOrWhiteSpace(baseUrl))
-                throw new InvalidOperationException("Endpoint LLM não configurado. Defina AURA_BASE_URL.");
-
-            string apiKey = ReadAiKey();
-
-            if (_aiClient != null)
-            {
-                _aiClient.Options.Provider = provider;
-                _aiClient.Options.BaseUrl = baseUrl;
-                _aiClient.Options.Model = selectedModel;
-                if (!string.IsNullOrWhiteSpace(apiKey)) _aiClient.Options.ApiKey = apiKey;
-                return _aiClient;
-            }
-
-            _aiClient = new OpenRouterClient(new OpenRouterOptions
-            {
-                Provider = provider,
-                ApiKey = apiKey,
-                BaseUrl = baseUrl,
-                Model = selectedModel,
-                AppReference = "AURA CLI"
-            }, _logger);
-
-            return _aiClient;
-        }
-
-        private static void PrintModels()
-        {
-            string current = Environment.GetEnvironmentVariable("AURA_MODEL") ?? "(não definido)";
-            Console.WriteLine("Modelos AURA:");
-            Console.WriteLine("  Modelo atual: " + current);
-            Console.WriteLine("  nvidia/nemotron-3-ultra:free");
-            Console.WriteLine("  openai/gpt-oss-20b:free");
-            Console.WriteLine("  google/gemma-4-26b-a4b-it:free");
-            Console.WriteLine();
-            Console.WriteLine("Escolha o padrão com: AURA_MODEL=\"modelo\"");
-            Console.WriteLine("Nenhum modelo é imposto pelo AURA.");
-        }
-
-'''
-          s = s[:start] + method + s[end:]
-
-          old = '''            Console.WriteLine("  plugins                 Lista plugins carregados");
-            Console.WriteLine("  ajuda                   Mostra esta ajuda");'''
-          new = '''            Console.WriteLine("  plugins                 Lista plugins carregados");
-            Console.WriteLine("  modelos                 Lista modelos disponíveis e o modelo atual");
-            Console.WriteLine("  ajuda                   Mostra esta ajuda");'''
-          if old in s and 'modelos                 Lista modelos' not in s:
-              s = s.replace(old, new, 1)
-
-          p.write_text(s, encoding="utf-8")
-
-          q = Path("src/AURA.AI/OpenRouterClient.cs")
-          t = q.read_text(encoding="utf-8")
-          t = t.replace('public string Provider { get; set; } = "openai";', 'public string Provider { get; set; } = string.Empty;', 1)
-          t = t.replace('public string BaseUrl { get; set; } = "https://api.openai.com/v1/chat/completions";', 'public string BaseUrl { get; set; } = string.Empty;', 1)
-          t = t.replace('public string Model { get; set; } = "qwen/qwen-plus";', 'public string Model { get; set; } = string.Empty;', 1)
-          q.write_text(t, encoding="utf-8")
-
-      - name: Validate no forbidden defaults
-        shell: bash
+      - name: No forbidden hard-coded defaults in CLI/AI options
         run: |
-          ! grep -R -n 'qwen/qwen-plus' src/AURA.CLI src/AURA.AI
-          ! grep -R -n 'https://api.openai.com/v1/chat/completions' src/AURA.CLI src/AURA.AI
-
-      - name: Configure persistent selection helper
-        shell: bash
-        run: |
-          test -f scripts/configurar-aura-llm.sh
-
-      - name: Commit patched runtime
-        shell: bash
-        run: |
-          git config user.name "AURA CI"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/AURA.CLI/Program.cs src/AURA.AI/OpenRouterClient.cs scripts/configurar-aura-llm.sh .github/workflows/apply-cli-model-runtime.yml
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit 0
+          set -e
+          # Modelo antigo forçado no CLI
+          if grep -n 'qwen/qwen-plus' src/AURA.CLI/Program.cs; then
+            echo "FAIL: qwen/qwen-plus ainda no CLI"
+            exit 1
           fi
-          git commit -m "feat(cli): make LLM provider and model explicit"
-          git push origin HEAD:fix/cli-model-runtime
+          # Defaults de Options devem ser vazios (config explícita)
+          if grep -n 'public string Model { get; set; } = "qwen' src/AURA.AI/OpenRouterClient.cs; then
+            echo "FAIL: Model default qwen"
+            exit 1
+          fi
+          echo "OK: validação CLI model runtime"

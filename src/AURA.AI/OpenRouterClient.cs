@@ -13,10 +13,13 @@ namespace AURA.AI
 {
     public sealed class OpenRouterOptions
     {
-        public string Provider { get; set; } = "openai";
+        /// <summary>Vazio = obrigatório configurar (env / UI). Sem default de provedor.</summary>
+        public string Provider { get; set; } = string.Empty;
         public string ApiKey { get; set; } = string.Empty;
-        public string BaseUrl { get; set; } = "https://api.openai.com/v1/chat/completions";
-        public string Model { get; set; } = "gpt-5-mini";
+        /// <summary>Vazio = obrigatório configurar endpoint.</summary>
+        public string BaseUrl { get; set; } = string.Empty;
+        /// <summary>Vazio = obrigatório escolher modelo.</summary>
+        public string Model { get; set; } = string.Empty;
         public int MaxTokens { get; set; } = 1500;
         public int TimeoutSeconds { get; set; } = 90;
         public string? AppReference { get; set; }
@@ -170,9 +173,8 @@ namespace AURA.AI
                         ["role"] = m.Role
                     };
 
-                    // OpenAI/OpenRouter: assistant+tool_calls costuma exigir content null explícito
                     if (m.ToolCalls is { Count: > 0 })
-                        mo["content"] = m.Content; // pode ser null
+                        mo["content"] = m.Content;
                     else if (m.Content != null)
                         mo["content"] = m.Content;
 
@@ -184,7 +186,6 @@ namespace AURA.AI
                         var calls = new List<Dictionary<string, object?>>();
                         foreach (AgentToolCall tc in m.ToolCalls)
                         {
-                            // OBRIGATÓRIO: arguments = string com JSON de objeto (não objeto aninhado)
                             string argsStr = NormalizeArgumentsJson(tc.ArgumentsJson);
                             calls.Add(new Dictionary<string, object?>
                             {
@@ -212,7 +213,6 @@ namespace AURA.AI
                         }
                         catch (JsonException)
                         {
-                            // ignora reasoning inválido
                         }
                     }
 
@@ -348,7 +348,6 @@ namespace AURA.AI
                                     argumentsJson = ReadArgumentsJson(fn);
                                 }
 
-                                // Descarta tool_call sem nome
                                 if (string.IsNullOrWhiteSpace(name))
                                     continue;
 
@@ -395,9 +394,6 @@ namespace AURA.AI
             }
         }
 
-        /// <summary>
-        /// Lê function.arguments: string JSON ou objeto; devolve sempre string de objeto válido.
-        /// </summary>
         private static string ReadArgumentsJson(JsonElement functionElement)
         {
             if (!functionElement.TryGetProperty("arguments", out JsonElement args))
@@ -412,13 +408,9 @@ namespace AURA.AI
             if (args.ValueKind == JsonValueKind.Null || args.ValueKind == JsonValueKind.Undefined)
                 return "{}";
 
-            // número/bool inesperado
             return NormalizeArgumentsJson(args.GetRawText());
         }
 
-        /// <summary>
-        /// Garante string cujo parse é um JSON object (ou {}). Nunca devolve JSON inválido.
-        /// </summary>
         internal static string NormalizeArgumentsJson(string? raw)
         {
             if (string.IsNullOrWhiteSpace(raw))
@@ -426,7 +418,6 @@ namespace AURA.AI
 
             string s = raw.Trim();
 
-            // Alguns modelos envelopam em markdown
             if (s.StartsWith("```", StringComparison.Ordinal))
             {
                 int firstNl = s.IndexOf('\n');
@@ -443,25 +434,14 @@ namespace AURA.AI
                 if (root.ValueKind == JsonValueKind.Object)
                     return root.GetRawText();
 
-                // Se veio array ou valor solto, embrulha — ainda é JSON válido
                 if (root.ValueKind == JsonValueKind.Array)
                     return root.GetRawText();
 
-                // string/number/bool → objeto mínimo
                 return "{}";
             }
             catch (JsonException)
             {
-                // Tentativa: às vezes vem com aspas simples ou texto solto
-                try
-                {
-                    // se parecer path=... sem JSON, desiste
-                    return "{}";
-                }
-                catch
-                {
-                    return "{}";
-                }
+                return "{}";
             }
         }
 
