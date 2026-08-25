@@ -1,28 +1,29 @@
 {
   "repository": "denilsonluiz3-sys/AURA_assistente",
-  "workflow": "CodeQL Advanced",
-  "run_id": "32795329422",
+  "workflow": "AURA Android APK",
+  "run_id": "32797155545",
   "status": "completed",
   "conclusion": "failure",
   "branch": "main",
-  "commit": "f52fda4d38b0c06a3b89d3418dd145c22e969a1d",
+  "commit": "3eaf5591a65c5a91acf125d731c35b7967d89f02",
   "event": "push",
-  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32795329422",
+  "url": "https://github.com/denilsonluiz3-sys/AURA_assistente/actions/runs/32797155545",
   "category": "C# / compilação",
   "infra_only": false,
   "failed_jobs": [
-    "Analyze (csharp)"
+    "build-apk"
   ],
   "failed_steps": [
     {
-      "job": "Analyze (csharp)",
-      "step": "Manual build (csharp)",
+      "job": "build-apk",
+      "step": "Build APK",
       "conclusion": "failure"
     }
   ],
   "changed_files": [
-    "src/AURA.AI/OpenRouterClient.cs"
+    "docs/ROADMAP_BRIDGE.md",
+    "src/AURA.Mobile/Pages/AgentPage.xaml"
   ],
   "associated_prs": [],
-  "diagnostic_report": "docs/ai/ci-failures/32795329422.md"
+  "diagnostic_report": "docs/ai/ci-failures/32797155545.md"
 }
