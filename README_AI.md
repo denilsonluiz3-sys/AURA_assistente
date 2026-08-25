@@ -266,8 +266,8 @@ testes relacionados
 
 > Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.
 
-- Commit: `f52fda4`
-- Data UTC: `2026-08-25 00:52:22 UTC`
+- Commit: `3eaf559`
+- Data UTC: `2026-08-25 01:20:33 UTC`
 - Branch: `main`
 
 ### Projetos
@@ -598,9 +598,9 @@ testes relacionados
 
 ### Últimos commits
 
+- `3eaf559` feat(agent): ponte Agente↔Web AI — copiar, contexto, painel web (2026-08-24)
+- `1fcd7a3` docs(ai): record CI failure context (2026-08-25)
+- `499215a` docs(ai): sync README_AI with source tree (2026-08-25)
 - `f52fda4` fix(ai): tool_call arguments sempre string JSON válida (2026-08-24)
 - `adbc2ae` docs(ai): record CI failure context (2026-08-24)
-- `e0638cc` docs(ai): sync README_AI with source tree (2026-08-24)
-- `e8be00c` fix(memory): memória procedural grava/reusa comandos, não prosa (2026-08-24)
-- `7497a37` docs(ai): record CI failure context (2026-08-24)
 <!-- AI-DOCS:END -->
