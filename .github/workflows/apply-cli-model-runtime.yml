@@ -1,0 +1,142 @@
+name: Apply CLI model runtime
+
+on:
+  push:
+    branches: [fix/cli-model-runtime]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch CLI runtime configuration
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path("src/AURA.CLI/Program.cs")
+          s = p.read_text(encoding="utf-8")
+
+          old = '''                    case "plugins":
+                        PrintPlugins();
+                        break;
+                    case "agents":'''
+          new = '''                    case "plugins":
+                        PrintPlugins();
+                        break;
+                    case "modelos":
+                    case "models":
+                        PrintModels();
+                        break;
+                    case "agents":'''
+          if old in s and 'case "modelos":' not in s:
+              s = s.replace(old, new, 1)
+
+          old = '''            File.WriteAllText(file, key);
+            Console.WriteLine("Chave salva em " + file);'''
+          new = '''            File.WriteAllText(file, key);
+            _aiClient = null;
+            Console.WriteLine("Chave salva em " + file);
+            Console.WriteLine("Cliente LLM recarregado.");'''
+          if old in s and 'Cliente LLM recarregado.' not in s:
+              s = s.replace(old, new, 1)
+
+          start = s.index('        private static OpenRouterClient EnsureAiClient(string? model = null)')
+          end = s.index('        private static void Ask(', start)
+          method = '''        private static OpenRouterClient EnsureAiClient(string? model = null)
+        {
+            string provider = Environment.GetEnvironmentVariable("AURA_PROVIDER") ?? "openrouter";
+            string configuredModel = Environment.GetEnvironmentVariable("AURA_MODEL");
+            string selectedModel = !string.IsNullOrWhiteSpace(model)
+                ? model
+                : (!string.IsNullOrWhiteSpace(configuredModel) ? configuredModel : "nvidia/nemotron-3-ultra:free");
+
+            string apiKey = ReadAiKey();
+
+            if (_aiClient != null)
+            {
+                if (!string.IsNullOrWhiteSpace(model))
+                {
+                    _aiClient.Options.Model = model;
+                }
+                else if (!string.IsNullOrWhiteSpace(configuredModel))
+                {
+                    _aiClient.Options.Model = configuredModel;
+                }
+
+                if (!string.IsNullOrWhiteSpace(apiKey) && string.IsNullOrWhiteSpace(_aiClient.Options.ApiKey))
+                {
+                    _aiClient.Options.ApiKey = apiKey;
+                }
+
+                return _aiClient;
+            }
+
+            _aiClient = new OpenRouterClient(new OpenRouterOptions
+            {
+                Provider = provider,
+                ApiKey = apiKey,
+                BaseUrl = "https://openrouter.ai/api/v1/chat/completions",
+                Model = selectedModel,
+                AppReference = "AURA CLI"
+            }, _logger);
+
+            return _aiClient;
+        }
+
+        private static void PrintModels()
+        {
+            string current = Environment.GetEnvironmentVariable("AURA_MODEL") ?? "nvidia/nemotron-3-ultra:free";
+            Console.WriteLine("Modelos AURA / OpenRouter:");
+            Console.WriteLine("  [ATUAL] " + current);
+            Console.WriteLine("  [FREE]  nvidia/nemotron-3-ultra:free");
+            Console.WriteLine("  [FREE]  openai/gpt-oss-20b:free");
+            Console.WriteLine("  [FREE]  google/gemma-4-26b-a4b-it:free");
+            Console.WriteLine("  [FREE]  qwen/qwen-plus");
+            Console.WriteLine();
+            Console.WriteLine("Para alterar nesta sessão: export AURA_MODEL=\"modelo\"");
+            Console.WriteLine("O AURA também lê AURA_MODEL automaticamente.");
+        }
+
+'''
+          s = s[:start] + method + s[end:]
+
+          old = '''            Console.WriteLine("  plugins                 Lista plugins carregados");
+            Console.WriteLine("  ajuda                   Mostra esta ajuda");'''
+          new = '''            Console.WriteLine("  plugins                 Lista plugins carregados");
+            Console.WriteLine("  modelos                 Lista modelos disponíveis e o modelo atual");
+            Console.WriteLine("  ajuda                   Mostra esta ajuda");'''
+          if old in s and 'modelos                 Lista modelos' not in s:
+              s = s.replace(old, new, 1)
+
+          p.write_text(s, encoding="utf-8")
+
+          q = Path("src/AURA.AI/OpenRouterClient.cs")
+          t = q.read_text(encoding="utf-8")
+          t = t.replace('public string Provider { get; set; } = "openai";', 'public string Provider { get; set; } = "openrouter";', 1)
+          t = t.replace('public string BaseUrl { get; set; } = "https://api.openai.com/v1/chat/completions";', 'public string BaseUrl { get; set; } = "https://openrouter.ai/api/v1/chat/completions";', 1)
+          q.write_text(t, encoding="utf-8")
+
+      - name: Configure persistent shell defaults
+        shell: bash
+        run: |
+          test -f scripts/configurar-aura-llm.sh
+
+      - name: Commit patched runtime
+        shell: bash
+        run: |
+          git config user.name "AURA CI"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/AURA.CLI/Program.cs src/AURA.AI/OpenRouterClient.cs scripts/configurar-aura-llm.sh .github/workflows/apply-cli-model-runtime.yml
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "feat(cli): persist OpenRouter provider and model selection"
+          git push origin HEAD:fix/cli-model-runtime
