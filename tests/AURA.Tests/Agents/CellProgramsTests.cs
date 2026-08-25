@@ -27,23 +27,32 @@ public sealed class CellProgramsTests
     {
         var policy = new PolicyGuard();
 
+        // PolicyGuard.Authorize(intent, command) — capabilities vêm como string (como no CellProgramRunner)
         var result = policy.Authorize(
-            new[] { "android.device.read", "android.battery.read", "android.network.read" },
+            "android.device.read, android.battery.read, android.network.read",
             "diagnóstico do aparelho");
 
         Assert.Equal(AuthorizationDecision.Allowed, result.Decision);
     }
 
     [Fact]
-    public void Policy_BlocksUnknownCapability()
+    public void Policy_BlocksExplicitBlockedIntent()
     {
         var policy = new PolicyGuard();
 
-        var result = policy.Authorize(
-            new[] { "android.shell.execute" },
-            "diagnóstico do aparelho");
+        var result = policy.Authorize("blocked", "diagnóstico do aparelho");
 
         Assert.Equal(AuthorizationDecision.Blocked, result.Decision);
+    }
+
+    [Fact]
+    public void Policy_RequiresConfirmationForShellIntent()
+    {
+        var policy = new PolicyGuard();
+
+        var result = policy.Authorize("shell", "diagnóstico do aparelho");
+
+        Assert.Equal(AuthorizationDecision.RequiresConfirmation, result.Decision);
     }
 
     [Fact]

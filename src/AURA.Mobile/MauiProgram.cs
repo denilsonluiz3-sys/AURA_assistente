@@ -57,7 +57,8 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new ConfigLoader(sp.GetRequiredService<ILogger>()).LoadModules(Path.Combine(configDir, "modules.json")));
         builder.Services.AddSingleton(sp => new ModuleManager(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "modules"), Path.Combine(configDir, "modules.json"), sp.GetRequiredService<EventBus>(), localPackageProvider: ReadEmbeddedModulePackageAsync));
         builder.Services.AddSingleton(sp => new MemoryStore(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "memory.json")));
-        builder.Services.AddSingleton(sp => new OpenRouterClient(new OpenRouterOptions { ApiKey = Preferences.Default.Get("ai_api_key", string.Empty), BaseUrl = "https://openrouter.ai/api/v1/chat/completions", Model = "qwen/qwen-plus", MaxTokens = 1500 }, sp.GetRequiredService<ILogger>()));
+        // MaxTokens 1024: planos gratuitos OpenRouter costumam estourar 402 com 1500
+        builder.Services.AddSingleton(sp => new OpenRouterClient(new OpenRouterOptions { ApiKey = Preferences.Default.Get("ai_api_key", string.Empty), BaseUrl = "https://openrouter.ai/api/v1/chat/completions", Model = "qwen/qwen-plus", MaxTokens = 1024 }, sp.GetRequiredService<ILogger>()));
         builder.Services.AddSingleton<AiDiagnosticsService>();
         builder.Services.AddSingleton<AiAssistant>();
         builder.Services.AddSingleton<ISpeechService, HybridSpeechService>();
@@ -83,7 +84,6 @@ public static class MauiProgram
         builder.Services.AddSingleton<Runner>();
         builder.Services.AddSingleton<ProcessRegistry>();
         builder.Services.AddSingleton(sp => new SolutionStore(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "aura")));
-        // LocalPlaybook: SolutionStore + MemoryStore — consulta local antes da IA
         builder.Services.AddSingleton(sp => new LocalPlaybook(
             sp.GetRequiredService<SolutionStore>(),
             sp.GetRequiredService<MemoryStore>()));
