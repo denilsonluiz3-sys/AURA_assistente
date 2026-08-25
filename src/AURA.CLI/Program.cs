@@ -19,10 +19,6 @@ using AURA.SystemInfo;
 
 namespace AURA.CLI
 {
-    /// <summary>
-    /// A text-mode front-end for AURA. The user picks a program; AURA decides
-    /// how to run it (launcher resolution) and inside which cell (isolation).
-    /// </summary>
     internal class Program
     {
         private static SimulationRuntime _runtime;
@@ -41,14 +37,7 @@ namespace AURA.CLI
 
         private static void Main(string[] args)
         {
-            try
-            {
-                Console.Title = VersionInfo.FullName;
-            }
-            catch
-            {
-                // Console.Title só existe no Windows; ignora no Linux/Termux.
-            }
+            try { Console.Title = VersionInfo.FullName; } catch { }
 
             Console.WriteLine("=================================");
             Console.WriteLine("        AURA ORCHESTRATOR");
@@ -102,25 +91,13 @@ namespace AURA.CLI
             {
                 Console.Write("AURA> ");
                 string input = Console.ReadLine();
-
-                if (input == null)
-                {
-                    // EOF (pipe fechado / modo não-interativo): sai limpo.
-                    break;
-                }
-
-                if (string.IsNullOrWhiteSpace(input))
-                {
-                    continue;
-                }
+                if (input == null) break;
+                if (string.IsNullOrWhiteSpace(input)) continue;
 
                 string cmd = input.Trim();
-
                 if (cmd.Equals("exit", StringComparison.OrdinalIgnoreCase) ||
                     cmd.Equals("quit", StringComparison.OrdinalIgnoreCase))
-                {
                     break;
-                }
 
                 RunCommand(cmd);
             }
@@ -153,6 +130,10 @@ namespace AURA.CLI
                         break;
                     case "plugins":
                         PrintPlugins();
+                        break;
+                    case "modelos":
+                    case "models":
+                        PrintModels();
                         break;
                     case "agents":
                         PrintAgents();
@@ -216,8 +197,6 @@ namespace AURA.CLI
             }
 
             string filePath = parts[1];
-
-            // F3: run aichat|termux-ai starts a long-lived assistant cell.
             if (_agentManager.Resolve(filePath) != null)
             {
                 RunAssistant(parts);
@@ -232,21 +211,13 @@ namespace AURA.CLI
             for (int i = 2; i < parts.Length; i++)
             {
                 if (parts[i] == "--cell" && i + 1 < parts.Length)
-                {
                     cellId = parts[++i];
-                }
                 else if (parts[i] == "--wait")
-                {
                     wait = true;
-                }
                 else if (TryParseLimit(parts, ref i, limits))
-                {
                     continue;
-                }
                 else
-                {
                     appArgs.Add(parts[i]);
-                }
             }
 
             string arguments = appArgs.Count > 0 ? string.Join(" ", appArgs) : null;
@@ -281,15 +252,11 @@ namespace AURA.CLI
             for (int i = 2; i < parts.Length; i++)
             {
                 if (parts[i] == "--cell" && i + 1 < parts.Length)
-                {
                     cellId = parts[++i];
-                }
             }
 
             if (string.IsNullOrWhiteSpace(cellId))
-            {
                 cellId = assistant;
-            }
 
             Cell cell = _agentManager.StartAssistantCell(_runtime, cellId, assistant);
             Console.WriteLine("Célula assistente criada (iniciar com 'cell start " + cell.Id + "'):");
@@ -309,9 +276,26 @@ namespace AURA.CLI
             }
 
             if (available.Length == 0)
-            {
                 Console.WriteLine("Nenhum assistente disponível. Rode: bash scripts/migrar-ferramentas.sh");
-            }
+        }
+
+        private static void PrintModels()
+        {
+            string current = Environment.GetEnvironmentVariable("AURA_MODEL") ?? "(não definido)";
+            string provider = Environment.GetEnvironmentVariable("AURA_PROVIDER") ?? "(não definido)";
+            string baseUrl = Environment.GetEnvironmentVariable("AURA_BASE_URL") ?? "(não definido)";
+            Console.WriteLine("Configuração LLM (env):" );
+            Console.WriteLine("  AURA_PROVIDER = " + provider);
+            Console.WriteLine("  AURA_MODEL    = " + current);
+            Console.WriteLine("  AURA_BASE_URL = " + baseUrl);
+            Console.WriteLine();
+            Console.WriteLine("Exemplos de modelo (você escolhe; nada é imposto):");
+            Console.WriteLine("  nvidia/nemotron-3-ultra:free");
+            Console.WriteLine("  openai/gpt-oss-20b:free");
+            Console.WriteLine("  google/gemma-4-26b-a4b-it:free");
+            Console.WriteLine();
+            Console.WriteLine("Configure com: bash scripts/configurar-aura-llm.sh <modelo>");
+            Console.WriteLine("Ou exporte AURA_PROVIDER / AURA_MODEL / AURA_BASE_URL.");
         }
 
         private static void ExecCommand(string[] parts)
@@ -355,17 +339,8 @@ namespace AURA.CLI
             Console.WriteLine();
 
             ExecutionResult result = executor.ExecuteAsync(request).GetAwaiter().GetResult();
-
             string output = result.CombineOutput();
-            if (!string.IsNullOrWhiteSpace(output))
-            {
-                Console.WriteLine(output);
-            }
-            else
-            {
-                Console.WriteLine("(sem saída)");
-            }
-
+            Console.WriteLine(string.IsNullOrWhiteSpace(output) ? "(sem saída)" : output);
             Console.WriteLine();
             Console.WriteLine("== exit " + result.ExitCode + " (" + (result.Success ? "OK" : "FALHOU") + ") em " +
                 result.Duration.TotalSeconds.ToString("0.0") + "s ==");
@@ -383,9 +358,7 @@ namespace AURA.CLI
             string? model = null;
             int modelIdx = Array.IndexOf(parts, "--model");
             if (modelIdx >= 0 && modelIdx + 1 < parts.Length)
-            {
                 model = parts[modelIdx + 1];
-            }
 
             OpenRouterClient client = EnsureAiClient(model);
             Console.WriteLine("Modelo: " + client.Options.Model + " · " + client.Options.BaseUrl);
@@ -409,7 +382,7 @@ namespace AURA.CLI
             string instruction = string.Join(" ", parts.Skip(1)).Trim();
             if (string.IsNullOrWhiteSpace(instruction))
             {
-                Console.WriteLine("Uso: agent \"instrução\" — agente de arquivos num workspace (listar/ler/editar/rodar comandos)");
+                Console.WriteLine("Uso: agent \"instrução\" — agente de arquivos num workspace");
                 return;
             }
 
@@ -428,11 +401,8 @@ namespace AURA.CLI
             };
 
             string systemPrompt =
-                "Você é o agente de arquivos da AURA, um assistente que trabalha " +
-                "dentro de um workspace no dispositivo (semelhante ao opencode). " +
-                "Você PODE listar, ler, criar, editar e sobrescrever arquivos do " +
-                "workspace e rodar comandos de shell para concluir a tarefa. " +
-                "Sempre responda em português. Workspace: " + workspace;
+                "Você é o agente de arquivos da AURA. Workspace: " + workspace +
+                ". Responda em português.";
 
             var session = new AgentSession(client, tools, systemPrompt, _logger, _memory);
             session.Step += step =>
@@ -440,9 +410,7 @@ namespace AURA.CLI
                 Console.WriteLine();
                 Console.WriteLine("  ◆ " + step.ToolName + " " + step.Arguments);
                 if (!string.IsNullOrWhiteSpace(step.Result))
-                {
                     Console.WriteLine("    " + step.Result.Replace("\n", "\n    "));
-                }
             };
 
             Console.WriteLine("Modelo: " + client.Options.Model + " · workspace: " + workspace);
@@ -468,7 +436,6 @@ namespace AURA.CLI
             if (string.IsNullOrWhiteSpace(task))
             {
                 Console.WriteLine("Uso: ensinar <descrição da tarefa>");
-                Console.WriteLine("Exemplo: ensinar como baixar um arquivo com Python");
                 return;
             }
 
@@ -494,13 +461,7 @@ namespace AURA.CLI
             };
 
             string systemPrompt =
-                "Você é a AURA Professora. Dada uma tarefa de aprendizado, " +
-                "execute o fluxo: 1) busque na memória por tarefas similares; " +
-                "2) pesquise na web exemplos; 3) extraia o código; " +
-                "4) execute o código e valide o resultado. " +
-                "Se o código falhar, tente novamente com ajustes. " +
-                "Responda em português com o que aprendeu e o resultado final. " +
-                "Workspace: " + workspace;
+                "Você é a AURA Professora. Workspace: " + workspace;
 
             var session = new AgentSession(
                 client ?? new OpenRouterClient(new OpenRouterOptions(), _logger),
@@ -510,27 +471,17 @@ namespace AURA.CLI
             {
                 Console.WriteLine();
                 Console.WriteLine("  ◆ " + step.ToolName + " " + step.Arguments);
-                if (!string.IsNullOrWhiteSpace(step.Result))
-                {
-                    Console.WriteLine("    " + step.Result.Replace("\n", "\n    "));
-                }
             };
 
-            Console.WriteLine("🧠 AURA está aprendendo...");
-            Console.WriteLine("📝 Tarefa: " + task);
-            Console.WriteLine("Modelo: " + (client?.Options.Model ?? "heurístico") + " · workspace: " + workspace);
-            Console.WriteLine();
+            Console.WriteLine("AURA está aprendendo: " + task);
 
             try
             {
-                string answer = session.RunAsync(
-                    "Ensinar: " + task,
+                string answer = session.RunAsync("Ensinar: " + task,
                     client != null ? SharedHttpClient : null).GetAwaiter().GetResult();
-
                 _memory.Append(MemoryEntry.Answer(answer));
-
                 Console.WriteLine();
-                Console.WriteLine("=== RESULTADO DO APRENDIZADO ===");
+                Console.WriteLine("=== RESULTADO ===");
                 Console.WriteLine(answer);
             }
             catch (Exception ex)
@@ -545,21 +496,22 @@ namespace AURA.CLI
             if (parts.Length < 2)
             {
                 Console.WriteLine("Uso: aichave <sk-or-...> — salva a chave em ~/.aura/ai_key.txt");
-                Console.WriteLine("     Ou defina a variável OPENROUTER_API_KEY.");
                 return;
             }
 
             string key = parts[1].Trim();
             if (key.Length > 200 || key.IndexOfAny(new[] { ' ', '\t', '\r', '\n' }) >= 0)
             {
-                Console.WriteLine("Chave inválida (parece conter texto de log). Use apenas a chave 'sk-or-...'.");
+                Console.WriteLine("Chave inválida.");
                 return;
             }
 
             string file = Path.Combine(UserAuraDir(), "ai_key.txt");
-            Directory.CreateDirectory(Path.GetDirectoryName(file));
+            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
             File.WriteAllText(file, key);
+            _aiClient = null;
             Console.WriteLine("Chave salva em " + file);
+            Console.WriteLine("Cliente LLM recarregado.");
         }
 
         private static string UserAuraDir()
@@ -574,42 +526,48 @@ namespace AURA.CLI
             {
                 string keyFile = Path.Combine(UserAuraDir(), "ai_key.txt");
                 if (File.Exists(keyFile))
-                {
                     apiKey = File.ReadAllText(keyFile).Trim();
-                }
             }
-
             return apiKey;
         }
 
+        /// <summary>
+        /// Provider/modelo/URL vêm de AURA_PROVIDER, AURA_MODEL, AURA_BASE_URL.
+        /// Nenhum modelo padrão é imposto.
+        /// </summary>
         private static OpenRouterClient EnsureAiClient(string? model = null)
         {
+            string provider = Environment.GetEnvironmentVariable("AURA_PROVIDER") ?? string.Empty;
+            string configuredModel = Environment.GetEnvironmentVariable("AURA_MODEL") ?? string.Empty;
+            string baseUrl = Environment.GetEnvironmentVariable("AURA_BASE_URL") ?? string.Empty;
+            string selectedModel = !string.IsNullOrWhiteSpace(model) ? model : configuredModel;
+
+            if (string.IsNullOrWhiteSpace(provider))
+                throw new InvalidOperationException("Provider LLM não configurado. Defina AURA_PROVIDER (ex.: openrouter).");
+            if (string.IsNullOrWhiteSpace(selectedModel))
+                throw new InvalidOperationException("Modelo LLM não configurado. Defina AURA_MODEL ou use --model.");
+            if (string.IsNullOrWhiteSpace(baseUrl))
+                throw new InvalidOperationException("Endpoint LLM não configurado. Defina AURA_BASE_URL.");
+
+            string apiKey = ReadAiKey();
+
             if (_aiClient != null)
             {
-                if (!string.IsNullOrWhiteSpace(model))
-                {
-                    _aiClient.Options.Model = model;
-                }
-
+                _aiClient.Options.Provider = provider;
+                _aiClient.Options.BaseUrl = baseUrl;
+                _aiClient.Options.Model = selectedModel;
+                if (!string.IsNullOrWhiteSpace(apiKey)) _aiClient.Options.ApiKey = apiKey;
                 return _aiClient;
-            }
-
-            string apiKey = Environment.GetEnvironmentVariable("OPENROUTER_API_KEY") ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(apiKey))
-            {
-                string keyFile = Path.Combine(UserAuraDir(), "ai_key.txt");
-                if (File.Exists(keyFile))
-                {
-                    apiKey = File.ReadAllText(keyFile).Trim();
-                }
             }
 
             _aiClient = new OpenRouterClient(new OpenRouterOptions
             {
+                Provider = provider,
                 ApiKey = apiKey,
-                Model = string.IsNullOrWhiteSpace(model) ? "qwen/qwen-plus" : model,
-                AppReference = "CLI"
-            });
+                BaseUrl = baseUrl,
+                Model = selectedModel,
+                AppReference = "AURA CLI"
+            }, _logger);
 
             return _aiClient;
         }
@@ -629,17 +587,11 @@ namespace AURA.CLI
             for (int i = 1; i < parts.Length; i++)
             {
                 if (parts[i] == "--assistente" && i + 1 < parts.Length)
-                {
                     assistant = parts[++i];
-                }
                 else if (parts[i] == "--cell" && i + 1 < parts.Length)
-                {
                     cellId = parts[++i];
-                }
                 else
-                {
                     args.Add(parts[i]);
-                }
             }
 
             string question = string.Join(" ", args);
@@ -657,44 +609,20 @@ namespace AURA.CLI
         private static bool TryParseLimit(string[] parts, ref int i, ResourceLimits limits)
         {
             string token = parts[i].ToLowerInvariant();
-            long? value = null;
-
             if (token == "--mem" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out long mem))
-            {
-                value = mem;
-                limits.MemoryLimitMb = value;
-                i++;
-            }
-            else if (token == "--cpu" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out long cpu))
-            {
-                value = cpu;
-                limits.CpuLimitSeconds = value;
-                i++;
-            }
-            else if (token == "--files" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out long files))
-            {
-                value = files;
-                limits.MaxFiles = value;
-                i++;
-            }
-            else if (token == "--procs" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out long procs))
-            {
-                value = procs;
-                limits.MaxProcesses = value;
-                i++;
-            }
-            else
-            {
-                return false;
-            }
-
-            return true;
+            { limits.MemoryLimitMb = mem; i++; return true; }
+            if (token == "--cpu" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out long cpu))
+            { limits.CpuLimitSeconds = cpu; i++; return true; }
+            if (token == "--files" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out long files))
+            { limits.MaxFiles = files; i++; return true; }
+            if (token == "--procs" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out long procs))
+            { limits.MaxProcesses = procs; i++; return true; }
+            return false;
         }
 
         private static void PrintCells()
         {
             Cell[] cells = _runtime.Cells.ToArray();
-
             if (cells.Length == 0)
             {
                 Console.WriteLine("Nenhuma célula. Use 'run <arquivo>' para criar uma.");
@@ -703,12 +631,10 @@ namespace AURA.CLI
 
             Console.WriteLine("Células (" + _runtime.CellsRoot + "):");
             Console.WriteLine("{0,-24} {1,-10} {2,-8} {3}", "ID", "ESTADO", "PID", "APLICATIVO");
-
             foreach (Cell cell in cells)
             {
                 Console.WriteLine("{0,-24} {1,-10} {2,-8} {3}",
-                    cell.Id,
-                    cell.State,
+                    cell.Id, cell.State,
                     cell.ProcessId.HasValue ? cell.ProcessId.Value.ToString() : "-",
                     cell.AppPath);
             }
@@ -727,161 +653,91 @@ namespace AURA.CLI
 
             switch (action)
             {
-                case "start":
-                    _runtime.StartCellAsync(id).GetAwaiter().GetResult();
-                    Console.WriteLine("Célula iniciada: " + id);
-                    break;
-                case "stop":
-                    _runtime.StopCell(id);
-                    break;
-                case "pause":
-                    _runtime.PauseCell(id);
-                    break;
-                case "resume":
-                    _runtime.ResumeCell(id);
-                    break;
-                case "delete":
-                    _runtime.DeleteCell(id);
-                    break;
-                case "log":
-                    Console.WriteLine(_runtime.ReadCellLog(id));
-                    break;
-                case "limits":
-                    SetLimits(id, parts);
-                    break;
-                default:
-                    Console.WriteLine("Ação desconhecida: " + action);
-                    break;
+                case "start": _runtime.StartCellAsync(id).GetAwaiter().GetResult(); Console.WriteLine("Célula iniciada: " + id); break;
+                case "stop": _runtime.StopCell(id); break;
+                case "pause": _runtime.PauseCell(id); break;
+                case "resume": _runtime.ResumeCell(id); break;
+                case "delete": _runtime.DeleteCell(id); break;
+                case "log": Console.WriteLine(_runtime.ReadCellLog(id)); break;
+                case "limits": SetLimits(id, parts); break;
+                default: Console.WriteLine("Ação desconhecida: " + action); break;
             }
         }
 
         private static void SetLimits(string id, string[] parts)
         {
             var limits = new ResourceLimits();
-
             for (int i = 3; i < parts.Length; i++)
             {
                 int idx = i;
-                if (TryParseLimit(parts, ref idx, limits))
-                {
-                    i = idx;
-                }
+                if (TryParseLimit(parts, ref idx, limits)) i = idx;
             }
-
             _runtime.SetCellLimits(id, limits);
             Console.WriteLine("Limites aplicados na célula '" + id + "'.");
         }
 
         private static void PrintLaunchers()
         {
-            Console.WriteLine("Launchers registrados (AURA decide como rodar):");
+            Console.WriteLine("Launchers registrados:");
             foreach (ILauncher launcher in _runner.Launchers)
-            {
-                Console.WriteLine("  " + launcher.GetType().Name +
-                    " -> " + string.Join(", ", launcher.SupportedExtensions));
-            }
+                Console.WriteLine("  " + launcher.GetType().Name + " -> " + string.Join(", ", launcher.SupportedExtensions));
         }
 
         private static void PrintPlugins()
         {
             Console.WriteLine("Plugins (" + _pluginWatcher.PluginsRoot + "):");
             string[] paths = _pluginWatcher.PluginPaths.ToArray();
-            if (paths.Length == 0)
-            {
-                Console.WriteLine("  (nenhum plugin .dll encontrado)");
-                return;
-            }
-
+            if (paths.Length == 0) { Console.WriteLine("  (nenhum)"); return; }
             foreach (string path in paths)
-            {
                 Console.WriteLine("  " + System.IO.Path.GetFileName(path));
-            }
-
-            Console.WriteLine("Launchers de plugins : " + _pluginWatcher.Launchers.Count);
-            Console.WriteLine("Plugins IPlugin      : " + _pluginWatcher.Plugins.Count);
         }
 
         private static void PrintDiagnostics()
         {
             SystemDiagnosticsResult result = new SystemAnalyzer().Analyze();
-            Console.WriteLine("Sistema operacional : " + result.OperatingSystem);
-            Console.WriteLine("Arquitetura         : " + result.Architecture);
-            Console.WriteLine("Processador          : " + result.ProcessorCount + " núcleos");
-            Console.WriteLine("Memória              : " + result.AvailableMemoryGb + " GB livres de " + result.TotalMemoryGb + " GB");
-            Console.WriteLine("Disco (" + result.SystemDrive + ")        : " + result.FreeDiskSpaceGb + " GB livres de " + result.TotalDiskSpaceGb + " GB");
+            Console.WriteLine("SO: " + result.OperatingSystem);
+            Console.WriteLine("Arch: " + result.Architecture);
+            Console.WriteLine("CPU: " + result.ProcessorCount);
+            Console.WriteLine("RAM: " + result.AvailableMemoryGb + " / " + result.TotalMemoryGb + " GB");
         }
 
         private static void PrintNetwork()
         {
             NetworkStatus status = new NetworkManager().CheckConnection();
-            Console.WriteLine("Rede local ativa  : " + (status.IsConnected ? "Sim" : "Não"));
-            Console.WriteLine("Acesso à Internet : " + (status.HasInternetAccess ? "Sim" : "Não"));
-            Console.WriteLine("IP local          : " + status.LocalIpAddress);
-            Console.WriteLine("Status            : " + status.Message);
+            Console.WriteLine("Rede: " + (status.IsConnected ? "Sim" : "Não"));
+            Console.WriteLine("Internet: " + (status.HasInternetAccess ? "Sim" : "Não"));
+            Console.WriteLine("IP: " + status.LocalIpAddress);
         }
 
         private static void PrintWelcome()
         {
             Console.WriteLine("Bem-vindo ao AURA Orchestrator!");
-            Console.WriteLine("Comandos básicos: 'ajuda' para ajuda, 'run <arquivo>' para executar,");
-            Console.WriteLine("'agents' para listar assistentes, 'config' para ver a configuração.");
             Console.WriteLine();
         }
 
         private static void PrintConfig()
         {
-            Console.WriteLine("Configuração (" + _bootstrap.SettingsPath + "):");
-            Console.WriteLine("  Internet           : " + _bootstrap.Settings.Internet);
-            Console.WriteLine("  FirstRunCompleted  : " + _bootstrap.Settings.FirstRunCompleted);
-            Console.WriteLine("  Theme              : " + _bootstrap.Settings.Theme);
-            Console.WriteLine();
-            Console.WriteLine("Módulos (" + _bootstrap.ModulesPath + "):");
-            foreach (ModuleInfo m in ModuleCatalog.GetAll())
-            {
-                string state = m.IsCore
-                    ? "núcleo"
-                    : _bootstrap.Modules.Modules.IsEnabled(m.Id) ? "aplicado" : "não aplicado";
-                Console.WriteLine("  " + m.DisplayName.PadRight(24) + ": " + state);
-            }
+            Console.WriteLine("Config (" + _bootstrap.SettingsPath + "):");
+            Console.WriteLine("  Internet: " + _bootstrap.Settings.Internet);
+            Console.WriteLine("  Theme: " + _bootstrap.Settings.Theme);
         }
 
         private static void PrintModules()
         {
             foreach (ModuleInfo module in ModuleCatalog.GetAll())
-            {
-                string kind = module.IsCore
-                    ? "núcleo"
-                    : string.IsNullOrWhiteSpace(module.PackageUrl) ? "planejado" : "baixável";
-                Console.WriteLine(module.Icon + " " + module.DisplayName +
-                    " [" + module.Status + ", " + kind + "] - " + module.ShortDescription);
-            }
+                Console.WriteLine(module.Icon + " " + module.DisplayName + " [" + module.Status + "]");
         }
 
         private static void PrintHelp()
         {
             Console.WriteLine("Comandos:");
-            Console.WriteLine("  run <arquivo> [args]   Escolhe um programa; AURA decide como rodar");
-            Console.WriteLine("  run --wait app.go      Roda em primeiro plano e mostra a saída");
-            Console.WriteLine("  run --mem 256 --cpu 30 app.py   Aplica limites (prlimit) à célula");
-            Console.WriteLine("  cells                   Lista as células");
-            Console.WriteLine("  cell start|stop|pause|resume|delete|log|limits <id>");
-            Console.WriteLine("  persist                 Salva o índice de células em disco");
-            Console.WriteLine("  diagnostico             Diagnóstico do sistema");
-            Console.WriteLine("  internet                Verifica conexão");
-            Console.WriteLine("  agents                  Lista assistentes (aichat/termux-ai)");
-            Console.WriteLine("  ask \"pergunta\"          Pergunta via assistente, logada em célula");
-            Console.WriteLine("  chat \"pergunta\"          Pergunta direta à IA (OpenRouter) [--model x]");
-            Console.WriteLine("  agent \"instrução\"        Agente de arquivos num workspace (IA + ferramentas)");
-            Console.WriteLine("  ensinar \"tarefa\"         AURA Professora: pesquisa, extrai e executa código");
-            Console.WriteLine("  aichave <sk-or-...>      Salva a chave da IA em ~/.aura/ai_key.txt");
-            Console.WriteLine("  exec <shell|git|python|node> <cmd> [args]   Executa via executor");
-            Console.WriteLine("  run aichat --cell chat  Inicia assistente como célula");
-            Console.WriteLine("  modulos                 Lista módulos disponíveis");
-            Console.WriteLine("  config                  Mostra configuração (settings + módulos)");
-            Console.WriteLine("  launchers               Lista resolutores de extensão");
-            Console.WriteLine("  plugins                 Lista plugins carregados");
-            Console.WriteLine("  ajuda                   Mostra esta ajuda");
-            Console.WriteLine("  exit                    Sai");
+            Console.WriteLine("  run <arquivo> [args]   Executa programa em célula");
+            Console.WriteLine("  cells / cell ...       Células");
+            Console.WriteLine("  chat / agent / ensinar IA (requer AURA_PROVIDER/MODEL/BASE_URL)");
+            Console.WriteLine("  modelos                Mostra AURA_PROVIDER / AURA_MODEL / AURA_BASE_URL");
+            Console.WriteLine("  aichave <sk-or-...>    Salva chave");
+            Console.WriteLine("  plugins / agents / ajuda");
+            Console.WriteLine("  exit");
             Console.WriteLine();
         }
     }
