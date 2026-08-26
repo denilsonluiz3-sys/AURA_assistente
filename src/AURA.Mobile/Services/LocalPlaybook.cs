@@ -8,7 +8,7 @@ namespace AURA.Mobile.Services;
 
 /// <summary>
 /// Memória procedural: reutiliza COMANDOS/ações bem-sucedidas, não prosa de chat.
-/// Ordem: atalhos embutidos → SolutionStore (só se executável) → process-log (só se executável) → null.
+/// Ordem: atalhos embutidos → memória X → SolutionStore → process-log → null.
 /// Turnos de conversa NÃO são usados como atalho (evita só repetir a resposta anterior).
 /// </summary>
 public sealed class LocalPlaybook
@@ -43,6 +43,14 @@ public sealed class LocalPlaybook
                 return shortcut;
             }
 
+            // 0b) memória <query>
+            string? memHit = TryMemoryQuery(query);
+            if (!string.IsNullOrWhiteSpace(memHit))
+            {
+                AuraLog.Info("LocalPlaybook hit atalho memória");
+                return memHit;
+            }
+
             // 1) Memória procedural — só se a ação for executável (não prosa)
             var match = _solutions.FindBestMatch(query, threshold: 72);
             if (match != null && IsExecutableAction(match.ActionTaken))
@@ -60,9 +68,6 @@ public sealed class LocalPlaybook
                 RememberExecutable(query, fromLog!);
                 return "[memória procedural · process-log · sem IA]\n" + EnsureAuraShBlock(fromLog!);
             }
-
-            // Turnos de conversa deliberadamente NÃO são usados aqui:
-            // isso só repetia a resposta anterior em vez de reexecutar o processo.
 
             return null;
         }
@@ -82,14 +87,12 @@ public sealed class LocalPlaybook
         if (q.Length == 0)
             return null;
 
-        // ls / listar workspace / listar arquivos
         if (q is "ls" or "dir" or "listar" or "listar workspace" or "listar arquivos"
             or "listar arquivos do workspace" or "liste os arquivos" or "liste os arquivos do workspace")
         {
             return "[atalho · workspace · sem IA]\n```aura-sh\npwd\nls -la\n```";
         }
 
-        // diagnóstico local (shell toybox — sem instalar nada)
         if (q is "diagnóstico" or "diagnostico" or "diagnosticar" or "diagnóstico do aparelho"
             or "diagnostico do aparelho" or "status do aparelho")
         {
@@ -99,9 +102,6 @@ echo === sdk ===\ngetprop ro.build.version.sdk
 echo === disco ===\ndf -h
 echo === memória ===\ncat /proc/meminfo 2>/dev/null | head -n 5\n```";
         }
-
-        // memória <query> / memoria <query> / buscar memória ...
-        // Tratado no instância (precisa SolutionStore) — ver TryMemoryQuery
 
         return null;
     }
@@ -138,9 +138,6 @@ echo === memória ===\ncat /proc/meminfo 2>/dev/null | head -n 5\n```";
         }
     }
 
-    /// <summary>
-    /// Grava só ação executável. Prosa de chat é ignorada.
-    /// </summary>
     public void RememberSuccess(string task, string actionTaken, string? details = null)
     {
         if (!IsExecutableAction(actionTaken))
@@ -152,9 +149,6 @@ echo === memória ===\ncat /proc/meminfo 2>/dev/null | head -n 5\n```";
         RememberExecutable(task, actionTaken!, details);
     }
 
-    /// <summary>
-    /// Preferência: bloco aura-sh da resposta; senão comandos run_shell da rodada.
-    /// </summary>
     public void RememberFromRun(string task, IReadOnlyList<string>? shellCommands, string? answerText)
     {
         string? aura = ExtractAuraShell(answerText);
@@ -195,7 +189,6 @@ echo === memória ===\ncat /proc/meminfo 2>/dev/null | head -n 5\n```";
         }
     }
 
-    /// <summary>True se parece comando/script reutilizável, não só texto de chat.</summary>
     public static bool IsExecutableAction(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -310,10 +303,6 @@ echo === memória ===\ncat /proc/meminfo 2>/dev/null | head -n 5\n```";
         return null;
     }
 
-    /// <summary>
-    /// process-log no dispositivo às vezes começa com ',' ou lixo antes do '{'.
-    /// Tenta recuperar; se impossível, devolve objeto vazio válido.
-    /// </summary>
     internal static string SanitizeProcessLogJson(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
@@ -321,18 +310,15 @@ echo === memória ===\ncat /proc/meminfo 2>/dev/null | head -n 5\n```";
 
         string s = raw.Trim();
 
-        // Remove BOM
         if (s.Length > 0 && s[0] == '\uFEFF')
             s = s[1..].Trim();
 
-        // Pula lixo antes do primeiro '{'
         int brace = s.IndexOf('{');
         if (brace < 0)
             return "{\"sessions\":[]}";
         if (brace > 0)
             s = s[brace..].Trim();
 
-        // Vírgulas soltas no início (caso clássico do log do aparelho)
         while (s.StartsWith(','))
             s = s[1..].Trim();
 
@@ -347,7 +333,6 @@ echo === memória ===\ncat /proc/meminfo 2>/dev/null | head -n 5\n```";
         }
         catch (JsonException)
         {
-            // tenta fechar array/objeto truncado de forma conservadora
             try
             {
                 string candidate = s.TrimEnd();
