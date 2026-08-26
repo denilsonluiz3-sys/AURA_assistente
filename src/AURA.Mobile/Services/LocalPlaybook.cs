@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using AURA.Memory;
 using AURA.Mobile.Diagnostics;
 
@@ -7,7 +8,7 @@ namespace AURA.Mobile.Services;
 
 /// <summary>
 /// Memória procedural: reutiliza COMANDOS/ações bem-sucedidas, não prosa de chat.
-/// Ordem: SolutionStore (só se executável) → process-log (só se executável) → null.
+/// Ordem: atalhos embutidos → memória X → SolutionStore → process-log → null.
 /// Turnos de conversa NÃO são usados como atalho (evita só repetir a resposta anterior).
 /// </summary>
 public sealed class LocalPlaybook
@@ -34,6 +35,22 @@ public sealed class LocalPlaybook
 
         try
         {
+            // 0) Atalhos determinísticos (sem IA)
+            string? shortcut = TryBuiltinShortcut(query);
+            if (!string.IsNullOrWhiteSpace(shortcut))
+            {
+                AuraLog.Info("LocalPlaybook hit atalho embutido");
+                return shortcut;
+            }
+
+            // 0b) memória <query>
+            string? memHit = TryMemoryQuery(query);
+            if (!string.IsNullOrWhiteSpace(memHit))
+            {
+                AuraLog.Info("LocalPlaybook hit atalho memória");
+                return memHit;
+            }
+
             // 1) Memória procedural — só se a ação for executável (não prosa)
             var match = _solutions.FindBestMatch(query, threshold: 72);
             if (match != null && IsExecutableAction(match.ActionTaken))
@@ -52,9 +69,6 @@ public sealed class LocalPlaybook
                 return "[memória procedural · process-log · sem IA]\n" + EnsureAuraShBlock(fromLog!);
             }
 
-            // Turnos de conversa deliberadamente NÃO são usados aqui:
-            // isso só repetia a resposta anterior em vez de reexecutar o processo.
-
             return null;
         }
         catch (Exception ex)
@@ -65,8 +79,65 @@ public sealed class LocalPlaybook
     }
 
     /// <summary>
-    /// Grava só ação executável. Prosa de chat é ignorada.
+    /// Frases curtas resolvidas localmente (sem LLM).
     /// </summary>
+    internal static string? TryBuiltinShortcut(string query)
+    {
+        string q = query.Trim().ToLowerInvariant();
+        if (q.Length == 0)
+            return null;
+
+        if (q is "ls" or "dir" or "listar" or "listar workspace" or "listar arquivos"
+            or "listar arquivos do workspace" or "liste os arquivos" or "liste os arquivos do workspace")
+        {
+            return "[atalho · workspace · sem IA]\n```aura-sh\npwd\nls -la\n```";
+        }
+
+        if (q is "diagnóstico" or "diagnostico" or "diagnosticar" or "diagnóstico do aparelho"
+            or "diagnostico do aparelho" or "status do aparelho")
+        {
+            return "[atalho · diagnóstico · sem IA]\n```aura-sh\necho === modelo ===\ngetprop ro.product.model
+echo === android ===\ngetprop ro.build.version.release
+echo === sdk ===\ngetprop ro.build.version.sdk
+echo === disco ===\ndf -h
+echo === memória ===\ncat /proc/meminfo 2>/dev/null | head -n 5\n```";
+        }
+
+        return null;
+    }
+
+    /// <summary>Resolve "memória X" / "buscar memória X" via SolutionStore.</summary>
+    private string? TryMemoryQuery(string query)
+    {
+        string q = query.Trim();
+        var m = Regex.Match(q, @"^(?:mem[oó]ria|buscar\s+mem[oó]ria|search\s+memory)\s*[:\-]?\s*(.+)$",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (!m.Success)
+            return null;
+
+        string topic = m.Groups[1].Value.Trim();
+        if (topic.Length < 2)
+            return "[atalho · memória]\nInforme o que buscar, ex.: memória listar workspace";
+
+        try
+        {
+            var match = _solutions.FindBestMatch(topic, threshold: 60);
+            if (match != null && IsExecutableAction(match.ActionTaken))
+            {
+                string action = EnsureAuraShBlock(match.ActionTaken!);
+                return "[atalho · memória · reexecutar · sem IA]\n" +
+                       "Query: " + topic + "\n" + action;
+            }
+
+            return "[atalho · memória · sem IA]\nNenhuma ação executável encontrada para: " + topic;
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("LocalPlaybook.TryMemoryQuery", ex);
+            return null;
+        }
+    }
+
     public void RememberSuccess(string task, string actionTaken, string? details = null)
     {
         if (!IsExecutableAction(actionTaken))
@@ -78,9 +149,6 @@ public sealed class LocalPlaybook
         RememberExecutable(task, actionTaken!, details);
     }
 
-    /// <summary>
-    /// Preferência: bloco aura-sh da resposta; senão comandos run_shell da rodada.
-    /// </summary>
     public void RememberFromRun(string task, IReadOnlyList<string>? shellCommands, string? answerText)
     {
         string? aura = ExtractAuraShell(answerText);
@@ -121,7 +189,6 @@ public sealed class LocalPlaybook
         }
     }
 
-    /// <summary>True se parece comando/script reutilizável, não só texto de chat.</summary>
     public static bool IsExecutableAction(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -236,10 +303,6 @@ public sealed class LocalPlaybook
         return null;
     }
 
-    /// <summary>
-    /// process-log no dispositivo às vezes começa com ',' ou lixo antes do '{'.
-    /// Tenta recuperar; se impossível, devolve objeto vazio válido.
-    /// </summary>
     internal static string SanitizeProcessLogJson(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
@@ -247,18 +310,15 @@ public sealed class LocalPlaybook
 
         string s = raw.Trim();
 
-        // Remove BOM
         if (s.Length > 0 && s[0] == '\uFEFF')
             s = s[1..].Trim();
 
-        // Pula lixo antes do primeiro '{'
         int brace = s.IndexOf('{');
         if (brace < 0)
             return "{\"sessions\":[]}";
         if (brace > 0)
             s = s[brace..].Trim();
 
-        // Vírgulas soltas no início (caso clássico do log do aparelho)
         while (s.StartsWith(','))
             s = s[1..].Trim();
 
@@ -273,7 +333,6 @@ public sealed class LocalPlaybook
         }
         catch (JsonException)
         {
-            // tenta fechar array/objeto truncado de forma conservadora
             try
             {
                 string candidate = s.TrimEnd();

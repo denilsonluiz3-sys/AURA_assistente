@@ -351,8 +351,8 @@ public partial class AgentPage : ContentPage
         int memCount = 0;
         try { memCount = _memory.Read(tail: 64).Count; } catch { /* ignore */ }
         string welcome = memCount > 0
-            ? $"Pronto. Memória ({memCount}). Use 📋 Contexto → Web AI → ▶ Colar plano para economizar tokens."
-            : "Pronto. 📋 Contexto copia o pacote; Web AI abre DeepSeek/ChatGPT; ▶ Colar plano executa aura-sh.";
+            ? $"Pronto. Memória ({memCount}). Atalhos: ls · diagnóstico · memória X · continue. Chips na barra."
+            : "Pronto. Atalhos: ls · diagnóstico · memória X · continue. 📋 Contexto → Web AI → ▶ Colar plano.";
         _ = AppendBubbleAsync(welcome, user: false);
     }
 
@@ -489,6 +489,66 @@ public partial class AgentPage : ContentPage
         EnsureSession();
     }
 
+    // --- Chips de atalho ---
+
+    private void OnChipWorkspace(object sender, EventArgs e)
+    {
+        CommandEditor.Text = "listar workspace";
+        OnRunClicked(RunButton, e);
+    }
+
+    private void OnChipDiagnostic(object sender, EventArgs e)
+    {
+        CommandEditor.Text = "diagnóstico";
+        OnRunClicked(RunButton, e);
+    }
+
+    private async void OnChipMemory(object sender, EventArgs e)
+    {
+        try
+        {
+            string? topic = await DisplayPromptAsync("Memória", "Buscar ação salva sobre:", "Buscar", "Cancelar", maxLength: 120);
+            if (string.IsNullOrWhiteSpace(topic)) return;
+            CommandEditor.Text = "memória " + topic.Trim();
+            OnRunClicked(RunButton, e);
+        }
+        catch (Exception ex)
+        {
+            await SafeAlertAsync("Memória", ex.Message);
+        }
+    }
+
+    private void OnChipContinue(object sender, EventArgs e)
+    {
+        CommandEditor.Text = "continue";
+        OnRunClicked(RunButton, e);
+    }
+
+    private void OnChipShellSafe(object sender, EventArgs e)
+    {
+        CommandEditor.Text =
+            "Só use run_shell com comandos toybox (ls, cat, grep, find, sed, pwd, df, getprop). " +
+            "Proibido apt, pip, npm, git install. Se faltar comando, diga e pare.";
+        // não dispara sozinho — usuário completa o objetivo e toca ▶
+    }
+
+    private static bool IsContinueCommand(string text)
+    {
+        string l = text.Trim().ToLowerInvariant();
+        return l is "continue" or "continua" or "continuar" or "prosseguir";
+    }
+
+    private string ExpandContinueCommand(string text)
+    {
+        if (!IsContinueCommand(text))
+            return text;
+
+        if (string.IsNullOrWhiteSpace(_lastUserGoal))
+            return "continue de onde parou; não reinicie a tarefa do zero";
+
+        return "continue de onde parou; não reinicie. Objetivo anterior: " + _lastUserGoal;
+    }
+
     private void OnEditorCompleted(object? sender, EventArgs e) => OnRunClicked(sender ?? RunButton, e);
 
     private async void OnRunClicked(object? sender, EventArgs e)
@@ -505,10 +565,15 @@ public partial class AgentPage : ContentPage
             return;
         }
 
+        // Expande "continue" antes de gravar como meta (preserva meta real)
+        bool wasContinue = IsContinueCommand(text);
+        string resolved = ExpandContinueCommand(text);
+
         _runInFlight = true;
         string? processId = null;
         _runShellCommands.Clear();
-        _lastUserGoal = text;
+        if (!wasContinue)
+            _lastUserGoal = text;
 
         if (_webMode)
         {
@@ -518,21 +583,23 @@ public partial class AgentPage : ContentPage
 
         try
         {
-            RememberCommand(text);
+            RememberCommand(wasContinue ? resolved : text);
             RuntimeConfig.Apply(_client);
 
             RunButton.IsEnabled = false;
             BusyIndicator.IsRunning = true;
             BusyIndicator.IsVisible = true;
 
-            await AppendBubbleAsync(text, user: true);
+            await AppendBubbleAsync(wasContinue ? resolved : text, user: true);
             CommandEditor.Text = string.Empty;
 
-            var process = _processes.Begin(Shorten(text, 40), "Assistente", "Entendendo solicitação");
+            var process = _processes.Begin(Shorten(resolved, 40), "Assistente", "Entendendo solicitação");
             processId = process.Id;
             _activeProcessId = process.Id;
 
-            string? local = _playbook?.TryResolveWithoutLlm(text);
+            // Atalhos locais usam o texto original (ls / diagnóstico / memória X)
+            string playbookQuery = wasContinue ? resolved : text;
+            string? local = _playbook?.TryResolveWithoutLlm(playbookQuery);
             if (!string.IsNullOrWhiteSpace(local))
             {
                 _processes.Update(process.Id, "Playbook", "Ação local", 0.5);
@@ -540,11 +607,11 @@ public partial class AgentPage : ContentPage
                 return;
             }
 
-            if (ShouldOrchestrate(text))
+            if (ShouldOrchestrate(resolved))
             {
                 _processes.Update(process.Id, "Planejando", "Orquestrador", 0.15);
-                string answer = await _orchestrator.ExecuteAsync(text);
-                _playbook?.RememberFromRun(text, _runShellCommands, answer);
+                string answer = await _orchestrator.ExecuteAsync(resolved);
+                _playbook?.RememberFromRun(resolved, _runShellCommands, answer);
                 await DeliverAnswerAsync(answer, process.Id, "OK");
                 return;
             }
@@ -554,7 +621,7 @@ public partial class AgentPage : ContentPage
             if (string.IsNullOrWhiteSpace(RuntimeConfig.ApiKey) && string.IsNullOrWhiteSpace(_client.Options.ApiKey))
             {
                 await AppendBubbleAsync("Buscando na web...", user: false, isTool: true);
-                answerFromAgent = await WebSearchAnswer.SearchWithRefinementAsync(text);
+                answerFromAgent = await WebSearchAnswer.SearchWithRefinementAsync(resolved);
             }
             else
             {
@@ -566,10 +633,10 @@ public partial class AgentPage : ContentPage
                     return;
                 }
                 EnsureSession();
-                answerFromAgent = await _session!.RunAsync(text);
+                answerFromAgent = await _session!.RunAsync(resolved);
             }
 
-            _playbook?.RememberFromRun(text, _runShellCommands, answerFromAgent);
+            _playbook?.RememberFromRun(resolved, _runShellCommands, answerFromAgent);
             await DeliverAnswerAsync(answerFromAgent, process.Id, "Resultado entregue");
 
             if (ProjectAccessService.IsLinked && !ProjectAccessService.IsDirect)

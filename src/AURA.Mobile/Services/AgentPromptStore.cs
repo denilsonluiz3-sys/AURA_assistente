@@ -67,6 +67,38 @@ public static class AgentPromptStore
             Description = "Consulta a memória persistente recente.",
             Body = "Com base na sua memória persistente, resuma o que já conversamos e o que está em andamento.",
             BuiltIn = true
+        },
+        new()
+        {
+            Id = "builtin-memory-first",
+            Title = "Memória primeiro",
+            Description = "Busca ação salva antes de chamar IA.",
+            Body = "Use search_memory com a query do meu pedido. Se achar ação executável, reexecute. Só use LLM se não achar nada útil.",
+            BuiltIn = true
+        },
+        new()
+        {
+            Id = "builtin-shell-safe",
+            Title = "Só shell seguro",
+            Description = "Restringe a comandos toybox do Android.",
+            Body = "Só use run_shell com comandos toybox (ls, cat, grep, find, sed, pwd, df, getprop). Proibido apt, pip, npm, git install. Se faltar comando, diga e pare.",
+            BuiltIn = true
+        },
+        new()
+        {
+            Id = "builtin-diagnostic",
+            Title = "Diagnóstico local",
+            Description = "Lista programas e tenta device-diagnostic.",
+            Body = "Use list_programs. Se existir device-diagnostic, use run_program. Resuma o resultado em até 5 linhas. Sem instalar pacotes.",
+            BuiltIn = true
+        },
+        new()
+        {
+            Id = "builtin-web-context",
+            Title = "Contexto Web",
+            Description = "Prepara texto para colar na Web AI (sem API).",
+            Body = "Monte um resumo curto do workspace e do meu objetivo para eu colar na Web AI. Não chame LLM de API; só descreva o que eu devo copiar.",
+            BuiltIn = true
         }
     };
 
