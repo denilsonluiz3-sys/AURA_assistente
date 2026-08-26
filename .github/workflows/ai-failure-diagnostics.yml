@@ -1,12 +1,8 @@
 name: AURA AI Failure Diagnostics
 
+# Cascata desligada: não dispara mais em workflow_run.
+# Use manualmente quando precisar diagnosticar um run específico.
 on:
-  # Só workflows de build/análise reais — evita cascata por docs/sync.
-  workflow_run:
-    workflows:
-      - AURA Android APK
-      - CodeQL Advanced
-    types: [completed]
   workflow_dispatch:
     inputs:
       run_id:
@@ -15,7 +11,7 @@ on:
         type: string
 
 concurrency:
-  group: aura-ai-failure-diagnostics-${{ github.event.workflow_run.id || github.event.inputs.run_id }}
+  group: aura-ai-failure-diagnostics-${{ github.event.inputs.run_id }}
   cancel-in-progress: true
 
 permissions:
@@ -25,7 +21,6 @@ permissions:
 
 jobs:
   diagnose:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion != 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -39,19 +34,17 @@ jobs:
       - name: Collect complete CI context
         env:
           GH_TOKEN: ${{ github.token }}
-          EVENT_RUN_ID: ${{ github.event.workflow_run.id }}
           INPUT_RUN_ID: ${{ github.event.inputs.run_id }}
           REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
 
-          RUN_ID="${EVENT_RUN_ID:-${INPUT_RUN_ID:-}}"
+          RUN_ID="${INPUT_RUN_ID:-}"
           test -n "$RUN_ID" || { echo 'run_id ausente' >&2; exit 1; }
 
           mkdir -p docs/ai/ci-failures
 
-          # Campo "artifacts" não existe em `gh run view --json` (API atual).
           gh run view "$RUN_ID" --repo "$REPOSITORY" --json \
             databaseId,name,displayTitle,status,conclusion,headBranch,headSha,event,createdAt,updatedAt,url,workflowName,jobs \
             > /tmp/run.json
@@ -87,7 +80,6 @@ jobs:
           for pattern, repl in redactions:
               raw = re.sub(pattern, repl, raw)
 
-          # Falhas de infraestrutura Actions (não são bugs de código).
           infra_patterns = [
               r'Artifact storage quota has been hit',
               r'Unable to upload any new artifacts',
@@ -125,7 +117,7 @@ jobs:
           conclusion = run.get('conclusion') or 'unknown'
           branch = run.get('headBranch') or 'unknown'
           sha = run.get('headSha') or 'unknown'
-          run_id = str(run.get('databaseId') or os.environ.get('EVENT_RUN_ID') or 'unknown')
+          run_id = str(run.get('databaseId') or os.environ.get('INPUT_RUN_ID') or 'unknown')
 
           def classify(text, infra):
               if infra:
@@ -185,16 +177,15 @@ jobs:
           if not pr_lines:
               pr_lines = ['- Nenhum PR associado ao commit.']
 
-          skip_publish = infra_only
-          Path('/tmp/skip_publish').write_text('1' if skip_publish else '0')
+          # Nunca publica commit no main a partir deste workflow (evita cascata).
+          Path('/tmp/skip_publish').write_text('1')
 
           report = f'''# Falha CI — {workflow} — run {run_id}\n\n'''
-          report += f'''## Identidade da execução\n\n- Workflow: `{workflow}`\n- Run ID: `{run_id}`\n- Status: `{run.get('status', 'unknown')}`\n- Conclusão: `{conclusion}`\n- Branch: `{branch}`\n- Commit: `{sha}`\n- Evento: `{run.get('event', 'unknown')}`\n- Criado: `{run.get('createdAt', 'unknown')}`\n- Atualizado: `{run.get('updatedAt', 'unknown')}`\n- URL: {run.get('url', '')}\n- Categoria provável: **{category}**\n- Infra-only (não publicar commit): `{skip_publish}`\n\n'''
+          report += f'''## Identidade da execução\n\n- Workflow: `{workflow}`\n- Run ID: `{run_id}`\n- Status: `{run.get('status', 'unknown')}`\n- Conclusão: `{conclusion}`\n- Branch: `{branch}`\n- Commit: `{sha}`\n- Evento: `{run.get('event', 'unknown')}`\n- Criado: `{run.get('createdAt', 'unknown')}`\n- Atualizado: `{run.get('updatedAt', 'unknown')}`\n- URL: {run.get('url', '')}\n- Categoria provável: **{category}**\n\n'''
           report += '## Jobs relevantes\n\n' + '\n'.join(job_lines) + '\n\n'
           report += '## Etapas com falha\n\n' + '\n'.join(step_lines) + '\n\n'
           report += '## Pull requests associados\n\n' + '\n'.join(pr_lines) + '\n\n'
           report += '## Arquivos alterados no commit\n\n' + '\n'.join(changed_file_lines) + '\n\n'
-          report += '''## Procedimento obrigatório para uma IA\n\n1. Trate o GitHub como fonte de verdade.\n2. Leia `README_AI.md` antes de alterar código.\n3. Ignore falhas de quota de artifact / CodeQL desabilitado — não são bugs de produto.\n4. Localize o primeiro erro causal de compilação/código.\n5. Faça a menor correção e valide no Actions.\n\n'''
           report += '## Evidência do log\n\n```text\n' + key[-18000:] + '\n```\n'
 
           latest = Path('docs/ai/CI_FAILURE_LATEST.md')
@@ -213,15 +204,9 @@ jobs:
               'event': run.get('event'),
               'url': run.get('url'),
               'category': category,
-              'infra_only': skip_publish,
+              'infra_only': True,
               'failed_jobs': [j.get('name') for j in failed_jobs],
-              'failed_steps': [
-                  {'job': j.get('name'), 'step': s.get('name'), 'conclusion': s.get('conclusion')}
-                  for j in relevant_jobs for s in (j.get('steps') or [])
-                  if s.get('conclusion') not in (None, 'success', 'skipped')
-              ],
               'changed_files': changed_files,
-              'associated_prs': [p.get('number') for p in prs] if isinstance(prs, list) else [],
               'diagnostic_report': f'docs/ai/ci-failures/{run_id}.md',
           }
           Path('docs/ai/CI_FAILURE_LATEST.json').write_text(
@@ -229,22 +214,13 @@ jobs:
           )
           PY
 
-      - name: Publish diagnostic context
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "$(cat /tmp/skip_publish 2>/dev/null || echo 0)" = "1" ]; then
-            echo 'Falha de infraestrutura (quota/CodeQL config). Não publica commit no main.'
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/ai/CI_FAILURE_LATEST.md docs/ai/CI_FAILURE_LATEST.json docs/ai/ci-failures/
-          if git diff --cached --quiet; then
-            echo 'Nenhuma alteração de diagnóstico para publicar.'
-            exit 0
-          fi
-          git commit -m "docs(ai): record CI failure context"
-          git push origin HEAD:main
+      - name: Upload diagnostic as artifact (sem push no main)
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: ci-failure-${{ github.event.inputs.run_id }}
+          path: |
+            docs/ai/CI_FAILURE_LATEST.md
+            docs/ai/CI_FAILURE_LATEST.json
+            docs/ai/ci-failures/
+          retention-days: 7
