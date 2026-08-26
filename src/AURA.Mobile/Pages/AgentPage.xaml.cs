@@ -1,7 +1,9 @@
 using AURA.AI;
 using AURA.Agents;
+using AURA.Agents.Programs;
 using AURA.Abstractions.Execution;
 using AURA.Core.Events;
+using AURA.Core.Runtime;
 using AURA.Memory;
 using AURA.Mobile.Diagnostics;
 using AURA.Mobile.Services;
@@ -22,13 +24,19 @@ public partial class AgentPage : ContentPage
 
     private readonly OpenRouterClient _client;
     private readonly MemoryStore _memory;
+    private readonly SolutionStore _solutions;
     private readonly ISpeechService _speech;
     private readonly VoiceAssistantService? _voice;
     private readonly ShellExecutor _shell;
+    private readonly GitExecutor _git;
+    private readonly PythonExecutor _python;
+    private readonly NodeExecutor _node;
     private readonly ProcessRegistry _processes;
     private readonly AuraOrchestrator _orchestrator;
     private readonly LocalPlaybook? _playbook;
     private readonly SolutionStore? _solutions;
+    private readonly CellProgramRegistry _cellRegistry;
+    private readonly SimulationRuntime _runtime;
     private readonly SemaphoreSlim _bubbleGate = new(1, 1);
     private readonly List<string> _recentCommands = new();
     private readonly List<string> _runShellCommands = new();
@@ -44,17 +52,23 @@ public partial class AgentPage : ContentPage
     public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
         ShellExecutor shell, ProcessRegistry processes, AuraOrchestrator orchestrator,
         LocalPlaybook? playbook = null, VoiceAssistantService? voice = null,
-        SolutionStore? solutions = null)
+        SolutionStore? solutions = null, GitExecutor? git = null, PythonExecutor? python = null,
+        NodeExecutor? node = null, CellProgramRegistry? cellRegistry = null, SimulationRuntime? runtime = null)
     {
         InitializeComponent();
         _client = client;
         _memory = memory;
+        _solutions = solutions;
         _speech = speech;
         _shell = shell;
+        _git = git;
+        _python = python;
+        _node = node;
         _processes = processes;
         _orchestrator = orchestrator;
+        _cellRegistry = cellRegistry;
+        _runtime = runtime;
         _playbook = playbook;
-        _solutions = solutions;
         ProcessCards.BindingContext = _processes;
         _voice = voice;
         LoadRecentsFromPrefs();
@@ -300,19 +314,34 @@ public partial class AgentPage : ContentPage
             new WebFetchTool()
         };
 
-        // Liga o agente à memória procedural do app (SolutionStore)
         if (_solutions != null)
+        {
             tools.Add(new SearchMemoryTool(_solutions));
+            tools.Add(new SaveMemoryTool(_solutions));
+        }
+        tools.Add(new ConversationMemoryTool(_memory));
+        tools.Add(new AgentBrowserTool());
+        if (_git != null && _python != null && _node != null)
+            tools.Add(new AgentExecutorTool(_shell, _git, _python, _node));
+        if (_cellRegistry != null && _runtime != null)
+        {
+            tools.Add(new AgentListProgramsTool(_cellRegistry));
+            tools.Add(new AgentRunProgramTool(_cellRegistry, _runtime));
+        }
 
         string systemPrompt =
             "Você é o agente de arquivos e execução da AURA no Android. " +
-            "REGRA PRINCIPAL: use ferramentas (list_dir, read_file, write_file, edit_file, run_shell, web_fetch, search_memory) em vez de inventar. " +
+            "REGRA PRINCIPAL: use ferramentas (list_dir, read_file, write_file, edit_file, run_shell, web_fetch, " +
+            "search_memory, memory_save, memory_conversation, open_browser, run_executor, list_programs, run_program) " +
+            "em vez de inventar. " +
             "CONTINUIDADE: se a conversa já tem resultados de ferramentas, CONTINUE de onde parou — não reinicie a tarefa do zero. " +
             "Antes de inventar comandos, use search_memory para ver se já existe ação executável salva. " +
             "SHELL REALISTA: o shell é /bin/sh do Android (toybox). NÃO existe apt, apt-get, yum, pip, npm, node, python3 completo, git (salvo se um teste anterior provar o contrário). " +
             "Se um comando falhar com 'not found' / 'No such file', NÃO tente instalar o pacote nem repita a mesma família de comandos. Use alternativa com ls, cat, grep, sed, find, sh, ou as ferramentas de arquivo. " +
             "Prefira list_dir/read_file/write_file a shell quando for só ler/escrever arquivos. " +
             "Você TEM memória persistente de AÇÕES (comandos), não só de texto. " +
+            "Use search_memory antes de repetir uma tarefa já resolvida. Use memory_save ao concluir. " +
+            "Use run_executor para git/python/node quando disponíveis. Use list_programs/run_program para automações. " +
             "Quando resolver com shell, inclua um bloco ```aura-sh\ncomandos\n``` para a memória poder reexecutar depois. " +
             "Responda em português, curto e objetivo. " +
             "Não invente caminhos fora do workspace. Use o mínimo de rodadas de ferramenta.";
