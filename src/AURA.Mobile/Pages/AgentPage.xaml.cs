@@ -24,19 +24,18 @@ public partial class AgentPage : ContentPage
 
     private readonly OpenRouterClient _client;
     private readonly MemoryStore _memory;
-    private readonly SolutionStore _solutions;
     private readonly ISpeechService _speech;
     private readonly VoiceAssistantService? _voice;
     private readonly ShellExecutor _shell;
-    private readonly GitExecutor _git;
-    private readonly PythonExecutor _python;
-    private readonly NodeExecutor _node;
+    private readonly GitExecutor? _git;
+    private readonly PythonExecutor? _python;
+    private readonly NodeExecutor? _node;
     private readonly ProcessRegistry _processes;
     private readonly AuraOrchestrator _orchestrator;
     private readonly LocalPlaybook? _playbook;
     private readonly SolutionStore? _solutions;
-    private readonly CellProgramRegistry _cellRegistry;
-    private readonly SimulationRuntime _runtime;
+    private readonly CellProgramRegistry? _cellRegistry;
+    private readonly SimulationRuntime? _runtime;
     private readonly SemaphoreSlim _bubbleGate = new(1, 1);
     private readonly List<string> _recentCommands = new();
     private readonly List<string> _runShellCommands = new();

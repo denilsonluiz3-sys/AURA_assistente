@@ -120,8 +120,9 @@ file sealed class AgentCellContext : IAuraCellContext
 
     private sealed class NoOpDiagnostic : IDeviceDiagnosticCapability
     {
-        public string Model => "unknown";
-        public string OsVersion => "unknown";
-        public bool HasInternet => false;
+        public string GetDevice() => "unknown";
+        public string GetProperties() => "unknown";
+        public string GetBattery() => "unknown";
+        public string GetNetwork() => "unknown";
     }
 }
