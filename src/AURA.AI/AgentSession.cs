@@ -32,7 +32,7 @@ namespace AURA.AI
 
         public AgentSession(OpenRouterClient client, IEnumerable<AgentTool> tools,
             string? systemPrompt = null, ILogger? logger = null, MemoryStore? memory = null,
-            int maxRounds = 3)
+            int maxRounds = 12)
         {
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _tools = (tools ?? Enumerable.Empty<AgentTool>()).ToList();
@@ -140,7 +140,6 @@ namespace AURA.AI
             _memory?.Append(MemoryEntry.Question(userText));
 
             string systemPrompt = BuildSystemPrompt();
-            var lastToolNotes = new List<string>();
 
             int round = 0;
             while (round++ < _maxRounds)
@@ -184,11 +183,6 @@ namespace AURA.AI
                         });
                         Step?.Invoke(new AgentStep(call.Name, call.ArgumentsJson, result));
                         _logger.Info("agent: ferramenta='" + call.Name + "'");
-
-                        string note = call.Name + ": " + Truncate(result, 200);
-                        lastToolNotes.Add(note);
-                        if (lastToolNotes.Count > 6)
-                            lastToolNotes.RemoveAt(0);
                     }
 
                     continue;
@@ -200,18 +194,15 @@ namespace AURA.AI
                 return final;
             }
 
-            // Soft stop: não explode a UI — devolve o que já foi obtido
+            // Limite atingido: encerra com mensagem genérica sem expor
+            // o resumo interno de ferramentas (evita poluir a UI).
             string soft =
-                "Alcancei o limite de " + _maxRounds + " passos de ferramentas. " +
-                "Resumo parcial do que já executei:\n\n" +
-                (lastToolNotes.Count == 0
-                    ? "(nenhuma ferramenta concluída)"
-                    : string.Join("\n", lastToolNotes.Select(n => "• " + n))) +
-                "\n\nReformule o pedido de forma mais direta ou continue em outra mensagem.";
+                "Continue a conversa — estou processando. Se precisar de algo específico, " +
+                "reformule o pedido.";
 
             _messages.Add(new AgentMessage { Role = "assistant", Content = soft });
             _memory?.Append(MemoryEntry.Answer(soft));
-            _logger.Warning("agent: soft-stop após " + _maxRounds + " rounds");
+            _logger.Warning("agent: limite de " + _maxRounds + " rounds atingido");
             return soft;
         }
 

@@ -18,7 +18,7 @@ namespace AURA.AI
         public override AgentToolDefinition Definition => new AgentToolDefinition
         {
             Name = "android",
-            Description = "Acessa APIs nativas do Android: battery, light, accelerometer, gyroscope, magnetometer, location, camera, audio, bluetooth, clipboard, notification, vibrate, network, device, apps, app_list, app_launch, properties, memory, storage, all",
+            Description = "Acessa APIs nativas do Android. Acoes: battery, light, accelerometer, gyroscope, magnetometer, location, camera, audio, bluetooth, clipboard, clipboard_set, notification, vibrate, network, device, apps, app_list, app_find, app_launch, properties, memory, storage, all",
             Parameters =
                 {
                     ["action"] = new AgentToolParameter { Type = "string", Description = "Acao a executar" },
@@ -68,6 +68,7 @@ namespace AURA.AI
                     "device" => _service.GetDevice(),
                     "apps" => _service.GetApps(),
                     "app_list" => _service.GetAppCatalog(),
+                    "app_find" => _service.FindApp(text),
                     "app_launch" => _service.LaunchApp(pkg),
                     "properties" => _service.GetProperties(),
                     "memory" => _service.GetMemory(),

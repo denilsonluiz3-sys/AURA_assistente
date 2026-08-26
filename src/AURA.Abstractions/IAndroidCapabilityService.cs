@@ -23,6 +23,7 @@ public interface IAndroidCapabilityService
     string GetDevice();
     string GetApps();
     string GetAppCatalog();
+    string FindApp(string query);
     string LaunchApp(string packageName);
     string GetProperties();
     string GetMemory();

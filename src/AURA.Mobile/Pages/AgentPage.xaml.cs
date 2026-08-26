@@ -493,8 +493,9 @@ public partial class AgentPage : ContentPage
             "A lista de ferramentas é gerada automaticamente — não precisa memorizá-la. " +
             "Quando precisar de uma capacidade, escolha a ferramenta mais específica e chame-a com os parâmetros corretos. " +
             "Se uma ferramenta falhar, não repita a mesma ação; tente uma alternativa ou reporte o erro. " +
-            "ANDROID: use android(action=...) para battery, light, accelerometer, gyroscope, magnetometer, location, camera, audio, bluetooth, clipboard, clipboard_set, notification, vibrate, network, device, apps, app_list, app_launch, properties, memory, storage, all. " +
-            "app_list retorna catálogo (nome|pacote|launchable); app_launch(package=...) abre um app pelo pacote. " +
+            "ANDROID: use android(action=...) para battery, light, accelerometer, gyroscope, magnetometer, location, camera, audio, bluetooth, clipboard, clipboard_set, notification, vibrate, network, device, apps, app_list, app_find, app_launch, properties, memory, storage, all. " +
+            "app_list retorna catálogo completo; app_find(text=nome) busca por nome; app_launch(package=...) abre um app pelo pacote. " +
+            "Se um app não estiver na lista, use app_find com parte do nome antes de dizer que não está instalado. " +
             "MENU RÁPIDO: use o botão ⚡ no header para acessar Workspace, Diagnóstico, Memória, Células, Web AI e Adicionar atalhos sem digitar. " +
             "CONTINUIDADE: se a conversa já tem resultados de ferramentas, CONTINUE de onde parou — não reinicie a tarefa do zero. " +
             "Antes de inventar comandos, use search_memory para ver se já existe ação executável salva. " +

@@ -314,13 +314,52 @@ public sealed class AndroidCapabilityService : IAndroidCapabilityService
                 bool launchable = pm.GetLaunchIntentForPackage(p.PackageName) != null;
                 sb.AppendLine($"{label}|{p.PackageName}|{(launchable ? "sim" : "não")}");
                 count++;
-                if (count >= 200) break;
             }
             return $"Catálogo ({count} apps):\n{sb}";
         }
         catch (Exception ex)
         {
             return Failure("catálogo de apps", ex);
+        }
+    }
+
+    public string FindApp(string query)
+    {
+        try
+        {
+            var pm = _context PackageManager;
+            if (pm == null)
+                return "ERRO: PackageManager indisponivel.";
+
+            if (string.IsNullOrWhiteSpace(query))
+                return "ERRO: informe o nome do app.";
+
+            string q = query.Trim().ToLowerInvariant();
+            var packages = pm.GetInstalledApplications(Android.Content.PM.PackageInfoFlags.MetaData);
+            if (packages == null)
+                return "App não encontrado: " + query;
+
+            var matches = new List<string>();
+            foreach (var p in packages)
+            {
+                if (string.IsNullOrWhiteSpace(p.PackageName)) continue;
+                string label = pm.GetApplicationLabel(p) ?? p.PackageName;
+                if (label.ToLowerInvariant().Contains(q) ||
+                    p.PackageName.ToLowerInvariant().Contains(q))
+                {
+                    bool launchable = pm.GetLaunchIntentForPackage(p.PackageName) != null;
+                    matches.Add($"{label}|{p.PackageName}|{(launchable ? "sim" : "não")}");
+                }
+            }
+
+            if (matches.Count == 0)
+                return "App não encontrado: " + query;
+
+            return $"Encontrados ({matches.Count}):\n" + string.Join("\n", matches);
+        }
+        catch (Exception ex)
+        {
+            return Failure(" buscar app " + query, ex);
         }
     }
 
