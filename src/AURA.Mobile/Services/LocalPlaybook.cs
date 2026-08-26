@@ -96,11 +96,21 @@ public sealed class LocalPlaybook
         if (q is "diagnóstico" or "diagnostico" or "diagnosticar" or "diagnóstico do aparelho"
             or "diagnostico do aparelho" or "status do aparelho")
         {
-            return "[atalho · diagnóstico · sem IA]\n```aura-sh\necho === modelo ===\ngetprop ro.product.model
-echo === android ===\ngetprop ro.build.version.release
-echo === sdk ===\ngetprop ro.build.version.sdk
-echo === disco ===\ndf -h
-echo === memória ===\ncat /proc/meminfo 2>/dev/null | head -n 5\n```";
+            // Uma única string com \n — evita CS1010 (newline em constante)
+            return
+                "[atalho · diagnóstico · sem IA]\n" +
+                "```aura-sh\n" +
+                "echo === modelo ===\n" +
+                "getprop ro.product.model\n" +
+                "echo === android ===\n" +
+                "getprop ro.build.version.release\n" +
+                "echo === sdk ===\n" +
+                "getprop ro.build.version.sdk\n" +
+                "echo === disco ===\n" +
+                "df -h\n" +
+                "echo === memória ===\n" +
+                "cat /proc/meminfo 2>/dev/null | head -n 5\n" +
+                "```";
         }
 
         return null;
