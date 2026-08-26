@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using AURA.Memory;
 using AURA.Mobile.Diagnostics;
 
@@ -7,7 +8,7 @@ namespace AURA.Mobile.Services;
 
 /// <summary>
 /// Memória procedural: reutiliza COMANDOS/ações bem-sucedidas, não prosa de chat.
-/// Ordem: SolutionStore (só se executável) → process-log (só se executável) → null.
+/// Ordem: atalhos embutidos → SolutionStore (só se executável) → process-log (só se executável) → null.
 /// Turnos de conversa NÃO são usados como atalho (evita só repetir a resposta anterior).
 /// </summary>
 public sealed class LocalPlaybook
@@ -34,6 +35,14 @@ public sealed class LocalPlaybook
 
         try
         {
+            // 0) Atalhos determinísticos (sem IA)
+            string? shortcut = TryBuiltinShortcut(query);
+            if (!string.IsNullOrWhiteSpace(shortcut))
+            {
+                AuraLog.Info("LocalPlaybook hit atalho embutido");
+                return shortcut;
+            }
+
             // 1) Memória procedural — só se a ação for executável (não prosa)
             var match = _solutions.FindBestMatch(query, threshold: 72);
             if (match != null && IsExecutableAction(match.ActionTaken))
@@ -60,6 +69,71 @@ public sealed class LocalPlaybook
         catch (Exception ex)
         {
             AuraLog.Exception("LocalPlaybook.TryResolve", ex);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Frases curtas resolvidas localmente (sem LLM).
+    /// </summary>
+    internal static string? TryBuiltinShortcut(string query)
+    {
+        string q = query.Trim().ToLowerInvariant();
+        if (q.Length == 0)
+            return null;
+
+        // ls / listar workspace / listar arquivos
+        if (q is "ls" or "dir" or "listar" or "listar workspace" or "listar arquivos"
+            or "listar arquivos do workspace" or "liste os arquivos" or "liste os arquivos do workspace")
+        {
+            return "[atalho · workspace · sem IA]\n```aura-sh\npwd\nls -la\n```";
+        }
+
+        // diagnóstico local (shell toybox — sem instalar nada)
+        if (q is "diagnóstico" or "diagnostico" or "diagnosticar" or "diagnóstico do aparelho"
+            or "diagnostico do aparelho" or "status do aparelho")
+        {
+            return "[atalho · diagnóstico · sem IA]\n```aura-sh\necho === modelo ===\ngetprop ro.product.model
+echo === android ===\ngetprop ro.build.version.release
+echo === sdk ===\ngetprop ro.build.version.sdk
+echo === disco ===\ndf -h
+echo === memória ===\ncat /proc/meminfo 2>/dev/null | head -n 5\n```";
+        }
+
+        // memória <query> / memoria <query> / buscar memória ...
+        // Tratado no instância (precisa SolutionStore) — ver TryMemoryQuery
+
+        return null;
+    }
+
+    /// <summary>Resolve "memória X" / "buscar memória X" via SolutionStore.</summary>
+    private string? TryMemoryQuery(string query)
+    {
+        string q = query.Trim();
+        var m = Regex.Match(q, @"^(?:mem[oó]ria|buscar\s+mem[oó]ria|search\s+memory)\s*[:\-]?\s*(.+)$",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (!m.Success)
+            return null;
+
+        string topic = m.Groups[1].Value.Trim();
+        if (topic.Length < 2)
+            return "[atalho · memória]\nInforme o que buscar, ex.: memória listar workspace";
+
+        try
+        {
+            var match = _solutions.FindBestMatch(topic, threshold: 60);
+            if (match != null && IsExecutableAction(match.ActionTaken))
+            {
+                string action = EnsureAuraShBlock(match.ActionTaken!);
+                return "[atalho · memória · reexecutar · sem IA]\n" +
+                       "Query: " + topic + "\n" + action;
+            }
+
+            return "[atalho · memória · sem IA]\nNenhuma ação executável encontrada para: " + topic;
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("LocalPlaybook.TryMemoryQuery", ex);
             return null;
         }
     }
