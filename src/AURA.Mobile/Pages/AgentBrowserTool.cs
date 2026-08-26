@@ -39,7 +39,7 @@ public sealed class AgentBrowserTool : AgentTool
         try
         {
             _ = Microsoft.Maui.ApplicationModel.Browser.Default.OpenAsync(
-                new Uri(url), Microsoft.Maui.ApplicationModel.Browser.OpenMode.SystemPreferred);
+                new Uri(url), Microsoft.Maui.ApplicationModel.BrowserLaunchMode.External);
             return Task.FromResult("OK: navegador aberto com " + url);
         }
         catch (Exception ex)
