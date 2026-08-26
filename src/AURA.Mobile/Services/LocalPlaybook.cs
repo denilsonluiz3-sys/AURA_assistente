@@ -8,8 +8,9 @@ namespace AURA.Mobile.Services;
 
 /// <summary>
 /// Memória procedural: reutiliza COMANDOS/ações bem-sucedidas, não prosa de chat.
-/// Ordem: atalhos embutidos → memória X → SolutionStore → process-log → null.
-/// Turnos de conversa NÃO são usados como atalho (evita só repetir a resposta anterior).
+/// Ordem sem IA: atalhos embutidos → "memória X" explícito → null (deixa o agente seguir).
+/// NÃO faz match automático do SolutionStore em qualquer frase — isso sequestrava
+/// a conversa e só relistava o workspace.
 /// </summary>
 public sealed class LocalPlaybook
 {
@@ -23,8 +24,8 @@ public sealed class LocalPlaybook
     }
 
     /// <summary>
-    /// null = precisa de IA ou ferramentas online.
-    /// string = ação reutilizável (preferencialmente com ```aura-sh``` para reexecutar).
+    /// null = seguir fluxo normal (agente / IA).
+    /// string = ação local determinística.
     /// </summary>
     public string? TryResolveWithoutLlm(string userText)
     {
@@ -32,6 +33,10 @@ public sealed class LocalPlaybook
             return null;
 
         string query = userText.Trim();
+
+        // "continue" / prosa longa nunca são atalho de memória procedural
+        if (IsContinueLike(query) || LooksLikeConversation(query))
+            return null;
 
         try
         {
@@ -43,7 +48,7 @@ public sealed class LocalPlaybook
                 return shortcut;
             }
 
-            // 0b) memória <query>
+            // 0b) só quando o usuário pede explicitamente: memória <query>
             string? memHit = TryMemoryQuery(query);
             if (!string.IsNullOrWhiteSpace(memHit))
             {
@@ -51,24 +56,8 @@ public sealed class LocalPlaybook
                 return memHit;
             }
 
-            // 1) Memória procedural — só se a ação for executável (não prosa)
-            var match = _solutions.FindBestMatch(query, threshold: 72);
-            if (match != null && IsExecutableAction(match.ActionTaken))
-            {
-                AuraLog.Info("LocalPlaybook hit SolutionStore (executável): " + match.Id);
-                string action = EnsureAuraShBlock(match.ActionTaken!);
-                return "[memória procedural · reexecutar · sem IA]\n" + action;
-            }
-
-            // 2) process-log — só se a resposta gravada tiver ação executável
-            string? fromLog = FindExecutableInProcessLog(query);
-            if (!string.IsNullOrWhiteSpace(fromLog))
-            {
-                AuraLog.Info("LocalPlaybook hit process-log (executável)");
-                RememberExecutable(query, fromLog!);
-                return "[memória procedural · process-log · sem IA]\n" + EnsureAuraShBlock(fromLog!);
-            }
-
+            // Auto-match SolutionStore / process-log DESLIGADO:
+            // frases parecidas (threshold baixo) só reexecutavam ls e bloqueavam a tarefa.
             return null;
         }
         catch (Exception ex)
@@ -76,6 +65,28 @@ public sealed class LocalPlaybook
             AuraLog.Exception("LocalPlaybook.TryResolve", ex);
             return null;
         }
+    }
+
+    private static bool IsContinueLike(string query)
+    {
+        string l = query.Trim().ToLowerInvariant();
+        return l is "continue" or "continua" or "continuar" or "prosseguir"
+            || l.StartsWith("continue ", StringComparison.Ordinal)
+            || l.StartsWith("continua ", StringComparison.Ordinal)
+            || l.StartsWith("continuar ", StringComparison.Ordinal);
+    }
+
+    /// <summary>Perguntas / pedidos longos não devem ser sequestrados por memória.</summary>
+    private static bool LooksLikeConversation(string query)
+    {
+        if (query.Length > 80)
+            return true;
+        if (query.Contains('?'))
+            return true;
+        // várias frases
+        if (query.Count(c => c == '.' || c == '!' || c == '\n') >= 2)
+            return true;
+        return false;
     }
 
     /// <summary>
@@ -96,7 +107,6 @@ public sealed class LocalPlaybook
         if (q is "diagnóstico" or "diagnostico" or "diagnosticar" or "diagnóstico do aparelho"
             or "diagnostico do aparelho" or "status do aparelho")
         {
-            // Uma única string com \n — evita CS1010 (newline em constante)
             return
                 "[atalho · diagnóstico · sem IA]\n" +
                 "```aura-sh\n" +
@@ -131,7 +141,8 @@ public sealed class LocalPlaybook
 
         try
         {
-            var match = _solutions.FindBestMatch(topic, threshold: 60);
+            // threshold alto: só reexecuta se for claramente o mesmo pedido
+            var match = _solutions.FindBestMatch(topic, threshold: 88);
             if (match != null && IsExecutableAction(match.ActionTaken))
             {
                 string action = EnsureAuraShBlock(match.ActionTaken!);
@@ -156,11 +167,23 @@ public sealed class LocalPlaybook
             return;
         }
 
+        if (!ShouldRememberTask(task))
+        {
+            AuraLog.Info("LocalPlaybook.RememberSuccess ignorado (tarefa conversacional)");
+            return;
+        }
+
         RememberExecutable(task, actionTaken!, details);
     }
 
     public void RememberFromRun(string task, IReadOnlyList<string>? shellCommands, string? answerText)
     {
+        if (!ShouldRememberTask(task))
+        {
+            AuraLog.Info("LocalPlaybook.RememberFromRun: tarefa não memorizável");
+            return;
+        }
+
         string? aura = ExtractAuraShell(answerText);
         if (!string.IsNullOrWhiteSpace(aura))
         {
@@ -183,6 +206,36 @@ public sealed class LocalPlaybook
         }
 
         AuraLog.Info("LocalPlaybook.RememberFromRun: nada executável para gravar");
+    }
+
+    /// <summary>Não associa ls a "perfeito!!!" / perguntas longas.</summary>
+    private static bool ShouldRememberTask(string? task)
+    {
+        if (string.IsNullOrWhiteSpace(task))
+            return false;
+        string t = task.Trim();
+        if (t.Length < 3 || t.Length > 120)
+            return false;
+        if (IsContinueLike(t))
+            return false;
+        if (LooksLikeConversation(t))
+            return false;
+        // só memoriza se parecer pedido de ação curta
+        string l = t.ToLowerInvariant();
+        string[] ok =
+        {
+            "ls", "listar", "dir", "diagnóst", "diagnost", "status", "df", "pwd",
+            "memória", "memoria", "cat ", "grep", "find ", "echo "
+        };
+        foreach (string k in ok)
+        {
+            if (l.Contains(k, StringComparison.Ordinal))
+                return true;
+        }
+        // comando shell curto
+        if (t.Length <= 40 && !t.Contains('?') && t.Split(' ').Length <= 6)
+            return true;
+        return false;
     }
 
     private void RememberExecutable(string task, string actionTaken, string? details = null)
@@ -254,65 +307,6 @@ public sealed class LocalPlaybook
         return "```aura-sh\n" + action.Trim() + "\n```";
     }
 
-    private string? FindExecutableInProcessLog(string query)
-    {
-        foreach (string root in CandidateRoots())
-        {
-            string path = Path.Combine(root, "process-log.json");
-            if (!File.Exists(path))
-                continue;
-
-            try
-            {
-                string raw = File.ReadAllText(path);
-                string json = SanitizeProcessLogJson(raw);
-                using var doc = JsonDocument.Parse(json);
-                if (!doc.RootElement.TryGetProperty("sessions", out var sessions)
-                    || sessions.ValueKind != JsonValueKind.Array)
-                    continue;
-
-                string q = query.ToLowerInvariant();
-                string? best = null;
-                int bestScore = 0;
-
-                foreach (var session in sessions.EnumerateArray())
-                {
-                    string status = session.TryGetProperty("status", out var st)
-                        ? (st.GetString() ?? "")
-                        : "completed";
-                    if (status.Equals("failed", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    string prompt = session.TryGetProperty("prompt", out var p)
-                        ? (p.GetString() ?? "")
-                        : "";
-                    string response = session.TryGetProperty("response", out var r)
-                        ? (r.GetString() ?? "")
-                        : "";
-
-                    if (string.IsNullOrWhiteSpace(prompt) || !IsExecutableAction(response))
-                        continue;
-
-                    int score = ScoreSimilarity(q, prompt.Trim().ToLowerInvariant());
-                    if (score < 70 || score <= bestScore)
-                        continue;
-
-                    bestScore = score;
-                    best = response;
-                }
-
-                if (!string.IsNullOrWhiteSpace(best))
-                    return best;
-            }
-            catch (Exception ex)
-            {
-                AuraLog.Info("LocalPlaybook process-log skip " + path + ": " + ex.Message);
-            }
-        }
-
-        return null;
-    }
-
     internal static string SanitizeProcessLogJson(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
@@ -359,67 +353,6 @@ public sealed class LocalPlaybook
         }
 
         return "{\"sessions\":[]}";
-    }
-
-    private static List<string> CandidateRoots()
-    {
-        var roots = new List<string>();
-
-        string active = string.Empty;
-        try { active = AgentWorkspace.ActiveRoot ?? string.Empty; }
-        catch { /* ignore */ }
-        if (!string.IsNullOrWhiteSpace(active))
-            roots.Add(active);
-
-        string privateWs = string.Empty;
-        try { privateWs = AgentWorkspace.WorkspaceRoot ?? string.Empty; }
-        catch { /* ignore */ }
-        if (!string.IsNullOrWhiteSpace(privateWs)
-            && !string.Equals(privateWs, active, StringComparison.OrdinalIgnoreCase))
-            roots.Add(privateWs);
-
-        try
-        {
-            string app = FileSystem.AppDataDirectory ?? string.Empty;
-            if (!string.IsNullOrWhiteSpace(app)
-                && !string.Equals(app, active, StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(app, privateWs, StringComparison.OrdinalIgnoreCase))
-                roots.Add(app);
-        }
-        catch { /* ignore */ }
-
-        return roots;
-    }
-
-    private static int ScoreSimilarity(string a, string b)
-    {
-        if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b))
-            return 0;
-        if (a == b)
-            return 100;
-
-        try
-        {
-            return Levenshtein.SimilarityPercent(a, b);
-        }
-        catch
-        {
-            // fallback por palavras
-        }
-
-        var stop = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "o","a","os","as","um","uma","de","do","da","em","com","para","por","e","que","me","mostrar","mostre"
-        };
-        var wa = a.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Where(w => w.Length > 2 && !stop.Contains(w)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var wb = b.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Where(w => w.Length > 2 && !stop.Contains(w)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (wa.Count == 0 || wb.Count == 0)
-            return 0;
-        int inter = wa.Intersect(wb, StringComparer.OrdinalIgnoreCase).Count();
-        int union = wa.Union(wb, StringComparer.OrdinalIgnoreCase).Count();
-        return union == 0 ? 0 : (int)(100.0 * inter / union);
     }
 
     private static string Shorten(string? text, int max)
