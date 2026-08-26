@@ -425,7 +425,7 @@ public partial class AgentPage : ContentPage
             _solutions?.Record(
                 task: name,
                 actionTaken: "```aura-sh\n" + command + "\n```",
-                result: "atalho criado pelo usuário",
+                resultDetails: "atalho criado pelo usuário",
                 success: true);
 
             await AppendBubbleAsync(
