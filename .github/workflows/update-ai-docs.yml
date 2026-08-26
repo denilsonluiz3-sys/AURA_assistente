@@ -1,18 +1,6 @@
 name: AURA AI Documentation Sync
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - '*.sln'
-      - '**/*.csproj'
-      - 'global.json'
-      - 'Directory.Build.props'
-      - '.github/workflows/**'
-      - '!README_AI.md'
-      - '!README.md'
   workflow_dispatch:
 
 concurrency:
@@ -43,7 +31,7 @@ jobs:
           {
             echo '## Snapshot automático do código'
             echo
-            echo '> Esta seção é regenerada pelo GitHub Actions após mudanças no código. O código-fonte continua sendo a fonte de verdade.'
+            echo '> Esta seção é regenerada pelo GitHub Actions (manual). O código-fonte continua sendo a fonte de verdade.'
             echo
             echo "- Commit: \`$(git rev-parse --short HEAD)\`"
             echo "- Data UTC: \`$(date -u '+%Y-%m-%d %H:%M:%S UTC')\`"
@@ -64,31 +52,11 @@ jobs:
               echo "- \`$d\`: ${cs} arquivos C#, ${xaml} arquivos XAML"
             done
             echo
-            echo '### Referências entre projetos'
-            echo
-            find src tests -name '*.csproj' -print 2>/dev/null | sort | while read -r f; do
-              refs=$(grep -o 'ProjectReference Include="[^"]*"' "$f" 2>/dev/null || true)
-              if [ -n "$refs" ]; then
-                echo "**$f**"
-                echo "$refs" | sed 's/ProjectReference Include="/- /; s/"$//' | sed 's#\\#/#g'
-                echo
-              fi
-            done
             echo '### Workflows'
             echo
-            find .github/workflows -maxdepth 1 -type f -name '*.yml' -o -name '*.yaml' 2>/dev/null | sort | while read -r f; do
+            find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) 2>/dev/null | sort | while read -r f; do
               echo "- \`$f\`"
             done
-            echo
-            echo '### Arquivos de código relevantes'
-            echo
-            find src -type f \( -name '*.cs' -o -name '*.xaml' \) | sort | sed -n '1,250p' | while read -r f; do
-              echo "- \`$f\`"
-            done
-            echo
-            echo '### Últimos commits'
-            echo
-            git log -5 --pretty=format:'- `%h` %s (%ad)' --date=short
             echo
           } > .ai-docs/generated.txt
 
