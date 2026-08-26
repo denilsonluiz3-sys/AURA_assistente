@@ -104,7 +104,22 @@ public static class MauiProgram
 #endif
         ));
         builder.Services.AddSingleton<ChatPage>();
-        builder.Services.AddSingleton<AgentPage>();
+        builder.Services.AddSingleton<AgentPage>(sp => new AgentPage(
+            sp.GetRequiredService<OpenRouterClient>(),
+            sp.GetRequiredService<MemoryStore>(),
+            sp.GetRequiredService<ISpeechService>(),
+            sp.GetRequiredService<ShellExecutor>(),
+            sp.GetRequiredService<ProcessRegistry>(),
+            sp.GetRequiredService<AuraOrchestrator>(),
+            sp.GetService<LocalPlaybook>(),
+            sp.GetService<VoiceAssistantService>(),
+            sp.GetService<SolutionStore>(),
+            sp.GetService<GitExecutor>(),
+            sp.GetService<PythonExecutor>(),
+            sp.GetService<NodeExecutor>(),
+            sp.GetService<CellProgramRegistry>(),
+            sp.GetService<SimulationRuntime>(),
+            sp.GetService<IAndroidCapabilityService>()));
         builder.Services.AddSingleton<MemoryPage>();
         builder.Services.AddSingleton<ExecutorsPage>();
         builder.Services.AddSingleton<ModulesPage>();

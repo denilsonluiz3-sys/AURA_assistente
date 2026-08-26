@@ -293,6 +293,59 @@ public sealed class AndroidCapabilityService : IAndroidCapabilityService
         }
     }
 
+    public string GetAppCatalog()
+    {
+        try
+        {
+            var pm = _context.PackageManager;
+            if (pm == null)
+                return "Catálogo de apps: indisponível.";
+
+            var packages = pm.GetInstalledApplications(Android.Content.PM.PackageInfoFlags.MetaData);
+            if (packages == null)
+                return "Catálogo de apps: vazio.";
+
+            var sb = new StringBuilder();
+            int count = 0;
+            foreach (var p in packages)
+            {
+                if (string.IsNullOrWhiteSpace(p.PackageName)) continue;
+                string label = pm.GetApplicationLabel(p) ?? p.PackageName;
+                bool launchable = pm.GetLaunchIntentForPackage(p.PackageName) != null;
+                sb.AppendLine($"{label}|{p.PackageName}|{(launchable ? "sim" : "não")}");
+                count++;
+                if (count >= 200) break;
+            }
+            return $"Catálogo ({count} apps):\n{sb}";
+        }
+        catch (Exception ex)
+        {
+            return Failure("catálogo de apps", ex);
+        }
+    }
+
+    public string LaunchApp(string packageName)
+    {
+        try
+        {
+            var pm = _context PackageManager;
+            if (pm == null)
+                return "ERRO: PackageManager indisponível.";
+
+            var intent = pm.GetLaunchIntentForPackage(packageName);
+            if (intent == null)
+                return $"App não pode ser aberto: {packageName}";
+
+            intent.AddFlags(ActivityFlags.NewTask);
+            _context.StartActivity(intent);
+            return $"App aberto: {packageName}";
+        }
+        catch (Exception ex)
+        {
+            return Failure($"abrir {packageName}", ex);
+        }
+    }
+
     public string GetProperties() =>
         $"Propriedades: SDK={Build.VERSION.SdkInt}; release={Build.VERSION.Release}; fabricante={Build.Manufacturer}; modelo={Build.Model}; produto={Build.Product}; dispositivo={Build.Device}; hardware={Build.Hardware}.";
 

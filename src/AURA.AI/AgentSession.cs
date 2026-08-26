@@ -67,6 +67,19 @@ namespace AURA.AI
             if (!string.IsNullOrWhiteSpace(_systemPrompt))
                 sb.Append(_systemPrompt.Trim());
 
+            // Lista automática de ferramentas — o agente sempre conhece o que está registrado.
+            if (_tools.Count > 0)
+            {
+                sb.Append("\n\nFERRAMENTAS REGISTRADAS (use em vez de inventar):\n");
+                foreach (var tool in _tools)
+                {
+                    var def = tool.Definition;
+                    sb.Append("- ").Append(def.Name).Append(": ").Append(def.Description).Append('\n');
+                    if (def.Required.Count > 0)
+                        sb.Append("  Parâmetros obrigatórios: ").Append(string.Join(", ", def.Required)).Append('\n');
+                }
+            }
+
             if (_memory == null)
                 return sb.ToString();
 

@@ -36,6 +36,7 @@ public partial class AgentPage : ContentPage
     private readonly SolutionStore? _solutions;
     private readonly CellProgramRegistry? _cellRegistry;
     private readonly SimulationRuntime? _runtime;
+    private readonly IAndroidCapabilityService? _android;
     private readonly SemaphoreSlim _bubbleGate = new(1, 1);
     private readonly List<string> _recentCommands = new();
     private readonly List<string> _runShellCommands = new();
@@ -52,7 +53,8 @@ public partial class AgentPage : ContentPage
         ShellExecutor shell, ProcessRegistry processes, AuraOrchestrator orchestrator,
         LocalPlaybook? playbook = null, VoiceAssistantService? voice = null,
         SolutionStore? solutions = null, GitExecutor? git = null, PythonExecutor? python = null,
-        NodeExecutor? node = null, CellProgramRegistry? cellRegistry = null, SimulationRuntime? runtime = null)
+        NodeExecutor? node = null, CellProgramRegistry? cellRegistry = null, SimulationRuntime? runtime = null,
+        IAndroidCapabilityService? android = null)
     {
         InitializeComponent();
         _client = client;
@@ -62,6 +64,8 @@ public partial class AgentPage : ContentPage
         _shell = shell;
         _git = git;
         _python = python;
+        _node = node;
+        _android = android;
         _node = node;
         _processes = processes;
         _orchestrator = orchestrator;
@@ -480,12 +484,17 @@ public partial class AgentPage : ContentPage
             tools.Add(new AgentListProgramsTool(_cellRegistry));
             tools.Add(new AgentRunProgramTool(_cellRegistry, _runtime));
         }
+        if (_android != null)
+            tools.Add(new AndroidCapabilityTool(_android));
 
         string systemPrompt =
             "Você é o agente de arquivos e execução da AURA no Android. " +
-            "REGRA PRINCIPAL: use ferramentas (list_dir, read_file, write_file, edit_file, run_shell, web_fetch, " +
-            "search_memory, memory_save, memory_conversation, open_browser, run_executor, list_programs, run_program) " +
-            "em vez de inventar. " +
+            "REGRAS DE USO: use as ferramentas listadas em FERRAMENTAS REGISTRADAS em vez de inventar comandos ou supor capacidades. " +
+            "A lista de ferramentas é gerada automaticamente — não precisa memorizá-la. " +
+            "Quando precisar de uma capacidade, escolha a ferramenta mais específica e chame-a com os parâmetros corretos. " +
+            "Se uma ferramenta falhar, não repita a mesma ação; tente uma alternativa ou reporte o erro. " +
+            "ANDROID: use android(action=...) para battery, light, accelerometer, gyroscope, magnetometer, location, camera, audio, bluetooth, clipboard, clipboard_set, notification, vibrate, network, device, apps, app_list, app_launch, properties, memory, storage, all. " +
+            "app_list retorna catálogo (nome|pacote|launchable); app_launch(package=...) abre um app pelo pacote. " +
             "MENU RÁPIDO: use o botão ⚡ no header para acessar Workspace, Diagnóstico, Memória, Células, Web AI e Adicionar atalhos sem digitar. " +
             "CONTINUIDADE: se a conversa já tem resultados de ferramentas, CONTINUE de onde parou — não reinicie a tarefa do zero. " +
             "Antes de inventar comandos, use search_memory para ver se já existe ação executável salva. " +

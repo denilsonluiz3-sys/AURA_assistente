@@ -22,6 +22,8 @@ public interface IAndroidCapabilityService
     string GetNetwork();
     string GetDevice();
     string GetApps();
+    string GetAppCatalog();
+    string LaunchApp(string packageName);
     string GetProperties();
     string GetMemory();
     string GetStorage();

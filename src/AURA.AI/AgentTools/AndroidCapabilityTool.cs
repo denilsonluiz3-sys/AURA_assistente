@@ -18,19 +18,20 @@ namespace AURA.AI
         public override AgentToolDefinition Definition => new AgentToolDefinition
         {
             Name = "android",
-            Description = "Acessa APIs nativas do Android: battery, light, accelerometer, gyroscope, magnetometer, location, camera, audio, bluetooth, clipboard, notification, vibrate, network, device, apps, properties, memory, storage, all",
+            Description = "Acessa APIs nativas do Android: battery, light, accelerometer, gyroscope, magnetometer, location, camera, audio, bluetooth, clipboard, notification, vibrate, network, device, apps, app_list, app_launch, properties, memory, storage, all",
             Parameters =
-            {
-                ["action"] = new AgentToolParameter { Type = "string", Description = "Acao a executar" },
-                ["text"] = new AgentToolParameter { Type = "string", Description = "Texto para clipboard ou notification" },
-                ["milliseconds"] = new AgentToolParameter { Type = "string", Description = "Duracao da vibracao em ms" }
-            },
+                {
+                    ["action"] = new AgentToolParameter { Type = "string", Description = "Acao a executar" },
+                    ["text"] = new AgentToolParameter { Type = "string", Description = "Texto para clipboard ou notification" },
+                    ["milliseconds"] = new AgentToolParameter { Type = "string", Description = "Duracao da vibracao em ms" },
+                    ["package"] = new AgentToolParameter { Type = "string", Description = "Pacote do app para app_launch" }
+                },
             Required = { "action" }
         };
 
         public override Task<string> ExecuteAsync(string argsJson, CancellationToken ct = default)
         {
-            string action = "", text = "";
+            string action = "", text = "", pkg = "";
             int ms = 500;
 
             try
@@ -40,6 +41,7 @@ namespace AURA.AI
                 if (root.TryGetProperty("action", out var a)) action = a.GetString()?.ToLowerInvariant() ?? "";
                 if (root.TryGetProperty("text", out var t)) text = t.GetString() ?? "";
                 if (root.TryGetProperty("milliseconds", out var m)) int.TryParse(m.GetString(), out ms);
+                if (root.TryGetProperty("package", out var p)) pkg = p.GetString() ?? "";
             }
             catch { return Task.FromResult("ERRO: JSON invalido"); }
 
@@ -65,6 +67,8 @@ namespace AURA.AI
                     "network" => _service.GetNetwork(),
                     "device" => _service.GetDevice(),
                     "apps" => _service.GetApps(),
+                    "app_list" => _service.GetAppCatalog(),
+                    "app_launch" => _service.LaunchApp(pkg),
                     "properties" => _service.GetProperties(),
                     "memory" => _service.GetMemory(),
                     "storage" => _service.GetStorage(),
