@@ -328,21 +328,21 @@ public sealed class AndroidCapabilityService : IAndroidCapabilityService
     {
         try
         {
-            var pm = _context PackageManager;
+            var pm = _context.PackageManager;
             if (pm == null)
-                return "ERRO: PackageManager indisponível.";
+                return "ERRO: PackageManager indisponivel.";
 
             var intent = pm.GetLaunchIntentForPackage(packageName);
             if (intent == null)
-                return $"App não pode ser aberto: {packageName}";
+                return "App nao pode ser aberto: " + packageName;
 
             intent.AddFlags(ActivityFlags.NewTask);
             _context.StartActivity(intent);
-            return $"App aberto: {packageName}";
+            return "App aberto: " + packageName;
         }
         catch (Exception ex)
         {
-            return Failure($"abrir {packageName}", ex);
+            return Failure("abrir app " + packageName, ex);
         }
     }
 
