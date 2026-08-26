@@ -1,32 +1,19 @@
-# CodeQL Advanced — análise C#
-# Se code scanning não estiver habilitado nas settings do repo, o job
-# conclui com aviso (continue-on-error) para não poluir o status do PR/main.
+# CodeQL — só schedule semanal ou manual. Não roda em todo push.
 name: "CodeQL Advanced"
 
 on:
-  push:
-    branches: [ "main" ]
-    paths-ignore:
-      - 'docs/ai/**'
-      - 'docs/**'
-      - '**/*.md'
-  pull_request:
-    branches: [ "main" ]
-    paths-ignore:
-      - 'docs/ai/**'
-      - 'docs/**'
-      - '**/*.md'
   schedule:
     - cron: '43 1 * * 6'
+  workflow_dispatch:
 
 concurrency:
-  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  group: codeql-manual
   cancel-in-progress: true
 
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     permissions:
       security-events: write
       packages: read
@@ -60,7 +47,6 @@ jobs:
       if: matrix.build-mode == 'manual'
       shell: bash
       run: |
-        # Solution completa pode falhar por projetos Windows; prioriza Mobile + libs
         dotnet build src/AURA.Mobile/AURA.Mobile.csproj -c Release || \
           dotnet build AURA.sln -c Release
 
