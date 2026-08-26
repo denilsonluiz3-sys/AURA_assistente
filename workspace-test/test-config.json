@@ -1,0 +1,17 @@
+{
+  "app": "AURA",
+  "versao": "2.1",
+  "testado_em": "2026-08-26",
+  "capacidades_verificadas": {
+    "list_dir": false,
+    "read_file": false,
+    "write_file": false,
+    "edit_file": false,
+    "run_shell": false,
+    "search_memory": false,
+    "memory_save": false,
+    "web_fetch": false,
+    "open_browser": false
+  },
+  "notas": "marque true quando cada tool for testada com sucesso"
+}

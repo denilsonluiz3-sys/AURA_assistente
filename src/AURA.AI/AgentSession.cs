@@ -19,7 +19,7 @@ namespace AURA.AI
     public sealed class AgentSession
     {
         /// <summary>Máximo de rodadas tool→modelo antes de encerrar com resumo.</summary>
-        private const int MaxRounds = 16;
+        private readonly int _maxRounds;
 
         private readonly OpenRouterClient _client;
         private readonly ILogger _logger;
@@ -31,13 +31,15 @@ namespace AURA.AI
         private readonly MemoryStore? _memory;
 
         public AgentSession(OpenRouterClient client, IEnumerable<AgentTool> tools,
-            string? systemPrompt = null, ILogger? logger = null, MemoryStore? memory = null)
+            string? systemPrompt = null, ILogger? logger = null, MemoryStore? memory = null,
+            int maxRounds = 3)
         {
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _tools = (tools ?? Enumerable.Empty<AgentTool>()).ToList();
             _systemPrompt = systemPrompt;
             _logger = logger ?? new ConsoleLogger();
             _memory = memory;
+            _maxRounds = maxRounds;
         }
 
         private void TrimHistory()
@@ -45,7 +47,18 @@ namespace AURA.AI
             if (_messages.Count <= MaxHistoryMessages)
                 return;
 
-            _messages.RemoveRange(0, _messages.Count - MaxHistoryMessages);
+            // Só cortar em ponto seguro: início até um par completo (assistant+tool_result)
+            int removeUpTo = 0;
+            for (int i = 0; i < _messages.Count - MaxHistoryMessages; i++)
+            {
+                if (_messages[i].Role == "user" || _messages[i].Role == "assistant")
+                {
+                    removeUpTo = i + 1;
+                }
+            }
+
+            if (removeUpTo > 0)
+                _messages.RemoveRange(0, removeUpTo);
         }
 
         private string BuildSystemPrompt()
@@ -117,12 +130,15 @@ namespace AURA.AI
             var lastToolNotes = new List<string>();
 
             int round = 0;
-            while (round++ < MaxRounds)
+            while (round++ < _maxRounds)
             {
                 TrimHistory();
 
+                // Snapshot: ChatToolsAsync itera a lista; se um evento Step ou thread
+                // secundária modifica _messages enquanto percorre, crasha.
+                var snapshot = new List<AgentMessage>(_messages);
                 AgentChatResponse response = await _client.ChatToolsAsync(
-                    _messages,
+                    snapshot,
                     _tools.Select(t => t.Definition).ToList(),
                     httpClient,
                     ct,
@@ -130,7 +146,7 @@ namespace AURA.AI
 
                 if (!string.IsNullOrEmpty(response.Error))
                 {
-                    throw new InvalidOperationException(response.Error);
+                    throw new AgentLlmException(response.Error, response.ErrorKind);
                 }
 
                 if (response.ToolCalls is { Count: > 0 })
@@ -173,7 +189,7 @@ namespace AURA.AI
 
             // Soft stop: não explode a UI — devolve o que já foi obtido
             string soft =
-                "Alcancei o limite de " + MaxRounds + " passos de ferramentas. " +
+                "Alcancei o limite de " + _maxRounds + " passos de ferramentas. " +
                 "Resumo parcial do que já executei:\n\n" +
                 (lastToolNotes.Count == 0
                     ? "(nenhuma ferramenta concluída)"
@@ -182,7 +198,7 @@ namespace AURA.AI
 
             _messages.Add(new AgentMessage { Role = "assistant", Content = soft });
             _memory?.Append(MemoryEntry.Answer(soft));
-            _logger.Warning("agent: soft-stop após " + MaxRounds + " rounds");
+            _logger.Warning("agent: soft-stop após " + _maxRounds + " rounds");
             return soft;
         }
 

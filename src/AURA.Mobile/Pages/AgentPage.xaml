@@ -7,7 +7,7 @@
 
     <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
         <Border Grid.Row="0" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="16,12">
-            <Grid ColumnDefinitions="*,Auto,Auto">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                 <VerticalStackLayout Spacing="2">
                     <HorizontalStackLayout Spacing="6">
                         <Label Text="◆" FontSize="14" TextColor="{DynamicResource AuraAccent}" />
@@ -16,8 +16,9 @@
                     <Label x:Name="WorkspaceLabel" FontSize="11" TextColor="{DynamicResource AuraTextSecondary}" LineBreakMode="TailTruncation" />
                     <Label x:Name="ModelLabel" FontSize="10" TextColor="{DynamicResource AuraTextMuted}" LineBreakMode="TailTruncation" />
                 </VerticalStackLayout>
-                <Button Grid.Column="1" x:Name="ConfigButton" Text="⚙" Clicked="OnConfigClicked" VerticalOptions="Center" Padding="10,6" FontSize="16" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
-                <Button Grid.Column="2" x:Name="ProjectButton" Text="📁 Projeto" Clicked="OnProjectClicked" VerticalOptions="Center" Padding="10,6" FontSize="12" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
+                <Button Grid.Column="1" x:Name="AgentMenuButton" Text="⚡" Clicked="OnAgentMenuClicked" VerticalOptions="Center" Padding="10,6" FontSize="16" BackgroundColor="Transparent" TextColor="{DynamicResource AuraAccent}" />
+                <Button Grid.Column="2" x:Name="ConfigButton" Text="⚙" Clicked="OnConfigClicked" VerticalOptions="Center" Padding="10,6" FontSize="16" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
+                <Button Grid.Column="3" x:Name="ProjectButton" Text="📁 Projeto" Clicked="OnProjectClicked" VerticalOptions="Center" Padding="10,6" FontSize="12" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
             </Grid>
         </Border>
 
@@ -36,6 +37,7 @@
                 <Button Text="⚡ Recentes" Clicked="OnRecentsClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
                 <Button Text="✦ Prompts" Clicked="OnPromptsClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
                 <Button Text="＋ Prompt" Clicked="OnAddPromptClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="17" />
+                <Button Text="➕ Atalho" Clicked="OnAddShortcutClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="17" />
                 <Button Text="🗑 Limpar chat" Clicked="OnClearChatClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextMuted}" CornerRadius="17" />
             </HorizontalStackLayout>
         </ScrollView>

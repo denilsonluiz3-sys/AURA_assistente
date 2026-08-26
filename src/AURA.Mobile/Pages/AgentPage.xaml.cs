@@ -297,6 +297,159 @@ public partial class AgentPage : ContentPage
         ConfigButton.Text = visible ? "×" : "⚙";
     }
 
+    // ── Menu de ações (botão ⚡) ──────────────────────────────────────
+
+    private async void OnAgentMenuClicked(object? sender, EventArgs e)
+    {
+        try
+        {
+            string action = await DisplayActionSheetAsync(
+                "⚡ AURA Agent", "Fechar", null,
+                // ── Ações Locais (sem LLM) ──
+                "📂 Workspace",
+                "🔍 Diagnóstico",
+                "🧠 Memória",
+                "▶ Continuar",
+                "🖥️ Shell",
+                // ── Células ──
+                "📋 Células",
+                "▶ Rodar programa",
+                // ── Web ──
+                "🌐 Contexto para Web AI",
+                "📋 Colar plano",
+                // ── Config ──
+                "⚙ Configurar IA",
+                // ── Adicionar ──
+                "➕ Adicionar atalho"
+            );
+
+            switch (action)
+            {
+                case "📂 Workspace": OnChipWorkspace(sender, e); break;
+                case "🔍 Diagnóstico": OnChipDiagnostic(sender, e); break;
+                case "🧠 Memória": OnChipMemory(sender, e); break;
+                case "▶ Continuar": OnChipContinue(sender, e); break;
+                case "🖥️ Shell": OnChipShellSafe(sender, e); break;
+                case "📋 Células": await OnCellsSubmenuAsync(); break;
+                case "▶ Rodar programa": await OnRunProgramSubmenuAsync(); break;
+                case "🌐 Contexto para Web AI": OnCopyContextClicked(sender, e); break;
+                case "📋 Colar plano": OnPastePlanClicked(sender, e); break;
+                case "⚙ Configurar IA": SetConfigVisible(true); break;
+                case "➕ Adicionar atalho": _ = OnAddShortcutAsync(); break;
+            }
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("AgentMenu", ex);
+        }
+    }
+
+    private async Task OnCellsSubmenuAsync()
+    {
+        try
+        {
+            string action = await DisplayActionSheetAsync(
+                "📋 Células", "Voltar", null,
+                "Ver status",
+                "Ver log",
+                "Parar célula");
+
+            switch (action)
+            {
+                case "Ver status":
+                    CommandEditor.Text = "liste as células e mostre o status de cada uma";
+                    OnRunClicked(this, EventArgs.Empty);
+                    break;
+                case "Ver log":
+                    CommandEditor.Text = "mostre as últimas 30 linhas do log de todas as células";
+                    OnRunClicked(this, EventArgs.Empty);
+                    break;
+                case "Parar célula":
+                    CommandEditor.Text = "pare todas as células que estejam rodando";
+                    OnRunClicked(this, EventArgs.Empty);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            await SafeAlertAsync("Células", ex.Message);
+        }
+    }
+
+    private async Task OnRunProgramSubmenuAsync()
+    {
+        try
+        {
+            if (_cellRegistry == null)
+            {
+                await DeliverErrorBubbleAsync("Células não disponíveis.");
+                return;
+            }
+
+            var programs = _cellRegistry.All.ToList();
+            if (programs.Count == 0)
+            {
+                await DeliverErrorBubbleAsync("Nenhum programa registrado.");
+                return;
+            }
+
+            string[] names = programs.Select(p => p.Name).ToArray();
+            string chosen = await DisplayActionSheetAsync(
+                "▶ Rodar programa", " Cancelar", null, names);
+
+            var program = programs.FirstOrDefault(p => p.Name == chosen);
+            if (program != null)
+            {
+                CommandEditor.Text = "run_program " + program.Name;
+                OnRunClicked(this, EventArgs.Empty);
+            }
+        }
+        catch (Exception ex)
+        {
+            await SafeAlertAsync("Rodar programa", ex.Message);
+        }
+    }
+
+    private async Task OnAddShortcutAsync()
+    {
+        try
+        {
+            string? name = await DisplayPromptAsync("Novo atalho", "Nome do atalho:",
+                "Salvar", " Cancelar", maxLength: 60);
+            if (string.IsNullOrWhiteSpace(name)) return;
+
+            string? command = await DisplayPromptAsync("Comando", "Comando shell ou ação:",
+                "ex.: getprop ro.product.model", " Salvar", " Cancelar", maxLength: 200);
+            if (string.IsNullOrWhiteSpace(command)) return;
+
+            _solutions?.Record(
+                task: name,
+                actionTaken: "```aura-sh\n" + command + "\n```",
+                result: "atalho criado pelo usuário",
+                success: true);
+
+            await AppendBubbleAsync(
+                "✅ Atalho '" + name + "' criado. Diga \"" + name + "\" para executar.",
+                user: false);
+        }
+        catch (Exception ex)
+        {
+            await SafeAlertAsync("Atalho", ex.Message);
+        }
+    }
+
+    private void OnAddShortcutClicked(object? sender, EventArgs e)
+        => _ = OnAddShortcutAsync();
+
+    private async Task DeliverErrorBubbleAsync(string message)
+    {
+        try
+        {
+            await AppendBubbleAsync(message, user: false, isError: true);
+        }
+        catch { /* ignore */ }
+    }
+
     private void EnsureSession()
     {
         if (_session != null)
@@ -333,6 +486,7 @@ public partial class AgentPage : ContentPage
             "REGRA PRINCIPAL: use ferramentas (list_dir, read_file, write_file, edit_file, run_shell, web_fetch, " +
             "search_memory, memory_save, memory_conversation, open_browser, run_executor, list_programs, run_program) " +
             "em vez de inventar. " +
+            "MENU RÁPIDO: use o botão ⚡ no header para acessar Workspace, Diagnóstico, Memória, Células, Web AI e Adicionar atalhos sem digitar. " +
             "CONTINUIDADE: se a conversa já tem resultados de ferramentas, CONTINUE de onde parou — não reinicie a tarefa do zero. " +
             "Antes de inventar comandos, use search_memory para ver se já existe ação executável salva. " +
             "SHELL REALISTA: o shell é /bin/sh do Android (toybox). NÃO existe apt, apt-get, yum, pip, npm, node, python3 completo, git (salvo se um teste anterior provar o contrário). " +
@@ -645,14 +799,22 @@ public partial class AgentPage : ContentPage
                 await AppendBubbleAsync($"↥ Sync: {synced} arquivo(s).", user: false, isTool: true);
             }
         }
-        catch (Exception ex)
-        {
-            string userMsg = FriendlyLlmError(ex);
-            if (!string.IsNullOrEmpty(processId))
-                _processes.Fail(processId, userMsg);
-            await AppendBubbleAsync("Erro: " + userMsg, user: false, isError: true);
-            AuraLog.Exception("AgentPage.OnRunClicked", ex);
-        }
+catch (AgentLlmException ex)
+            {
+                string userMsg = FriendlyLlmError(ex);
+                if (!string.IsNullOrEmpty(processId))
+                    _processes.Fail(processId, userMsg);
+                await AppendBubbleAsync("Erro: " + userMsg, user: false, isError: true);
+                AuraLog.Exception("AgentPage.OnRunClicked", ex);
+            }
+            catch (Exception ex)
+            {
+                string userMsg = FriendlyLlmError(ex);
+                if (!string.IsNullOrEmpty(processId))
+                    _processes.Fail(processId, userMsg);
+                await AppendBubbleAsync("Erro: " + userMsg, user: false, isError: true);
+                AuraLog.Exception("AgentPage.OnRunClicked", ex);
+            }
         finally
         {
             if (_activeProcessId == processId) _activeProcessId = null;
@@ -705,19 +867,41 @@ public partial class AgentPage : ContentPage
         }
     }
 
-    private static string FriendlyLlmError(Exception ex)
-    {
-        string m = ex.Message ?? "";
-        if (m.Contains("401")) return "API key inválida.";
-        if (m.Contains("402")) return "Sem créditos LLM. Use Web AI (📋 Contexto) ou reduza max_tokens.";
-        if (m.Contains("429")) return "Rate limit.";
-        if (m.Contains("node already has a parent", StringComparison.OrdinalIgnoreCase))
-            return "Erro interno de tools. Atualize o APK.";
-        if (m.Contains("Invalid JSON in tool call", StringComparison.OrdinalIgnoreCase)
-            || m.Contains("tool arguments must be", StringComparison.OrdinalIgnoreCase))
-            return "Argumentos de ferramenta inválidos (JSON). Reformule o pedido.";
-        return m.Length > 280 ? m[..280] + "…" : m;
-    }
+private static string FriendlyLlmError(Exception ex)
+        {
+            if (ex is AgentLlmException aex)
+            {
+                return aex.ErrorKind switch
+                {
+                    AgentErrorKind.RateLimited =>
+                        "Rate limit atingido. 💡 Use a aba Web AI ou copie o contexto (📋) e cole no ChatGPT/DeepSeek.",
+                    AgentErrorKind.PaymentRequired =>
+                        "Sem créditos LLM. Use Web AI (📋 Contexto) ou reduza max_tokens.",
+                    AgentErrorKind.InvalidApiKey =>
+                        "API key inválida. Toque ⚙ na aba Assistente e corrija.",
+                    AgentErrorKind.Timeout =>
+                        "A chamada LLM expirou. Tente novamente.",
+                    AgentErrorKind.Network =>
+                        "Falha de rede ao falar com o provedor.",
+                    AgentErrorKind.InvalidRequest =>
+                        "Requisição inválida para o modelo.",
+                    AgentErrorKind.ProviderError =>
+                        "Erro no provedor LLM. Tente novamente.",
+                    _ => aex.Message.Length > 280 ? aex.Message[..280] + "…" : aex.Message
+                };
+            }
+
+            string m = ex.Message ?? "";
+            if (m.Contains("401")) return "API key inválida.";
+            if (m.Contains("402")) return "Sem créditos LLM. Use Web AI (📋 Contexto) ou reduza max_tokens.";
+            if (m.Contains("429")) return "Rate limit.";
+            if (m.Contains("node already has a parent", StringComparison.OrdinalIgnoreCase))
+                return "Erro interno de tools. Atualize o APK.";
+            if (m.Contains("Invalid JSON in tool call", StringComparison.OrdinalIgnoreCase)
+                || m.Contains("tool arguments must be", StringComparison.OrdinalIgnoreCase))
+                return "Argumentos de ferramenta inválidos (JSON). Reformule o pedido.";
+            return m.Length > 280 ? m[..280] + "…" : m;
+        }
 
     private static bool ShouldOrchestrate(string text)
     {
