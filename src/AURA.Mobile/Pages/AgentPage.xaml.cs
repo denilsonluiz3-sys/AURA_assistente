@@ -47,6 +47,7 @@ public partial class AgentPage : ContentPage
     private bool _webMode;
     private bool _webLoaded;
     private string? _lastUserGoal;
+    private string? _lastUserQuery;
     private string? _lastAssistantText;
 
     public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
@@ -66,7 +67,6 @@ public partial class AgentPage : ContentPage
         _python = python;
         _node = node;
         _android = android;
-        _node = node;
         _processes = processes;
         _orchestrator = orchestrator;
         _cellRegistry = cellRegistry;
@@ -761,8 +761,17 @@ public partial class AgentPage : ContentPage
             _activeProcessId = process.Id;
 
             // Atalhos locais usam o texto original (ls / diagnóstico / memória X)
+            // Se o usuário repete a mesma frase, pula o playbook/orquestrador
+            // (que gerariam o mesmo resultado) e vai direto para a IA, que
+            // pode interpretar o novo contexto.
             string playbookQuery = wasContinue ? resolved : text;
-            string? local = _playbook?.TryResolveWithoutLlm(playbookQuery);
+            bool isRepeat = !wasContinue && _lastUserQuery != null
+                && string.Equals(text, _lastUserQuery, StringComparison.OrdinalIgnoreCase);
+
+            if (isRepeat)
+                _lastUserQuery = text;
+
+            string? local = isRepeat ? null : _playbook?.TryResolveWithoutLlm(playbookQuery);
             if (!string.IsNullOrWhiteSpace(local))
             {
                 _processes.Update(process.Id, "Playbook", "Ação local", 0.5);
@@ -770,7 +779,7 @@ public partial class AgentPage : ContentPage
                 return;
             }
 
-            if (ShouldOrchestrate(resolved))
+            if (!isRepeat && ShouldOrchestrate(resolved))
             {
                 _processes.Update(process.Id, "Planejando", "Orquestrador", 0.15);
                 string answer = await _orchestrator.ExecuteAsync(resolved);
@@ -801,6 +810,7 @@ public partial class AgentPage : ContentPage
 
             _playbook?.RememberFromRun(resolved, _runShellCommands, answerFromAgent);
             await DeliverAnswerAsync(answerFromAgent, process.Id, "Resultado entregue");
+            _lastUserQuery = text;
 
             if (ProjectAccessService.IsLinked && !ProjectAccessService.IsDirect)
             {
