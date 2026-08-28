@@ -330,55 +330,51 @@ private void TryAutoDetect()
             }
         }
 
-        if (string.IsNullOrWhiteSpace(model) && provider.Models.Count > 0)
+        // Prioridade ao selecionar: modelo salvo > primeiro free > defaultModelId > primeiro da lista
+        int modelIndex = 0;
+        var models = provider.Models;
+        if (models.Count > 0)
         {
-            model = provider.Models[0].Id;
-        }
-
-int modelIndex = 0;
-            List<ProviderModel> models = provider.Models;
-            if (models.Count > 0)
+            if (!string.IsNullOrWhiteSpace(model))
             {
-                // Prioridade: modelo salvo > primeiro free > defaultModelId > primeiro da lista
-                if (!string.IsNullOrWhiteSpace(model))
+                // Modelo salvo encontrado na lista
+                for (int i = 0; i < models.Count; i++)
+                {
+                    if (string.Equals(models[i].Id, model, StringComparison.OrdinalIgnoreCase))
+                    {
+                        modelIndex = i;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                // Sem modelo salvo: prioriza free, depois defaultModelId, por último o primeiro
+                int freeIdx = -1;
+                for (int i = 0; i < models.Count; i++)
+                {
+                    if (models[i].IsFree) { freeIdx = i; break; }
+                }
+
+                if (freeIdx >= 0)
+                {
+                    modelIndex = freeIdx;
+                }
+                else if (!string.IsNullOrWhiteSpace(provider.DefaultModelId))
                 {
                     for (int i = 0; i < models.Count; i++)
                     {
-                        if (string.Equals(models[i].Id, model, StringComparison.OrdinalIgnoreCase))
+                        if (string.Equals(models[i].Id, provider.DefaultModelId, StringComparison.OrdinalIgnoreCase))
                         {
                             modelIndex = i;
                             break;
                         }
                     }
                 }
-                else
-                {
-                    // Sem modelo salvo: prioriza free, depois defaultModelId
-                    int freeIdx = -1;
-                    for (int i = 0; i < models.Count; i++)
-                    {
-                        if (models[i].IsFree) { freeIdx = i; break; }
-                    }
-
-                    if (freeIdx >= 0)
-                    {
-                        modelIndex = freeIdx;
-                    }
-                    else if (!string.IsNullOrWhiteSpace(provider.DefaultModelId))
-                    {
-                        for (int i = 0; i < models.Count; i++)
-                        {
-                            if (string.Equals(models[i].Id, provider.DefaultModelId, StringComparison.OrdinalIgnoreCase))
-                            {
-                                modelIndex = i;
-                                break;
-                            }
-                        }
-                    }
-                }
             }
+        }
 
-            _modelPicker.SelectedIndex = modelIndex;
+        _modelPicker.SelectedIndex = modelIndex;
 
         string hint = provider.NeedsKey
             ? (string.IsNullOrWhiteSpace(provider.KeyHint) ? "Chave de API" : $"Chave ({provider.KeyHint})")

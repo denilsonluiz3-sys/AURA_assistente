@@ -30,7 +30,7 @@ public sealed class OpenRouterClient
     {
         private static readonly JsonSerializerOptions SerializeOpts = new()
         {
-            DefaultIgnoreCondition = System.Text.Json.Serialization.jsonIgnoreCondition.WhenWritingNull
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
         };
 
         private readonly ILogger _logger;
