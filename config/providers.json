@@ -96,37 +96,14 @@
       "keyPrefixesList": ["sk-"],
       "models": [
         { "id": "gpt-4o-mini", "label": "GPT-4o Mini", "category": "Eficiente", "isFree": false },
-        { "id": "gpt-4o", "label": "GPT-4o", "category": "Flagship", "isFree": false },
-        { "id": "gpt-5-mini", "label": "GPT-5 Mini", "category": "Eficiente", "isFree": false },
-        { "id": "gpt-5", "label": "GPT-5", "category": "Flagship", "isFree": false }
-      ]
-    },
-    {
-      "id": "opencode-zen",
-      "name": "OpenCode Zen",
-      "baseUrl": "https://opencode.ai/zen/v1/chat/completions",
-      "modelsUrl": "https://opencode.ai/zen/v1/models",
-      "needsKey": true,
-      "keyEnv": "OPENCODE_API_KEY",
-      "keyHint": "OPENCODE_API_KEY",
-      "defaultModelId": "kimi-k2.7-code",
-      "authHeaderName": "Authorization",
-      "authScheme": "Bearer ",
-      "apiFormat": "OpenAICompletions",
-      "keyPrefixesList": [],
-      "models": [
-        { "id": "kimi-k2.7-code", "label": "Kimi K2.7 Code", "category": "Coding", "isFree": false },
-        { "id": "deepseek-v4-flash", "label": "DeepSeek V4 Flash", "category": "Eficiente", "isFree": false },
-        { "id": "big-pickle", "label": "Big Pickle", "category": "Grátis", "isFree": true },
-        { "id": "mimo-v2.5-free", "label": "MiMo-V2.5 Free", "category": "Grátis", "isFree": true },
-        { "id": "hy3-free", "label": "Hy3 Free", "category": "Grátis", "isFree": true }
+        { "id": "gpt-4o", "label": "GPT-4o", "category": "Flagship", "isFree": false }
       ]
     },
     {
       "id": "ollama",
       "name": "Ollama (local)",
-      "baseUrl": "http://127.0.0.1:11435",
-      "modelsUrl": "http://127.0.0.1:11435/api/tags",
+      "baseUrl": "http://127.0.0.1:11435/v1/chat/completions",
+      "modelsUrl": "http://127.0.0.1:11435/v1/models",
       "needsKey": false,
       "defaultModelId": "qwen2:0.5b",
       "authHeaderName": "",
@@ -134,26 +111,9 @@
       "apiFormat": "OpenAICompletions",
       "keyPrefixesList": [],
       "models": [
-        { "id": "qwen2:0.5b", "label": "Qwen2 0.5B (local)", "category": "Local", "isFree": true }
-      ]
-    },
-    {
-      "id": "deepseek",
-      "name": "DeepSeek",
-      "baseUrl": "https://api.deepseek.com/v1/chat/completions",
-      "modelsUrl": "https://api.deepseek.com/v1/models",
-      "needsKey": true,
-      "keyEnv": "DEEPSEEK_API_KEY",
-      "keyHint": "DEEPSEEK_API_KEY",
-      "defaultModelId": "deepseek-chat",
-      "authHeaderName": "Authorization",
-      "authScheme": "Bearer ",
-      "apiFormat": "OpenAICompletions",
-      "keyPrefixesList": ["sk-"],
-      "models": [
-        { "id": "deepseek-r1", "label": "DeepSeek R1", "category": "Raciocínio", "isFree": false },
-        { "id": "deepseek-chat", "label": "DeepSeek Chat", "category": "Eficiente", "isFree": false },
-        { "id": "deepseek-coder", "label": "DeepSeek Coder", "category": "Coding", "isFree": false }
+        { "id": "qwen2:0.5b", "label": "Qwen2 0.5B (local)", "category": "Local", "isFree": true },
+        { "id": "qwen2.5-coder:1.5b", "label": "Qwen 2.5 Coder 1.5B", "category": "Local", "isFree": true },
+        { "id": "llama3.2:3b", "label": "Llama 3.2 3B", "category": "Local", "isFree": true }
       ]
     },
     {
@@ -164,15 +124,14 @@
       "needsKey": true,
       "keyEnv": "MISTRAL_API_KEY",
       "keyHint": "MISTRAL_API_KEY",
-      "defaultModelId": "magistral-medium",
+      "defaultModelId": "mistral-small-latest",
       "authHeaderName": "Authorization",
       "authScheme": "Bearer ",
       "apiFormat": "OpenAICompletions",
       "keyPrefixesList": [],
       "models": [
-        { "id": "magistral-medium", "label": "Magistral Medium", "category": "Raciocínio", "isFree": false },
-        { "id": "mistral-large-latest", "label": "Mistral Large", "category": "Flagship", "isFree": false },
-        { "id": "mistral-small-latest", "label": "Mistral Small", "category": "Eficiente", "isFree": false }
+        { "id": "mistral-small-latest", "label": "Mistral Small", "category": "Eficiente", "isFree": false },
+        { "id": "mistral-large-latest", "label": "Mistral Large", "category": "Flagship", "isFree": false }
       ]
     },
     {
@@ -182,14 +141,13 @@
       "modelsUrl": "https://api.anthropic.com/v1/models",
       "needsKey": true,
       "keyEnv": "ANTHROPIC_API_KEY",
-      "keyHint": "ANTHROPIC_API_KEY",
+      "keyHint": "sk-ant-…",
       "defaultModelId": "claude-sonnet-4-5-20250929",
       "authHeaderName": "x-api-key",
       "authScheme": "",
       "apiFormat": "AnthropicMessages",
       "keyPrefixesList": ["sk-ant-"],
       "models": [
-        { "id": "claude-opus-4-5-20251120", "label": "Claude Opus 4.5", "category": "Flagship", "isFree": false },
         { "id": "claude-sonnet-4-5-20250929", "label": "Claude Sonnet 4.5", "category": "Razoável", "isFree": false },
         { "id": "claude-haiku-4-5-20251001", "label": "Claude Haiku 4.5", "category": "Eficiente", "isFree": false }
       ]
@@ -202,69 +160,14 @@
       "needsKey": true,
       "keyEnv": "XAI_API_KEY",
       "keyHint": "XAI_API_KEY",
-      "defaultModelId": "grok-3",
+      "defaultModelId": "grok-3-mini",
       "authHeaderName": "Authorization",
       "authScheme": "Bearer ",
       "apiFormat": "OpenAICompletions",
       "keyPrefixesList": ["xai-"],
       "models": [
-        { "id": "grok-3", "label": "Grok 3", "category": "Flagship", "isFree": false },
-        { "id": "grok-3-mini", "label": "Grok 3 Mini", "category": "Eficiente", "isFree": false }
-      ]
-    },
-    {
-      "id": "together",
-      "name": "Together AI",
-      "baseUrl": "https://api.together.xyz/v1/chat/completions",
-      "modelsUrl": "https://api.together.xyz/v1/models",
-      "needsKey": true,
-      "keyEnv": "TOGETHER_API_KEY",
-      "keyHint": "TOGETHER_API_KEY",
-      "defaultModelId": "deepseek-ai/DeepSeek-R1",
-      "authHeaderName": "Authorization",
-      "authScheme": "Bearer ",
-      "apiFormat": "OpenAICompletions",
-      "keyPrefixesList": [],
-      "models": [
-        { "id": "deepseek-ai/DeepSeek-R1", "label": "DeepSeek R1", "category": "Raciocínio", "isFree": false },
-        { "id": "deepseek-ai/DeepSeek-V3", "label": "DeepSeek V3", "category": "Razoável", "isFree": false },
-        { "id": "meta-llama/Llama-3.3-70B-Instruct-Turbo", "label": "Llama 3.3 70B", "category": "Razoável", "isFree": false }
-      ]
-    },
-    {
-      "id": "fireworks",
-      "name": "Fireworks AI",
-      "baseUrl": "https://api.fireworks.ai/v1/chat/completions",
-      "modelsUrl": "https://api.fireworks.ai/v1/models",
-      "needsKey": true,
-      "keyEnv": "FIREWORKS_API_KEY",
-      "keyHint": "FIREWORKS_API_KEY",
-      "defaultModelId": "accounts/fireworks/models/llama-v3p1-70b-instruct",
-      "authHeaderName": "Authorization",
-      "authScheme": "Bearer ",
-      "apiFormat": "OpenAICompletions",
-      "keyPrefixesList": ["fw_"],
-      "models": [
-        { "id": "accounts/fireworks/models/llama-v3p1-70b-instruct", "label": "Llama 3.1 70B", "category": "Razoável", "isFree": false },
-        { "id": "accounts/fireworks/models/llama-v3p1-8b-instruct", "label": "Llama 3.1 8B", "category": "Eficiente", "isFree": false }
-      ]
-    },
-    {
-      "id": "cohere",
-      "name": "Cohere",
-      "baseUrl": "https://api.cohere.com/v2/chat",
-      "modelsUrl": "https://api.cohere.com/v2/models",
-      "needsKey": true,
-      "keyEnv": "COHERE_API_KEY",
-      "keyHint": "COHERE_API_KEY",
-      "defaultModelId": "command-a",
-      "authHeaderName": "Authorization",
-      "authScheme": "Bearer ",
-      "apiFormat": "OpenAICompletions",
-      "keyPrefixesList": [],
-      "models": [
-        { "id": "command-a", "label": "Command A", "category": "Flagship", "isFree": false },
-        { "id": "command-r-08-2024", "label": "Command R", "category": "Eficiente", "isFree": false }
+        { "id": "grok-3-mini", "label": "Grok 3 Mini", "category": "Eficiente", "isFree": false },
+        { "id": "grok-3", "label": "Grok 3", "category": "Flagship", "isFree": false }
       ]
     }
   ]
