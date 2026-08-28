@@ -4,11 +4,14 @@ namespace AURA.Mobile.Diagnostics
 {
     /// <summary>
     /// Configuração aplicável em tempo de execução (sem recompilar o APK).
-    /// Toda alteração feita aqui persiste em Preferences e reflete
-    /// imediatamente no OpenRouterClient.
+    /// Preferências não sensíveis usam Preferences; a API key usa SecureStorage
+    /// (Keystore / armazenamento cifrado no Android).
     /// </summary>
     public static class RuntimeConfig
     {
+        private const string ApiKeySecureName = "ai_api_key";
+        private const string ApiKeyLegacyPref = "ai_api_key";
+
         public static int MaxTokens
         {
             get => Preferences.Default.Get("ai_max_tokens", 1500);
@@ -40,10 +43,77 @@ namespace AURA.Mobile.Diagnostics
             set => Preferences.Default.Set("ai_model", value);
         }
 
+        /// <summary>
+        /// Chave de API: SecureStorage. Migra automaticamente de Preferences legadas.
+        /// </summary>
         public static string ApiKey
         {
-            get => Preferences.Default.Get("ai_api_key", string.Empty);
-            set => Preferences.Default.Set("ai_api_key", value);
+            get
+            {
+                try
+                {
+                    string? secure = SecureStorage.Default
+                        .GetAsync(ApiKeySecureName)
+                        .GetAwaiter()
+                        .GetResult();
+
+                    if (!string.IsNullOrWhiteSpace(secure))
+                        return secure.Trim();
+                }
+                catch
+                {
+                    // SecureStorage indisponível ou valor de backup ilegível
+                }
+
+                string legacy = Preferences.Default.Get(ApiKeyLegacyPref, string.Empty);
+                if (string.IsNullOrWhiteSpace(legacy))
+                    return string.Empty;
+
+                // Migração única: sobe para SecureStorage e apaga texto claro
+                try
+                {
+                    SecureStorage.Default
+                        .SetAsync(ApiKeySecureName, legacy.Trim())
+                        .GetAwaiter()
+                        .GetResult();
+                    Preferences.Default.Remove(ApiKeyLegacyPref);
+                }
+                catch
+                {
+                    // Mantém leitura legada se SecureStorage falhar
+                }
+
+                return legacy.Trim();
+            }
+            set
+            {
+                string v = (value ?? string.Empty).Trim();
+
+                try
+                {
+                    if (string.IsNullOrEmpty(v))
+                        SecureStorage.Default.Remove(ApiKeySecureName);
+                    else
+                        SecureStorage.Default
+                            .SetAsync(ApiKeySecureName, v)
+                            .GetAwaiter()
+                            .GetResult();
+                }
+                catch
+                {
+                    // Fallback mínimo: não gravar de novo em Preferences em claro
+                }
+
+                // Nunca deixar cópia legada
+                try { Preferences.Default.Remove(ApiKeyLegacyPref); }
+                catch { }
+            }
+        }
+
+        /// <summary>Remove a key do SecureStorage e de Preferences legadas.</summary>
+        public static void ClearApiKey()
+        {
+            ApiKey = string.Empty;
         }
 
         public static void Apply(OpenRouterClient client)
@@ -63,7 +133,6 @@ namespace AURA.Mobile.Diagnostics
                     }
                 }
 
-                // Modelo customizado (digitado) — aceita se não vazio
                 if (!modelBelongsToProvider && model.Length >= 2)
                     modelBelongsToProvider = true;
             }
@@ -86,10 +155,6 @@ namespace AURA.Mobile.Diagnostics
             client.Options.ApiFormat = provider.ApiFormat;
         }
 
-        /// <summary>
-        /// Valida formato básico da chave para o provedor atual.
-        /// null = ok; string = mensagem de erro amigável.
-        /// </summary>
         public static string? ValidateApiKeyFormat(string? key, ProviderInfo? provider)
         {
             if (provider == null || !provider.NeedsKey)
@@ -97,7 +162,7 @@ namespace AURA.Mobile.Diagnostics
 
             string k = (key ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(k))
-                return null; // vazio tratado em EnsureReady
+                return null;
 
             if (k.Length > 200 || k.IndexOfAny(new[] { ' ', '\t', '\r', '\n' }) >= 0)
             {
@@ -105,7 +170,6 @@ namespace AURA.Mobile.Diagnostics
                        "Cole só a chave, sem aspas.";
             }
 
-            // Gemini AI Studio: AIzaSy… — tokens AQ. não são API key da Generative Language
             if (string.Equals(provider.Id, "gemini", System.StringComparison.OrdinalIgnoreCase))
             {
                 if (k.StartsWith("AQ.", System.StringComparison.Ordinal))
@@ -136,10 +200,6 @@ namespace AURA.Mobile.Diagnostics
             return null;
         }
 
-        /// <summary>
-        /// Garante client pronto para Chat e Agent.
-        /// Sem API key: fallback para provedor NeedsKey=false (Ollama).
-        /// </summary>
         public static string? EnsureReadyForRequest(OpenRouterClient client)
         {
             Apply(client);
