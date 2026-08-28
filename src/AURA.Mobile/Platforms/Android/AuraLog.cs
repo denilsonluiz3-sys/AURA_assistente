@@ -5,7 +5,6 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Android.Content;
 using Android.Provider;
-using Android.Runtime;
 using Android.Util;
 
 namespace AURA.Mobile
@@ -93,7 +92,7 @@ namespace AURA.Mobile
                     else Error("AppDomain.UnhandledException (não-Exception): " + (args.ExceptionObject?.ToString() ?? "null"));
                 };
                 TaskScheduler.UnobservedTaskException += (_, args) => Exception("TaskScheduler.UnobservedTaskException", args.Exception);
-                AndroidEnvironment.UnhandledExceptionRaiser += (_, args) => Exception("AndroidEnvironment.UnhandledExceptionRaiser", args.Exception);
+                // AndroidEnvironment.UnhandledExceptionRaiser removido: CS0103 em net10 Android.
                 _previousUncaughtHandler = Java.Lang.Thread.DefaultUncaughtExceptionHandler;
                 Java.Lang.Thread.DefaultUncaughtExceptionHandler = new AuraUncaughtExceptionHandler(_previousUncaughtHandler);
             }
