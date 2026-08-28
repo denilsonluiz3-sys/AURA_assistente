@@ -125,17 +125,16 @@
     {
       "id": "ollama",
       "name": "Ollama (local)",
-      "baseUrl": "http://127.0.0.1:11434/v1/chat/completions",
-      "modelsUrl": "http://127.0.0.1:11434/v1/models",
+      "baseUrl": "http://127.0.0.1:11435",
+      "modelsUrl": "http://127.0.0.1:11435/api/tags",
       "needsKey": false,
-      "defaultModelId": "qwen2.5-coder:1.5b",
-      "authHeaderName": "Authorization",
-      "authScheme": "Bearer ",
+      "defaultModelId": "qwen2:0.5b",
+      "authHeaderName": "",
+      "authScheme": "",
       "apiFormat": "OpenAICompletions",
+      "keyPrefixesList": [],
       "models": [
-        { "id": "qwen2.5-coder:1.5b", "label": "Qwen 2.5 Coder 1.5B", "category": "Local", "isFree": true },
-        { "id": "llama3.2:3b", "label": "Llama 3.2 3B", "category": "Local", "isFree": true },
-        { "id": "phi3:mini", "label": "Phi-3 Mini", "category": "Local", "isFree": true }
+        { "id": "qwen2:0.5b", "label": "Qwen2 0.5B (local)", "category": "Local", "isFree": true }
       ]
     }
   ]
