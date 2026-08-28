@@ -6,6 +6,7 @@ namespace AURA.Mobile.Controls;
 
 /// <summary>
 /// Painel de configuração da IA (provedor + modelo + chave + base URL).
+/// Sem API key: prioriza Ollama (local) no Picker.
 /// </summary>
 public sealed class AiConfigView : ContentView
 {
@@ -15,12 +16,12 @@ public sealed class AiConfigView : ContentView
     private readonly Picker _modelPicker = new() { Title = "Modelo" };
     private readonly Entry _customModelEntry = new()
     {
-        Placeholder = "Modelo custom (opcional)",
+        Placeholder = "Modelo custom (ex.: aura-qwen:latest)",
         FontSize = 12,
     };
     private readonly Entry _baseUrlEntry = new()
     {
-        Placeholder = "http://127.0.0.1:11435/v1/chat/completions",
+        Placeholder = "http://127.0.0.1:11434/v1/chat/completions",
         FontSize = 12,
         Keyboard = Keyboard.Url,
     };
@@ -32,7 +33,7 @@ public sealed class AiConfigView : ContentView
     };
     private readonly Entry _apiKeyEntry = new()
     {
-        Placeholder = "Cole a chave do provedor",
+        Placeholder = "Vazio = Ollama local | ou cole sk-or- / AIza…",
         IsPassword = true,
     };
     private readonly Button _detectButton = new()
@@ -114,7 +115,7 @@ public sealed class AiConfigView : ContentView
                     {
                         new Label
                         {
-                            Text = "BASE URL (Ollama / servidor local — deixe vazio = catálogo)",
+                            Text = "BASE URL (Ollama — vazio = catálogo)",
                             FontSize = 10,
                             TextColor = Color.FromArgb("#7a7a90"),
                         },
@@ -144,13 +145,38 @@ public sealed class AiConfigView : ContentView
         {
             string savedProvider = RuntimeConfig.Provider;
             string savedModel = RuntimeConfig.Model;
-            _apiKeyEntry.Text = RuntimeConfig.ApiKey;
+            string key = RuntimeConfig.ApiKey;
+            _apiKeyEntry.Text = key;
             _baseUrlEntry.Text = RuntimeConfig.BaseUrlOverride;
 
             if (_providerPicker.ItemsSource == null)
             {
                 _providerPicker.ItemsSource = ProviderCatalog.Providers;
                 _providerPicker.ItemDisplayBinding = new Binding(nameof(ProviderInfo.Name));
+            }
+
+            // Sem chave: não ficar preso em OpenRouter/Auto grátis
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                bool needsKey = true;
+                if (!string.IsNullOrWhiteSpace(savedProvider))
+                {
+                    var saved = ProviderCatalog.Find(savedProvider);
+                    needsKey = saved?.NeedsKey ?? true;
+                }
+
+                if (needsKey || string.IsNullOrWhiteSpace(savedProvider))
+                {
+                    savedProvider = "ollama";
+                    RuntimeConfig.Provider = "ollama";
+                    if (string.IsNullOrWhiteSpace(savedModel) ||
+                        savedModel.Contains("openrouter", StringComparison.OrdinalIgnoreCase) ||
+                        savedModel.Contains("free", StringComparison.OrdinalIgnoreCase))
+                    {
+                        savedModel = "qwen2:0.5b";
+                        RuntimeConfig.Model = savedModel;
+                    }
+                }
             }
 
             int providerIndex = 0;
@@ -165,6 +191,7 @@ public sealed class AiConfigView : ContentView
                 }
             }
 
+            // Se não achou, índice 0 = Ollama (primeiro no catálogo)
             _providerPicker.SelectedIndex = providerIndex;
             PopulateModels(savedModel);
             ApplyToClient();
@@ -182,15 +209,21 @@ public sealed class AiConfigView : ContentView
         _customModelEntry.Text = string.Empty;
 
         if (_providerPicker.SelectedItem is ProviderInfo p &&
-            string.Equals(p.Id, "ollama", StringComparison.OrdinalIgnoreCase) &&
-            string.IsNullOrWhiteSpace(_baseUrlEntry.Text))
+            string.Equals(p.Id, "ollama", StringComparison.OrdinalIgnoreCase))
         {
             _applying = true;
             try
             {
-                _baseUrlEntry.Text = string.IsNullOrWhiteSpace(p.BaseUrl)
-                    ? "http://127.0.0.1:11435/v1/chat/completions"
-                    : p.BaseUrl;
+                // Limpa chave ao ir para local — evita validação sk-or-
+                if (!string.IsNullOrWhiteSpace(_apiKeyEntry.Text))
+                    _apiKeyEntry.Text = string.Empty;
+
+                if (string.IsNullOrWhiteSpace(_baseUrlEntry.Text))
+                {
+                    _baseUrlEntry.Text = string.IsNullOrWhiteSpace(p.BaseUrl)
+                        ? "http://127.0.0.1:11434/v1/chat/completions"
+                        : p.BaseUrl;
+                }
             }
             finally { _applying = false; }
         }
@@ -231,6 +264,14 @@ public sealed class AiConfigView : ContentView
         string key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(key) || _client == null)
             return;
+
+        // Não tratar nome de modelo Ollama como chave OpenRouter
+        if (key.Contains(':') && !key.StartsWith("sk-", StringComparison.Ordinal) &&
+            !key.StartsWith("AIza", StringComparison.Ordinal) &&
+            !key.StartsWith("gsk_", StringComparison.Ordinal))
+        {
+            return;
+        }
 
         var detection = _resolver.Detect(new ProviderCredential(key));
         if (!detection.IsConclusive || detection.Provider == null)
@@ -287,6 +328,42 @@ public sealed class AiConfigView : ContentView
     {
         if (_client == null) return;
 
+        string key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
+
+        // Chave vazia → força Ollama e testa (não fica em OpenRouter)
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            SelectProviderById("ollama");
+            ApplyAndPersist();
+
+            _detectButton.IsEnabled = false;
+            _detectStatus.Text = "Testando Ollama (local)…";
+            try
+            {
+                RuntimeConfig.Apply(_client);
+                string probe = await _client.ChatAsync("Responda apenas: OK");
+                string snippet = (probe ?? string.Empty).Trim();
+                if (snippet.Length > 120)
+                    snippet = snippet.Substring(0, 120) + "…";
+                _detectStatus.Text = string.IsNullOrWhiteSpace(snippet)
+                    ? "Sem resposta do Ollama em " + _client.Options.BaseUrl +
+                      "\nAjuste BASE URL (11434 ou 11435) e o modelo (ollama list)."
+                    : "OK · Ollama · " + _client.Options.BaseUrl + " · " + snippet;
+            }
+            catch (Exception ex)
+            {
+                _detectStatus.Text = "Falha Ollama: " + ex.Message +
+                                     "\nURL: " + (_client.Options.BaseUrl ?? "?") +
+                                     "\nConfira: ollama serve e a porta na BASE URL.";
+                AuraLog.Exception("AiConfigView.TestOllama", ex);
+            }
+            finally
+            {
+                _detectButton.IsEnabled = true;
+            }
+            return;
+        }
+
         ApplyAndPersist();
 
         if (_providerPicker.SelectedItem is ProviderInfo localProv && !localProv.NeedsKey)
@@ -301,26 +378,18 @@ public sealed class AiConfigView : ContentView
                 if (snippet.Length > 120)
                     snippet = snippet.Substring(0, 120) + "…";
                 _detectStatus.Text = string.IsNullOrWhiteSpace(snippet)
-                    ? "Sem resposta de " + localProv.Name + " em " + _client.Options.BaseUrl
+                    ? "Sem resposta em " + _client.Options.BaseUrl
                     : "OK · " + localProv.Name + " · " + _client.Options.BaseUrl + " · " + snippet;
             }
             catch (Exception ex)
             {
-                _detectStatus.Text = "Falha Ollama/local: " + ex.Message +
-                                     "\nURL: " + (_client.Options.BaseUrl ?? "?");
+                _detectStatus.Text = "Falha local: " + ex.Message;
                 AuraLog.Exception("AiConfigView.TestLocal", ex);
             }
             finally
             {
                 _detectButton.IsEnabled = true;
             }
-            return;
-        }
-
-        string key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            _detectStatus.Text = "Digite uma chave ou escolha Ollama (local).";
             return;
         }
 
@@ -476,17 +545,13 @@ public sealed class AiConfigView : ContentView
 
         _modelPicker.SelectedIndex = models.Count > 0 ? modelIndex : -1;
 
-        string hint = provider.NeedsKey
+        _apiKeyEntry.Placeholder = provider.NeedsKey
             ? (string.IsNullOrWhiteSpace(provider.KeyHint) ? "Chave de API" : provider.KeyHint)
-            : "Deixe vazio (provedor local)";
-        _apiKeyEntry.Placeholder = hint;
-        _apiKeyLabel.Text = provider.NeedsKey ? "Chave de API" : "Chave de API (opcional)";
+            : "Deixe VAZIO para Ollama local";
+        _apiKeyLabel.Text = provider.NeedsKey ? "Chave de API" : "Chave (não use em Ollama)";
 
-        if (string.IsNullOrWhiteSpace(RuntimeConfig.BaseUrlOverride) &&
-            string.Equals(provider.Id, "ollama", StringComparison.OrdinalIgnoreCase))
-        {
+        if (string.Equals(provider.Id, "ollama", StringComparison.OrdinalIgnoreCase))
             _baseUrlEntry.Placeholder = provider.BaseUrl;
-        }
 
         _modelPicker.SelectedIndexChanged += OnModelChanged;
     }
@@ -508,6 +573,9 @@ public sealed class AiConfigView : ContentView
         RuntimeConfig.BaseUrlOverride = _baseUrlEntry.Text?.Trim() ?? string.Empty;
 
         string apiKey = _apiKeyEntry.Text?.Trim() ?? string.Empty;
+        // Em Ollama nunca grava "chave" que seja lixo
+        if (!provider.NeedsKey)
+            apiKey = string.Empty;
         RuntimeConfig.ApiKey = apiKey;
 
         string? fmt = RuntimeConfig.ValidateApiKeyFormat(apiKey, provider);
