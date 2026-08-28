@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Android.Content;
 using Android.Provider;
+using Android.Runtime;
 using Android.Util;
 
 namespace AURA.Mobile
@@ -132,7 +133,7 @@ namespace AURA.Mobile
 
                 AndroidEnvironment.UnhandledExceptionRaiser += (_, args) =>
                 {
-                    Exception("AndroidEnvironment.UnhandledExceptionRaiser", args.Exception);
+                    Exception("AndroidEnvironment.UnhandledExceptionRaiser", args);
                 };
 
                 _previousUncaughtHandler = Java.Lang.Thread.DefaultUncaughtExceptionHandler;
