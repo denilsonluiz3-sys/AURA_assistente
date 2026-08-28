@@ -1,7 +1,25 @@
 {
   "schemaVersion": 2,
-  "description": "AURA LLM provider catalog",
+  "description": "AURA LLM provider catalog — Ollama primeiro para seleção local",
   "providers": [
+    {
+      "id": "ollama",
+      "name": "Ollama (local)",
+      "baseUrl": "http://127.0.0.1:11434/v1/chat/completions",
+      "modelsUrl": "http://127.0.0.1:11434/v1/models",
+      "needsKey": false,
+      "defaultModelId": "qwen2:0.5b",
+      "authHeaderName": "",
+      "authScheme": "",
+      "apiFormat": "OpenAICompletions",
+      "keyPrefixesList": [],
+      "models": [
+        { "id": "qwen2:0.5b", "label": "Qwen2 0.5B", "category": "Local", "isFree": true },
+        { "id": "aura-qwen:latest", "label": "aura-qwen", "category": "Local", "isFree": true },
+        { "id": "qwen2.5-coder:1.5b", "label": "Qwen 2.5 Coder 1.5B", "category": "Local", "isFree": true },
+        { "id": "llama3.2:3b", "label": "Llama 3.2 3B", "category": "Local", "isFree": true }
+      ]
+    },
     {
       "id": "openrouter",
       "name": "OpenRouter",
@@ -19,10 +37,7 @@
         { "id": "openrouter/free", "label": "Auto grátis", "category": "Grátis", "isFree": true },
         { "id": "google/gemma-2-9b-it:free", "label": "Gemma 2 9B (free)", "category": "Grátis", "isFree": true },
         { "id": "meta-llama/llama-3.2-3b-instruct:free", "label": "Llama 3.2 3B (free)", "category": "Grátis", "isFree": true },
-        { "id": "qwen/qwen-2.5-7b-instruct:free", "label": "Qwen 2.5 7B (free)", "category": "Grátis", "isFree": true },
-        { "id": "qwen/qwen-plus", "label": "Qwen Plus", "category": "Pago", "isFree": false },
-        { "id": "google/gemini-2.5-flash", "label": "Gemini 2.5 Flash (OR)", "category": "Pago", "isFree": false },
-        { "id": "deepseek/deepseek-chat", "label": "DeepSeek Chat (OR)", "category": "Pago", "isFree": false }
+        { "id": "qwen/qwen-2.5-7b-instruct:free", "label": "Qwen 2.5 7B (free)", "category": "Grátis", "isFree": true }
       ]
     },
     {
@@ -40,26 +55,7 @@
       "keyPrefixesList": ["AIza"],
       "models": [
         { "id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash", "category": "Grátis", "isFree": true },
-        { "id": "gemini-2.5-flash-lite", "label": "Gemini 2.5 Flash-Lite", "category": "Grátis", "isFree": true },
-        { "id": "gemini-2.5-pro", "label": "Gemini 2.5 Pro", "category": "Pago", "isFree": false }
-      ]
-    },
-    {
-      "id": "deepseek",
-      "name": "DeepSeek",
-      "baseUrl": "https://api.deepseek.com/chat/completions",
-      "modelsUrl": "https://api.deepseek.com/models",
-      "needsKey": true,
-      "keyEnv": "DEEPSEEK_API_KEY",
-      "keyHint": "sk-… (platform.deepseek.com)",
-      "defaultModelId": "deepseek-chat",
-      "authHeaderName": "Authorization",
-      "authScheme": "Bearer ",
-      "apiFormat": "OpenAICompletions",
-      "keyPrefixesList": [],
-      "models": [
-        { "id": "deepseek-chat", "label": "DeepSeek Chat", "category": "Eficiente", "isFree": false },
-        { "id": "deepseek-reasoner", "label": "DeepSeek Reasoner", "category": "Raciocínio", "isFree": false }
+        { "id": "gemini-2.5-flash-lite", "label": "Gemini 2.5 Flash-Lite", "category": "Grátis", "isFree": true }
       ]
     },
     {
@@ -70,15 +66,31 @@
       "needsKey": true,
       "keyEnv": "GROQ_API_KEY",
       "keyHint": "gsk_…",
-      "defaultModelId": "llama-3.3-70b-versatile",
+      "defaultModelId": "llama-3.1-8b-instant",
       "authHeaderName": "Authorization",
       "authScheme": "Bearer ",
       "apiFormat": "OpenAICompletions",
       "keyPrefixesList": ["gsk_"],
       "models": [
-        { "id": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B", "category": "Grátis", "isFree": true },
         { "id": "llama-3.1-8b-instant", "label": "Llama 3.1 8B", "category": "Grátis", "isFree": true },
-        { "id": "gemma2-9b-it", "label": "Gemma 2 9B", "category": "Grátis", "isFree": true }
+        { "id": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B", "category": "Grátis", "isFree": true }
+      ]
+    },
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "baseUrl": "https://api.deepseek.com/chat/completions",
+      "modelsUrl": "https://api.deepseek.com/models",
+      "needsKey": true,
+      "keyEnv": "DEEPSEEK_API_KEY",
+      "keyHint": "sk-…",
+      "defaultModelId": "deepseek-chat",
+      "authHeaderName": "Authorization",
+      "authScheme": "Bearer ",
+      "apiFormat": "OpenAICompletions",
+      "keyPrefixesList": [],
+      "models": [
+        { "id": "deepseek-chat", "label": "DeepSeek Chat", "category": "Eficiente", "isFree": false }
       ]
     },
     {
@@ -95,79 +107,7 @@
       "apiFormat": "OpenAICompletions",
       "keyPrefixesList": ["sk-"],
       "models": [
-        { "id": "gpt-4o-mini", "label": "GPT-4o Mini", "category": "Eficiente", "isFree": false },
-        { "id": "gpt-4o", "label": "GPT-4o", "category": "Flagship", "isFree": false }
-      ]
-    },
-    {
-      "id": "ollama",
-      "name": "Ollama (local)",
-      "baseUrl": "http://127.0.0.1:11435/v1/chat/completions",
-      "modelsUrl": "http://127.0.0.1:11435/v1/models",
-      "needsKey": false,
-      "defaultModelId": "qwen2:0.5b",
-      "authHeaderName": "",
-      "authScheme": "",
-      "apiFormat": "OpenAICompletions",
-      "keyPrefixesList": [],
-      "models": [
-        { "id": "qwen2:0.5b", "label": "Qwen2 0.5B (local)", "category": "Local", "isFree": true },
-        { "id": "qwen2.5-coder:1.5b", "label": "Qwen 2.5 Coder 1.5B", "category": "Local", "isFree": true },
-        { "id": "llama3.2:3b", "label": "Llama 3.2 3B", "category": "Local", "isFree": true }
-      ]
-    },
-    {
-      "id": "mistral",
-      "name": "Mistral AI",
-      "baseUrl": "https://api.mistral.ai/v1/chat/completions",
-      "modelsUrl": "https://api.mistral.ai/v1/models",
-      "needsKey": true,
-      "keyEnv": "MISTRAL_API_KEY",
-      "keyHint": "MISTRAL_API_KEY",
-      "defaultModelId": "mistral-small-latest",
-      "authHeaderName": "Authorization",
-      "authScheme": "Bearer ",
-      "apiFormat": "OpenAICompletions",
-      "keyPrefixesList": [],
-      "models": [
-        { "id": "mistral-small-latest", "label": "Mistral Small", "category": "Eficiente", "isFree": false },
-        { "id": "mistral-large-latest", "label": "Mistral Large", "category": "Flagship", "isFree": false }
-      ]
-    },
-    {
-      "id": "anthropic",
-      "name": "Anthropic (Claude)",
-      "baseUrl": "https://api.anthropic.com/v1/messages",
-      "modelsUrl": "https://api.anthropic.com/v1/models",
-      "needsKey": true,
-      "keyEnv": "ANTHROPIC_API_KEY",
-      "keyHint": "sk-ant-…",
-      "defaultModelId": "claude-sonnet-4-5-20250929",
-      "authHeaderName": "x-api-key",
-      "authScheme": "",
-      "apiFormat": "AnthropicMessages",
-      "keyPrefixesList": ["sk-ant-"],
-      "models": [
-        { "id": "claude-sonnet-4-5-20250929", "label": "Claude Sonnet 4.5", "category": "Razoável", "isFree": false },
-        { "id": "claude-haiku-4-5-20251001", "label": "Claude Haiku 4.5", "category": "Eficiente", "isFree": false }
-      ]
-    },
-    {
-      "id": "xai",
-      "name": "Grok (xAI)",
-      "baseUrl": "https://api.x.ai/v1/chat/completions",
-      "modelsUrl": "https://api.x.ai/v1/models",
-      "needsKey": true,
-      "keyEnv": "XAI_API_KEY",
-      "keyHint": "XAI_API_KEY",
-      "defaultModelId": "grok-3-mini",
-      "authHeaderName": "Authorization",
-      "authScheme": "Bearer ",
-      "apiFormat": "OpenAICompletions",
-      "keyPrefixesList": ["xai-"],
-      "models": [
-        { "id": "grok-3-mini", "label": "Grok 3 Mini", "category": "Eficiente", "isFree": false },
-        { "id": "grok-3", "label": "Grok 3", "category": "Flagship", "isFree": false }
+        { "id": "gpt-4o-mini", "label": "GPT-4o Mini", "category": "Eficiente", "isFree": false }
       ]
     }
   ]
