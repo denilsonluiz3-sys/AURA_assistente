@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
-	<application android:allowBackup="true" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true" android:requestLegacyExternalStorage="true"></application>
+	<!-- allowBackup=false: evita exportar prefs/segredos via backup do sistema. -->
+	<application android:allowBackup="false" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true" android:requestLegacyExternalStorage="true"></application>
 
 	<!-- Rede e diagnóstico. -->
 	<uses-permission android:name="android.permission.INTERNET" />
