@@ -301,29 +301,22 @@ public partial class AgentPage : ContentPage
         ConfigButton.Text = visible ? "×" : "⚙";
     }
 
-    // ── Menu de ações (botão ⚡) ──────────────────────────────────────
-
     private async void OnAgentMenuClicked(object? sender, EventArgs e)
     {
         try
         {
             string action = await DisplayActionSheetAsync(
                 "⚡ AURA Agent", "Fechar", null,
-                // ── Ações Locais (sem LLM) ──
                 "📂 Workspace",
                 "🔍 Diagnóstico",
                 "🧠 Memória",
                 "▶ Continuar",
                 "🖥️ Shell",
-                // ── Células ──
                 "📋 Células",
                 "▶ Rodar programa",
-                // ── Web ──
                 "🌐 Contexto para Web AI",
                 "📋 Colar plano",
-                // ── Config ──
                 "⚙ Configurar IA",
-                // ── Adicionar ──
                 "➕ Adicionar atalho"
             );
 
@@ -419,7 +412,7 @@ public partial class AgentPage : ContentPage
         try
         {
             string? name = await DisplayPromptAsync("Novo atalho", "Nome do atalho:",
-                "Salvar", " Cancelar", maxLength: 60);
+                "Salvar", "Cancelar", maxLength: 60);
             if (string.IsNullOrWhiteSpace(name)) return;
 
             string? command = await DisplayPromptAsync("Comando", "Comando shell ou ação:",
@@ -452,6 +445,19 @@ public partial class AgentPage : ContentPage
             await AppendBubbleAsync(message, user: false, isError: true);
         }
         catch { /* ignore */ }
+    }
+
+    /// <summary>
+    /// True se o cliente atual pode chamar LLM sem API key (Ollama / NeedsKey=false).
+    /// </summary>
+    private bool HasLocalLlmWithoutKey()
+    {
+        if (string.Equals(_client.Options.Provider, "ollama", StringComparison.OrdinalIgnoreCase))
+            return !string.IsNullOrWhiteSpace(_client.Options.BaseUrl);
+
+        ProviderInfo? p = ProviderCatalog.Find(RuntimeConfig.Provider)
+            ?? ProviderCatalog.Find(_client.Options.Provider);
+        return p != null && !p.NeedsKey && !string.IsNullOrWhiteSpace(_client.Options.BaseUrl);
     }
 
     private void EnsureSession()
@@ -507,7 +513,8 @@ public partial class AgentPage : ContentPage
             "Use run_executor para git/python/node quando disponíveis. Use list_programs/run_program para automações. " +
             "Quando resolver com shell, inclua um bloco ```aura-sh\ncomandos\n``` para a memória poder reexecutar depois. " +
             "Responda em português, curto e objetivo. " +
-            "Não invente caminhos fora do workspace. Use o mínimo de rodadas de ferramenta.";
+            "Não invente caminhos fora do workspace. Use o mínimo de rodadas de ferramenta. " +
+            "NÃO use busca na web nem diga que pesquisou na internet para perguntas simples — responda direto com o modelo local quando possível.";
 
         _session = new AgentSession(_client, tools, systemPrompt, memory: _memory);
         _session.Step += OnAgentStep;
@@ -653,8 +660,6 @@ public partial class AgentPage : ContentPage
         EnsureSession();
     }
 
-    // --- Chips de atalho ---
-
     private void OnChipWorkspace(object sender, EventArgs e)
     {
         CommandEditor.Text = "listar workspace";
@@ -693,7 +698,6 @@ public partial class AgentPage : ContentPage
         CommandEditor.Text =
             "Só use run_shell com comandos toybox (ls, cat, grep, find, sed, pwd, df, getprop). " +
             "Proibido apt, pip, npm, git install. Se faltar comando, diga e pare.";
-        // não dispara sozinho — usuário completa o objetivo e toca ▶
     }
 
     private static bool IsContinueCommand(string text)
@@ -729,7 +733,6 @@ public partial class AgentPage : ContentPage
             return;
         }
 
-        // Expande "continue" antes de gravar como meta (preserva meta real)
         bool wasContinue = IsContinueCommand(text);
         string resolved = ExpandContinueCommand(text);
 
@@ -761,10 +764,6 @@ public partial class AgentPage : ContentPage
             processId = process.Id;
             _activeProcessId = process.Id;
 
-            // Atalhos locais usam o texto original (ls / diagnóstico / memória X)
-            // Se o usuário repete a mesma frase, pula o playbook/orquestrador
-            // (que gerariam o mesmo resultado) e vai direto para a IA, que
-            // pode interpretar o novo contexto.
             string playbookQuery = wasContinue ? resolved : text;
             bool isRepeat = !wasContinue && _lastUserQuery != null
                 && string.Equals(text, _lastUserQuery, StringComparison.OrdinalIgnoreCase);
@@ -791,9 +790,15 @@ public partial class AgentPage : ContentPage
 
             _processes.Update(process.Id, "Executando", "Processando", 0.1);
             string answerFromAgent;
-            if (string.IsNullOrWhiteSpace(RuntimeConfig.ApiKey) && string.IsNullOrWhiteSpace(_client.Options.ApiKey))
+
+            bool hasCloudKey = !string.IsNullOrWhiteSpace(RuntimeConfig.ApiKey)
+                || !string.IsNullOrWhiteSpace(_client.Options.ApiKey);
+            bool hasLocalLlm = HasLocalLlmWithoutKey();
+
+            // Só busca web se NÃO houver LLM configurado (nem nuvem nem Ollama)
+            if (!hasCloudKey && !hasLocalLlm)
             {
-                await AppendBubbleAsync("Buscando na web...", user: false, isTool: true);
+                await AppendBubbleAsync("Sem LLM local/chave — tentando web…", user: false, isTool: true);
                 answerFromAgent = await WebSearchAnswer.SearchWithRefinementAsync(resolved);
             }
             else
@@ -805,6 +810,9 @@ public partial class AgentPage : ContentPage
                     await AppendBubbleAsync(readyError, user: false, isError: true);
                     return;
                 }
+
+                // Sessão antiga pode ter sido criada antes de mudar o provedor
+                _session = null;
                 EnsureSession();
                 answerFromAgent = await _session!.RunAsync(resolved);
             }
@@ -819,22 +827,22 @@ public partial class AgentPage : ContentPage
                 await AppendBubbleAsync($"↥ Sync: {synced} arquivo(s).", user: false, isTool: true);
             }
         }
-catch (AgentLlmException ex)
-            {
-                string userMsg = FriendlyLlmError(ex);
-                if (!string.IsNullOrEmpty(processId))
-                    _processes.Fail(processId, userMsg);
-                await AppendBubbleAsync("Erro: " + userMsg, user: false, isError: true);
-                AuraLog.Exception("AgentPage.OnRunClicked", ex);
-            }
-            catch (Exception ex)
-            {
-                string userMsg = FriendlyLlmError(ex);
-                if (!string.IsNullOrEmpty(processId))
-                    _processes.Fail(processId, userMsg);
-                await AppendBubbleAsync("Erro: " + userMsg, user: false, isError: true);
-                AuraLog.Exception("AgentPage.OnRunClicked", ex);
-            }
+        catch (AgentLlmException ex)
+        {
+            string userMsg = FriendlyLlmError(ex);
+            if (!string.IsNullOrEmpty(processId))
+                _processes.Fail(processId, userMsg);
+            await AppendBubbleAsync("Erro: " + userMsg, user: false, isError: true);
+            AuraLog.Exception("AgentPage.OnRunClicked", ex);
+        }
+        catch (Exception ex)
+        {
+            string userMsg = FriendlyLlmError(ex);
+            if (!string.IsNullOrEmpty(processId))
+                _processes.Fail(processId, userMsg);
+            await AppendBubbleAsync("Erro: " + userMsg, user: false, isError: true);
+            AuraLog.Exception("AgentPage.OnRunClicked", ex);
+        }
         finally
         {
             if (_activeProcessId == processId) _activeProcessId = null;
@@ -887,41 +895,41 @@ catch (AgentLlmException ex)
         }
     }
 
-private static string FriendlyLlmError(Exception ex)
+    private static string FriendlyLlmError(Exception ex)
+    {
+        if (ex is AgentLlmException aex)
         {
-            if (ex is AgentLlmException aex)
+            return aex.ErrorKind switch
             {
-                return aex.ErrorKind switch
-                {
-                    AgentErrorKind.RateLimited =>
-                        "Rate limit atingido. 💡 Use a aba Web AI ou copie o contexto (📋) e cole no ChatGPT/DeepSeek.",
-                    AgentErrorKind.PaymentRequired =>
-                        "Sem créditos LLM. Use Web AI (📋 Contexto) ou reduza max_tokens.",
-                    AgentErrorKind.InvalidApiKey =>
-                        "API key inválida. Toque ⚙ na aba Assistente e corrija.",
-                    AgentErrorKind.Timeout =>
-                        "A chamada LLM expirou. Tente novamente.",
-                    AgentErrorKind.Network =>
-                        "Falha de rede ao falar com o provedor.",
-                    AgentErrorKind.InvalidRequest =>
-                        "Requisição inválida para o modelo.",
-                    AgentErrorKind.ProviderError =>
-                        "Erro no provedor LLM. Tente novamente.",
-                    _ => aex.Message.Length > 280 ? aex.Message[..280] + "…" : aex.Message
-                };
-            }
-
-            string m = ex.Message ?? "";
-            if (m.Contains("401")) return "API key inválida.";
-            if (m.Contains("402")) return "Sem créditos LLM. Use Web AI (📋 Contexto) ou reduza max_tokens.";
-            if (m.Contains("429")) return "Rate limit.";
-            if (m.Contains("node already has a parent", StringComparison.OrdinalIgnoreCase))
-                return "Erro interno de tools. Atualize o APK.";
-            if (m.Contains("Invalid JSON in tool call", StringComparison.OrdinalIgnoreCase)
-                || m.Contains("tool arguments must be", StringComparison.OrdinalIgnoreCase))
-                return "Argumentos de ferramenta inválidos (JSON). Reformule o pedido.";
-            return m.Length > 280 ? m[..280] + "…" : m;
+                AgentErrorKind.RateLimited =>
+                    "Rate limit atingido. 💡 Use a aba Web AI ou copie o contexto (📋) e cole no ChatGPT/DeepSeek.",
+                AgentErrorKind.PaymentRequired =>
+                    "Sem créditos LLM. Use Web AI (📋 Contexto) ou reduza max_tokens.",
+                AgentErrorKind.InvalidApiKey =>
+                    "API key inválida. Toque ⚙ na aba Assistente e corrija.",
+                AgentErrorKind.Timeout =>
+                    "A chamada LLM expirou. Tente novamente.",
+                AgentErrorKind.Network =>
+                    "Falha de rede ao falar com o provedor.",
+                AgentErrorKind.InvalidRequest =>
+                    "Requisição inválida para o modelo.",
+                AgentErrorKind.ProviderError =>
+                    "Erro no provedor LLM. Tente novamente.",
+                _ => aex.Message.Length > 280 ? aex.Message[..280] + "…" : aex.Message
+            };
         }
+
+        string m = ex.Message ?? "";
+        if (m.Contains("401")) return "API key inválida.";
+        if (m.Contains("402")) return "Sem créditos LLM. Use Web AI (📋 Contexto) ou reduza max_tokens.";
+        if (m.Contains("429")) return "Rate limit.";
+        if (m.Contains("node already has a parent", StringComparison.OrdinalIgnoreCase))
+            return "Erro interno de tools. Atualize o APK.";
+        if (m.Contains("Invalid JSON in tool call", StringComparison.OrdinalIgnoreCase)
+            || m.Contains("tool arguments must be", StringComparison.OrdinalIgnoreCase))
+            return "Argumentos de ferramenta inválidos (JSON). Reformule o pedido.";
+        return m.Length > 280 ? m[..280] + "…" : m;
+    }
 
     private static bool ShouldOrchestrate(string text)
     {
