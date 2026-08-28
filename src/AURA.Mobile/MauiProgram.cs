@@ -59,7 +59,18 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new MemoryStore(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "memory.json")));
         // MaxTokens 1024: planos gratuitos OpenRouter costumam estourar 402 com 1500
         // API key vem do SecureStorage (RuntimeConfig), não de Preferences em claro.
-        builder.Services.AddSingleton(sp => new OpenRouterClient(new OpenRouterOptions { ApiKey = RuntimeConfig.ApiKey, BaseUrl = "https://openrouter.ai/api/v1/chat/completions", Model = "qwen/qwen-plus", MaxTokens = 1024 }, sp.GetRequiredService<ILogger>()));
+        builder.Services.AddSingleton(sp => new OpenRouterClient(
+            new OpenRouterOptions
+            {
+                Provider = "ollama",
+                ApiKey = string.Empty,
+                BaseUrl = "http://127.0.0.1:11435/api/chat",
+                Model = "aura-qwen",
+                MaxTokens = 1024,
+                TimeoutSeconds = 180,
+                ApiFormat = AiApiFormat.OpenAICompletions
+            },
+            sp.GetRequiredService<ILogger>()));
         builder.Services.AddSingleton<AiDiagnosticsService>();
         builder.Services.AddSingleton<AiAssistant>();
         builder.Services.AddSingleton<ISpeechService, HybridSpeechService>();
