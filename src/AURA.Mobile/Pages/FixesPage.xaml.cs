@@ -105,7 +105,7 @@ public partial class FixesPage : ContentPage
             $"max_tokens: {_client.Options.MaxTokens}\n" +
             $"timeout_seconds: {_client.Options.TimeoutSeconds}\n" +
             $"log_lines: {RuntimeConfig.LogLinesForAnalysis}\n" +
-            $"api_key: {(string.IsNullOrWhiteSpace(_client.Options.ApiKey) ? "(vazio)" : "(configurada)" )}";
+            $"api_key: {(string.IsNullOrWhiteSpace(_client.Options.ApiKey) ? "(vazio)" : "(configurada)")}";
     }
 
     private void OnApplyClicked(object sender, EventArgs e)
@@ -135,11 +135,12 @@ public partial class FixesPage : ContentPage
         Preferences.Default.Remove("ai_timeout_seconds");
         Preferences.Default.Remove("ai_log_lines");
         Preferences.Default.Remove("ai_api_key");
+        RuntimeConfig.ClearApiKey();
 
         RuntimeConfig.Apply(_client);
         _pending = new List<FixProposal>();
         FixesView.ItemsSource = null;
         ShowCurrentConfig();
-        StatusLabel.Text = "Configuração restaurada para o padrão.";
+        StatusLabel.Text = "Configuração restaurada para o padrão (API key removida do SecureStorage).";
     }
 }
