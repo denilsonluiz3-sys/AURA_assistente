@@ -111,9 +111,6 @@ namespace AURA.Mobile.Diagnostics
             ApiKey = string.Empty;
         }
 
-        /// <summary>
-        /// Normaliza URL de chat: se o usuário informar só host:porta, completa o path OpenAI.
-        /// </summary>
         public static string NormalizeChatBaseUrl(string? url, string? providerId)
         {
             string u = (url ?? string.Empty).Trim().TrimEnd('/');
@@ -125,7 +122,6 @@ namespace AURA.Mobile.Diagnostics
                 u.Contains("/api/chat", System.StringComparison.OrdinalIgnoreCase))
                 return u;
 
-            // Ollama / OpenAI-compat local
             if (string.Equals(providerId, "ollama", System.StringComparison.OrdinalIgnoreCase) ||
                 u.Contains("127.0.0.1", System.StringComparison.OrdinalIgnoreCase) ||
                 u.Contains("localhost", System.StringComparison.OrdinalIgnoreCase))
@@ -230,7 +226,8 @@ namespace AURA.Mobile.Diagnostics
         }
 
         /// <summary>
-        /// Garante client pronto. Sem key: fallback para NeedsKey=false e retorna aviso (não erro).
+        /// null = pode enviar. string = erro bloqueante (formato de key ou sem provedor).
+        /// Fallback para Ollama atualiza LastStatusMessage e retorna null (não bloqueia).
         /// </summary>
         public static string? EnsureReadyForRequest(OpenRouterClient client)
         {
@@ -276,12 +273,10 @@ namespace AURA.Mobile.Diagnostics
             }
             Apply(client);
 
-            string msg = "Sem chave em " + previous + " — usando " + fallback.Name +
-                         " (" + client.Options.BaseUrl + ").";
-            LastStatusMessage = msg;
-            AuraLog.Info("RuntimeConfig: " + msg);
-            // Aviso informativo (não bloqueia): começa com prefixo reconhecível pela UI
-            return "AVISO: " + msg;
+            LastStatusMessage = "Sem chave em " + previous + " — usando " + fallback.Name +
+                                " (" + client.Options.BaseUrl + ").";
+            AuraLog.Info("RuntimeConfig: " + LastStatusMessage);
+            return null;
         }
     }
 }
