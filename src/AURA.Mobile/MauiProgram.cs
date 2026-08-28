@@ -1,4 +1,5 @@
 using AURA.AI;
+using AURA.AI.Providers;
 using AURA.Agents;
 using AURA.Agents.Programs;
 using AURA.Abstractions;
@@ -125,7 +126,7 @@ public static class MauiProgram
             sp.GetRequiredService<AuraOrchestrator>(),
             sp.GetService<LocalPlaybook>(),
             sp.GetService<VoiceAssistantService>(),
-            sp.GetService<SolutionStore>(),
+            sp.GetRequiredService<SolutionStore>(),
             sp.GetService<GitExecutor>(),
             sp.GetService<PythonExecutor>(),
             sp.GetService<NodeExecutor>(),
