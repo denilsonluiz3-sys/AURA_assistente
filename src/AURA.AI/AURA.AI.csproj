@@ -14,4 +14,11 @@
     <ProjectReference Include="..\AURA.Memory\AURA.Memory.csproj" />
   </ItemGroup>
 
+  <!-- Catálogo de provedores/modelos disponível no APK (não só no clone do repo). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\config\providers.json"
+                      Link="config\providers.json"
+                      LogicalName="AURA.AI.config.providers.json" />
+  </ItemGroup>
+
 </Project>

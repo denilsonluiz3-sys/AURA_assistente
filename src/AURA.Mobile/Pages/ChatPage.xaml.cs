@@ -56,10 +56,7 @@ public partial class ChatPage : ContentPage
     {
         string entryKey = ApiKeyEntry?.Text?.Trim() ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(entryKey))
-        {
-            Preferences.Default.Set("ai_api_key", entryKey);
             RuntimeConfig.ApiKey = entryKey;
-        }
 
         string question = QuestionEditor.Text?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(question))
@@ -84,7 +81,6 @@ public partial class ChatPage : ContentPage
 
         try
         {
-            // 1) Intents determinísticos (navigate / android programs) via orquestrador
             var intent = _intentResolver.Resolve(question);
 
             if (intent.Intent == "navigate"
@@ -110,7 +106,6 @@ public partial class ChatPage : ContentPage
                 return;
             }
 
-            // 2) Fluxo de processo / IA existente
             string answer;
             LlmHandler? llm = null;
             if (!string.IsNullOrWhiteSpace(RuntimeConfig.ApiKey) ||

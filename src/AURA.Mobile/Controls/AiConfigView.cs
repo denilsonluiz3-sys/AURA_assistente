@@ -6,12 +6,7 @@ namespace AURA.Mobile.Controls;
 
 /// <summary>
 /// Painel de configuração da IA (provedor + modelo + chave) compartilhado
-/// entre Chat e Agente. Toda alteração persiste imediatamente em
-/// RuntimeConfig/Preferences e é aplicada no OpenRouterClient — sem depender
-/// do botão "Enviar" de uma aba específica.
-/// Também detecta o provedor pela chave: ao digitar, faz detecção
-/// determinística (formato, sem rede); o botão "Detectar/Testar" faz a
-/// validação real, autorizada explicitamente pelo usuário.
+/// entre Chat e Agente.
 /// </summary>
 public sealed class AiConfigView : ContentView
 {
@@ -19,6 +14,11 @@ public sealed class AiConfigView : ContentView
 
     private readonly Picker _providerPicker = new() { Title = "Provedor" };
     private readonly Picker _modelPicker = new() { Title = "Modelo" };
+    private readonly Entry _customModelEntry = new()
+    {
+        Placeholder = "Modelo custom (opcional, ex.: gemini-2.5-flash)",
+        FontSize = 12,
+    };
     private readonly Label _apiKeyLabel = new()
     {
         Text = "CHAVE DE API",
@@ -27,7 +27,7 @@ public sealed class AiConfigView : ContentView
     };
     private readonly Entry _apiKeyEntry = new()
     {
-        Placeholder = "sk-or-… (deixe vazio se não precisar)",
+        Placeholder = "Cole a chave do provedor",
         IsPassword = true,
     };
     private readonly Button _detectButton = new()
@@ -49,6 +49,7 @@ public sealed class AiConfigView : ContentView
     {
         _providerPicker.SelectedIndexChanged += OnProviderChanged;
         _apiKeyEntry.TextChanged += OnKeyTextChanged;
+        _customModelEntry.TextChanged += OnCustomModelChanged;
         _detectButton.Clicked += OnDetectClicked;
 
         var providerCol = new VerticalStackLayout
@@ -88,6 +89,20 @@ public sealed class AiConfigView : ContentView
                     ColumnSpacing = 10,
                     Children = { providerCol, modelCol },
                 },
+                new VerticalStackLayout
+                {
+                    Spacing = 3,
+                    Children =
+                    {
+                        new Label
+                        {
+                            Text = "MODELO CUSTOM (se não estiver na lista)",
+                            FontSize = 10,
+                            TextColor = Color.FromArgb("#7a7a90"),
+                        },
+                        _customModelEntry,
+                    },
+                },
                 apiKeyCol,
                 new HorizontalStackLayout
                 {
@@ -112,12 +127,15 @@ public sealed class AiConfigView : ContentView
             if (_providerPicker.ItemsSource == null)
             {
                 _providerPicker.ItemsSource = ProviderCatalog.Providers;
+                _providerPicker.ItemDisplayBinding = new Binding(nameof(ProviderInfo.Name));
             }
 
             int providerIndex = 0;
             for (int i = 0; i < ProviderCatalog.Providers.Count; i++)
             {
-                if (string.Equals(ProviderCatalog.Providers[i].Name, savedProvider, StringComparison.OrdinalIgnoreCase))
+                var p = ProviderCatalog.Providers[i];
+                if (string.Equals(p.Id, savedProvider, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(p.Name, savedProvider, StringComparison.OrdinalIgnoreCase))
                 {
                     providerIndex = i;
                     break;
@@ -136,36 +154,34 @@ public sealed class AiConfigView : ContentView
 
     private void OnProviderChanged(object? sender, EventArgs e)
     {
-        if (_applying)
-        {
-            return;
-        }
-
+        if (_applying) return;
+        _customModelEntry.Text = string.Empty;
         PopulateModels(null);
         ApplyAndPersist();
     }
 
     private void OnModelChanged(object? sender, EventArgs e)
     {
-        if (_applying)
-        {
-            return;
-        }
+        if (_applying) return;
+        if (_modelPicker.SelectedItem is ProviderModel)
+            _customModelEntry.Text = string.Empty;
+        ApplyAndPersist();
+    }
 
+    private void OnCustomModelChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (_applying) return;
         ApplyAndPersist();
     }
 
     private void OnKeyTextChanged(object? sender, TextChangedEventArgs e)
     {
-        if (_applying)
-        {
-            return;
-        }
-
+        if (_applying) return;
         ApplyAndPersist();
         TryAutoDetect();
     }
 
+<<<<<<< HEAD
 private void TryAutoDetect()
         {
             string key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
@@ -204,9 +220,25 @@ private void TryAutoDetect()
         }
 
         private async Task TryAutoProbeAsync(string key, IEnumerable<AURA.AI.Providers.IAiProvider> candidates)
+=======
+    private void TryAutoDetect()
+    {
+        string key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(key) || _client == null)
+            return;
+
+        var detection = _resolver.Detect(new ProviderCredential(key));
+        if (!detection.IsConclusive || detection.Provider == null)
+            return;
+
+        ProviderInfo detected = (ProviderInfo)detection.Provider;
+        if (_providerPicker.SelectedItem is ProviderInfo current &&
+            string.Equals(current.Id, detected.Id, StringComparison.OrdinalIgnoreCase))
+>>>>>>> bd1d9e58aea352ba2aefc444e4ec4c23d2da7411
         {
             if (_client == null) return;
 
+<<<<<<< HEAD
             _detectStatus.Text = "Detectando provedor…";
             try
             {
@@ -230,19 +262,31 @@ private void TryAutoDetect()
                 AuraLog.Exception("AiConfigView.TryAutoProbe", ex);
             }
         }
+=======
+        _detectStatus.Text = "Provedor reconhecido pela chave: " + detected.Name + ".";
+        SelectProviderById(detected.Id);
+    }
+>>>>>>> bd1d9e58aea352ba2aefc444e4ec4c23d2da7411
 
     private async void OnDetectClicked(object sender, EventArgs e)
     {
-        if (_client == null)
-        {
-            return;
-        }
+        if (_client == null) return;
 
         string key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(key))
         {
             _detectStatus.Text = "Digite uma chave para detectar o provedor.";
             return;
+        }
+
+        if (_providerPicker.SelectedItem is ProviderInfo sel)
+        {
+            string? fmt = RuntimeConfig.ValidateApiKeyFormat(key, sel);
+            if (fmt != null)
+            {
+                _detectStatus.Text = fmt;
+                return;
+            }
         }
 
         string? preferred = (_providerPicker.SelectedItem as ProviderInfo)?.Name;
@@ -261,7 +305,10 @@ private void TryAutoDetect()
             if (result.Provider != null && result.IsConclusive)
             {
                 _resolver.ApplyToClient(_client, result);
-                SelectProvider(result.Provider.Name);
+                if (result.Provider is ProviderInfo pi)
+                    SelectProviderById(pi.Id);
+                else
+                    SelectProviderById(result.Provider.Name);
                 _detectStatus.Text = result.Message;
             }
             else
@@ -280,15 +327,16 @@ private void TryAutoDetect()
         }
     }
 
-    private void SelectProvider(string providerName)
+    private void SelectProviderById(string idOrName)
     {
         _applying = true;
         try
         {
-            for (int i = 0; i < _providerPicker.ItemsSource.Count; i++)
+            for (int i = 0; i < ProviderCatalog.Providers.Count; i++)
             {
-                if (_providerPicker.ItemsSource[i] is ProviderInfo p &&
-                    string.Equals(p.Name, providerName, StringComparison.OrdinalIgnoreCase))
+                var p = ProviderCatalog.Providers[i];
+                if (string.Equals(p.Id, idOrName, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(p.Name, idOrName, StringComparison.OrdinalIgnoreCase))
                 {
                     _providerPicker.SelectedIndex = i;
                     break;
@@ -318,6 +366,7 @@ private void TryAutoDetect()
         _modelPicker.ItemDisplayBinding = new Binding(nameof(ProviderModel.Label));
 
         string model = string.Empty;
+        bool inList = false;
         if (!string.IsNullOrWhiteSpace(savedModel))
         {
             foreach (var m in provider.Models)
@@ -325,11 +374,19 @@ private void TryAutoDetect()
                 if (string.Equals(m.Id, savedModel, StringComparison.OrdinalIgnoreCase))
                 {
                     model = m.Id;
+                    inList = true;
                     break;
                 }
             }
+
+            if (!inList)
+            {
+                _customModelEntry.Text = savedModel;
+                model = savedModel;
+            }
         }
 
+<<<<<<< HEAD
         // Prioridade ao selecionar: modelo salvo > primeiro free > defaultModelId > primeiro da lista
         int modelIndex = 0;
         var models = provider.Models;
@@ -370,18 +427,37 @@ private void TryAutoDetect()
                             break;
                         }
                     }
+=======
+        if (string.IsNullOrWhiteSpace(model) && provider.Models.Count > 0)
+        {
+            model = !string.IsNullOrWhiteSpace(provider.DefaultModelId)
+                ? provider.DefaultModelId
+                : provider.Models[0].Id;
+            inList = true;
+        }
+
+        int modelIndex = 0;
+        if (inList)
+        {
+            for (int i = 0; i < provider.Models.Count; i++)
+            {
+                if (string.Equals(provider.Models[i].Id, model, StringComparison.OrdinalIgnoreCase))
+                {
+                    modelIndex = i;
+                    break;
+>>>>>>> bd1d9e58aea352ba2aefc444e4ec4c23d2da7411
                 }
             }
         }
 
-        _modelPicker.SelectedIndex = modelIndex;
+        _modelPicker.SelectedIndex = provider.Models.Count > 0 ? modelIndex : -1;
 
         string hint = provider.NeedsKey
-            ? (string.IsNullOrWhiteSpace(provider.KeyHint) ? "Chave de API" : $"Chave ({provider.KeyHint})")
+            ? (string.IsNullOrWhiteSpace(provider.KeyHint) ? "Chave de API" : provider.KeyHint)
             : "Deixe vazio (provedor local)";
         _apiKeyEntry.Placeholder = hint;
         _apiKeyLabel.Text = provider.NeedsKey ? "Chave de API" : "Chave de API (opcional)";
-        _apiKeyEntry.IsVisible = provider.NeedsKey;
+        _apiKeyEntry.IsVisible = true;
 
         _modelPicker.SelectedIndexChanged += OnModelChanged;
     }
@@ -390,34 +466,35 @@ private void TryAutoDetect()
     {
         OpenRouterClient? client = _client;
         if (client == null || _providerPicker.SelectedItem is not ProviderInfo provider)
-        {
             return;
+
+        RuntimeConfig.Provider = provider.Id;
+
+        string custom = _customModelEntry.Text?.Trim() ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(custom))
+        {
+            RuntimeConfig.Model = custom;
         }
-
-        RuntimeConfig.Provider = provider.Name;
-        Preferences.Default.Set("ai_provider", provider.Name);
-
-        if (_modelPicker.SelectedItem is ProviderModel pm)
+        else if (_modelPicker.SelectedItem is ProviderModel pm)
         {
             RuntimeConfig.Model = pm.Id;
-            Preferences.Default.Set("ai_model", pm.Id);
         }
 
         string apiKey = _apiKeyEntry.Text?.Trim() ?? string.Empty;
         RuntimeConfig.ApiKey = apiKey;
-        Preferences.Default.Set("ai_api_key", apiKey);
+
+        string? fmt = RuntimeConfig.ValidateApiKeyFormat(apiKey, provider);
+        if (fmt != null && !string.IsNullOrWhiteSpace(apiKey))
+            _detectStatus.Text = fmt;
+        else if (!string.IsNullOrWhiteSpace(apiKey))
+            _detectStatus.Text = "Provedor: " + provider.Name + " · modelo: " + RuntimeConfig.Model;
 
         ApplyToClient();
     }
 
-    /// <summary>Aplica a configuração completa, incluindo provider e autenticação.</summary>
     public void ApplyToClient()
     {
-        if (_client == null)
-        {
-            return;
-        }
-
+        if (_client == null) return;
         RuntimeConfig.Apply(_client);
     }
 }

@@ -327,7 +327,7 @@ public sealed class AndroidCapabilityService : IAndroidCapabilityService
     {
         try
         {
-            var pm = _context PackageManager;
+            var pm = _context.PackageManager;
             if (pm == null)
                 return "ERRO: PackageManager indisponivel.";
 
@@ -359,7 +359,7 @@ public sealed class AndroidCapabilityService : IAndroidCapabilityService
         }
         catch (Exception ex)
         {
-            return Failure(" buscar app " + query, ex);
+            return Failure("buscar app " + query, ex);
         }
     }
 
