@@ -166,36 +166,70 @@ public sealed class AiConfigView : ContentView
         TryAutoDetect();
     }
 
-    private void TryAutoDetect()
-    {
-        string key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(key) || _client == null)
+private void TryAutoDetect()
         {
-            return;
-        }
-
-        var detection = _resolver.Detect(new ProviderCredential(key));
-        if (!detection.IsConclusive || detection.Provider == null)
-        {
-            if (string.IsNullOrWhiteSpace(key))
+            string key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(key) || _client == null)
             {
-                _detectStatus.Text = string.Empty;
+                return;
             }
 
-            return;
+            var detection = _resolver.Detect(new ProviderCredential(key));
+            if (!detection.IsConclusive || detection.Provider == null)
+            {
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    _detectStatus.Text = string.Empty;
+                }
+
+                // Sem prefixo conhecido: tenta probe automático (autorizado pelo app).
+                if (!detection.IsConclusive && detection.Candidates.Count > 0)
+                {
+                    _ = TryAutoProbeAsync(key, detection.Candidates);
+                }
+
+                return;
+            }
+
+            ProviderInfo detected = (ProviderInfo)detection.Provider;
+            if (_providerPicker.SelectedItem is ProviderInfo current &&
+                string.Equals(current.Name, detected.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                _detectStatus.Text = "Provedor reconhecido: " + detected.Name + ".";
+                return;
+            }
+
+            _detectStatus.Text = "Provedor reconhecido pela chave: " + detected.Name + ".";
+            SelectProvider(detected.Name);
         }
 
-        ProviderInfo detected = (ProviderInfo)detection.Provider;
-        if (_providerPicker.SelectedItem is ProviderInfo current &&
-            string.Equals(current.Name, detected.Name, StringComparison.OrdinalIgnoreCase))
+        private async Task TryAutoProbeAsync(string key, IEnumerable<AURA.AI.Providers.IAiProvider> candidates)
         {
-            _detectStatus.Text = "Provedor reconhecido: " + detected.Name + ".";
-            return;
-        }
+            if (_client == null) return;
 
-        _detectStatus.Text = "Provedor reconhecido pela chave: " + detected.Name + ".";
-        SelectProvider(detected.Name);
-    }
+            _detectStatus.Text = "Detectando provedor…";
+            try
+            {
+                var credential = new ProviderCredential(key, allowProbe: true);
+                ProviderDetectionResult result = await _resolver.ResolveAsync(credential);
+
+                if (result.Provider != null && result.IsConclusive)
+                {
+                    _resolver.ApplyToClient(_client, result);
+                    SelectProvider(result.Provider.Name);
+                    _detectStatus.Text = result.Message;
+                }
+                else
+                {
+                    _detectStatus.Text = result.Message;
+                }
+            }
+            catch (Exception ex)
+            {
+                _detectStatus.Text = "Falha ao detectar.";
+                AuraLog.Exception("AiConfigView.TryAutoProbe", ex);
+            }
+        }
 
     private async void OnDetectClicked(object sender, EventArgs e)
     {
@@ -301,17 +335,50 @@ public sealed class AiConfigView : ContentView
             model = provider.Models[0].Id;
         }
 
-        int modelIndex = 0;
-        for (int i = 0; i < provider.Models.Count; i++)
-        {
-            if (string.Equals(provider.Models[i].Id, model, StringComparison.OrdinalIgnoreCase))
+int modelIndex = 0;
+            List<ProviderModel> models = provider.Models;
+            if (models.Count > 0)
             {
-                modelIndex = i;
-                break;
-            }
-        }
+                // Prioridade: modelo salvo > primeiro free > defaultModelId > primeiro da lista
+                if (!string.IsNullOrWhiteSpace(model))
+                {
+                    for (int i = 0; i < models.Count; i++)
+                    {
+                        if (string.Equals(models[i].Id, model, StringComparison.OrdinalIgnoreCase))
+                        {
+                            modelIndex = i;
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    // Sem modelo salvo: prioriza free, depois defaultModelId
+                    int freeIdx = -1;
+                    for (int i = 0; i < models.Count; i++)
+                    {
+                        if (models[i].IsFree) { freeIdx = i; break; }
+                    }
 
-        _modelPicker.SelectedIndex = modelIndex;
+                    if (freeIdx >= 0)
+                    {
+                        modelIndex = freeIdx;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(provider.DefaultModelId))
+                    {
+                        for (int i = 0; i < models.Count; i++)
+                        {
+                            if (string.Equals(models[i].Id, provider.DefaultModelId, StringComparison.OrdinalIgnoreCase))
+                            {
+                                modelIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            _modelPicker.SelectedIndex = modelIndex;
 
         string hint = provider.NeedsKey
             ? (string.IsNullOrWhiteSpace(provider.KeyHint) ? "Chave de API" : $"Chave ({provider.KeyHint})")

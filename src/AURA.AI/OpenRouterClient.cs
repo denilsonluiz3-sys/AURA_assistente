@@ -26,13 +26,11 @@ namespace AURA.AI
         public AiApiFormat ApiFormat { get; set; } = AiApiFormat.OpenAICompletions;
     }
 
-    public sealed class OpenRouterClient
+public sealed class OpenRouterClient
     {
-        private static readonly string[] BannedTokens = { "anthropic", "claude" };
-
         private static readonly JsonSerializerOptions SerializeOpts = new()
         {
-            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            DefaultIgnoreCondition = System.Text.Json.Serialization.jsonIgnoreCondition.WhenWritingNull
         };
 
         private readonly ILogger _logger;
@@ -43,23 +41,6 @@ namespace AURA.AI
         {
             Options = options ?? throw new ArgumentNullException(nameof(options));
             _logger = logger ?? new ConsoleLogger();
-            GuardAgainstBanned();
-        }
-
-        private void GuardAgainstBanned()
-        {
-            string hay =
-                (Options.Provider ?? string.Empty) + " " +
-                (Options.Model ?? string.Empty) + " " +
-                (Options.BaseUrl ?? string.Empty);
-            foreach (string token in BannedTokens)
-            {
-                if (hay.Contains(token, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidOperationException(
-                        "Provedor/modelo banido no AURA: '" + token + "' não é permitido.");
-                }
-            }
         }
 
         public HttpRequestMessage BuildRequest(string question, string? systemPrompt = null)
@@ -73,32 +54,68 @@ namespace AURA.AI
 
             messages.Add(new { role = "user", content = question });
 
-            var payload = new
-            {
-                model = Options.Model,
-                max_tokens = Options.MaxTokens,
-                messages
-            };
-
-            string json = JsonSerializer.Serialize(payload);
+            string json;
             var request = new HttpRequestMessage(HttpMethod.Post, Options.BaseUrl);
+
+            bool anthropic = Options.ApiFormat == AiApiFormat.AnthropicMessages;
+
+            if (anthropic)
+            {
+                // Anthropic: max_tokens + system (top-level) + messages + optional tool_use
+                string systemText = string.Empty;
+                if (!string.IsNullOrWhiteSpace(systemPrompt))
+                    systemText = systemPrompt.Trim();
+
+                var payload = new Dictionary<string, object?>
+                {
+                    ["model"] = Options.Model,
+                    ["max_tokens"] = Options.MaxTokens,
+                    ["messages"] = messages
+                };
+
+                if (!string.IsNullOrEmpty(systemText))
+                    payload["system"] = systemText;
+
+                json = JsonSerializer.Serialize(payload, SerializeOpts);
+            }
+            else
+            {
+                var payload = new
+                {
+                    model = Options.Model,
+                    max_tokens = Options.MaxTokens,
+                    messages
+                };
+                json = JsonSerializer.Serialize(payload);
+            }
+
+            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
             if (!string.Equals(Options.Provider, "ollama", StringComparison.OrdinalIgnoreCase))
             {
                 string header = string.IsNullOrWhiteSpace(Options.AuthHeaderName)
                     ? "Authorization"
                     : Options.AuthHeaderName;
-                string scheme = Options.AuthScheme ?? "Bearer ";
-                request.Headers.TryAddWithoutValidation(header, scheme + Options.ApiKey);
+                string scheme = Options.AuthScheme ?? (anthropic ? "" : "Bearer ");
 
-                if (Options.AppReference != null)
+                if (!string.IsNullOrEmpty(scheme))
+                    request.Headers.TryAddWithoutValidation(header, scheme + Options.ApiKey);
+                else
+                    request.Headers.TryAddWithoutValidation(header, Options.ApiKey);
+
+                if (Options.AppReference != null && !anthropic)
                 {
                     request.Headers.TryAddWithoutValidation("X-Title", "AURA");
                     request.Headers.TryAddWithoutValidation("X-URL", Options.AppReference);
                 }
+
+                // Anthropic exige version header
+                if (anthropic)
+                {
+                    request.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
+                }
             }
 
-            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
             return request;
         }
 
@@ -127,18 +144,45 @@ namespace AURA.AI
 
             using var document = JsonDocument.Parse(body);
             JsonElement root = document.RootElement;
-            if (root.TryGetProperty("choices", out JsonElement choices) &&
+
+            bool anthropicResult = Options.ApiFormat == AiApiFormat.AnthropicMessages;
+            string? resultText = null;
+
+            if (anthropicResult && root.TryGetProperty("content", out JsonElement contentArr))
+            {
+                var sb = new StringBuilder();
+                foreach (JsonElement part in contentArr.EnumerateArray())
+                {
+                    if (part.TryGetProperty("text", out JsonElement textEl) &&
+                        textEl.ValueKind == JsonValueKind.String)
+                        sb.Append(textEl.GetString());
+                }
+                resultText = sb.Length > 0 ? sb.ToString() : null;
+            }
+            else if (root.TryGetProperty("choices", out JsonElement choices) &&
                 choices.GetArrayLength() > 0)
             {
                 JsonElement first = choices[0];
                 if (first.TryGetProperty("message", out JsonElement message) &&
                     message.TryGetProperty("content", out JsonElement content))
                 {
-                    return content.GetString() ?? string.Empty;
+                    if (content.ValueKind == JsonValueKind.String)
+                        resultText = content.GetString() ?? string.Empty;
+                    else if (content.ValueKind == JsonValueKind.Array)
+                    {
+                        var sb = new StringBuilder();
+                        foreach (JsonElement part in content.EnumerateArray())
+                        {
+                            if (part.TryGetProperty("text", out JsonElement textEl) &&
+                                textEl.ValueKind == JsonValueKind.String)
+                                sb.Append(textEl.GetString());
+                        }
+                        resultText = sb.Length > 0 ? sb.ToString() : null;
+                    }
                 }
             }
 
-            return body;
+            return !string.IsNullOrEmpty(resultText) ? resultText : body;
         }
 
         public async Task<AgentChatResponse> ChatToolsAsync(
@@ -150,9 +194,11 @@ namespace AURA.AI
         {
             EnsureValidApiKey();
 
-            var messageList = new List<Dictionary<string, object?>>();
+var messageList = new List<Dictionary<string, object?>>();
+            bool anthropic2 = Options.ApiFormat == AiApiFormat.AnthropicMessages;
 
-            if (!string.IsNullOrWhiteSpace(systemPrompt))
+            // Anthropic: system vai no campo top-level "system", não como message.
+            if (!anthropic2 && !string.IsNullOrWhiteSpace(systemPrompt))
             {
                 messageList.Add(new Dictionary<string, object?>
                 {
@@ -163,122 +209,198 @@ namespace AURA.AI
 
             if (messages != null)
             {
-                foreach (AgentMessage m in messages)
-                {
-                    var mo = new Dictionary<string, object?>
+                    bool anthropic = Options.ApiFormat == AiApiFormat.AnthropicMessages;
+
+                    foreach (AgentMessage m in messages)
                     {
-                        ["role"] = m.Role
-                    };
-
-                    // OpenAI/OpenRouter: assistant+tool_calls costuma exigir content null explícito
-                    if (m.ToolCalls is { Count: > 0 })
-                        mo["content"] = m.Content; // pode ser null
-                    else if (m.Content != null)
-                        mo["content"] = m.Content;
-
-                    if (m.ToolCallId != null)
-                        mo["tool_call_id"] = m.ToolCallId;
-
-                    if (m.ToolCalls is { Count: > 0 })
-                    {
-                        var calls = new List<Dictionary<string, object?>>();
-                        foreach (AgentToolCall tc in m.ToolCalls)
+                        var mo = new Dictionary<string, object?>
                         {
-                            // OBRIGATÓRIO: arguments = string com JSON de objeto (não objeto aninhado)
-                            string argsStr = NormalizeArgumentsJson(tc.ArgumentsJson);
-                            calls.Add(new Dictionary<string, object?>
+                            ["role"] = m.Role
+                        };
+
+                        if (anthropic)
+                        {
+                            // Anthropic: assistant com tool_calls -> content array com {type:"tool_use",...}
+                            // tool role -> role:"user" + content [{type:"tool_result",tool_use_id,...}]
+                            if (m.ToolCalls is { Count: > 0 })
                             {
-                                ["id"] = string.IsNullOrWhiteSpace(tc.Id)
-                                    ? "call_" + Guid.NewGuid().ToString("N")
-                                    : tc.Id,
-                                ["type"] = "function",
-                                ["function"] = new Dictionary<string, object?>
+                                var contentArr = new List<Dictionary<string, object?>>();
+                                if (!string.IsNullOrWhiteSpace(m.Content))
+                                    contentArr.Add(new Dictionary<string, object?> { ["type"] = "text", ["text"] = m.Content });
+
+                                foreach (AgentToolCall tc in m.ToolCalls)
                                 {
-                                    ["name"] = tc.Name ?? string.Empty,
-                                    ["arguments"] = argsStr
+                                    contentArr.Add(new Dictionary<string, object?>
+                                    {
+                                        ["type"] = "tool_use",
+                                        ["id"] = tc.Id,
+                                        ["name"] = tc.Name ?? string.Empty,
+                                        ["input"] = NormalizeArgumentsJson(tc.ArgumentsJson) is string s && !string.IsNullOrEmpty(s)
+                                            ? (object)JsonDocument.Parse(s).RootElement.Clone()
+                                            : (object)new { }
+                                    });
                                 }
-                            });
+                                mo["content"] = contentArr;
+                            }
+                            else if (m.ToolCallId != null)
+                            {
+                                // tool_result: Anthropic espera role=user + content array
+                                mo["role"] = "user";
+                                mo["content"] = new List<Dictionary<string, object?>>
+                                {
+                                    new Dictionary<string, object?>
+                                    {
+                                        ["type"] = "tool_result",
+                                        ["tool_use_id"] = m.ToolCallId,
+                                        ["content"] = m.Content ?? string.Empty
+                                    }
+                                };
+                            }
+                            else if (m.Content != null)
+                            {
+                                mo["content"] = m.Content;
+                            }
                         }
-
-                        mo["tool_calls"] = calls;
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(m.ReasoningDetailsJson))
-                    {
-                        try
+                        else
                         {
-                            using var rdDoc = JsonDocument.Parse(m.ReasoningDetailsJson);
-                            mo["reasoning_details"] = rdDoc.RootElement.Clone();
-                        }
-                        catch (JsonException)
-                        {
-                            // ignora reasoning inválido
-                        }
-                    }
+                            // OpenAI/OpenRouter: assistant+tool_calls costuma exigir content null explícito
+                            if (m.ToolCalls is { Count: > 0 })
+                                mo["content"] = m.Content; // pode ser null
+                            else if (m.Content != null)
+                                mo["content"] = m.Content;
 
-                    messageList.Add(mo);
+                            if (m.ToolCallId != null)
+                                mo["tool_call_id"] = m.ToolCallId;
+                        }
+
+                        if (!anthropic && m.ToolCalls is { Count: > 0 })
+                        {
+                            var calls = new List<Dictionary<string, object?>>();
+                            foreach (AgentToolCall tc in m.ToolCalls)
+                            {
+                                string argsStr = NormalizeArgumentsJson(tc.ArgumentsJson);
+                                calls.Add(new Dictionary<string, object?>
+                                {
+                                    ["id"] = string.IsNullOrWhiteSpace(tc.Id)
+                                        ? "call_" + Guid.NewGuid().ToString("N")
+                                        : tc.Id,
+                                    ["type"] = "function",
+                                    ["function"] = new Dictionary<string, object?>
+                                    {
+                                        ["name"] = tc.Name ?? string.Empty,
+                                        ["arguments"] = argsStr
+                                    }
+                                });
+                            }
+
+                            mo["tool_calls"] = calls;
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(m.ReasoningDetailsJson))
+                        {
+                            try
+                            {
+                                using var rdDoc = JsonDocument.Parse(m.ReasoningDetailsJson);
+                                if (!anthropic)
+                                    mo["reasoning_details"] = rdDoc.RootElement.Clone();
+                            }
+                            catch (JsonException)
+                            {
+                                // ignora reasoning inválido
+                            }
+                        }
+
+                        messageList.Add(mo);
+                    }
                 }
-            }
 
-            var payload = new Dictionary<string, object?>
+var payload = new Dictionary<string, object?>
             {
                 ["model"] = Options.Model,
                 ["max_tokens"] = Options.MaxTokens,
                 ["messages"] = messageList
             };
 
+            if (anthropic2 && !string.IsNullOrWhiteSpace(systemPrompt))
+                payload["system"] = systemPrompt.Trim();
+
             if (tools is { Count: > 0 })
-            {
-                var toolsArray = new List<Dictionary<string, object?>>();
-                foreach (AgentToolDefinition t in tools)
                 {
-                    var props = new Dictionary<string, object?>();
-                    foreach (KeyValuePair<string, AgentToolParameter> p in t.Parameters)
+                    var toolsArray = new List<Dictionary<string, object?>>();
+                    foreach (AgentToolDefinition t in tools)
                     {
-                        props[p.Key] = new Dictionary<string, object?>
+                        var props = new Dictionary<string, object?>();
+                        foreach (KeyValuePair<string, AgentToolParameter> p in t.Parameters)
                         {
-                            ["type"] = p.Value.Type,
-                            ["description"] = p.Value.Description
+                            props[p.Key] = new Dictionary<string, object?>
+                            {
+                                ["type"] = p.Value.Type,
+                                ["description"] = p.Value.Description
+                            };
+                        }
+
+                        var schema = new Dictionary<string, object?>
+                        {
+                            ["type"] = "object",
+                            ["properties"] = props
                         };
+                        if (t.Required.Count > 0)
+                            schema["required"] = t.Required.ToList();
+
+                        bool anthropic = Options.ApiFormat == AiApiFormat.AnthropicMessages;
+
+                        if (anthropic)
+                        {
+                            // Anthropic: { type:"function", name, description, input_schema }
+                            toolsArray.Add(new Dictionary<string, object?>
+                            {
+                                ["type"] = "function",
+                                ["name"] = t.Name,
+                                ["description"] = t.Description,
+                                ["input_schema"] = schema
+                            });
+                        }
+                        else
+                        {
+                            // OpenAI: { type:"function", function:{name,description,parameters} }
+                            toolsArray.Add(new Dictionary<string, object?>
+                            {
+                                ["type"] = "function",
+                                ["function"] = new Dictionary<string, object?>
+                                {
+                                    ["name"] = t.Name,
+                                    ["description"] = t.Description,
+                                    ["parameters"] = schema
+                                }
+                            });
+                        }
                     }
 
-                    var schema = new Dictionary<string, object?>
-                    {
-                        ["type"] = "object",
-                        ["properties"] = props
-                    };
-                    if (t.Required.Count > 0)
-                        schema["required"] = t.Required.ToList();
-
-                    toolsArray.Add(new Dictionary<string, object?>
-                    {
-                        ["type"] = "function",
-                        ["function"] = new Dictionary<string, object?>
-                        {
-                            ["name"] = t.Name,
-                            ["description"] = t.Description,
-                            ["parameters"] = schema
-                        }
-                    });
+                    payload["tools"] = toolsArray;
                 }
-
-                payload["tools"] = toolsArray;
-            }
 
             string json = JsonSerializer.Serialize(payload, SerializeOpts);
             HttpClient client = httpClient ?? ResolveClient();
             var request = new HttpRequestMessage(HttpMethod.Post, Options.BaseUrl);
 
-            string header = string.IsNullOrWhiteSpace(Options.AuthHeaderName)
+            string header2 = string.IsNullOrWhiteSpace(Options.AuthHeaderName)
                 ? "Authorization"
                 : Options.AuthHeaderName;
-            string scheme = Options.AuthScheme ?? "Bearer ";
-            request.Headers.TryAddWithoutValidation(header, scheme + Options.ApiKey);
+            string scheme2 = Options.AuthScheme ?? "Bearer ";
+            if (!string.IsNullOrEmpty(scheme2))
+                request.Headers.TryAddWithoutValidation(header2, scheme2 + Options.ApiKey);
+            else
+                request.Headers.TryAddWithoutValidation(header2, Options.ApiKey);
 
-            if (Options.AppReference != null)
+            if (Options.AppReference != null && !anthropic2)
             {
                 request.Headers.TryAddWithoutValidation("X-Title", "AURA");
                 request.Headers.TryAddWithoutValidation("X-URL", Options.AppReference);
+            }
+
+            if (anthropic2)
+            {
+                request.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
             }
 
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -321,20 +443,61 @@ namespace AURA.AI
                     ErrorKind = ClassifyError(response.StatusCode)
                 };
             }
-
-            try
+try
             {
                 using var document = JsonDocument.Parse(body);
                 JsonElement root = document.RootElement;
-                if (root.TryGetProperty("choices", out JsonElement choices) &&
+                string? content = null;
+                string? reasoningJson = null;
+                var calls = new List<AgentToolCall>();
+
+                bool anthropic = Options.ApiFormat == AiApiFormat.AnthropicMessages;
+
+                if (anthropic && root.TryGetProperty("content", out JsonElement contentArr))
+                {
+                    // Anthropic: content = [{type:"text",text:"..."}, {type:"tool_use",id,name,input}]
+                    var sb = new StringBuilder();
+                    foreach (JsonElement part in contentArr.EnumerateArray())
+                    {
+                        string? ptype = GetProp(part, "type");
+                        if (ptype == "text")
+                        {
+                            if (part.TryGetProperty("text", out JsonElement textEl) &&
+                                textEl.ValueKind == JsonValueKind.String)
+                                sb.Append(textEl.GetString());
+                        }
+                        else if (ptype == "tool_use")
+                        {
+                            string id = GetProp(part, "id") ?? string.Empty;
+                            string name = GetProp(part, "name") ?? string.Empty;
+                            string argsJson = "{}";
+                            if (part.TryGetProperty("input", out JsonElement inputEl))
+                                argsJson = NormalizeArgumentsJson(inputEl.GetRawText());
+
+                            if (!string.IsNullOrWhiteSpace(name))
+                            {
+                                calls.Add(new AgentToolCall
+                                {
+                                    Id = string.IsNullOrWhiteSpace(id)
+                                        ? "call_" + Guid.NewGuid().ToString("N")
+                                        : id,
+                                    Name = name,
+                                    ArgumentsJson = argsJson
+                                });
+                            }
+                        }
+                    }
+
+                    content = sb.Length > 0 ? sb.ToString() : null;
+                }
+                else if (root.TryGetProperty("choices", out JsonElement choices) &&
                     choices.GetArrayLength() > 0)
                 {
                     JsonElement message = choices[0];
                     if (message.TryGetProperty("message", out JsonElement msg))
                     {
-                        string? content = ReadContentString(msg);
-                        string? reasoningJson = ReadReasoningDetailsJson(msg);
-                        var calls = new List<AgentToolCall>();
+                        content = ReadContentString(msg);
+                        reasoningJson = ReadReasoningDetailsJson(msg);
                         if (msg.TryGetProperty("tool_calls", out JsonElement toolCalls))
                         {
                             foreach (JsonElement call in toolCalls.EnumerateArray())
@@ -354,7 +517,7 @@ namespace AURA.AI
 
                                 calls.Add(new AgentToolCall
                                 {
-                                    Id = string.IsNullOrWhiteSpace(id)
+                                    Id = string.IsNullOrEmpty(id)
                                         ? "call_" + Guid.NewGuid().ToString("N")
                                         : id,
                                     Name = name,
@@ -362,31 +525,29 @@ namespace AURA.AI
                                 });
                             }
                         }
+                    }
+                }
 
-                        if (calls.Count == 0)
-                        {
-                            List<AgentToolCall>? textCalls = TryParseTextToolCall(content);
-                            if (textCalls is { Count: > 0 })
-                            {
-                                return new AgentChatResponse
-                                {
-                                    Content = null,
-                                    ToolCalls = textCalls,
-                                    ReasoningDetailsJson = reasoningJson
-                                };
-                            }
-                        }
-
+                if (calls.Count == 0)
+                {
+                    List<AgentToolCall>? textCalls = TryParseTextToolCall(content);
+                    if (textCalls is { Count: > 0 })
+                    {
                         return new AgentChatResponse
                         {
-                            Content = content,
-                            ToolCalls = calls.Count > 0 ? calls : null,
+                            Content = null,
+                            ToolCalls = textCalls,
                             ReasoningDetailsJson = reasoningJson
                         };
                     }
                 }
 
-                return new AgentChatResponse { Content = body };
+                return new AgentChatResponse
+                {
+                    Content = content,
+                    ToolCalls = calls.Count > 0 ? calls : null,
+                    ReasoningDetailsJson = reasoningJson
+                };
             }
             catch (JsonException jex)
             {

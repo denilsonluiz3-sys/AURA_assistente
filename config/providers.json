@@ -114,6 +114,136 @@
         { "id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash", "category": "Grátis", "isFree": true },
         { "id": "gemini-2.5-flash-lite", "label": "Gemini 2.5 Flash-Lite", "category": "Grátis", "isFree": true }
       ]
+    },
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "baseUrl": "https://api.deepseek.com/v1/chat/completions",
+      "modelsUrl": "https://api.deepseek.com/v1/models",
+      "needsKey": true,
+      "keyEnv": "DEEPSEEK_API_KEY",
+      "keyHint": "DEEPSEEK_API_KEY",
+      "defaultModelId": "deepseek-chat",
+      "authHeaderName": "Authorization",
+      "authScheme": "Bearer ",
+      "apiFormat": "OpenAICompletions",
+      "keyPrefixesList": ["sk-"],
+      "models": [
+        { "id": "deepseek-r1", "label": "DeepSeek R1", "category": "Raciocínio", "isFree": false },
+        { "id": "deepseek-chat", "label": "DeepSeek Chat", "category": "Eficiente", "isFree": false },
+        { "id": "deepseek-coder", "label": "DeepSeek Coder", "category": "Coding", "isFree": false }
+      ]
+    },
+    {
+      "id": "mistral",
+      "name": "Mistral AI",
+      "baseUrl": "https://api.mistral.ai/v1/chat/completions",
+      "modelsUrl": "https://api.mistral.ai/v1/models",
+      "needsKey": true,
+      "keyEnv": "MISTRAL_API_KEY",
+      "keyHint": "MISTRAL_API_KEY",
+      "defaultModelId": "magistral-medium",
+      "authHeaderName": "Authorization",
+      "authScheme": "Bearer ",
+      "apiFormat": "OpenAICompletions",
+      "keyPrefixesList": [],
+      "models": [
+        { "id": "magistral-medium", "label": "Magistral Medium", "category": "Raciocínio", "isFree": false },
+        { "id": "mistral-large-latest", "label": "Mistral Large", "category": "Flagship", "isFree": false },
+        { "id": "mistral-small-latest", "label": "Mistral Small", "category": "Eficiente", "isFree": false }
+      ]
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic (Claude)",
+      "baseUrl": "https://api.anthropic.com/v1/messages",
+      "modelsUrl": "https://api.anthropic.com/v1/models",
+      "needsKey": true,
+      "keyEnv": "ANTHROPIC_API_KEY",
+      "keyHint": "ANTHROPIC_API_KEY",
+      "defaultModelId": "claude-sonnet-4-5-20250929",
+      "authHeaderName": "x-api-key",
+      "authScheme": "",
+      "apiFormat": "AnthropicMessages",
+      "keyPrefixesList": ["sk-ant-"],
+      "models": [
+        { "id": "claude-opus-4-5-20251120", "label": "Claude Opus 4.5", "category": "Flagship", "isFree": false },
+        { "id": "claude-sonnet-4-5-20250929", "label": "Claude Sonnet 4.5", "category": "Razoável", "isFree": false },
+        { "id": "claude-haiku-4-5-20251001", "label": "Claude Haiku 4.5", "category": "Eficiente", "isFree": false }
+      ]
+    },
+    {
+      "id": "xai",
+      "name": "Grok (xAI)",
+      "baseUrl": "https://api.x.ai/v1/chat/completions",
+      "modelsUrl": "https://api.x.ai/v1/models",
+      "needsKey": true,
+      "keyEnv": "XAI_API_KEY",
+      "keyHint": "XAI_API_KEY",
+      "defaultModelId": "grok-3",
+      "authHeaderName": "Authorization",
+      "authScheme": "Bearer ",
+      "apiFormat": "OpenAICompletions",
+      "keyPrefixesList": ["xai-"],
+      "models": [
+        { "id": "grok-3", "label": "Grok 3", "category": "Flagship", "isFree": false },
+        { "id": "grok-3-mini", "label": "Grok 3 Mini", "category": "Eficiente", "isFree": false }
+      ]
+    },
+    {
+      "id": "together",
+      "name": "Together AI",
+      "baseUrl": "https://api.together.xyz/v1/chat/completions",
+      "modelsUrl": "https://api.together.xyz/v1/models",
+      "needsKey": true,
+      "keyEnv": "TOGETHER_API_KEY",
+      "keyHint": "TOGETHER_API_KEY",
+      "defaultModelId": "deepseek-ai/DeepSeek-R1",
+      "authHeaderName": "Authorization",
+      "authScheme": "Bearer ",
+      "apiFormat": "OpenAICompletions",
+      "keyPrefixesList": [],
+      "models": [
+        { "id": "deepseek-ai/DeepSeek-R1", "label": "DeepSeek R1", "category": "Raciocínio", "isFree": false },
+        { "id": "deepseek-ai/DeepSeek-V3", "label": "DeepSeek V3", "category": "Razoável", "isFree": false },
+        { "id": "meta-llama/Llama-3.3-70B-Instruct-Turbo", "label": "Llama 3.3 70B", "category": "Razoável", "isFree": false }
+      ]
+    },
+    {
+      "id": "fireworks",
+      "name": "Fireworks AI",
+      "baseUrl": "https://api.fireworks.ai/v1/chat/completions",
+      "modelsUrl": "https://api.fireworks.ai/v1/models",
+      "needsKey": true,
+      "keyEnv": "FIREWORKS_API_KEY",
+      "keyHint": "FIREWORKS_API_KEY",
+      "defaultModelId": "accounts/fireworks/models/llama-v3p1-70b-instruct",
+      "authHeaderName": "Authorization",
+      "authScheme": "Bearer ",
+      "apiFormat": "OpenAICompletions",
+      "keyPrefixesList": ["fw_"],
+      "models": [
+        { "id": "accounts/fireworks/models/llama-v3p1-70b-instruct", "label": "Llama 3.1 70B", "category": "Razoável", "isFree": false },
+        { "id": "accounts/fireworks/models/llama-v3p1-8b-instruct", "label": "Llama 3.1 8B", "category": "Eficiente", "isFree": false }
+      ]
+    },
+    {
+      "id": "cohere",
+      "name": "Cohere",
+      "baseUrl": "https://api.cohere.com/v2/chat",
+      "modelsUrl": "https://api.cohere.com/v2/models",
+      "needsKey": true,
+      "keyEnv": "COHERE_API_KEY",
+      "keyHint": "COHERE_API_KEY",
+      "defaultModelId": "command-a",
+      "authHeaderName": "Authorization",
+      "authScheme": "Bearer ",
+      "apiFormat": "OpenAICompletions",
+      "keyPrefixesList": [],
+      "models": [
+        { "id": "command-a", "label": "Command A", "category": "Flagship", "isFree": false },
+        { "id": "command-r-08-2024", "label": "Command R", "category": "Eficiente", "isFree": false }
+      ]
     }
   ]
 }
