@@ -3,9 +3,8 @@ using AURA.AI;
 namespace AURA.Mobile.Diagnostics
 {
     /// <summary>
-    /// Configuração aplicável em tempo de execução (sem recompilar o APK).
-    /// Preferências não sensíveis usam Preferences; a API key usa SecureStorage
-    /// (Keystore / armazenamento cifrado no Android).
+    /// Configuração em tempo de execução. Preferências não sensíveis em Preferences;
+    /// API key em SecureStorage. BaseUrl pode ser sobrescrita (Ollama / LAN).
     /// </summary>
     public static class RuntimeConfig
     {
@@ -30,7 +29,6 @@ namespace AURA.Mobile.Diagnostics
             set => Preferences.Default.Set("ai_log_lines", value);
         }
 
-        /// <summary>Id do provedor (ex.: gemini, openrouter) — não o display name.</summary>
         public static string Provider
         {
             get => Preferences.Default.Get("ai_provider", string.Empty);
@@ -44,8 +42,18 @@ namespace AURA.Mobile.Diagnostics
         }
 
         /// <summary>
-        /// Chave de API: SecureStorage. Migra automaticamente de Preferences legadas.
+        /// URL completa de chat (ex.: http://127.0.0.1:11435/v1/chat/completions).
+        /// Vazia = usa BaseUrl do catálogo do provedor atual.
         /// </summary>
+        public static string BaseUrlOverride
+        {
+            get => Preferences.Default.Get("ai_base_url", string.Empty);
+            set => Preferences.Default.Set("ai_base_url", (value ?? string.Empty).Trim());
+        }
+
+        /// <summary>Última mensagem de status (fallback, URL efetiva) para a UI.</summary>
+        public static string LastStatusMessage { get; private set; } = string.Empty;
+
         public static string ApiKey
         {
             get
@@ -60,16 +68,12 @@ namespace AURA.Mobile.Diagnostics
                     if (!string.IsNullOrWhiteSpace(secure))
                         return secure.Trim();
                 }
-                catch
-                {
-                    // SecureStorage indisponível ou valor de backup ilegível
-                }
+                catch { }
 
                 string legacy = Preferences.Default.Get(ApiKeyLegacyPref, string.Empty);
                 if (string.IsNullOrWhiteSpace(legacy))
                     return string.Empty;
 
-                // Migração única: sobe para SecureStorage e apaga texto claro
                 try
                 {
                     SecureStorage.Default
@@ -78,17 +82,13 @@ namespace AURA.Mobile.Diagnostics
                         .GetResult();
                     Preferences.Default.Remove(ApiKeyLegacyPref);
                 }
-                catch
-                {
-                    // Mantém leitura legada se SecureStorage falhar
-                }
+                catch { }
 
                 return legacy.Trim();
             }
             set
             {
                 string v = (value ?? string.Empty).Trim();
-
                 try
                 {
                     if (string.IsNullOrEmpty(v))
@@ -99,21 +99,41 @@ namespace AURA.Mobile.Diagnostics
                             .GetAwaiter()
                             .GetResult();
                 }
-                catch
-                {
-                    // Fallback mínimo: não gravar de novo em Preferences em claro
-                }
+                catch { }
 
-                // Nunca deixar cópia legada
                 try { Preferences.Default.Remove(ApiKeyLegacyPref); }
                 catch { }
             }
         }
 
-        /// <summary>Remove a key do SecureStorage e de Preferences legadas.</summary>
         public static void ClearApiKey()
         {
             ApiKey = string.Empty;
+        }
+
+        /// <summary>
+        /// Normaliza URL de chat: se o usuário informar só host:porta, completa o path OpenAI.
+        /// </summary>
+        public static string NormalizeChatBaseUrl(string? url, string? providerId)
+        {
+            string u = (url ?? string.Empty).Trim().TrimEnd('/');
+            if (string.IsNullOrEmpty(u))
+                return string.Empty;
+
+            if (u.Contains("/chat/completions", System.StringComparison.OrdinalIgnoreCase) ||
+                u.Contains("/messages", System.StringComparison.OrdinalIgnoreCase) ||
+                u.Contains("/api/chat", System.StringComparison.OrdinalIgnoreCase))
+                return u;
+
+            // Ollama / OpenAI-compat local
+            if (string.Equals(providerId, "ollama", System.StringComparison.OrdinalIgnoreCase) ||
+                u.Contains("127.0.0.1", System.StringComparison.OrdinalIgnoreCase) ||
+                u.Contains("localhost", System.StringComparison.OrdinalIgnoreCase))
+            {
+                return u + "/v1/chat/completions";
+            }
+
+            return u;
         }
 
         public static void Apply(OpenRouterClient client)
@@ -144,15 +164,24 @@ namespace AURA.Mobile.Diagnostics
                     : provider.Models[0].Id;
             }
 
+            string baseUrl = provider.BaseUrl;
+            string ovr = BaseUrlOverride;
+            if (!string.IsNullOrWhiteSpace(ovr))
+                baseUrl = NormalizeChatBaseUrl(ovr, provider.Id);
+            else
+                baseUrl = NormalizeChatBaseUrl(baseUrl, provider.Id);
+
             client.Options.Provider = provider.Id;
-            client.Options.BaseUrl = provider.BaseUrl;
+            client.Options.BaseUrl = baseUrl;
             client.Options.Model = model;
             client.Options.MaxTokens = MaxTokens;
             client.Options.TimeoutSeconds = TimeoutSeconds;
             client.Options.ApiKey = ApiKey?.Trim() ?? string.Empty;
-            client.Options.AuthHeaderName = provider.AuthHeaderName;
-            client.Options.AuthScheme = provider.AuthScheme;
+            client.Options.AuthHeaderName = provider.AuthHeaderName ?? string.Empty;
+            client.Options.AuthScheme = provider.AuthScheme ?? string.Empty;
             client.Options.ApiFormat = provider.ApiFormat;
+
+            LastStatusMessage = provider.Name + " · " + model + " · " + baseUrl;
         }
 
         public static string? ValidateApiKeyFormat(string? key, ProviderInfo? provider)
@@ -200,6 +229,9 @@ namespace AURA.Mobile.Diagnostics
             return null;
         }
 
+        /// <summary>
+        /// Garante client pronto. Sem key: fallback para NeedsKey=false e retorna aviso (não erro).
+        /// </summary>
         public static string? EnsureReadyForRequest(OpenRouterClient client)
         {
             Apply(client);
@@ -234,6 +266,7 @@ namespace AURA.Mobile.Diagnostics
                        "use OpenRouter/Groq/Gemini, ou Ollama local (sem chave).";
             }
 
+            string previous = provider.Name;
             Provider = fallback.Id;
             if (fallback.Models.Count > 0)
             {
@@ -242,8 +275,13 @@ namespace AURA.Mobile.Diagnostics
                     : fallback.DefaultModelId;
             }
             Apply(client);
-            AuraLog.Info("RuntimeConfig: sem API key — fallback para provedor '" + fallback.Id + "' (NeedsKey=false).");
-            return null;
+
+            string msg = "Sem chave em " + previous + " — usando " + fallback.Name +
+                         " (" + client.Options.BaseUrl + ").";
+            LastStatusMessage = msg;
+            AuraLog.Info("RuntimeConfig: " + msg);
+            // Aviso informativo (não bloqueia): começa com prefixo reconhecível pela UI
+            return "AVISO: " + msg;
         }
     }
 }
