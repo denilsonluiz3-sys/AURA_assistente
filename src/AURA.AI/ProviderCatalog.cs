@@ -61,7 +61,6 @@ namespace AURA.AI
 
         private static List<ProviderInfo> Load()
         {
-            // 1) Resource embutido (APK / publish)
             try
             {
                 var list = TryDeserialize(ReadEmbeddedJson());
@@ -76,7 +75,6 @@ namespace AURA.AI
                 Console.Error.WriteLine("[AURA] Embedded providers.json: " + ex.Message);
             }
 
-            // 2) Arquivo em disco (dev / workspace)
             try
             {
                 string? path = FindCatalogFile();
@@ -144,7 +142,7 @@ namespace AURA.AI
                     if (File.Exists(full))
                         return full;
                 }
-                catch { /* ignore */ }
+                catch { }
             }
 
             return null;
@@ -159,6 +157,21 @@ namespace AURA.AI
                 provider.Models ??= new List<ProviderModel>();
                 if (string.IsNullOrWhiteSpace(provider.DefaultModelId) && provider.Models.Count > 0)
                     provider.DefaultModelId = provider.Models[0].Id;
+
+                // Ollama: BaseUrl deve ser path OpenAI-compat completo
+                if (string.Equals(provider.Id, "ollama", StringComparison.OrdinalIgnoreCase))
+                {
+                    string b = provider.BaseUrl?.TrimEnd('/') ?? string.Empty;
+                    if (!string.IsNullOrEmpty(b) &&
+                        !b.Contains("/chat/completions", StringComparison.OrdinalIgnoreCase) &&
+                        !b.Contains("/api/chat", StringComparison.OrdinalIgnoreCase))
+                    {
+                        provider.BaseUrl = b + "/v1/chat/completions";
+                    }
+                    if (string.IsNullOrWhiteSpace(provider.ModelsUrl))
+                        provider.ModelsUrl = b.Contains("/v1/") ? b.Replace("/chat/completions", "/models") : b + "/v1/models";
+                }
+
                 if (string.IsNullOrWhiteSpace(provider.ModelsUrl))
                 {
                     provider.ModelsUrl = provider.BaseUrl
@@ -167,7 +180,7 @@ namespace AURA.AI
                 }
                 if (string.IsNullOrWhiteSpace(provider.AuthHeaderName))
                     provider.AuthHeaderName = "Authorization";
-                if (string.IsNullOrWhiteSpace(provider.AuthScheme))
+                if (provider.AuthScheme == null)
                     provider.AuthScheme = "Bearer ";
                 provider.KeyPrefixesList ??= new List<string>();
                 foreach (ProviderModel model in provider.Models)
@@ -232,106 +245,23 @@ namespace AURA.AI
                     Models = new List<ProviderModel>
                     {
                         new() { Id = "openrouter/free", Label = "Auto grátis", Category = "Grátis", IsFree = true },
-                        new() { Id = "google/gemma-2-9b-it:free", Label = "Gemma 2 9B (free)", Category = "Grátis", IsFree = true },
-                        new() { Id = "qwen/qwen-2.5-7b-instruct:free", Label = "Qwen 2.5 7B (free)", Category = "Grátis", IsFree = true },
-                        new() { Id = "qwen/qwen-plus", Label = "Qwen Plus", Category = "Pago" }
-                    }
-                },
-                new ProviderInfo
-                {
-                    Id = "gemini",
-                    Name = "Google Gemini",
-                    BaseUrl = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                    ModelsUrl = "https://generativelanguage.googleapis.com/v1beta/openai/models",
-                    NeedsKey = true,
-                    KeyEnv = "GEMINI_API_KEY",
-                    KeyHint = "AIzaSy… (AI Studio)",
-                    DefaultModelId = "gemini-2.5-flash",
-                    AuthHeaderName = "Authorization",
-                    AuthScheme = "Bearer ",
-                    ApiFormat = AiApiFormat.OpenAICompletions,
-                    KeyPrefixesList = new List<string> { "AIza" },
-                    Models = new List<ProviderModel>
-                    {
-                        new() { Id = "gemini-2.5-flash", Label = "Gemini 2.5 Flash", Category = "Grátis", IsFree = true },
-                        new() { Id = "gemini-2.5-flash-lite", Label = "Gemini 2.5 Flash-Lite", Category = "Grátis", IsFree = true },
-                        new() { Id = "gemini-2.5-pro", Label = "Gemini 2.5 Pro", Category = "Pago" }
-                    }
-                },
-                new ProviderInfo
-                {
-                    Id = "deepseek",
-                    Name = "DeepSeek",
-                    BaseUrl = "https://api.deepseek.com/chat/completions",
-                    ModelsUrl = "https://api.deepseek.com/models",
-                    NeedsKey = true,
-                    KeyEnv = "DEEPSEEK_API_KEY",
-                    KeyHint = "sk-… (platform.deepseek.com)",
-                    DefaultModelId = "deepseek-chat",
-                    AuthHeaderName = "Authorization",
-                    AuthScheme = "Bearer ",
-                    ApiFormat = AiApiFormat.OpenAICompletions,
-                    KeyPrefixesList = new List<string>(),
-                    Models = new List<ProviderModel>
-                    {
-                        new() { Id = "deepseek-chat", Label = "DeepSeek Chat", Category = "Eficiente" },
-                        new() { Id = "deepseek-reasoner", Label = "DeepSeek Reasoner", Category = "Raciocínio" }
-                    }
-                },
-                new ProviderInfo
-                {
-                    Id = "groq",
-                    Name = "Groq (grátis)",
-                    BaseUrl = "https://api.groq.com/openai/v1/chat/completions",
-                    ModelsUrl = "https://api.groq.com/openai/v1/models",
-                    NeedsKey = true,
-                    KeyEnv = "GROQ_API_KEY",
-                    KeyHint = "gsk_…",
-                    DefaultModelId = "llama-3.3-70b-versatile",
-                    AuthHeaderName = "Authorization",
-                    AuthScheme = "Bearer ",
-                    ApiFormat = AiApiFormat.OpenAICompletions,
-                    KeyPrefixesList = new List<string> { "gsk_" },
-                    Models = new List<ProviderModel>
-                    {
-                        new() { Id = "llama-3.3-70b-versatile", Label = "Llama 3.3 70B", Category = "Grátis", IsFree = true },
-                        new() { Id = "llama-3.1-8b-instant", Label = "Llama 3.1 8B", Category = "Grátis", IsFree = true },
-                        new() { Id = "gemma2-9b-it", Label = "Gemma 2 9B", Category = "Grátis", IsFree = true }
-                    }
-                },
-                new ProviderInfo
-                {
-                    Id = "openai",
-                    Name = "OpenAI",
-                    BaseUrl = "https://api.openai.com/v1/chat/completions",
-                    ModelsUrl = "https://api.openai.com/v1/models",
-                    NeedsKey = true,
-                    KeyEnv = "OPENAI_API_KEY",
-                    KeyHint = "sk-…",
-                    DefaultModelId = "gpt-4o-mini",
-                    AuthHeaderName = "Authorization",
-                    AuthScheme = "Bearer ",
-                    ApiFormat = AiApiFormat.OpenAICompletions,
-                    KeyPrefixesList = new List<string> { "sk-" },
-                    Models = new List<ProviderModel>
-                    {
-                        new() { Id = "gpt-4o-mini", Label = "GPT-4o Mini", Category = "Eficiente" },
-                        new() { Id = "gpt-4o", Label = "GPT-4o", Category = "Flagship" }
+                        new() { Id = "google/gemma-2-9b-it:free", Label = "Gemma 2 9B (free)", Category = "Grátis", IsFree = true }
                     }
                 },
                 new ProviderInfo
                 {
                     Id = "ollama",
                     Name = "Ollama (local)",
-                    BaseUrl = "http://127.0.0.1:11434/v1/chat/completions",
-                    ModelsUrl = "http://127.0.0.1:11434/v1/models",
+                    BaseUrl = "http://127.0.0.1:11435/v1/chat/completions",
+                    ModelsUrl = "http://127.0.0.1:11435/v1/models",
                     NeedsKey = false,
-                    DefaultModelId = "qwen2.5-coder:1.5b",
-                    AuthHeaderName = "Authorization",
-                    AuthScheme = "Bearer ",
+                    DefaultModelId = "qwen2:0.5b",
+                    AuthHeaderName = "",
+                    AuthScheme = "",
                     ApiFormat = AiApiFormat.OpenAICompletions,
                     Models = new List<ProviderModel>
                     {
+                        new() { Id = "qwen2:0.5b", Label = "Qwen2 0.5B (local)", Category = "Local", IsFree = true },
                         new() { Id = "qwen2.5-coder:1.5b", Label = "Qwen 2.5 Coder 1.5B", Category = "Local", IsFree = true },
                         new() { Id = "llama3.2:3b", Label = "Llama 3.2 3B", Category = "Local", IsFree = true }
                     }
