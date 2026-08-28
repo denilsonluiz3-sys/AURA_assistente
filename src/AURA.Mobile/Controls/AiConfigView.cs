@@ -181,7 +181,6 @@ public sealed class AiConfigView : ContentView
         if (_applying) return;
         _customModelEntry.Text = string.Empty;
 
-        // Ao mudar para Ollama, sugere URL padrão se override vazio
         if (_providerPicker.SelectedItem is ProviderInfo p &&
             string.Equals(p.Id, "ollama", StringComparison.OrdinalIgnoreCase) &&
             string.IsNullOrWhiteSpace(_baseUrlEntry.Text))
@@ -290,7 +289,6 @@ public sealed class AiConfigView : ContentView
 
         ApplyAndPersist();
 
-        // Ollama / local: testa sem chave
         if (_providerPicker.SelectedItem is ProviderInfo localProv && !localProv.NeedsKey)
         {
             _detectButton.IsEnabled = false;
@@ -298,11 +296,7 @@ public sealed class AiConfigView : ContentView
             try
             {
                 RuntimeConfig.Apply(_client);
-                string probe = await _client.ChatAsync(
-                    new List<ChatMessage>
-                    {
-                        new() { Role = "user", Content = "Responda apenas: OK" }
-                    });
+                string probe = await _client.ChatAsync("Responda apenas: OK");
                 string snippet = (probe ?? string.Empty).Trim();
                 if (snippet.Length > 120)
                     snippet = snippet.Substring(0, 120) + "…";
