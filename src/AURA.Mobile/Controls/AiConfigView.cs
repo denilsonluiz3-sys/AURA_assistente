@@ -5,8 +5,7 @@ using AURA.Mobile.Diagnostics;
 namespace AURA.Mobile.Controls;
 
 /// <summary>
-/// Painel de configuração da IA (provedor + modelo + chave) compartilhado
-/// entre Chat e Agente.
+/// Painel de configuração da IA (provedor + modelo + chave + base URL).
 /// </summary>
 public sealed class AiConfigView : ContentView
 {
@@ -16,8 +15,14 @@ public sealed class AiConfigView : ContentView
     private readonly Picker _modelPicker = new() { Title = "Modelo" };
     private readonly Entry _customModelEntry = new()
     {
-        Placeholder = "Modelo custom (opcional, ex.: gemini-2.5-flash)",
+        Placeholder = "Modelo custom (opcional)",
         FontSize = 12,
+    };
+    private readonly Entry _baseUrlEntry = new()
+    {
+        Placeholder = "http://127.0.0.1:11435/v1/chat/completions",
+        FontSize = 12,
+        Keyboard = Keyboard.Url,
     };
     private readonly Label _apiKeyLabel = new()
     {
@@ -50,6 +55,7 @@ public sealed class AiConfigView : ContentView
         _providerPicker.SelectedIndexChanged += OnProviderChanged;
         _apiKeyEntry.TextChanged += OnKeyTextChanged;
         _customModelEntry.TextChanged += OnCustomModelChanged;
+        _baseUrlEntry.TextChanged += OnBaseUrlChanged;
         _detectButton.Clicked += OnDetectClicked;
 
         var providerCol = new VerticalStackLayout
@@ -70,12 +76,6 @@ public sealed class AiConfigView : ContentView
                 new Label { Text = "MODELO", FontSize = 10, TextColor = Color.FromArgb("#7a7a90") },
                 _modelPicker,
             },
-        };
-
-        var apiKeyCol = new VerticalStackLayout
-        {
-            Spacing = 3,
-            Children = { _apiKeyLabel, _apiKeyEntry },
         };
 
         Content = new VerticalStackLayout
@@ -100,14 +100,32 @@ public sealed class AiConfigView : ContentView
                     {
                         new Label
                         {
-                            Text = "MODELO CUSTOM (se não estiver na lista)",
+                            Text = "MODELO CUSTOM",
                             FontSize = 10,
                             TextColor = Color.FromArgb("#7a7a90"),
                         },
                         _customModelEntry,
                     },
                 },
-                apiKeyCol,
+                new VerticalStackLayout
+                {
+                    Spacing = 3,
+                    Children =
+                    {
+                        new Label
+                        {
+                            Text = "BASE URL (Ollama / servidor local — deixe vazio = catálogo)",
+                            FontSize = 10,
+                            TextColor = Color.FromArgb("#7a7a90"),
+                        },
+                        _baseUrlEntry,
+                    },
+                },
+                new VerticalStackLayout
+                {
+                    Spacing = 3,
+                    Children = { _apiKeyLabel, _apiKeyEntry },
+                },
                 new HorizontalStackLayout
                 {
                     Spacing = 10,
@@ -127,6 +145,7 @@ public sealed class AiConfigView : ContentView
             string savedProvider = RuntimeConfig.Provider;
             string savedModel = RuntimeConfig.Model;
             _apiKeyEntry.Text = RuntimeConfig.ApiKey;
+            _baseUrlEntry.Text = RuntimeConfig.BaseUrlOverride;
 
             if (_providerPicker.ItemsSource == null)
             {
@@ -149,6 +168,7 @@ public sealed class AiConfigView : ContentView
             _providerPicker.SelectedIndex = providerIndex;
             PopulateModels(savedModel);
             ApplyToClient();
+            RefreshStatusLine();
         }
         finally
         {
@@ -160,6 +180,22 @@ public sealed class AiConfigView : ContentView
     {
         if (_applying) return;
         _customModelEntry.Text = string.Empty;
+
+        // Ao mudar para Ollama, sugere URL padrão se override vazio
+        if (_providerPicker.SelectedItem is ProviderInfo p &&
+            string.Equals(p.Id, "ollama", StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(_baseUrlEntry.Text))
+        {
+            _applying = true;
+            try
+            {
+                _baseUrlEntry.Text = string.IsNullOrWhiteSpace(p.BaseUrl)
+                    ? "http://127.0.0.1:11435/v1/chat/completions"
+                    : p.BaseUrl;
+            }
+            finally { _applying = false; }
+        }
+
         PopulateModels(null);
         ApplyAndPersist();
     }
@@ -173,6 +209,12 @@ public sealed class AiConfigView : ContentView
     }
 
     private void OnCustomModelChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (_applying) return;
+        ApplyAndPersist();
+    }
+
+    private void OnBaseUrlChanged(object? sender, TextChangedEventArgs e)
     {
         if (_applying) return;
         ApplyAndPersist();
@@ -246,10 +288,45 @@ public sealed class AiConfigView : ContentView
     {
         if (_client == null) return;
 
+        ApplyAndPersist();
+
+        // Ollama / local: testa sem chave
+        if (_providerPicker.SelectedItem is ProviderInfo localProv && !localProv.NeedsKey)
+        {
+            _detectButton.IsEnabled = false;
+            _detectStatus.Text = "Testando " + localProv.Name + "…";
+            try
+            {
+                RuntimeConfig.Apply(_client);
+                string probe = await _client.ChatAsync(
+                    new List<ChatMessage>
+                    {
+                        new() { Role = "user", Content = "Responda apenas: OK" }
+                    });
+                string snippet = (probe ?? string.Empty).Trim();
+                if (snippet.Length > 120)
+                    snippet = snippet.Substring(0, 120) + "…";
+                _detectStatus.Text = string.IsNullOrWhiteSpace(snippet)
+                    ? "Sem resposta de " + localProv.Name + " em " + _client.Options.BaseUrl
+                    : "OK · " + localProv.Name + " · " + _client.Options.BaseUrl + " · " + snippet;
+            }
+            catch (Exception ex)
+            {
+                _detectStatus.Text = "Falha Ollama/local: " + ex.Message +
+                                     "\nURL: " + (_client.Options.BaseUrl ?? "?");
+                AuraLog.Exception("AiConfigView.TestLocal", ex);
+            }
+            finally
+            {
+                _detectButton.IsEnabled = true;
+            }
+            return;
+        }
+
         string key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(key))
         {
-            _detectStatus.Text = "Digite uma chave para detectar o provedor.";
+            _detectStatus.Text = "Digite uma chave ou escolha Ollama (local).";
             return;
         }
 
@@ -360,7 +437,6 @@ public sealed class AiConfigView : ContentView
             }
         }
 
-        // Prioridade: modelo salvo > primeiro free > defaultModelId > primeiro da lista
         int modelIndex = 0;
         var models = provider.Models;
         if (models.Count > 0)
@@ -389,9 +465,7 @@ public sealed class AiConfigView : ContentView
                 }
 
                 if (freeIdx >= 0)
-                {
                     modelIndex = freeIdx;
-                }
                 else if (!string.IsNullOrWhiteSpace(provider.DefaultModelId))
                 {
                     for (int i = 0; i < models.Count; i++)
@@ -413,7 +487,12 @@ public sealed class AiConfigView : ContentView
             : "Deixe vazio (provedor local)";
         _apiKeyEntry.Placeholder = hint;
         _apiKeyLabel.Text = provider.NeedsKey ? "Chave de API" : "Chave de API (opcional)";
-        _apiKeyEntry.IsVisible = true;
+
+        if (string.IsNullOrWhiteSpace(RuntimeConfig.BaseUrlOverride) &&
+            string.Equals(provider.Id, "ollama", StringComparison.OrdinalIgnoreCase))
+        {
+            _baseUrlEntry.Placeholder = provider.BaseUrl;
+        }
 
         _modelPicker.SelectedIndexChanged += OnModelChanged;
     }
@@ -428,13 +507,11 @@ public sealed class AiConfigView : ContentView
 
         string custom = _customModelEntry.Text?.Trim() ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(custom))
-        {
             RuntimeConfig.Model = custom;
-        }
         else if (_modelPicker.SelectedItem is ProviderModel pm)
-        {
             RuntimeConfig.Model = pm.Id;
-        }
+
+        RuntimeConfig.BaseUrlOverride = _baseUrlEntry.Text?.Trim() ?? string.Empty;
 
         string apiKey = _apiKeyEntry.Text?.Trim() ?? string.Empty;
         RuntimeConfig.ApiKey = apiKey;
@@ -442,10 +519,22 @@ public sealed class AiConfigView : ContentView
         string? fmt = RuntimeConfig.ValidateApiKeyFormat(apiKey, provider);
         if (fmt != null && !string.IsNullOrWhiteSpace(apiKey))
             _detectStatus.Text = fmt;
-        else if (!string.IsNullOrWhiteSpace(apiKey))
-            _detectStatus.Text = "Provedor: " + provider.Name + " · modelo: " + RuntimeConfig.Model;
+        else
+            RefreshStatusLine();
 
         ApplyToClient();
+    }
+
+    private void RefreshStatusLine()
+    {
+        if (_client != null)
+            RuntimeConfig.Apply(_client);
+
+        string status = RuntimeConfig.LastStatusMessage;
+        if (string.IsNullOrWhiteSpace(status) && _providerPicker.SelectedItem is ProviderInfo p)
+            status = p.Name + " · " + RuntimeConfig.Model;
+
+        _detectStatus.Text = status;
     }
 
     public void ApplyToClient()
