@@ -2,10 +2,6 @@ using AURA.AI;
 
 namespace AURA.Mobile.Diagnostics
 {
-    /// <summary>
-    /// Configuração em tempo de execução. Preferências não sensíveis em Preferences;
-    /// API key em SecureStorage. BaseUrl pode ser sobrescrita (Ollama / LAN).
-    /// </summary>
     public static class RuntimeConfig
     {
         private const string ApiKeySecureName = "ai_api_key";
@@ -41,17 +37,12 @@ namespace AURA.Mobile.Diagnostics
             set => Preferences.Default.Set("ai_model", value);
         }
 
-        /// <summary>
-        /// URL completa de chat (ex.: http://127.0.0.1:11435/v1/chat/completions).
-        /// Vazia = usa BaseUrl do catálogo do provedor atual.
-        /// </summary>
         public static string BaseUrlOverride
         {
             get => Preferences.Default.Get("ai_base_url", string.Empty);
             set => Preferences.Default.Set("ai_base_url", (value ?? string.Empty).Trim());
         }
 
-        /// <summary>Última mensagem de status (fallback, URL efetiva) para a UI.</summary>
         public static string LastStatusMessage { get; private set; } = string.Empty;
 
         public static string ApiKey
@@ -106,10 +97,7 @@ namespace AURA.Mobile.Diagnostics
             }
         }
 
-        public static void ClearApiKey()
-        {
-            ApiKey = string.Empty;
-        }
+        public static void ClearApiKey() => ApiKey = string.Empty;
 
         public static string NormalizeChatBaseUrl(string? url, string? providerId)
         {
@@ -172,7 +160,8 @@ namespace AURA.Mobile.Diagnostics
             client.Options.Model = model;
             client.Options.MaxTokens = MaxTokens;
             client.Options.TimeoutSeconds = TimeoutSeconds;
-            client.Options.ApiKey = ApiKey?.Trim() ?? string.Empty;
+            // Ollama: nunca envia chave residual de OpenRouter
+            client.Options.ApiKey = provider.NeedsKey ? (ApiKey?.Trim() ?? string.Empty) : string.Empty;
             client.Options.AuthHeaderName = provider.AuthHeaderName ?? string.Empty;
             client.Options.AuthScheme = provider.AuthScheme ?? string.Empty;
             client.Options.ApiFormat = provider.ApiFormat;
@@ -191,44 +180,35 @@ namespace AURA.Mobile.Diagnostics
 
             if (k.Length > 200 || k.IndexOfAny(new[] { ' ', '\t', '\r', '\n' }) >= 0)
             {
-                return "Chave de API inválida (parece conter texto de log ou espaços). " +
-                       "Cole só a chave, sem aspas.";
+                return "Chave de API inválida (texto de log ou espaços). Cole só a chave.";
             }
 
             if (string.Equals(provider.Id, "gemini", System.StringComparison.OrdinalIgnoreCase))
             {
                 if (k.StartsWith("AQ.", System.StringComparison.Ordinal))
-                {
-                    return "Esta chave começa com AQ. e não é uma API key do Google AI Studio. " +
-                           "Em aistudio.google.com/apikey crie uma chave que começa com AIzaSy…";
-                }
+                    return "Chave AQ. não é API key do AI Studio. Use chave AIzaSy…";
 
                 if (!k.StartsWith("AIza", System.StringComparison.Ordinal))
-                {
-                    return "Chave Gemini costuma começar com AIzaSy…. " +
-                           "Confira em Google AI Studio → Get API key.";
-                }
+                    return "Gemini costuma usar AIzaSy…. Ou escolha Ollama (local) sem chave.";
             }
 
             if (string.Equals(provider.Id, "openrouter", System.StringComparison.OrdinalIgnoreCase) &&
                 !k.StartsWith("sk-or-", System.StringComparison.Ordinal))
             {
-                return "OpenRouter espera chave sk-or-…. Se a chave for de outro provedor, troque o seletor.";
+                return "Provedor atual é OpenRouter (precisa sk-or-…). " +
+                       "Para IA local: no seletor PROVEDOR escolha «Ollama (local)», " +
+                       "apague a chave e toque Detectar/Testar.";
             }
 
             if (string.Equals(provider.Id, "groq", System.StringComparison.OrdinalIgnoreCase) &&
                 !k.StartsWith("gsk_", System.StringComparison.Ordinal))
             {
-                return "Groq espera chave gsk_….";
+                return "Groq espera gsk_…. Ou escolha Ollama (local) sem chave.";
             }
 
             return null;
         }
 
-        /// <summary>
-        /// null = pode enviar. string = erro bloqueante (formato de key ou sem provedor).
-        /// Fallback para Ollama atualiza LastStatusMessage e retorna null (não bloqueia).
-        /// </summary>
         public static string? EnsureReadyForRequest(OpenRouterClient client)
         {
             Apply(client);
@@ -259,8 +239,7 @@ namespace AURA.Mobile.Diagnostics
 
             if (fallback == null)
             {
-                return "Sem chave de API. Configure uma chave no painel ⚙ da IA, " +
-                       "use OpenRouter/Groq/Gemini, ou Ollama local (sem chave).";
+                return "Sem chave de API. Escolha Ollama (local) no seletor ou cole uma chave.";
             }
 
             string previous = provider.Name;
