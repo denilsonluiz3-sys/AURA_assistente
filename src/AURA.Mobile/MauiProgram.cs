@@ -59,8 +59,6 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new ConfigLoader(sp.GetRequiredService<ILogger>()).LoadModules(Path.Combine(configDir, "modules.json")));
         builder.Services.AddSingleton(sp => new ModuleManager(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "modules"), Path.Combine(configDir, "modules.json"), sp.GetRequiredService<EventBus>(), localPackageProvider: ReadEmbeddedModulePackageAsync));
         builder.Services.AddSingleton(sp => new MemoryStore(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "memory.json")));
-        // MaxTokens 1024: planos gratuitos OpenRouter costumam estourar 402 com 1500
-        // API key vem do SecureStorage (RuntimeConfig), não de Preferences em claro.
         builder.Services.AddSingleton(sp => new OpenRouterClient(
             new OpenRouterOptions
             {
@@ -84,7 +82,6 @@ public static class MauiProgram
         builder.Services.AddSingleton<GitExecutor>();
         builder.Services.AddSingleton<PythonExecutor>(sp =>
         {
-            // Liga o interpretador embutido (APK) ao executor usado pelo agente
             PythonExecutor.Embedded = sp.GetService<IEmbeddedPython>();
             return new PythonExecutor();
         });
@@ -141,6 +138,7 @@ public static class MauiProgram
             sp.GetService<IAndroidCapabilityService>()));
         builder.Services.AddSingleton<MemoryPage>();
         builder.Services.AddSingleton<ExecutorsPage>();
+        builder.Services.AddSingleton<SpectrumPage>(sp => new SpectrumPage(sp.GetService<IAndroidCapabilityService>()));
         builder.Services.AddSingleton<ModulesPage>();
         builder.Services.AddSingleton<LogsPage>();
         builder.Services.AddSingleton<FixesPage>();
@@ -162,7 +160,6 @@ public static class MauiProgram
         }
         catch (Exception ex) { AuraLog.Exception("MauiProgram.MemoryEventSink", ex); }
 
-        // Garante que PythonExecutor.Embedded está ligado mesmo se a factory rodou antes do IEmbeddedPython
         try
         {
             PythonExecutor.Embedded = app.Services.GetService<IEmbeddedPython>();
