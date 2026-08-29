@@ -13,8 +13,8 @@
     <ApplicationId>com.aura.genesis</ApplicationId>
     <ApplicationTitle>AURA</ApplicationTitle>
     <!-- versionCode (inteiro): deve subir a cada APK publicado -->
-    <ApplicationVersion>23</ApplicationVersion>
-    <ApplicationDisplayVersion>2.3</ApplicationDisplayVersion>
+    <ApplicationVersion>24</ApplicationVersion>
+    <ApplicationDisplayVersion>2.4</ApplicationDisplayVersion>
 
     <AndroidLinkMode>SdkOnly</AndroidLinkMode>
     <PublishTrimmed>false</PublishTrimmed>
