@@ -44,6 +44,7 @@ public static class MauiProgram
             return registry;
         });
         builder.Services.AddSingleton<ISpeechRecognitionService, AndroidSpeechRecognitionService>();
+        builder.Services.AddSingleton<IEmbeddedPython, EmbeddedPythonService>();
 #endif
 
         AuraLog.Info("MauiProgram: builder created");
@@ -81,7 +82,12 @@ public static class MauiProgram
         builder.Services.AddSingleton<NetworkManager>();
         builder.Services.AddSingleton<ShellExecutor>();
         builder.Services.AddSingleton<GitExecutor>();
-        builder.Services.AddSingleton<PythonExecutor>();
+        builder.Services.AddSingleton<PythonExecutor>(sp =>
+        {
+            // Liga o interpretador embutido (APK) ao executor usado pelo agente
+            PythonExecutor.Embedded = sp.GetService<IEmbeddedPython>();
+            return new PythonExecutor();
+        });
         builder.Services.AddSingleton<NodeExecutor>();
         builder.Services.AddSingleton<IToolExecutor>(sp => sp.GetRequiredService<ShellExecutor>());
         builder.Services.AddSingleton<AURA.Core.Abstractions.IWebSearch, AURA.Core.WebSearchService>();
@@ -155,6 +161,16 @@ public static class MauiProgram
             bus.Subscribe<CellStateChangedEvent>(evt => memory.Append(MemoryEntry.CellStateChange(evt.CellId, evt.To)));
         }
         catch (Exception ex) { AuraLog.Exception("MauiProgram.MemoryEventSink", ex); }
+
+        // Garante que PythonExecutor.Embedded está ligado mesmo se a factory rodou antes do IEmbeddedPython
+        try
+        {
+            PythonExecutor.Embedded = app.Services.GetService<IEmbeddedPython>();
+            if (PythonExecutor.Embedded is not null)
+                AuraLog.Info("MauiProgram: Python embutido ligado ao PythonExecutor");
+        }
+        catch (Exception ex) { AuraLog.Exception("MauiProgram.EmbeddedPython", ex); }
+
         AuraLog.Info("MauiProgram.CreateMauiApp OK");
         return app;
     }
