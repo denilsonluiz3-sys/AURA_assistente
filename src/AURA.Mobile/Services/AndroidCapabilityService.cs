@@ -16,8 +16,6 @@ namespace AURA.Mobile.Services;
 
 /// <summary>
 /// Implementação Android das capacidades expostas à camada de agentes.
-/// Cada operação falha de forma controlada para que uma permissão ou hardware
-/// ausente não derrube o orquestrador.
 /// </summary>
 public sealed class AndroidCapabilityService : IAndroidCapabilityService
 {
@@ -60,7 +58,76 @@ public sealed class AndroidCapabilityService : IAndroidCapabilityService
     public string GetLight() => ReadSensor(SensorType.Light, "Luz");
     public string GetAccelerometer() => ReadSensor(SensorType.Accelerometer, "Acelerômetro");
     public string GetGyroscope() => ReadSensor(SensorType.Gyroscope, "Giroscópio");
-    public string GetMagnetometer() => ReadSensor(SensorType.MagneticField, "Magnetômetro");
+
+    public string GetMagnetometer()
+    {
+        try
+        {
+            var manager = (SensorManager?)_context.GetSystemService(Context.SensorService);
+            var sensor = manager?.GetDefaultSensor(SensorType.MagneticField);
+            if (sensor == null)
+                return "Magnetômetro: sensor não disponível.";
+
+            return $"Magnetômetro: disponível ({sensor.Name}), vendor={sensor.Vendor}, max={sensor.MaximumRange:F1} µT.";
+        }
+        catch (Exception ex)
+        {
+            return Failure("magnetômetro", ex);
+        }
+    }
+
+    public string SampleMagnetometer(int durationMs = 400)
+    {
+        try
+        {
+            float[] mags = SampleMagnetometerMagnitudes(durationMs);
+            if (mags.Length < 4)
+                return "Magnetômetro: poucas amostras (" + mags.Length + ").";
+
+            float mean = mags.Average();
+            float min = mags.Min();
+            float max = mags.Max();
+            float sampleRate = mags.Length / Math.Max(0.05f, durationMs / 1000f);
+            float? hz = SignalAnalysis.EstimateHzZeroCrossing(mags, sampleRate);
+            string? hint = SignalAnalysis.HintMainsHz(hz);
+
+            return $"Magnetômetro amostra ({mags.Length} pts, ~{sampleRate:F0} Hz): " +
+                   $"mag média={mean:F2} µT, min={min:F2}, max={max:F2}" +
+                   (hint is not null ? $", freq={hint}" : "") + ".";
+        }
+        catch (Exception ex)
+        {
+            return Failure("amostra magnetômetro", ex);
+        }
+    }
+
+    /// <summary>
+    /// Coleta magnitudes √(x²+y²+z²) por durationMs usando SENSOR_DELAY_FASTEST.
+    /// </summary>
+    public float[] SampleMagnetometerMagnitudes(int durationMs = 400)
+    {
+        var manager = (SensorManager?)_context.GetSystemService(Context.SensorService);
+        var sensor = manager?.GetDefaultSensor(SensorType.MagneticField);
+        if (manager == null || sensor == null)
+            return Array.Empty<float>();
+
+        int ms = Math.Clamp(durationMs, 50, 3000);
+        var list = new List<float>(256);
+        var listener = new MagListener(list);
+
+        try
+        {
+            manager.RegisterListener(listener, sensor, SensorDelay.Fastest);
+            // bloqueia a thread atual por um pouco — chamado de timer UI em SpectrumPage
+            Thread.Sleep(ms);
+        }
+        finally
+        {
+            try { manager.UnregisterListener(listener); } catch { /* ignore */ }
+        }
+
+        return list.ToArray();
+    }
 
     public string GetLocation()
     {
@@ -86,10 +153,7 @@ public sealed class AndroidCapabilityService : IAndroidCapabilityService
                     if (location != null && (best == null || location.Time > best.Time))
                         best = location;
                 }
-                catch
-                {
-                    // Alguns providers podem negar acesso individualmente.
-                }
+                catch { }
             }
 
             return best == null
@@ -433,6 +497,7 @@ public sealed class AndroidCapabilityService : IAndroidCapabilityService
         sb.AppendLine(GetAccelerometer());
         sb.AppendLine(GetGyroscope());
         sb.AppendLine(GetMagnetometer());
+        sb.AppendLine(SampleMagnetometer(300));
         return sb.ToString().TrimEnd();
     }
 
@@ -469,5 +534,24 @@ public sealed class AndroidCapabilityService : IAndroidCapabilityService
 
     private static string Failure(string operation, Exception ex) =>
         $"{operation}: indisponível ({ex.GetType().Name}).";
+
+    private sealed class MagListener : Java.Lang.Object, ISensorEventListener
+    {
+        private readonly List<float> _mags;
+
+        public MagListener(List<float> mags) => _mags = mags;
+
+        public void OnAccuracyChanged(Sensor? sensor, SensorStatus accuracy) { }
+
+        public void OnSensorChanged(SensorEvent? e)
+        {
+            if (e?.Values == null || e.Values.Count < 3)
+                return;
+            float x = e.Values[0];
+            float y = e.Values[1];
+            float z = e.Values[2];
+            _mags.Add(MathF.Sqrt(x * x + y * y + z * z));
+        }
+    }
 }
 #endif
