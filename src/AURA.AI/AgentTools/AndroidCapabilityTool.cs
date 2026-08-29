@@ -18,12 +18,12 @@ namespace AURA.AI
         public override AgentToolDefinition Definition => new AgentToolDefinition
         {
             Name = "android",
-            Description = "Acessa APIs nativas do Android. Acoes: battery, light, accelerometer, gyroscope, magnetometer, location, camera, audio, bluetooth, clipboard, clipboard_set, notification, vibrate, network, device, apps, app_list, app_find, app_launch, properties, memory, storage, all",
+            Description = "Acessa APIs nativas do Android. Acoes: battery, light, accelerometer, gyroscope, magnetometer, magnetometer_sample, location, camera, audio, bluetooth, clipboard, clipboard_set, notification, vibrate, network, device, apps, app_list, app_find, app_launch, properties, memory, storage, all",
             Parameters =
                 {
                     ["action"] = new AgentToolParameter { Type = "string", Description = "Acao a executar" },
-                    ["text"] = new AgentToolParameter { Type = "string", Description = "Texto para clipboard ou notification" },
-                    ["milliseconds"] = new AgentToolParameter { Type = "string", Description = "Duracao da vibracao em ms" },
+                    ["text"] = new AgentToolParameter { Type = "string", Description = "Texto para clipboard, notification ou app_find" },
+                    ["milliseconds"] = new AgentToolParameter { Type = "string", Description = "Duracao ms (vibrate ou magnetometer_sample)" },
                     ["package"] = new AgentToolParameter { Type = "string", Description = "Pacote do app para app_launch" }
                 },
             Required = { "action" }
@@ -56,6 +56,7 @@ namespace AURA.AI
                     "accelerometer" => _service.GetAccelerometer(),
                     "gyroscope" => _service.GetGyroscope(),
                     "magnetometer" => _service.GetMagnetometer(),
+                    "magnetometer_sample" => _service.SampleMagnetometer(ms > 0 ? ms : 400),
                     "location" => _service.GetLocation(),
                     "camera" => _service.GetCameras(),
                     "audio" => _service.GetAudio(),
