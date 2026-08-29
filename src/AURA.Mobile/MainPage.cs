@@ -11,11 +11,10 @@ namespace AURA.Mobile
         private bool _permissionsAsked;
         private CancellationTokenSource? _rebuildCts;
 
-        public MainPage(EventBus events, ModuleManager manager, HomePage home, DiagnosticoPage diagnostico, ChatPage chat, AgentPage agent, MemoryPage memory, ExecutorsPage executors, ModulesPage modules, LogsPage logs, FixesPage fixes, TerminalPage terminal, BrowserPage browser, CellsPage cells, RunPage run, ProgramsPage programs, EcosystemPage ecosystem)
+        public MainPage(EventBus events, ModuleManager manager, HomePage home, DiagnosticoPage diagnostico, ChatPage chat, AgentPage agent, MemoryPage memory, ExecutorsPage executors, ModulesPage modules, LogsPage logs, FixesPage fixes, TerminalPage terminal, BrowserPage browser, CellsPage cells, RunPage run, ProgramsPage programs, EcosystemPage ecosystem, SpectrumPage spectrum)
         {
             AuraLog.Info("MainPage.ctor BEGIN");
             _manager = manager;
-            // Debounce: aplicar 7 módulos não deve reconstruir abas 7 vezes
             events.Subscribe<ModuleStateChangedEvent>(_ =>
                 MainThread.BeginInvokeOnMainThread(ScheduleRebuildTabs));
 
@@ -33,6 +32,7 @@ namespace AURA.Mobile
 
                 ("terminal", "Ferramentas", "Terminal", terminal),
                 ("executors", "Ferramentas", "Executores", executors),
+                (null, "Ferramentas", "Espectro", spectrum),
                 (null, "Ferramentas", "Módulos", modules),
                 ("logs", "Ferramentas", "Logs", logs),
 
@@ -64,7 +64,6 @@ namespace AURA.Mobile
             catch (Exception ex) { AuraLog.Info("Permissões de armazenamento: " + ex.Message); }
         }
 
-        /// <summary>Agrupa vários Apply em um único RebuildTabs (~250 ms).</summary>
         private void ScheduleRebuildTabs()
         {
             try { _rebuildCts?.Cancel(); } catch { /* ignore */ }
