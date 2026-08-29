@@ -11,6 +11,12 @@ public interface IAndroidCapabilityService
     string GetAccelerometer();
     string GetGyroscope();
     string GetMagnetometer();
+
+    /// <summary>
+    /// Amostra o campo magnético por alguns ms e resume magnitude + Hz estimado.
+    /// </summary>
+    string SampleMagnetometer(int durationMs = 400);
+
     string GetLocation();
     string GetCameras();
     string GetAudio();
