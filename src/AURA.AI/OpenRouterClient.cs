@@ -26,7 +26,7 @@ namespace AURA.AI
         public AiApiFormat ApiFormat { get; set; } = AiApiFormat.OpenAICompletions;
     }
 
-public sealed class OpenRouterClient
+    public sealed class OpenRouterClient
     {
         private static readonly JsonSerializerOptions SerializeOpts = new()
         {
@@ -42,6 +42,9 @@ public sealed class OpenRouterClient
             Options = options ?? throw new ArgumentNullException(nameof(options));
             _logger = logger ?? new ConsoleLogger();
         }
+
+        private bool IsOllama =>
+            string.Equals(Options.Provider, "ollama", StringComparison.OrdinalIgnoreCase);
 
         public HttpRequestMessage BuildRequest(string question, string? systemPrompt = null)
         {
@@ -61,7 +64,6 @@ public sealed class OpenRouterClient
 
             if (anthropic)
             {
-                // Anthropic: max_tokens + system (top-level) + messages + optional tool_use
                 string systemText = string.Empty;
                 if (!string.IsNullOrWhiteSpace(systemPrompt))
                     systemText = systemPrompt.Trim();
@@ -91,7 +93,7 @@ public sealed class OpenRouterClient
 
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            if (!string.Equals(Options.Provider, "ollama", StringComparison.OrdinalIgnoreCase))
+            if (!IsOllama)
             {
                 string header = string.IsNullOrWhiteSpace(Options.AuthHeaderName)
                     ? "Authorization"
@@ -109,11 +111,8 @@ public sealed class OpenRouterClient
                     request.Headers.TryAddWithoutValidation("X-URL", Options.AppReference);
                 }
 
-                // Anthropic exige version header
                 if (anthropic)
-                {
                     request.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
-                }
             }
 
             return request;
@@ -194,213 +193,234 @@ public sealed class OpenRouterClient
         {
             EnsureValidApiKey();
 
-var messageList = new List<Dictionary<string, object?>>();
+            var messageList = new List<Dictionary<string, object?>>();
             bool anthropic2 = Options.ApiFormat == AiApiFormat.AnthropicMessages;
+            bool ollama = IsOllama;
 
-            // Anthropic: system vai no campo top-level "system", não como message.
-            if (!anthropic2 && !string.IsNullOrWhiteSpace(systemPrompt))
+            // Ollama pequeno: tools OpenAI costumam gerar 400 — descreve no system e parseia texto
+            string? effectiveSystem = systemPrompt;
+            if (ollama && tools is { Count: > 0 })
+            {
+                var tb = new StringBuilder();
+                if (!string.IsNullOrWhiteSpace(systemPrompt))
+                    tb.AppendLine(systemPrompt.Trim());
+                tb.AppendLine("FERRAMENTAS (se precisar, responda SÓ com JSON: {\"name\":\"...\",\"arguments\":{...}}):");
+                foreach (AgentToolDefinition t in tools)
+                    tb.AppendLine("- " + t.Name + ": " + (t.Description ?? ""));
+                effectiveSystem = tb.ToString().Trim();
+            }
+
+            if (!anthropic2 && !string.IsNullOrWhiteSpace(effectiveSystem))
             {
                 messageList.Add(new Dictionary<string, object?>
                 {
                     ["role"] = "system",
-                    ["content"] = systemPrompt
+                    ["content"] = effectiveSystem
                 });
             }
 
             if (messages != null)
             {
-                    bool anthropic = Options.ApiFormat == AiApiFormat.AnthropicMessages;
+                bool anthropic = Options.ApiFormat == AiApiFormat.AnthropicMessages;
 
-                    foreach (AgentMessage m in messages)
+                foreach (AgentMessage m in messages)
+                {
+                    var mo = new Dictionary<string, object?>
                     {
-                        var mo = new Dictionary<string, object?>
-                        {
-                            ["role"] = m.Role
-                        };
+                        ["role"] = m.Role
+                    };
 
-                        if (anthropic)
+                    if (anthropic)
+                    {
+                        if (m.ToolCalls is { Count: > 0 })
                         {
-                            // Anthropic: assistant com tool_calls -> content array com {type:"tool_use",...}
-                            // tool role -> role:"user" + content [{type:"tool_result",tool_use_id,...}]
+                            var contentArr = new List<Dictionary<string, object?>>();
+                            if (!string.IsNullOrWhiteSpace(m.Content))
+                                contentArr.Add(new Dictionary<string, object?> { ["type"] = "text", ["text"] = m.Content });
+
+                            foreach (AgentToolCall tc in m.ToolCalls)
+                            {
+                                contentArr.Add(new Dictionary<string, object?>
+                                {
+                                    ["type"] = "tool_use",
+                                    ["id"] = tc.Id,
+                                    ["name"] = tc.Name ?? string.Empty,
+                                    ["input"] = NormalizeArgumentsJson(tc.ArgumentsJson) is string s && !string.IsNullOrEmpty(s)
+                                        ? (object)JsonDocument.Parse(s).RootElement.Clone()
+                                        : (object)new { }
+                                });
+                            }
+                            mo["content"] = contentArr;
+                        }
+                        else if (m.ToolCallId != null)
+                        {
+                            mo["role"] = "user";
+                            mo["content"] = new List<Dictionary<string, object?>>
+                            {
+                                new Dictionary<string, object?>
+                                {
+                                    ["type"] = "tool_result",
+                                    ["tool_use_id"] = m.ToolCallId,
+                                    ["content"] = m.Content ?? string.Empty
+                                }
+                            };
+                        }
+                        else if (m.Content != null)
+                        {
+                            mo["content"] = m.Content;
+                        }
+                    }
+                    else
+                    {
+                        // Ollama: mensagens tool/assistant com tool_calls quebram — simplifica
+                        if (ollama)
+                        {
+                            string role = m.Role ?? "user";
+                            if (string.Equals(role, "tool", StringComparison.OrdinalIgnoreCase))
+                                role = "user";
+                            mo["role"] = role;
+                            mo["content"] = m.Content ?? string.Empty;
                             if (m.ToolCalls is { Count: > 0 })
                             {
-                                var contentArr = new List<Dictionary<string, object?>>();
-                                if (!string.IsNullOrWhiteSpace(m.Content))
-                                    contentArr.Add(new Dictionary<string, object?> { ["type"] = "text", ["text"] = m.Content });
-
-                                foreach (AgentToolCall tc in m.ToolCalls)
-                                {
-                                    contentArr.Add(new Dictionary<string, object?>
-                                    {
-                                        ["type"] = "tool_use",
-                                        ["id"] = tc.Id,
-                                        ["name"] = tc.Name ?? string.Empty,
-                                        ["input"] = NormalizeArgumentsJson(tc.ArgumentsJson) is string s && !string.IsNullOrEmpty(s)
-                                            ? (object)JsonDocument.Parse(s).RootElement.Clone()
-                                            : (object)new { }
-                                    });
-                                }
-                                mo["content"] = contentArr;
-                            }
-                            else if (m.ToolCallId != null)
-                            {
-                                // tool_result: Anthropic espera role=user + content array
-                                mo["role"] = "user";
-                                mo["content"] = new List<Dictionary<string, object?>>
-                                {
-                                    new Dictionary<string, object?>
-                                    {
-                                        ["type"] = "tool_result",
-                                        ["tool_use_id"] = m.ToolCallId,
-                                        ["content"] = m.Content ?? string.Empty
-                                    }
-                                };
-                            }
-                            else if (m.Content != null)
-                            {
-                                mo["content"] = m.Content;
+                                // já executado no histórico: resume em texto
+                                mo["content"] = (m.Content ?? "") + " [tool_calls omitidos no modo Ollama]";
                             }
                         }
                         else
                         {
-                            // OpenAI/OpenRouter: assistant+tool_calls costuma exigir content null explícito
                             if (m.ToolCalls is { Count: > 0 })
-                                mo["content"] = m.Content; // pode ser null
+                                mo["content"] = m.Content;
                             else if (m.Content != null)
                                 mo["content"] = m.Content;
 
                             if (m.ToolCallId != null)
                                 mo["tool_call_id"] = m.ToolCallId;
-                        }
 
-                        if (!anthropic && m.ToolCalls is { Count: > 0 })
-                        {
-                            var calls = new List<Dictionary<string, object?>>();
-                            foreach (AgentToolCall tc in m.ToolCalls)
+                            if (m.ToolCalls is { Count: > 0 })
                             {
-                                string argsStr = NormalizeArgumentsJson(tc.ArgumentsJson);
-                                calls.Add(new Dictionary<string, object?>
+                                var calls = new List<Dictionary<string, object?>>();
+                                foreach (AgentToolCall tc in m.ToolCalls)
                                 {
-                                    ["id"] = string.IsNullOrWhiteSpace(tc.Id)
-                                        ? "call_" + Guid.NewGuid().ToString("N")
-                                        : tc.Id,
-                                    ["type"] = "function",
-                                    ["function"] = new Dictionary<string, object?>
+                                    string argsStr = NormalizeArgumentsJson(tc.ArgumentsJson);
+                                    calls.Add(new Dictionary<string, object?>
                                     {
-                                        ["name"] = tc.Name ?? string.Empty,
-                                        ["arguments"] = argsStr
-                                    }
-                                });
+                                        ["id"] = string.IsNullOrWhiteSpace(tc.Id)
+                                            ? "call_" + Guid.NewGuid().ToString("N")
+                                            : tc.Id,
+                                        ["type"] = "function",
+                                        ["function"] = new Dictionary<string, object?>
+                                        {
+                                            ["name"] = tc.Name ?? string.Empty,
+                                            ["arguments"] = argsStr
+                                        }
+                                    });
+                                }
+                                mo["tool_calls"] = calls;
                             }
-
-                            mo["tool_calls"] = calls;
                         }
 
-                        if (!string.IsNullOrWhiteSpace(m.ReasoningDetailsJson))
+                        if (!ollama && !string.IsNullOrWhiteSpace(m.ReasoningDetailsJson))
                         {
                             try
                             {
                                 using var rdDoc = JsonDocument.Parse(m.ReasoningDetailsJson);
-                                if (!anthropic)
-                                    mo["reasoning_details"] = rdDoc.RootElement.Clone();
+                                mo["reasoning_details"] = rdDoc.RootElement.Clone();
                             }
-                            catch (JsonException)
-                            {
-                                // ignora reasoning inválido
-                            }
+                            catch (JsonException) { }
                         }
-
-                        messageList.Add(mo);
                     }
-                }
 
-var payload = new Dictionary<string, object?>
+                    messageList.Add(mo);
+                }
+            }
+
+            var payload = new Dictionary<string, object?>
             {
                 ["model"] = Options.Model,
                 ["max_tokens"] = Options.MaxTokens,
                 ["messages"] = messageList
             };
 
-            if (anthropic2 && !string.IsNullOrWhiteSpace(systemPrompt))
-                payload["system"] = systemPrompt.Trim();
+            if (anthropic2 && !string.IsNullOrWhiteSpace(effectiveSystem))
+                payload["system"] = effectiveSystem.Trim();
 
-            if (tools is { Count: > 0 })
+            // Tools OpenAI só em nuvem — Ollama local usa JSON em texto
+            if (!ollama && tools is { Count: > 0 })
+            {
+                var toolsArray = new List<Dictionary<string, object?>>();
+                foreach (AgentToolDefinition t in tools)
                 {
-                    var toolsArray = new List<Dictionary<string, object?>>();
-                    foreach (AgentToolDefinition t in tools)
+                    var props = new Dictionary<string, object?>();
+                    foreach (KeyValuePair<string, AgentToolParameter> p in t.Parameters)
                     {
-                        var props = new Dictionary<string, object?>();
-                        foreach (KeyValuePair<string, AgentToolParameter> p in t.Parameters)
+                        props[p.Key] = new Dictionary<string, object?>
                         {
-                            props[p.Key] = new Dictionary<string, object?>
-                            {
-                                ["type"] = p.Value.Type,
-                                ["description"] = p.Value.Description
-                            };
-                        }
-
-                        var schema = new Dictionary<string, object?>
-                        {
-                            ["type"] = "object",
-                            ["properties"] = props
+                            ["type"] = p.Value.Type,
+                            ["description"] = p.Value.Description
                         };
-                        if (t.Required.Count > 0)
-                            schema["required"] = t.Required.ToList();
-
-                        bool anthropic = Options.ApiFormat == AiApiFormat.AnthropicMessages;
-
-                        if (anthropic)
-                        {
-                            // Anthropic: { type:"function", name, description, input_schema }
-                            toolsArray.Add(new Dictionary<string, object?>
-                            {
-                                ["type"] = "function",
-                                ["name"] = t.Name,
-                                ["description"] = t.Description,
-                                ["input_schema"] = schema
-                            });
-                        }
-                        else
-                        {
-                            // OpenAI: { type:"function", function:{name,description,parameters} }
-                            toolsArray.Add(new Dictionary<string, object?>
-                            {
-                                ["type"] = "function",
-                                ["function"] = new Dictionary<string, object?>
-                                {
-                                    ["name"] = t.Name,
-                                    ["description"] = t.Description,
-                                    ["parameters"] = schema
-                                }
-                            });
-                        }
                     }
 
-                    payload["tools"] = toolsArray;
+                    var schema = new Dictionary<string, object?>
+                    {
+                        ["type"] = "object",
+                        ["properties"] = props
+                    };
+                    if (t.Required.Count > 0)
+                        schema["required"] = t.Required.ToList();
+
+                    bool anthropic = Options.ApiFormat == AiApiFormat.AnthropicMessages;
+
+                    if (anthropic)
+                    {
+                        toolsArray.Add(new Dictionary<string, object?>
+                        {
+                            ["type"] = "function",
+                            ["name"] = t.Name,
+                            ["description"] = t.Description,
+                            ["input_schema"] = schema
+                        });
+                    }
+                    else
+                    {
+                        toolsArray.Add(new Dictionary<string, object?>
+                        {
+                            ["type"] = "function",
+                            ["function"] = new Dictionary<string, object?>
+                            {
+                                ["name"] = t.Name,
+                                ["description"] = t.Description,
+                                ["parameters"] = schema
+                            }
+                        });
+                    }
                 }
+
+                payload["tools"] = toolsArray;
+            }
 
             string json = JsonSerializer.Serialize(payload, SerializeOpts);
             HttpClient client = httpClient ?? ResolveClient();
             var request = new HttpRequestMessage(HttpMethod.Post, Options.BaseUrl);
 
-            string header2 = string.IsNullOrWhiteSpace(Options.AuthHeaderName)
-                ? "Authorization"
-                : Options.AuthHeaderName;
-            string scheme2 = Options.AuthScheme ?? "Bearer ";
-            if (!string.IsNullOrEmpty(scheme2))
-                request.Headers.TryAddWithoutValidation(header2, scheme2 + Options.ApiKey);
-            else
-                request.Headers.TryAddWithoutValidation(header2, Options.ApiKey);
-
-            if (Options.AppReference != null && !anthropic2)
+            if (!ollama)
             {
-                request.Headers.TryAddWithoutValidation("X-Title", "AURA");
-                request.Headers.TryAddWithoutValidation("X-URL", Options.AppReference);
-            }
+                string header2 = string.IsNullOrWhiteSpace(Options.AuthHeaderName)
+                    ? "Authorization"
+                    : Options.AuthHeaderName;
+                string scheme2 = Options.AuthScheme ?? "Bearer ";
+                if (!string.IsNullOrEmpty(scheme2))
+                    request.Headers.TryAddWithoutValidation(header2, scheme2 + Options.ApiKey);
+                else
+                    request.Headers.TryAddWithoutValidation(header2, Options.ApiKey);
 
-            if (anthropic2)
-            {
-                request.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
+                if (Options.AppReference != null && !anthropic2)
+                {
+                    request.Headers.TryAddWithoutValidation("X-Title", "AURA");
+                    request.Headers.TryAddWithoutValidation("X-URL", Options.AppReference);
+                }
+
+                if (anthropic2)
+                    request.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
             }
 
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -443,7 +463,8 @@ var payload = new Dictionary<string, object?>
                     ErrorKind = ClassifyError(response.StatusCode)
                 };
             }
-try
+
+            try
             {
                 using var document = JsonDocument.Parse(body);
                 JsonElement root = document.RootElement;
@@ -455,7 +476,6 @@ try
 
                 if (anthropic && root.TryGetProperty("content", out JsonElement contentArr))
                 {
-                    // Anthropic: content = [{type:"text",text:"..."}, {type:"tool_use",id,name,input}]
                     var sb = new StringBuilder();
                     foreach (JsonElement part in contentArr.EnumerateArray())
                     {
@@ -511,7 +531,6 @@ try
                                     argumentsJson = ReadArgumentsJson(fn);
                                 }
 
-                                // Descarta tool_call sem nome
                                 if (string.IsNullOrWhiteSpace(name))
                                     continue;
 
@@ -556,9 +575,6 @@ try
             }
         }
 
-        /// <summary>
-        /// Lê function.arguments: string JSON ou objeto; devolve sempre string de objeto válido.
-        /// </summary>
         private static string ReadArgumentsJson(JsonElement functionElement)
         {
             if (!functionElement.TryGetProperty("arguments", out JsonElement args))
@@ -573,13 +589,9 @@ try
             if (args.ValueKind == JsonValueKind.Null || args.ValueKind == JsonValueKind.Undefined)
                 return "{}";
 
-            // número/bool inesperado
             return NormalizeArgumentsJson(args.GetRawText());
         }
 
-        /// <summary>
-        /// Garante string cujo parse é um JSON object (ou {}). Nunca devolve JSON inválido.
-        /// </summary>
         internal static string NormalizeArgumentsJson(string? raw)
         {
             if (string.IsNullOrWhiteSpace(raw))
@@ -587,7 +599,6 @@ try
 
             string s = raw.Trim();
 
-            // Alguns modelos envelopam em markdown
             if (s.StartsWith("```", StringComparison.Ordinal))
             {
                 int firstNl = s.IndexOf('\n');
@@ -604,25 +615,14 @@ try
                 if (root.ValueKind == JsonValueKind.Object)
                     return root.GetRawText();
 
-                // Se veio array ou valor solto, embrulha — ainda é JSON válido
                 if (root.ValueKind == JsonValueKind.Array)
                     return root.GetRawText();
 
-                // string/number/bool → objeto mínimo
                 return "{}";
             }
             catch (JsonException)
             {
-                // Tentativa: às vezes vem com aspas simples ou texto solto
-                try
-                {
-                    // se parecer path=... sem JSON, desiste
-                    return "{}";
-                }
-                catch
-                {
-                    return "{}";
-                }
+                return "{}";
             }
         }
 
@@ -657,7 +657,7 @@ try
 
         private void EnsureValidApiKey()
         {
-            if (string.Equals(Options.Provider, "ollama", StringComparison.OrdinalIgnoreCase))
+            if (IsOllama)
             {
                 if (string.IsNullOrWhiteSpace(Options.BaseUrl))
                     throw new InvalidOperationException("Endpoint do Ollama não configurado.");
