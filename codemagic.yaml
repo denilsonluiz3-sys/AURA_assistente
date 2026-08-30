@@ -17,228 +17,88 @@ workflows:
       - name: Install .NET 10
         script: |
           set -euo pipefail
-
-          echo "=== INSTALL .NET ==="
-          echo "CM_BUILD_DIR=$CM_BUILD_DIR"
-          echo "DOTNET_PATH=$DOTNET_PATH"
-          echo "DOTNET_VERSION=$DOTNET_VERSION"
-
           curl -fsSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
           chmod +x dotnet-install.sh
-
-          ./dotnet-install.sh \
-            --install-dir "$DOTNET_PATH" \
-            --version "$DOTNET_VERSION"
-
+          ./dotnet-install.sh --install-dir "$DOTNET_PATH" --version "$DOTNET_VERSION"
           export PATH="$DOTNET_PATH:$PATH"
-
-          echo "=== DOTNET INFO ==="
-          "$DOTNET_BIN" --info
-
-          echo "=== DOTNET VERSION ==="
-          "$DOTNET_BIN" --version
-
-      - name: Diagnose .NET and Android environment
-        script: |
-          set +e
-
-          export PATH="$DOTNET_PATH:$PATH"
-
-          mkdir -p "$CM_BUILD_DIR/diagnostics"
-
-          echo "=== ENVIRONMENT ===" | tee "$CM_BUILD_DIR/diagnostics/environment.txt"
-          env | sort | grep -E '^(CM_|ANDROID_|JAVA_|PATH=|DOTNET_)' \
-            | tee -a "$CM_BUILD_DIR/diagnostics/environment.txt"
-
-          echo "=== DOTNET INFO ===" | tee "$CM_BUILD_DIR/diagnostics/dotnet-info.txt"
-          "$DOTNET_BIN" --info 2>&1 \
-            | tee -a "$CM_BUILD_DIR/diagnostics/dotnet-info.txt"
-
-          echo "=== WORKLOAD LIST ===" | tee "$CM_BUILD_DIR/diagnostics/workloads.txt"
-          "$DOTNET_BIN" workload list 2>&1 \
-            | tee -a "$CM_BUILD_DIR/diagnostics/workloads.txt"
-
-          echo "=== ANDROID SDK ===" | tee "$CM_BUILD_DIR/diagnostics/android-sdk.txt"
-
-          SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
-
-          echo "ANDROID_HOME=${ANDROID_HOME:-<unset>}" \
-            | tee -a "$CM_BUILD_DIR/diagnostics/android-sdk.txt"
-
-          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-<unset>}" \
-            | tee -a "$CM_BUILD_DIR/diagnostics/android-sdk.txt"
-
-          echo "SDK_DIR=$SDK_DIR" \
-            | tee -a "$CM_BUILD_DIR/diagnostics/android-sdk.txt"
-
-          if [ -d "$SDK_DIR" ]; then
-            echo "SDK_EXISTS=true" \
-              | tee -a "$CM_BUILD_DIR/diagnostics/android-sdk.txt"
-            find "$SDK_DIR" -maxdepth 2 -type d \
-              | head -100 \
-              | tee -a "$CM_BUILD_DIR/diagnostics/android-sdk.txt"
-          else
-            echo "SDK_EXISTS=false" \
-              | tee -a "$CM_BUILD_DIR/diagnostics/android-sdk.txt"
-          fi
-
-          echo "=== JAVA ==="
-          command -v java
-          java -version 2>&1
-
-          exit 0
+          echo "dotnet=$($DOTNET_BIN --version)"
 
       - name: Install MAUI Android workload
         script: |
-          set +e
-
+          set -euo pipefail
           export PATH="$DOTNET_PATH:$PATH"
-
-          mkdir -p "$CM_BUILD_DIR/diagnostics"
-
-          echo "=== INSTALL MAUI ANDROID ==="
-
-          "$DOTNET_BIN" workload install maui-android \
-            --verbosity diag \
-            2>&1 | tee "$CM_BUILD_DIR/diagnostics/workload-install.log"
-
-          PIPE_STATUS=("${PIPESTATUS[@]}")
-          EXIT_CODE="${PIPE_STATUS[0]}"
-
-          echo "DOTNET_WORKLOAD_EXIT_CODE=$EXIT_CODE"
-
-          echo "=== WORKLOAD LIST AFTER INSTALL ==="
-          "$DOTNET_BIN" workload list 2>&1 \
-            | tee "$CM_BUILD_DIR/diagnostics/workloads-after-install.txt"
-
-          if [ "$EXIT_CODE" -ne 0 ]; then
-            echo "MAUI workload installation FAILED"
-            exit "$EXIT_CODE"
-          fi
-
-          echo "MAUI workload installation OK"
+          "$DOTNET_BIN" workload install maui-android --verbosity minimal
+          echo "MAUI workload: OK"
 
       - name: Restore
         script: |
-          set +e
-
+          set -euo pipefail
           export PATH="$DOTNET_PATH:$PATH"
-
-          mkdir -p "$CM_BUILD_DIR/diagnostics"
-
-          "$DOTNET_BIN" restore \
-            src/AURA.Mobile/AURA.Mobile.csproj \
-            -v:minimal \
-            2>&1 | tee "$CM_BUILD_DIR/diagnostics/restore.log"
-
-          EXIT_CODE="${PIPESTATUS[0]}"
-
-          echo "DOTNET_RESTORE_EXIT_CODE=$EXIT_CODE"
-
-          exit "$EXIT_CODE"
+          "$DOTNET_BIN" restore src/AURA.Mobile/AURA.Mobile.csproj --verbosity minimal
 
       - name: Install Android SDK deps
         script: |
           set +e
-
           export PATH="$DOTNET_PATH:$PATH"
-
-          mkdir -p "$CM_BUILD_DIR/diagnostics"
-
           SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
-
-          echo "=== ANDROID SDK DEPENDENCIES ==="
-          echo "SDK_DIR=$SDK_DIR"
-
-          "$DOTNET_BIN" build \
-            src/AURA.Mobile/AURA.Mobile.csproj \
+          "$DOTNET_BIN" build src/AURA.Mobile/AURA.Mobile.csproj \
             -t:InstallAndroidDependencies \
             -f "$ANDROID_TFM" \
             -p:AndroidSdkDirectory="$SDK_DIR" \
             -p:AcceptAndroidSDKLicenses=True \
-            -v:diag \
-            2>&1 | tee "$CM_BUILD_DIR/diagnostics/android-dependencies.log"
-
-          EXIT_CODE="${PIPESTATUS[0]}"
-
-          echo "ANDROID_DEPENDENCIES_EXIT_CODE=$EXIT_CODE"
-
+            --verbosity minimal > "$CM_BUILD_DIR/android-deps.log" 2>&1
+          EXIT_CODE=$?
+          if [ "$EXIT_CODE" -ne 0 ]; then
+            echo "Android SDK dependency installation failed. Last 120 lines:"
+            tail -120 "$CM_BUILD_DIR/android-deps.log"
+          else
+            echo "Android SDK dependencies: OK"
+          fi
           exit "$EXIT_CODE"
 
-      - name: Build diagnostic APK
+      - name: Build APK
         script: |
           set +e
-
           export PATH="$DOTNET_PATH:$PATH"
-
-          mkdir -p "$CM_BUILD_DIR/diagnostics"
-
-          echo "=== BUILD AURA MOBILE ==="
-
-          "$DOTNET_BIN" build \
-            src/AURA.Mobile/AURA.Mobile.csproj \
+          "$DOTNET_BIN" build src/AURA.Mobile/AURA.Mobile.csproj \
             -f "$ANDROID_TFM" \
             -c Release \
-            -v:diag \
-            --no-restore \
-            2>&1 | tee "$CM_BUILD_DIR/diagnostics/build.log"
-
-          EXIT_CODE="${PIPESTATUS[0]}"
-
-          echo "DOTNET_BUILD_EXIT_CODE=$EXIT_CODE"
-
-          echo "=== BUILD ERROR SUMMARY ==="
-
-          grep -Ein \
-            'error|failed|failure|exception|fatal|NETSDK|CS[0-9]+|MSB[0-9]+|XA[0-9]+|Xamarin|Android' \
-            "$CM_BUILD_DIR/diagnostics/build.log" \
-            | tail -200 \
-            || true
-
-          echo "=== LAST BUILD LOG ==="
-
-          tail -300 "$CM_BUILD_DIR/diagnostics/build.log"
-
+            --verbosity minimal \
+            --no-restore > "$CM_BUILD_DIR/build.log" 2>&1
+          EXIT_CODE=$?
+          if [ "$EXIT_CODE" -ne 0 ]; then
+            echo "Build failed. Last 160 lines:"
+            tail -160 "$CM_BUILD_DIR/build.log"
+          else
+            echo "Build: OK"
+          fi
           exit "$EXIT_CODE"
 
       - name: Publish APK
         script: |
           set +e
-
           export PATH="$DOTNET_PATH:$PATH"
-
           mkdir -p "$CM_BUILD_DIR/artifacts"
-          mkdir -p "$CM_BUILD_DIR/diagnostics"
-
-          echo "=== PUBLISH APK ==="
-
-          "$DOTNET_BIN" publish \
-            src/AURA.Mobile/AURA.Mobile.csproj \
+          "$DOTNET_BIN" publish src/AURA.Mobile/AURA.Mobile.csproj \
             -f "$ANDROID_TFM" \
             -c Release \
             -p:AndroidPackageFormats=apk \
             -p:ApplicationVersion="${BUILD_NUMBER:-1}" \
             -p:ApplicationDisplayVersion="$AURA_DISPLAY_VERSION" \
-            -v:diag \
-            -o "$CM_BUILD_DIR/artifacts" \
-            2>&1 | tee "$CM_BUILD_DIR/diagnostics/publish.log"
-
-          EXIT_CODE="${PIPESTATUS[0]}"
-
-          echo "DOTNET_PUBLISH_EXIT_CODE=$EXIT_CODE"
-
-          echo "=== APK FILES ==="
-          find "$CM_BUILD_DIR/artifacts" \
-            -type f \
-            -name '*.apk' \
-            -print
-
-          echo "=== LAST PUBLISH LOG ==="
-          tail -300 "$CM_BUILD_DIR/diagnostics/publish.log"
-
+            --verbosity minimal \
+            -o "$CM_BUILD_DIR/artifacts" > "$CM_BUILD_DIR/publish.log" 2>&1
+          EXIT_CODE=$?
+          if [ "$EXIT_CODE" -ne 0 ]; then
+            echo "Publish failed. Last 160 lines:"
+            tail -160 "$CM_BUILD_DIR/publish.log"
+          else
+            echo "Publish: OK"
+            find "$CM_BUILD_DIR/artifacts" -type f -name '*.apk' -print
+          fi
           exit "$EXIT_CODE"
 
     artifacts:
       - artifacts/**/*.apk
-      - diagnostics/**/*.log
-      - diagnostics/**/*.txt
+      - android-deps.log
+      - build.log
+      - publish.log
