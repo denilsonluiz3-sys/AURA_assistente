@@ -237,14 +237,14 @@ namespace AURA.AI
                     NeedsKey = true,
                     KeyEnv = "OPENROUTER_API_KEY",
                     KeyHint = "sk-or-…",
-                    DefaultModelId = "openrouter/free",
+                    DefaultModelId = "deepseek/deepseek-chat-v3.1:free",
                     AuthHeaderName = "Authorization",
                     AuthScheme = "Bearer ",
                     ApiFormat = AiApiFormat.OpenAICompletions,
                     KeyPrefixesList = new List<string> { "sk-or-" },
                     Models = new List<ProviderModel>
                     {
-                        new() { Id = "openrouter/free", Label = "Auto grátis", Category = "Grátis", IsFree = true },
+                        new() { Id = "deepseek/deepseek-chat-v3.1:free", Label = "DeepSeek V3.1 (free · tool-calling)", Category = "Grátis", IsFree = true },
                         new() { Id = "google/gemma-2-9b-it:free", Label = "Gemma 2 9B (free)", Category = "Grátis", IsFree = true }
                     }
                 },
