@@ -32,14 +32,6 @@
                 <Button Text="🧠 Memória" Clicked="OnChipMemory" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="17" />
                 <Button Text="▶ Continuar" Clicked="OnChipContinue" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="17" />
                 <Button Text="🛡 Shell" Clicked="OnChipShellSafe" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="17" />
-                <Button Text="📋 Contexto" Clicked="OnCopyContextClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="17" />
-                <Button Text="▶ Colar plano" Clicked="OnPastePlanClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
-                <Button Text="🕑 Histórico" Clicked="OnHistoryClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
-                <Button Text="⚡ Recentes" Clicked="OnRecentsClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
-                <Button Text="✦ Prompts" Clicked="OnPromptsClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
-                <Button Text="＋ Prompt" Clicked="OnAddPromptClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="17" />
-                <Button Text="➕ Atalho" Clicked="OnAddShortcutClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="17" />
-                <Button Text="🗑 Limpar chat" Clicked="OnClearChatClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextMuted}" CornerRadius="17" />
             </HorizontalStackLayout>
         </ScrollView>
 
