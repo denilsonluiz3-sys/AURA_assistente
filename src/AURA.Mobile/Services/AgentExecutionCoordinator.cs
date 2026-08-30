@@ -1,19 +1,22 @@
 using AURA.Abstractions.Execution;
+using AURA.Modules.Executors;
 
 namespace AURA.Mobile.Services;
 
 /// <summary>
-/// Porta única para execuções iniciadas pelo Agente. A execução recebe uma
-/// identidade no ProcessRegistry antes de chegar ao executor; a mesma identidade
-/// acompanha a saída incremental e pode ser ligada à AgentCapabilitySurface.
+/// Porta única para execuções iniciadas pelo Agente.
+/// A identidade criada no ProcessRegistry acompanha a requisição e a saída
+/// incremental, permitindo que a superfície visual acompanhe exatamente uma execução.
 /// </summary>
-public sealed class AgentExecutionCoordinator
+public sealed class AgentExecutionCoordinator : IDisposable
 {
     private readonly ProcessRegistry _processes;
+    private bool _disposed;
 
     public AgentExecutionCoordinator(ProcessRegistry processes)
     {
         _processes = processes;
+        ProcessExecutorBase.OutputReceived += OnProcessOutput;
     }
 
     public event EventHandler<AgentExecutionStartedEventArgs>? Started;
@@ -39,11 +42,12 @@ public sealed class AgentExecutionCoordinator
         var process = _processes.Begin(title, executor.Name, "executando");
         request.CorrelationId = process.Id;
         _processes.Update(process.Id, title, "executando", 0.1);
-        Started?.Invoke(this, new AgentExecutionStartedEventArgs(process.Id, title, executor.Name, request.WorkingDirectory));
+        Started?.Invoke(this, new AgentExecutionStartedEventArgs(
+            process.Id, title, executor.Name, request.WorkingDirectory));
 
         try
         {
-            ExecutionResult result = await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+            var result = await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
 
             if (result.Success)
                 _processes.Complete(process.Id, "concluído");
@@ -52,7 +56,8 @@ public sealed class AgentExecutionCoordinator
                     ? $"exit={result.ExitCode}"
                     : result.StandardError.Trim());
 
-            Completed?.Invoke(this, new AgentExecutionCompletedEventArgs(process.Id, executor.Name, result));
+            Completed?.Invoke(this, new AgentExecutionCompletedEventArgs(
+                process.Id, executor.Name, result));
             return new AgentExecutionResult(process.Id, executor.Name, result);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -71,13 +76,27 @@ public sealed class AgentExecutionCoordinator
         }
     }
 
-    /// <summary>Encaminha saída incremental já associada a uma execução.</summary>
-    public void PublishOutput(string correlationId, string stream, string text)
+    private void OnProcessOutput(object? sender, ProcessOutputEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(correlationId) || string.IsNullOrEmpty(text))
+        if (_disposed || string.IsNullOrWhiteSpace(e.CorrelationId) || string.IsNullOrEmpty(e.Text))
             return;
 
+        Output?.Invoke(this, new AgentExecutionOutputEventArgs(
+            e.CorrelationId, e.IsError ? "stderr" : "stdout", e.Text));
+    }
+
+    public void PublishOutput(string correlationId, string stream, string text)
+    {
+        if (_disposed || string.IsNullOrWhiteSpace(correlationId) || string.IsNullOrEmpty(text))
+            return;
         Output?.Invoke(this, new AgentExecutionOutputEventArgs(correlationId, stream, text));
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        ProcessExecutorBase.OutputReceived -= OnProcessOutput;
     }
 }
 
