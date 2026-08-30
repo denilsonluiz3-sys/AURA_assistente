@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Maui.Controls;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace AURA.Mobile.Pages;
 
