@@ -30,8 +30,11 @@ public static class MauiProgram
     {
         AuraLog.Info("MauiProgram.CreateMauiApp BEGIN");
         var builder = MauiApp.CreateBuilder();
-        builder.UseMauiApp<App>()
-               .UseMauiCommunityToolkitMediaElement(isAndroidForegroundServiceEnabled: true);
+        builder.UseMauiApp<App>();
+
+        // MediaElement requires Android 26+. Keep the app's minimum API at 24.
+        if (OperatingSystem.IsAndroidVersionAtLeast(26))
+            builder.UseMauiCommunityToolkitMediaElement(isAndroidForegroundServiceEnabled: true);
 
 #if ANDROID
         builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Microsoft.Maui.Controls.WebView, AURA.Mobile.Platforms.Android.WebView.AuraWebViewHandler>());
@@ -134,8 +137,8 @@ public static class MauiProgram
             sp.GetService<PythonExecutor>(),
             sp.GetService<NodeExecutor>(),
             sp.GetService<CellProgramRegistry>(),
-            sp.GetService<SimulationRuntime>(),
-            sp.GetService<IAndroidCapabilityService>()));
+            sp.GetRequiredService<SimulationRuntime>(),
+            sp.GetRequiredService<IAndroidCapabilityService>()));
         builder.Services.AddSingleton<MemoryPage>();
         builder.Services.AddSingleton<ExecutorsPage>();
         builder.Services.AddSingleton<SpectrumPage>(sp => new SpectrumPage(sp.GetService<IAndroidCapabilityService>()));
