@@ -83,12 +83,10 @@ public sealed class AgentCapabilitySurface : ContentView
             if (_activeWorkingDirectory == null)
                 return;
 
-            var eventDirectory = System.IO.Path.GetFullPath(e.WorkingDirectory);
-            var activeDirectory = System.IO.Path.GetFullPath(_activeWorkingDirectory);
-            if (!string.Equals(eventDirectory, activeDirectory, StringComparison.OrdinalIgnoreCase))
+            if (!SameDirectory(e.WorkingDirectory, _activeWorkingDirectory))
                 return;
 
-            Show(System.IO.Path.GetFileName(e.FileName), e.IsError ? "stderr" : "executando");
+            Show(PathTitle(e.FileName), e.IsError ? "stderr" : "executando");
             AppendOutput(e.IsError ? "[stderr] " + e.Text : e.Text);
         });
     }
@@ -99,8 +97,7 @@ public sealed class AgentCapabilitySurface : ContentView
             return;
 
         var active = _processes.Processes
-            .LastOrDefault(p => !string.Equals(p.Status, "Concluído", StringComparison.OrdinalIgnoreCase)
-                              && !string.Equals(p.Status, "Falhou", StringComparison.OrdinalIgnoreCase));
+            .LastOrDefault(p => !IsTerminalStatus(p.Status));
 
         if (active != null)
         {
@@ -108,7 +105,8 @@ public sealed class AgentCapabilitySurface : ContentView
             if (_activeProcessId != processId)
             {
                 _activeProcessId = processId;
-                _activeWorkingDirectory = Directory.GetCurrentDirectory();
+                _activeWorkingDirectory = AgentWorkspaceRoot();
+                _output.Text = string.Empty;
                 Show(processId ?? "Processo", active.Status);
             }
             return;
@@ -118,7 +116,7 @@ public sealed class AgentCapabilitySurface : ContentView
         if (latest != null)
         {
             _activeProcessId = latest.Id?.ToString();
-            _activeWorkingDirectory = Directory.GetCurrentDirectory();
+            _activeWorkingDirectory = AgentWorkspaceRoot();
             Show(_activeProcessId ?? "Processo", latest.Status);
         }
     }
@@ -162,6 +160,50 @@ public sealed class AgentCapabilitySurface : ContentView
             _activeProcessId = null;
             _activeWorkingDirectory = null;
         }
+    }
+
+    private static bool IsTerminalStatus(string? status)
+        => string.Equals(status, "Concluído", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(status, "Falhou", StringComparison.OrdinalIgnoreCase);
+
+    private static bool SameDirectory(string? left, string? right)
+    {
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+            return false;
+
+        try
+        {
+            return string.Equals(
+                System.IO.Path.GetFullPath(left),
+                System.IO.Path.GetFullPath(right),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private static string PathTitle(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return "Execução";
+
+        try
+        {
+            return System.IO.Path.GetFileName(path);
+        }
+        catch
+        {
+            return path;
+        }
+    }
+
+    private static string AgentWorkspaceRoot()
+    {
+        // O AgentPage já estabelece o workspace como diretório de execução.
+        // Usamos o cwd do processo como fallback sem criar uma segunda fonte de verdade.
+        return Directory.GetCurrentDirectory();
     }
 
     protected override void OnParentSet()
