@@ -23,35 +23,28 @@
             </Grid>
         </Border>
 
-        <ScrollView Grid.Row="1" Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
-            <HorizontalStackLayout Spacing="8" Padding="12,8,12,4">
-                <Button x:Name="ModeAgentBtn" Text="Agente" Clicked="OnModeAgentClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="17" />
-                <Button x:Name="ModeWebBtn" Text="Web AI" Clicked="OnModeWebClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
-                <Button Text="📂 Workspace" Clicked="OnChipWorkspace" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="17" />
-                <Button Text="🩺 Diagnóstico" Clicked="OnChipDiagnostic" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="17" />
-                <Button Text="🧠 Memória" Clicked="OnChipMemory" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="17" />
-                <Button Text="▶ Continuar" Clicked="OnChipContinue" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="17" />
-                <Button Text="🛡 Shell" Clicked="OnChipShellSafe" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="17" />
-                <Button Text="📋 Contexto" Clicked="OnCopyContextClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="17" />
-                <Button Text="▶ Colar plano" Clicked="OnPastePlanClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
-                <Button Text="🕑 Histórico" Clicked="OnHistoryClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
-                <Button Text="⚡ Recentes" Clicked="OnRecentsClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
-                <Button Text="✦ Prompts" Clicked="OnPromptsClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="17" />
-                <Button Text="＋ Prompt" Clicked="OnAddPromptClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="17" />
-                <Button Text="➕ Atalho" Clicked="OnAddShortcutClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="17" />
-                <Button Text="🗑 Limpar chat" Clicked="OnClearChatClicked" FontSize="11" Padding="12,6" HeightRequest="34" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextMuted}" CornerRadius="17" />
+        <!-- Superfície curta: somente os atalhos de uso frequente ficam na frente. O restante permanece no menu ⚡. -->
+        <ScrollView Grid.Row="1" Orientation="Horizontal" HorizontalScrollBarVisibility="Never" HeightRequest="42">
+            <HorizontalStackLayout Spacing="6" Padding="12,5,12,3">
+                <Button x:Name="ModeAgentBtn" Text="Agente" Clicked="OnModeAgentClicked" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="16" />
+                <Button x:Name="ModeWebBtn" Text="Web AI" Clicked="OnModeWebClicked" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="16" />
+                <Button Text="📂 Workspace" Clicked="OnChipWorkspace" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
+                <Button Text="🩺 Diagnóstico" Clicked="OnChipDiagnostic" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
+                <Button Text="🧠 Memória" Clicked="OnChipMemory" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
+                <Button Text="▶ Continuar" Clicked="OnChipContinue" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
+                <Button Text="🛡 Shell" Clicked="OnChipShellSafe" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
             </HorizontalStackLayout>
         </ScrollView>
 
-        <Border x:Name="ProcessCardsHost" Grid.Row="2" IsVisible="False" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="10,7">
-            <CollectionView x:Name="ProcessCards" ItemsSource="{Binding Processes}" ItemsLayout="HorizontalList" HeightRequest="72" SelectionMode="None">
+        <Border x:Name="ProcessCardsHost" Grid.Row="2" IsVisible="False" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="8,5">
+            <CollectionView x:Name="ProcessCards" ItemsSource="{Binding Processes}" ItemsLayout="HorizontalList" HeightRequest="58" SelectionMode="None">
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
                         <Border WidthRequest="170" Margin="0,0,8,0" BackgroundColor="{DynamicResource AuraSurface2}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" StrokeShape="RoundRectangle 12">
-                            <Grid Padding="10,6" RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
-                                <Label Grid.ColumnSpan="2" Text="{Binding Title}" FontSize="11" FontAttributes="Bold" TextColor="{DynamicResource AuraTextPrimary}" LineBreakMode="TailTruncation" />
-                                <Label Grid.Row="1" Text="{Binding Status}" FontSize="10" TextColor="{DynamicResource AuraAccent}" />
-                                <Button Grid.Row="1" Grid.Column="1" Text="Abrir" Clicked="OnProcessCardClicked" FontSize="9" Padding="7,2" HeightRequest="25" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
+                            <Grid Padding="10,5" RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
+                                <Label Grid.ColumnSpan="2" Text="{Binding Title}" FontSize="10" FontAttributes="Bold" TextColor="{DynamicResource AuraTextPrimary}" LineBreakMode="TailTruncation" />
+                                <Label Grid.Row="1" Text="{Binding Status}" FontSize="9" TextColor="{DynamicResource AuraAccent}" />
+                                <Button Grid.Row="1" Grid.Column="1" Text="Abrir" Clicked="OnProcessCardClicked" FontSize="8" Padding="6,1" HeightRequest="22" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
                                 <ProgressBar Grid.Row="2" Grid.ColumnSpan="2" Progress="{Binding Progress}" HeightRequest="3" ProgressColor="{DynamicResource AuraAccent}" />
                             </Grid>
                         </Border>
@@ -60,17 +53,18 @@
             </CollectionView>
         </Border>
 
-        <Grid x:Name="AgentPane" Grid.Row="3" IsVisible="True">
-            <ScrollView x:Name="ConversationScroll">
-                <Grid>
-                    <VerticalStackLayout x:Name="ConversationContainer" Spacing="6" Padding="14,12" />
-                    <pages:AgentCapabilitySurface x:Name="CapabilitySurface"
-                                             HorizontalOptions="Fill"
-                                             VerticalOptions="End"
-                                             Margin="6"
-                                             ZIndex="100" />
-                </Grid>
+        <!-- O Agente ocupa a área principal. A superfície de capacidade fica fora do ScrollView,
+             portanto stdout/stderr e estado permanecem visíveis durante a execução. -->
+        <Grid x:Name="AgentPane" Grid.Row="3" IsVisible="True" RowDefinitions="*,Auto">
+            <ScrollView x:Name="ConversationScroll" Grid.Row="0">
+                <VerticalStackLayout x:Name="ConversationContainer" Spacing="6" Padding="14,12" />
             </ScrollView>
+            <pages:AgentCapabilitySurface x:Name="CapabilitySurface"
+                                           Grid.Row="1"
+                                           HorizontalOptions="Fill"
+                                           VerticalOptions="End"
+                                           Margin="6,0,6,4"
+                                           ZIndex="100" />
         </Grid>
 
         <Grid x:Name="WebPane" Grid.Row="3" IsVisible="False" RowDefinitions="Auto,*">
@@ -82,12 +76,12 @@
             <WebView x:Name="BridgeWebView" Grid.Row="1" />
         </Grid>
 
-        <Border Grid.Row="4" ZIndex="50" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,10">
-            <VerticalStackLayout Spacing="8">
+        <Border Grid.Row="4" ZIndex="50" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,8">
+            <VerticalStackLayout Spacing="7">
                 <ContentView x:Name="ConfigHost" IsVisible="False" />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                    <Border Grid.Column="0" BackgroundColor="{DynamicResource AuraSurface2}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,6" StrokeShape="RoundRectangle 12,12,12,12">
-                        <Editor x:Name="CommandEditor" MinimumHeightRequest="40" MaximumHeightRequest="120" Placeholder="Instrua o agente… (atalhos: ls, diagnóstico, memória X, continue)" AutoSize="TextChanges" BackgroundColor="Transparent" />
+                    <Border Grid.Column="0" BackgroundColor="{DynamicResource AuraSurface2}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,5" StrokeShape="RoundRectangle 12,12,12,12">
+                        <Editor x:Name="CommandEditor" MinimumHeightRequest="40" MaximumHeightRequest="110" Placeholder="Instrua o agente… (ex.: ls, diagnostique, execute o programa X)" AutoSize="TextChanges" BackgroundColor="Transparent" />
                     </Border>
                     <Grid Grid.Column="1" WidthRequest="56" HeightRequest="56" VerticalOptions="End" ZIndex="51">
                         <ActivityIndicator x:Name="BusyIndicator" IsRunning="False" IsVisible="False" InputTransparent="True" Color="White" WidthRequest="22" HeightRequest="22" HorizontalOptions="Center" VerticalOptions="Center" />
