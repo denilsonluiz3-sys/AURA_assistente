@@ -7,8 +7,7 @@ using System.Threading.Tasks;
 using AURA.Abstractions;
 using AURA.AI;
 using AURA.Agents.Programs;
-using AURA.Core.Launchers;
-using AURA.Core.Runtime;
+using Microsoft.Maui.Controls;
 
 namespace AURA.Mobile.Pages;
 
@@ -46,12 +45,11 @@ public sealed class AgentListProgramsTool : AgentTool
 public sealed class AgentRunProgramTool : AgentTool
 {
     private readonly CellProgramRegistry _registry;
-    private readonly SimulationRuntime _runtime;
 
-    public AgentRunProgramTool(CellProgramRegistry registry, SimulationRuntime runtime)
+    public AgentRunProgramTool(CellProgramRegistry registry, AURA.Core.Runtime.SimulationRuntime runtime)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
-        _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+        _ = runtime ?? throw new ArgumentNullException(nameof(runtime));
     }
 
     public override AgentToolDefinition Definition => new AgentToolDefinition
@@ -87,9 +85,20 @@ public sealed class AgentRunProgramTool : AgentTool
 
         try
         {
+            // Usa o mesmo contexto real e o mesmo CellProgramRunner da tela Programas.
+            // Isso mantém as capabilities Android reais e passa pelo PolicyGuard.
+            var services = Application.Current?.Handler?.MauiContext?.Services;
+            var contextFactory = services?.GetService(typeof(IAuraCellContextFactory)) as IAuraCellContextFactory;
+            var runner = services?.GetService(typeof(CellProgramRunner)) as CellProgramRunner;
+
+            if (contextFactory == null)
+                return "ERRO: contexto de execução de programas indisponível neste dispositivo.";
+            if (runner == null)
+                return "ERRO: executor de programas indisponível neste dispositivo.";
+
             string cellId = "prog-" + Guid.NewGuid().ToString("N")[..8];
-            var context = new AgentCellContext(cellId, ct);
-            CellProgramResult result = await program.ExecuteAsync(context, ct).ConfigureAwait(false);
+            IAuraCellContext context = contextFactory.Create(cellId, ct);
+            CellProgramResult result = await runner.RunAsync(program, context, ct).ConfigureAwait(false);
 
             var sb = new StringBuilder();
             sb.Append($"Programa '{name}': ");
@@ -102,27 +111,5 @@ public sealed class AgentRunProgramTool : AgentTool
         {
             return $"ERRO ao executar '{name}': {ex.Message}";
         }
-    }
-}
-
-file sealed class AgentCellContext : IAuraCellContext
-{
-    public AgentCellContext(string cellId, CancellationToken ct)
-    {
-        CellId = cellId;
-        CancellationToken = ct;
-        Device = new NoOpDiagnostic();
-    }
-
-    public string CellId { get; }
-    public CancellationToken CancellationToken { get; }
-    public IDeviceDiagnosticCapability Device { get; }
-
-    private sealed class NoOpDiagnostic : IDeviceDiagnosticCapability
-    {
-        public string GetDevice() => "unknown";
-        public string GetProperties() => "unknown";
-        public string GetBattery() => "unknown";
-        public string GetNetwork() => "unknown";
     }
 }
