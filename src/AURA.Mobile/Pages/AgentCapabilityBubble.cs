@@ -1,4 +1,5 @@
 using Microsoft.Maui.Controls;
+using Microsoft.Maui.Controls.Shapes;
 using Microsoft.Maui.Graphics;
 
 namespace AURA.Mobile.Pages;
@@ -46,7 +47,7 @@ public sealed class AgentCapabilityBubble : Border
         Padding = new Thickness(12, 8);
         Stroke = Colors.Gray;
         StrokeThickness = 1;
-        StrokeShape = new RoundRectangle
+        StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
         {
             CornerRadius = new CornerRadius(12)
         };
