@@ -1,33 +1,79 @@
-# AURA — Integração incremental de processos
+# AURA — Integração contínua de capacidades no fluxo do Agente
 
-## Núcleo como processo jurídico (LegalProcessEngine)
-- [x] Conectar estado de processos ao `EventBus`/Cells existente.
-- [x] Registrar processos da Assistente sem alterar o fluxo atual de IA/orquestração.
-- [x] Exibir processos como mini-cards na aba Assistente.
-- [x] Manter processos fora da página para sobreviver à navegação.
-- [x] Navegar do mini-card para a aba correspondente.
-- [x] Preservar a identidade da Cell no processo exibido.
-- [x] Conectar a execução da solicitação da Assistente ao ciclo vivo do `ProcessRegistry`.
-- [x] Publicar etapas do `AuraOrchestrator` no `EventBus` e refletir nos mini-cards.
-- [x] Conectar solicitações explicitamente orquestradas da Assistente ao `AuraOrchestrator`.
-- [x] Criar `IProcessOrchestrator` como porta única que une chat e agentes (fases jurídicas).
-- [x] Criar `LegalProcessEngine` percorrendo fases pré-processual → conhecimento → decisão → recursal → execução → arquivamento.
-- [x] Associar decisões if/else de cada fase aos blocos existentes (MemoryAgent, AutomationAgent, AIAgent, orquestrador, LLM opcional).
-- [x] `KnowledgeManager` como agente IAgent de conhecimento offline/online (cache + DuckDuckGo + aprendizado local).
-- [x] `ChatPage` roteia toda solicitação pelo `IProcessOrchestrator` (unifica chat + agentes).
-- [x] Retry isolado da etapa que falhar (fase recursal).
-- [x] Revisão dos resultados e composição final (arquivamento).
-- [x] `EcosystemPage`: visualização nativa do ecossistema (Chat, Agente, Células, Runtime, Shell, Python, Git) com navegação direta para as páginas reais.
+## Objetivo
+Uma solicitação do Agente deve possuir uma única identidade de execução e uma única superfície temporária de acompanhamento. Capacidades existentes continuam sendo executores reais; a mudança é de orquestração e apresentação, não de substituição.
 
-## Próximo núcleo (pendente)
-- [ ] Dividir uma solicitação em múltiplas tarefas/Cells nomeadas.
-- [ ] Expor sentenças jurídicas (`Verdict`) no card de processo da UI.
-- [ ] Motor de conhecimento ampliado (perguntas frequentes embutidas e tópicos do sistema).
+## Pipeline comum
 
-Estado atual: o `LegalProcessEngine` conduz cada solicitação como um processo jurídico — conciliação via memória/conhecimento local, instrução com pesquisa, sentença (com LLM opcional), recurso com retry isolado, execução e arquivamento — publicando cada fase no `EventBus` para os mini-cards da Assistente. Validação contínua pelo GitHub Actions.
-- [ ] Associar tarefas planejadas a processos nomeados.
-- [ ] Dividir uma solicitação em múltiplas tarefas/Cells.
-- [ ] Retry isolado da tarefa que falhar.
-- [ ] Revisão dos resultados e composição final.
+```text
+AgentPage
+  ↓
+ProcessRegistry.Begin
+  ↓
+CorrelationId
+  ↓
+AgentExecutionCoordinator
+  ↓
+IToolExecutor existente
+  ↓
+ProcessExecutorBase / stdout / stderr incremental
+  ↓
+AgentCapabilitySurface
+  ↓
+resultado padronizado
+  ↓
+bolha do Agente
+```
 
-Estado atual: a Assistente possui cards vivos para o fluxo normal e para o `AuraOrchestrator`; o orquestrador publica entendimento, planejamento, pesquisa, execução, revisão, falha e conclusão pelo `EventBus`. Próximo núcleo: tarefas nomeadas, divisão em múltiplas Cells, retry isolado e composição final. Validação contínua pelo GitHub Actions.
+## Capacidades que devem reutilizar o pipeline
+
+- [x] Shell: executor real existente.
+- [x] stdout/stderr incremental: `ProcessExecutorBase` publica eventos.
+- [x] CorrelationId: `ExecutionRequest` e `ProcessOutputEventArgs` carregam a identidade.
+- [x] CapabilitySurface: pode ser vinculada explicitamente ao processo.
+- [x] `AgentExecutionCoordinator`: cria o processo, injeta `CorrelationId`, preserva `AgentWorkspace.ActiveRoot` e fecha o estado.
+- [ ] AgentPage usar o coordenador no caminho de shell, eliminando o caminho paralelo de apresentação.
+- [ ] run_program reutilizar o mesmo coordenador/superfície.
+- [ ] Python reutilizar o mesmo coordenador/superfície.
+- [ ] Node reutilizar o mesmo coordenador/superfície.
+- [ ] Git reutilizar o mesmo coordenador/superfície.
+- [ ] Memória reutilizar a mesma apresentação de processo.
+- [ ] Android reutilizar a mesma apresentação de processo.
+- [ ] Células reutilizar a mesma apresentação de processo.
+
+## Integridade do fluxo
+
+- [ ] Uma solicitação = uma execução principal.
+- [ ] Uma execução = um CorrelationId.
+- [ ] Uma superfície aceita apenas a execução vinculada.
+- [ ] stdout/stderr não são duplicados como novas execuções.
+- [ ] Resultado final não dispara novamente o mesmo comando.
+- [ ] Execução concluída/falha encerra a superfície temporária.
+- [ ] Cancelamento e timeout fecham corretamente o processo.
+
+## UI — somente depois da integração
+
+- [ ] Remover atalhos duplicados que apenas chamam o mesmo fluxo.
+- [ ] Manter as capacidades disponíveis no menu do Agente.
+- [ ] Esconder Chat, Logs, Executores, Células e outras superfícies secundárias somente quando o fluxo equivalente dentro do Agente estiver validado.
+- [ ] Não apagar implementações existentes antes da validação no aparelho.
+
+## Validação por lote
+
+Cada lote deve manter:
+
+```text
+245 Warning(s)
+0 Error(s)
+Build: OK
+Publish APK
+```
+
+Falhas de compilação devem ser corrigidas antes do próximo lote. O objetivo é chegar à integração completa sem criar um segundo motor de execução e sem remover capacidades existentes.
+
+## Histórico
+
+- Núcleo de processos e cards vivos já existente.
+- Correlação explícita adicionada ao contrato de execução e aos eventos.
+- `AgentCapabilitySurface` preparada para vínculo por processo.
+- `AgentExecutionCoordinator` adicionado como porta comum para os executores existentes.
