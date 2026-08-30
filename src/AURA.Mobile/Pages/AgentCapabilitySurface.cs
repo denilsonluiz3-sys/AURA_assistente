@@ -8,7 +8,7 @@ namespace AURA.Mobile.Pages;
 
 /// <summary>
 /// Superfície visual temporária para capacidades executadas pelo agente.
-/// Observa o registry de processos e apresenta saída incremental.
+/// Observa saída incremental dos executores e apresenta o estado da execução.
 /// </summary>
 public sealed class AgentCapabilitySurface : ContentView
 {
@@ -18,6 +18,7 @@ public sealed class AgentCapabilitySurface : ContentView
     private readonly Editor _output;
     private ProcessRegistry? _processes;
     private string? _activeProcessId;
+    private string? _activeWorkingDirectory;
     private bool _bound;
 
     public AgentCapabilitySurface()
@@ -89,10 +90,17 @@ public sealed class AgentCapabilitySurface : ContentView
     {
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            if (_activeProcessId == null)
-                Show(System.IO.Path.GetFileName(e.FileName), e.IsError ? "stderr" : "executando");
+            if (_activeWorkingDirectory == null)
+                return;
 
-            AppendOutput(e.Text);
+            if (!string.Equals(
+                    Path.GetFullPath(e.WorkingDirectory),
+                    Path.GetFullPath(_activeWorkingDirectory),
+                    StringComparison.OrdinalIgnoreCase))
+                return;
+
+            Show(Path.GetFileName(e.FileName), e.IsError ? "stderr" : "executando");
+            AppendOutput(e.IsError ? "[stderr] " + e.Text : e.Text);
         });
     }
 
@@ -111,6 +119,7 @@ public sealed class AgentCapabilitySurface : ContentView
             if (_activeProcessId != processId)
             {
                 _activeProcessId = processId;
+                _activeWorkingDirectory = AgentWorkspace.ActiveRoot;
                 Show(processId ?? "Processo", active.Status);
             }
             return;
@@ -120,8 +129,23 @@ public sealed class AgentCapabilitySurface : ContentView
         if (latest != null)
         {
             _activeProcessId = latest.Id?.ToString();
+            _activeWorkingDirectory = AgentWorkspace.ActiveRoot;
             Show(_activeProcessId ?? "Processo", latest.Status);
         }
+    }
+
+    /// <summary>
+    /// Inicia uma apresentação visual para uma execução disparada diretamente
+    /// pelo Agente. O conteúdo anterior é descartado para não misturar execuções.
+    /// </summary>
+    public void BeginExecution(string title, string workingDirectory)
+    {
+        _activeProcessId = null;
+        _activeWorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory)
+            ? Directory.GetCurrentDirectory()
+            : workingDirectory;
+        _output.Text = string.Empty;
+        Show(title, "executando");
     }
 
     public void Show(string title, string status = "executando")
@@ -144,7 +168,11 @@ public sealed class AgentCapabilitySurface : ContentView
     {
         _status.Text = success ? "concluído" : "falhou";
         if (hide)
+        {
             IsVisible = false;
+            _activeProcessId = null;
+            _activeWorkingDirectory = null;
+        }
     }
 
     protected override void OnParentSet()
@@ -156,6 +184,8 @@ public sealed class AgentCapabilitySurface : ContentView
                 _processes.Processes.CollectionChanged -= OnProcessesChanged;
             ProcessExecutorBase.OutputReceived -= OnProcessOutput;
             _bound = false;
+            _activeProcessId = null;
+            _activeWorkingDirectory = null;
         }
     }
 }
