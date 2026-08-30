@@ -4,8 +4,30 @@ using AURA.Abstractions.Execution;
 
 namespace AURA.Modules.Executors;
 
+public sealed class ProcessOutputEventArgs : EventArgs
+{
+    public ProcessOutputEventArgs(string fileName, string workingDirectory, bool isError, string text)
+    {
+        FileName = fileName;
+        WorkingDirectory = workingDirectory;
+        IsError = isError;
+        Text = text;
+    }
+
+    public string FileName { get; }
+    public string WorkingDirectory { get; }
+    public bool IsError { get; }
+    public string Text { get; }
+}
+
 public abstract class ProcessExecutorBase : IToolExecutor
 {
+    /// <summary>
+    /// Saída incremental de processos. A UI pode observar este evento sem
+    /// criar outro executor ou alterar o contrato de IToolExecutor.
+    /// </summary>
+    public static event EventHandler<ProcessOutputEventArgs>? OutputReceived;
+
     public abstract string Name { get; }
     public abstract bool IsAvailable();
     public abstract Task<ExecutionResult> ExecuteAsync(ExecutionRequest request, CancellationToken cancellationToken = default);
@@ -39,7 +61,6 @@ public abstract class ProcessExecutorBase : IToolExecutor
         return result;
     }
 
-    /// <summary>Configura PATH/LD_LIBRARY_PATH do Termux ao executar binários dele.</summary>
     private static void ApplyTermuxEnvironment(ProcessStartInfo psi, string fileName)
     {
         const string termuxRoot = "/data/data/com.termux/files/usr";
@@ -63,14 +84,10 @@ public abstract class ProcessExecutorBase : IToolExecutor
         }
 
         if (Directory.Exists(libDir))
-        {
             psi.Environment["LD_LIBRARY_PATH"] = libDir;
-        }
 
         if (!psi.Environment.ContainsKey("HOME") && Directory.Exists(home))
-        {
             psi.Environment["HOME"] = home;
-        }
     }
 
     private static List<string> BuildShellCommand(string fileName, IEnumerable<string> arguments)
@@ -85,10 +102,11 @@ public abstract class ProcessExecutorBase : IToolExecutor
         ExecutionRequest request,
         CancellationToken cancellationToken)
     {
+        var workingDirectory = request.WorkingDirectory ?? Directory.GetCurrentDirectory();
         var psi = new ProcessStartInfo
         {
             FileName = fileName,
-            WorkingDirectory = request.WorkingDirectory ?? Directory.GetCurrentDirectory(),
+            WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -119,7 +137,40 @@ public abstract class ProcessExecutorBase : IToolExecutor
             return ExecutionResult.Failed($"[AURA] Falha ao iniciar '{fileName}': {ex.Message}");
         }
 
-        var tcs = new TaskCompletionSource<bool>();
+        var stdout = new StringBuilder();
+        var stderr = new StringBuilder();
+
+        Task ReadStreamAsync(StreamReader reader, StringBuilder buffer, bool isError) =>
+            Task.Run(async () =>
+            {
+                while (true)
+                {
+                    string? line;
+                    try
+                    {
+                        line = await reader.ReadLineAsync().ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        break;
+                    }
+
+                    if (line is null)
+                        break;
+
+                    buffer.AppendLine(line);
+                    OutputReceived?.Invoke(null, new ProcessOutputEventArgs(
+                        fileName,
+                        workingDirectory,
+                        isError,
+                        line + Environment.NewLine));
+                }
+            });
+
+        var stdoutTask = ReadStreamAsync(process.StandardOutput, stdout, false);
+        var stderrTask = ReadStreamAsync(process.StandardError, stderr, true);
+
+        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var timedOut = false;
         process.Exited += (_, _) => tcs.TrySetResult(true);
         process.EnableRaisingEvents = true;
@@ -136,28 +187,23 @@ public abstract class ProcessExecutorBase : IToolExecutor
             tcs.TrySetResult(false);
         });
 
-        await tcs.Task;
+        await tcs.Task.ConfigureAwait(false);
+        await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
         stopwatch.Stop();
 
-        var stdout = timedOut ? string.Empty : await process.StandardOutput.ReadToEndAsync();
-        var stderr = timedOut ? "[AURA] Execução cancelada por timeout.\n" + await process.StandardError.ReadToEndAsync()
-                             : await process.StandardError.ReadToEndAsync();
+        if (timedOut)
+            stderr.Append("[AURA] Execução cancelada por timeout.\n");
 
         return new ExecutionResult
         {
-            Success = process.ExitCode == 0,
-            ExitCode = process.ExitCode,
-            StandardOutput = stdout,
-            StandardError = stderr,
+            Success = !timedOut && process.ExitCode == 0,
+            ExitCode = timedOut ? -1 : process.ExitCode,
+            StandardOutput = stdout.ToString(),
+            StandardError = stderr.ToString(),
             Duration = stopwatch.Elapsed
         };
     }
 
-    /// <summary>
-    /// Procura o primeiro binário disponível dentre os candidatos. Além do
-    /// PATH, procura nos diretórios do Termux (Android), onde o app não
-    /// costuma ter acesso via variável de ambiente.
-    /// </summary>
     protected static string? ResolveBinary(params string[] candidates)
     {
         var pathEnv = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
