@@ -38,10 +38,27 @@ public sealed class ProcessStartedEventArgs : EventArgs
     public int ProcessId { get; }
 }
 
+public sealed class ProcessCompletedEventArgs : EventArgs
+{
+    public ProcessCompletedEventArgs(string fileName, string workingDirectory, string correlationId, ExecutionResult result)
+    {
+        FileName = fileName;
+        WorkingDirectory = workingDirectory;
+        CorrelationId = correlationId;
+        Result = result;
+    }
+
+    public string FileName { get; }
+    public string WorkingDirectory { get; }
+    public string CorrelationId { get; }
+    public ExecutionResult Result { get; }
+}
+
 public abstract class ProcessExecutorBase : IToolExecutor
 {
     public static event EventHandler<ProcessStartedEventArgs>? ProcessStarted;
     public static event EventHandler<ProcessOutputEventArgs>? OutputReceived;
+    public static event EventHandler<ProcessCompletedEventArgs>? ProcessCompleted;
 
     public abstract string Name { get; }
     public abstract bool IsAvailable();
@@ -107,8 +124,6 @@ public abstract class ProcessExecutorBase : IToolExecutor
         try { process.Start(); }
         catch (Exception ex) { stopwatch.Stop(); return ExecutionResult.Failed($"[AURA] Falha ao iniciar '{fileName}': {ex.Message}"); }
 
-        // Execuções legadas que chegam sem CorrelationId continuam sendo rastreáveis.
-        // O PID do processo fornece uma identidade estável para a superfície visual.
         string correlationId = string.IsNullOrWhiteSpace(request.CorrelationId)
             ? $"pid:{process.Id}"
             : request.CorrelationId!;
@@ -150,7 +165,7 @@ public abstract class ProcessExecutorBase : IToolExecutor
         await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
         stopwatch.Stop();
         if (timedOut) stderr.Append("[AURA] Execução cancelada por timeout.\n");
-        return new ExecutionResult
+        var result = new ExecutionResult
         {
             Success = !timedOut && process.ExitCode == 0,
             ExitCode = timedOut ? -1 : process.ExitCode,
@@ -158,6 +173,8 @@ public abstract class ProcessExecutorBase : IToolExecutor
             StandardError = stderr.ToString(),
             Duration = stopwatch.Elapsed
         };
+        ProcessCompleted?.Invoke(null, new ProcessCompletedEventArgs(fileName, workingDirectory, correlationId, result));
+        return result;
     }
 
     protected static string? ResolveBinary(params string[] candidates)
