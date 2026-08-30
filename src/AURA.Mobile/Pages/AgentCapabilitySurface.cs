@@ -2,6 +2,7 @@ using System;
 using System.Collections.Specialized;
 using System.Linq;
 using AURA.Core.Runtime;
+using AURA.Modules.Executors;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Controls.Shapes;
@@ -9,9 +10,9 @@ using Microsoft.Maui.Controls.Shapes;
 namespace AURA.Mobile.Pages;
 
 /// <summary>
-/// Superfície transitória para exibir uma capacidade usada pelo Agente.
-/// A execução continua pertencendo aos motores existentes; esta classe é UI
-/// e observa o ProcessRegistry para tornar processos visíveis no fluxo do Agente.
+/// Superfície transitória das capacidades do Agente.
+/// Não executa processos: observa o runtime existente e apresenta estado e
+/// saída incremental no próprio fluxo da conversa.
 /// </summary>
 public sealed class AgentCapabilitySurface : ContentView
 {
@@ -85,25 +86,38 @@ public sealed class AgentCapabilitySurface : ContentView
         };
 
         Content = _frame;
-        HandlerChanged += (_, _) => BindProcessRegistry();
+        HandlerChanged += (_, _) => BindRuntime();
     }
 
-    private void BindProcessRegistry()
+    private void BindRuntime()
     {
         if (_bound || Handler?.MauiContext?.Services is not IServiceProvider services)
             return;
 
         _processes = services.GetService<ProcessRegistry>();
-        if (_processes == null)
-            return;
+        if (_processes != null)
+            _processes.Processes.CollectionChanged += OnProcessesChanged;
 
+        ProcessExecutorBase.OutputReceived += OnProcessOutput;
         _bound = true;
-        _processes.Processes.CollectionChanged += OnProcessesChanged;
         RefreshFromProcesses();
     }
 
     private void OnProcessesChanged(object? sender, NotifyCollectionChangedEventArgs e)
         => MainThread.BeginInvokeOnMainThread(RefreshFromProcesses);
+
+    private void OnProcessOutput(object? sender, ProcessOutputEventArgs e)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (_activeProcessId == null)
+            {
+                Show(Path.GetFileName(e.FileName), e.IsError ? "stderr" : "executando");
+            }
+
+            AppendOutput(e.Text);
+        });
+    }
 
     private void RefreshFromProcesses()
     {
@@ -189,13 +203,16 @@ public sealed class AgentCapabilitySurface : ContentView
 
     protected override void OnHandlerChanged()
     {
-        base.OnHandlerChanged();
-        if (Handler == null && _processes != null)
+        if (Handler == null && _bound)
         {
-            _processes.Processes.CollectionChanged -= OnProcessesChanged;
+            if (_processes != null)
+                _processes.Processes.CollectionChanged -= OnProcessesChanged;
+            ProcessExecutorBase.OutputReceived -= OnProcessOutput;
             _bound = false;
             _processes = null;
             _activeProcessId = null;
         }
+
+        base.OnHandlerChanged();
     }
 }
