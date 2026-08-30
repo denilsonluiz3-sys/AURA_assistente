@@ -4,9 +4,8 @@ namespace AURA.Mobile.Services;
 
 /// <summary>
 /// Orquestra uma execução de capacidade mantendo uma única identidade de processo.
-/// A camada de UI pode vincular AgentCapabilitySurface ao CorrelationId devolvido
-/// antes de iniciar o executor. O mesmo contrato serve para shell, git, python,
-/// node e qualquer IToolExecutor existente.
+/// O workspace é recebido pelo request; quando ausente, usa o diretório padrão do
+/// processo. A UI pode vincular a superfície ao CorrelationId antes da execução.
 /// </summary>
 public sealed class AgentExecutionCoordinator
 {
@@ -29,9 +28,9 @@ public sealed class AgentExecutionCoordinator
         if (!executor.IsAvailable())
             return AgentExecutionResult.Failed($"Executor indisponível: {executor.Name}");
 
-        string workingDirectory = string.IsNullOrWhiteSpace(request.WorkingDirectory)
-            ? AgentWorkspace.ActiveRoot
-            : request.WorkingDirectory;
+        var workingDirectory = request.WorkingDirectory;
+        if (string.IsNullOrWhiteSpace(workingDirectory))
+            workingDirectory = Directory.GetCurrentDirectory();
 
         var process = _processes.Begin(title, executor.Name, "executando");
         request.WorkingDirectory = workingDirectory;
