@@ -23,8 +23,23 @@ public sealed class AgentCapabilitySurface : ContentView
     {
         _title = new Label { FontSize = 13, FontAttributes = FontAttributes.Bold };
         _status = new Label { FontSize = 11, Opacity = 0.75 };
-        _output = new Editor { IsReadOnly = true, AutoSize = EditorAutoSizeOption.TextChanges, MinimumHeightRequest = 48, MaximumHeightRequest = 240, FontSize = 12, Text = string.Empty };
-        _card = new Border { StrokeThickness = 0, Padding = new Thickness(12, 8), Margin = new Thickness(0, 4), StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(12) }, Content = new VerticalStackLayout { Spacing = 4, Children = { _title, _status, _output } } };
+        _output = new Editor
+        {
+            IsReadOnly = true,
+            AutoSize = EditorAutoSizeOption.TextChanges,
+            MinimumHeightRequest = 48,
+            MaximumHeightRequest = 180,
+            FontSize = 12,
+            Text = string.Empty
+        };
+        _card = new Border
+        {
+            StrokeThickness = 0,
+            Padding = new Thickness(12, 8),
+            Margin = new Thickness(0, 4),
+            StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(12) },
+            Content = new VerticalStackLayout { Spacing = 4, Children = { _title, _status, _output } }
+        };
         Content = _card;
         IsVisible = false;
     }
@@ -47,6 +62,9 @@ public sealed class AgentCapabilitySurface : ContentView
             _coordinator.Output += OnExecutionOutput;
             _coordinator.Completed += OnExecutionCompleted;
         }
+        ProcessExecutorBase.ProcessStarted += OnProcessStarted;
+        ProcessExecutorBase.OutputReceived += OnProcessOutput;
+        ProcessExecutorBase.ProcessCompleted += OnProcessCompleted;
         _bound = true;
         RefreshFromProcesses();
     }
@@ -66,6 +84,12 @@ public sealed class AgentCapabilitySurface : ContentView
         MainThread.BeginInvokeOnMainThread(() => BindProcess(e.ProcessId, e.WorkingDirectory, e.Title));
     }
 
+    private void OnProcessStarted(object? sender, ProcessStartedEventArgs e)
+    {
+        if (_activeProcessId != null) return;
+        MainThread.BeginInvokeOnMainThread(() => BindProcess(e.CorrelationId, e.WorkingDirectory, e.FileName));
+    }
+
     private void OnExecutionOutput(object? sender, AgentExecutionOutputEventArgs e)
     {
         if (!string.Equals(e.CorrelationId, _activeProcessId, StringComparison.OrdinalIgnoreCase)) return;
@@ -76,10 +100,38 @@ public sealed class AgentCapabilitySurface : ContentView
         });
     }
 
+    private void OnProcessOutput(object? sender, ProcessOutputEventArgs e)
+    {
+        if (!string.Equals(e.CorrelationId, _activeProcessId, StringComparison.OrdinalIgnoreCase)) return;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            Show(_title.Text ?? e.FileName, e.IsError ? "stderr" : "executando");
+            AppendOutput(e.IsError ? "[stderr] " + e.Text : e.Text);
+        });
+    }
+
     private void OnExecutionCompleted(object? sender, AgentExecutionCompletedEventArgs e)
     {
         if (!string.Equals(e.ProcessId, _activeProcessId, StringComparison.OrdinalIgnoreCase)) return;
-        MainThread.BeginInvokeOnMainThread(() => _status.Text = e.Result.Success ? "concluído" : "falhou");
+        MainThread.BeginInvokeOnMainThread(() => Finish(e.Result.Success));
+    }
+
+    private void OnProcessCompleted(object? sender, ProcessCompletedEventArgs e)
+    {
+        if (!string.Equals(e.CorrelationId, _activeProcessId, StringComparison.OrdinalIgnoreCase)) return;
+        MainThread.BeginInvokeOnMainThread(() => Finish(e.Result.Success));
+    }
+
+    private async void Finish(bool success)
+    {
+        _status.Text = success ? "concluído" : "falhou";
+        // A superfície é contextual: permanece tempo suficiente para leitura e fecha sozinha.
+        try
+        {
+            await Task.Delay(1800);
+            if (IsVisible) Hide();
+        }
+        catch { /* ignore */ }
     }
 
     private void OnProcessesChanged(object? sender, NotifyCollectionChangedEventArgs e) => MainThread.BeginInvokeOnMainThread(RefreshFromProcesses);
@@ -117,6 +169,9 @@ public sealed class AgentCapabilitySurface : ContentView
                 _coordinator.Output -= OnExecutionOutput;
                 _coordinator.Completed -= OnExecutionCompleted;
             }
+            ProcessExecutorBase.ProcessStarted -= OnProcessStarted;
+            ProcessExecutorBase.OutputReceived -= OnProcessOutput;
+            ProcessExecutorBase.ProcessCompleted -= OnProcessCompleted;
             _bound = false;
         }
     }
