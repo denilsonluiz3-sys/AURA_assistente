@@ -17,7 +17,7 @@ public sealed class AgentCapabilitySurface : ContentView
     private readonly Label _status;
     private readonly Editor _output;
     private ProcessRegistry? _processes;
-    private Guid? _activeProcessId;
+    private string? _activeProcessId;
     private bool _bound;
 
     public AgentCapabilitySurface()
@@ -107,10 +107,11 @@ public sealed class AgentCapabilitySurface : ContentView
 
         if (active != null)
         {
-            if (_activeProcessId != active.Id)
+            var processId = active.Id?.ToString();
+            if (_activeProcessId != processId)
             {
-                _activeProcessId = active.Id;
-                Show(active.Command, active.Status);
+                _activeProcessId = processId;
+                Show(processId ?? "Processo", active.Status);
             }
             return;
         }
@@ -118,8 +119,8 @@ public sealed class AgentCapabilitySurface : ContentView
         var latest = _processes.Processes.LastOrDefault();
         if (latest != null)
         {
-            _activeProcessId = latest.Id;
-            Show(latest.Command, latest.Status);
+            _activeProcessId = latest.Id?.ToString();
+            Show(_activeProcessId ?? "Processo", latest.Status);
         }
     }
 
