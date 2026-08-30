@@ -4,10 +4,12 @@ using System.Collections.Generic;
 namespace AURA.Abstractions.Execution
 {
     /// <summary>
-    /// Descreve um comando a ser executado por um IToolExecutor. O significado
-    /// de <see cref="Command"/> e <see cref="Arguments"/> varia por executor
-    /// (ex.: no Git, Command é o subcomando "status" e Arguments são os
-    /// argumentos dele; no Shell, Command é o comando completo).
+    /// Descreve um comando a ser executado por um IToolExecutor.
+    /// <para>
+    /// CorrelationId liga explicitamente uma execução à superfície visual que
+    /// a acompanha. É opcional para preservar compatibilidade com chamadas
+    /// existentes que não precisam de apresentação em tempo real.
+    /// </para>
     /// </summary>
     public sealed class ExecutionRequest
     {
@@ -23,5 +25,12 @@ namespace AURA.Abstractions.Execution
 
         /// <summary>Timeout da execução. Null = sem timeout.</summary>
         public TimeSpan? Timeout { get; set; }
+
+        /// <summary>
+        /// Identificador estável da execução no ProcessRegistry.
+        /// Quando preenchido, a saída incremental pode ser roteada sem depender
+        /// apenas de cwd, nome do executável ou heurísticas.
+        /// </summary>
+        public string? CorrelationId { get; set; }
     }
 }
