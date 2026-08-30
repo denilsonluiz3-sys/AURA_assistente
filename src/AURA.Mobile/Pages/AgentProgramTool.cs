@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using AURA.Abstractions;
 using AURA.AI;
 using AURA.Agents.Programs;
+using AURA.Mobile.Services;
 using Microsoft.Maui.Controls;
 
 namespace AURA.Mobile.Pages;
@@ -45,11 +46,13 @@ public sealed class AgentListProgramsTool : AgentTool
 public sealed class AgentRunProgramTool : AgentTool
 {
     private readonly CellProgramRegistry _registry;
+    private readonly AgentExecutionCoordinator? _coordinator;
 
-    public AgentRunProgramTool(CellProgramRegistry registry, AURA.Core.Runtime.SimulationRuntime runtime)
+    public AgentRunProgramTool(CellProgramRegistry registry, AURA.Core.Runtime.SimulationRuntime runtime, AgentExecutionCoordinator? coordinator = null)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _ = runtime ?? throw new ArgumentNullException(nameof(runtime));
+        _coordinator = coordinator;
     }
 
     public override AgentToolDefinition Definition => new AgentToolDefinition
@@ -83,6 +86,11 @@ public sealed class AgentRunProgramTool : AgentTool
             return $"ERRO: programa '{name}' não encontrado. Disponíveis: {available}";
         }
 
+        // Registra a execução no Coordinator ANTES de rodar, para que uma bolha de
+        // capacidade ("Programa: <nome>") apareça no chat assim que ela começa,
+        // e não só depois que o resultado inteiro já estiver pronto.
+        string? correlationId = _coordinator?.BeginManual("Programa: " + program.Name, "run_program");
+
         try
         {
             // Usa o mesmo contexto real e o mesmo CellProgramRunner da tela Programas.
@@ -92,11 +100,17 @@ public sealed class AgentRunProgramTool : AgentTool
             var runner = services?.GetService(typeof(CellProgramRunner)) as CellProgramRunner;
 
             if (contextFactory == null)
+            {
+                if (correlationId != null) _coordinator!.CompleteManual(correlationId, false, "contexto indisponível");
                 return "ERRO: contexto de execução de programas indisponível neste dispositivo.";
+            }
             if (runner == null)
+            {
+                if (correlationId != null) _coordinator!.CompleteManual(correlationId, false, "executor indisponível");
                 return "ERRO: executor de programas indisponível neste dispositivo.";
+            }
 
-            string cellId = "prog-" + Guid.NewGuid().ToString("N")[..8];
+            string cellId = correlationId ?? "prog-" + Guid.NewGuid().ToString("N")[..8];
             IAuraCellContext context = contextFactory.Create(cellId, ct);
             CellProgramResult result = await runner.RunAsync(program, context, ct).ConfigureAwait(false);
 
@@ -105,10 +119,15 @@ public sealed class AgentRunProgramTool : AgentTool
             sb.AppendLine(result.IsSuccess ? "sucesso" : "falha");
             if (result.Error != null) sb.AppendLine("Erro: " + result.Error);
             if (result.Data != null) sb.AppendLine("Dados: " + JsonSerializer.Serialize(result.Data));
+
+            if (correlationId != null)
+                _coordinator!.CompleteManual(correlationId, result.IsSuccess, result.IsSuccess ? "concluído" : (result.Error ?? "falhou"));
+
             return sb.ToString().TrimEnd();
         }
         catch (Exception ex)
         {
+            if (correlationId != null) _coordinator!.CompleteManual(correlationId, false, ex.Message);
             return $"ERRO ao executar '{name}': {ex.Message}";
         }
     }
