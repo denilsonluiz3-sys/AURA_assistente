@@ -22,8 +22,25 @@ public sealed class ProcessOutputEventArgs : EventArgs
     public string? CorrelationId { get; }
 }
 
+public sealed class ProcessStartedEventArgs : EventArgs
+{
+    public ProcessStartedEventArgs(string fileName, string workingDirectory, string correlationId, int processId)
+    {
+        FileName = fileName;
+        WorkingDirectory = workingDirectory;
+        CorrelationId = correlationId;
+        ProcessId = processId;
+    }
+
+    public string FileName { get; }
+    public string WorkingDirectory { get; }
+    public string CorrelationId { get; }
+    public int ProcessId { get; }
+}
+
 public abstract class ProcessExecutorBase : IToolExecutor
 {
+    public static event EventHandler<ProcessStartedEventArgs>? ProcessStarted;
     public static event EventHandler<ProcessOutputEventArgs>? OutputReceived;
 
     public abstract string Name { get; }
@@ -90,9 +107,16 @@ public abstract class ProcessExecutorBase : IToolExecutor
         try { process.Start(); }
         catch (Exception ex) { stopwatch.Stop(); return ExecutionResult.Failed($"[AURA] Falha ao iniciar '{fileName}': {ex.Message}"); }
 
+        // Execuções legadas que chegam sem CorrelationId continuam sendo rastreáveis.
+        // O PID do processo fornece uma identidade estável para a superfície visual.
+        string correlationId = string.IsNullOrWhiteSpace(request.CorrelationId)
+            ? $"pid:{process.Id}"
+            : request.CorrelationId!;
+        request.CorrelationId = correlationId;
+        ProcessStarted?.Invoke(null, new ProcessStartedEventArgs(fileName, workingDirectory, correlationId, process.Id));
+
         var stdout = new StringBuilder();
         var stderr = new StringBuilder();
-        string? correlationId = request.CorrelationId;
 
         Task ReadStreamAsync(StreamReader reader, StringBuilder buffer, bool isError) => Task.Run(async () =>
         {
