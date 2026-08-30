@@ -6,15 +6,20 @@ namespace AURA.Mobile.Pages;
 
 /// <summary>
 /// Superfície transitória para exibir uma capacidade usada pelo Agente.
-/// Não executa ferramentas: apenas apresenta estado/saída do mesmo motor que
-/// o Agente já utiliza. Pode ser aberta durante uma operação e fechada depois.
+/// A execução continua pertencendo ao motor existente; esta classe é apenas UI.
 /// </summary>
 public sealed class AgentCapabilitySurface : ContentView
 {
     private readonly Label _title;
     private readonly Label _state;
     private readonly Editor _output;
+    private readonly ActivityIndicator _busy;
     private readonly Button _close;
+    private readonly Border _frame;
+
+    public event EventHandler? Closed;
+
+    public bool AutoHideOnComplete { get; set; }
 
     public AgentCapabilitySurface()
     {
@@ -33,6 +38,15 @@ public sealed class AgentCapabilitySurface : ContentView
             Opacity = 0.75
         };
 
+        _busy = new ActivityIndicator
+        {
+            IsVisible = false,
+            IsRunning = false,
+            WidthRequest = 18,
+            HeightRequest = 18,
+            VerticalOptions = LayoutOptions.Center
+        };
+
         _output = new Editor
         {
             IsReadOnly = true,
@@ -45,7 +59,8 @@ public sealed class AgentCapabilitySurface : ContentView
         _close = new Button
         {
             Text = "Fechar",
-            HorizontalOptions = LayoutOptions.End
+            HorizontalOptions = LayoutOptions.End,
+            Padding = new Thickness(10, 4)
         };
         _close.Clicked += (_, _) => Hide();
 
@@ -54,13 +69,15 @@ public sealed class AgentCapabilitySurface : ContentView
             ColumnDefinitions =
             {
                 new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Auto),
                 new ColumnDefinition(GridLength.Auto)
             }
         };
         header.Add(_title, 0, 0);
-        header.Add(_close, 1, 0);
+        header.Add(_busy, 1, 0);
+        header.Add(_close, 2, 0);
 
-        var frame = new Border
+        _frame = new Border
         {
             StrokeThickness = 1,
             StrokeShape = new RoundRectangle { CornerRadius = 12 },
@@ -71,7 +88,7 @@ public sealed class AgentCapabilitySurface : ContentView
             }
         };
 
-        Content = frame;
+        Content = _frame;
     }
 
     public void Show(string capability, string state = "executando")
@@ -79,6 +96,8 @@ public sealed class AgentCapabilitySurface : ContentView
         _title.Text = capability;
         _state.Text = state;
         _output.Text = string.Empty;
+        _busy.IsVisible = true;
+        _busy.IsRunning = true;
         IsVisible = true;
     }
 
@@ -86,21 +105,37 @@ public sealed class AgentCapabilitySurface : ContentView
     {
         if (string.IsNullOrEmpty(text)) return;
         _output.Text += text;
+        _output.CursorPosition = _output.Text.Length;
+    }
+
+    public void SetOutput(string text)
+    {
+        _output.Text = text ?? string.Empty;
+        _output.CursorPosition = _output.Text.Length;
     }
 
     public void Complete(string state = "concluído")
     {
         _state.Text = state;
+        _busy.IsRunning = false;
+        _busy.IsVisible = false;
+        if (AutoHideOnComplete)
+            Hide();
     }
 
     public void Fail(string state = "falhou")
     {
         _state.Text = state;
+        _busy.IsRunning = false;
+        _busy.IsVisible = false;
     }
 
     public void Hide()
     {
+        _busy.IsRunning = false;
+        _busy.IsVisible = false;
         IsVisible = false;
         _output.Text = string.Empty;
+        Closed?.Invoke(this, EventArgs.Empty);
     }
 }
