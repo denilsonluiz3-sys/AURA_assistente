@@ -2,13 +2,11 @@ using System.Collections.Specialized;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Controls.Shapes;
 using AURA.Modules.Executors;
+using AURA.Mobile.Services;
 
 namespace AURA.Mobile.Pages;
 
-/// <summary>
-/// Superfície visual temporária para uma execução do Agente.
-/// A correlação por ProcessId é a autoridade; cwd somente serve para compatibilidade.
-/// </summary>
+/// <summary>Superfície visual temporária para uma execução específica do Agente.</summary>
 public sealed class AgentCapabilitySurface : ContentView
 {
     private readonly Border _card;
@@ -25,23 +23,8 @@ public sealed class AgentCapabilitySurface : ContentView
     {
         _title = new Label { FontSize = 13, FontAttributes = FontAttributes.Bold };
         _status = new Label { FontSize = 11, Opacity = 0.75 };
-        _output = new Editor
-        {
-            IsReadOnly = true,
-            AutoSize = EditorAutoSizeOption.TextChanges,
-            MinimumHeightRequest = 48,
-            MaximumHeightRequest = 240,
-            FontSize = 12,
-            Text = string.Empty
-        };
-        _card = new Border
-        {
-            StrokeThickness = 0,
-            Padding = new Thickness(12, 8),
-            Margin = new Thickness(0, 4),
-            StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(12) },
-            Content = new VerticalStackLayout { Spacing = 4, Children = { _title, _status, _output } }
-        };
+        _output = new Editor { IsReadOnly = true, AutoSize = EditorAutoSizeOption.TextChanges, MinimumHeightRequest = 48, MaximumHeightRequest = 240, FontSize = 12, Text = string.Empty };
+        _card = new Border { StrokeThickness = 0, Padding = new Thickness(12, 8), Margin = new Thickness(0, 4), StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(12) }, Content = new VerticalStackLayout { Spacing = 4, Children = { _title, _status, _output } } };
         Content = _card;
         IsVisible = false;
     }
@@ -96,20 +79,16 @@ public sealed class AgentCapabilitySurface : ContentView
     private void OnExecutionCompleted(object? sender, AgentExecutionCompletedEventArgs e)
     {
         if (!string.Equals(e.ProcessId, _activeProcessId, StringComparison.OrdinalIgnoreCase)) return;
-        MainThread.BeginInvokeOnMainThread(() =>
-        {
-            _status.Text = e.Result.Success ? "concluído" : "falhou";
-        });
+        MainThread.BeginInvokeOnMainThread(() => _status.Text = e.Result.Success ? "concluído" : "falhou");
     }
 
-    private void OnProcessesChanged(object? sender, NotifyCollectionChangedEventArgs e)
-        => MainThread.BeginInvokeOnMainThread(RefreshFromProcesses);
+    private void OnProcessesChanged(object? sender, NotifyCollectionChangedEventArgs e) => MainThread.BeginInvokeOnMainThread(RefreshFromProcesses);
 
     private void RefreshFromProcesses()
     {
         if (_processes == null || _activeProcessId != null) return;
         var active = _processes.Processes.LastOrDefault(p => !IsTerminalStatus(p.Status));
-        if (active != null) BindProcess(active.Id, active.Title, active.Title);
+        if (active != null) BindProcess(active.Id, null, active.Title);
     }
 
     public void BeginExecution(string title, string workingDirectory)
@@ -120,39 +99,16 @@ public sealed class AgentCapabilitySurface : ContentView
         Show(title, "executando");
     }
 
-    public void Show(string title, string status = "executando")
-    {
-        _title.Text = title;
-        _status.Text = status;
-        IsVisible = true;
-    }
-
-    public void AppendOutput(string text)
-    {
-        if (string.IsNullOrEmpty(text)) return;
-        _output.Text += text;
-        _output.CursorPosition = _output.Text.Length;
-    }
-
-    public void Complete(bool success, bool hide = true)
-    {
-        _status.Text = success ? "concluído" : "falhou";
-        if (hide)
-        {
-            IsVisible = false;
-            _activeProcessId = null;
-            _activeWorkingDirectory = null;
-        }
-    }
-
-    private static bool IsTerminalStatus(string? status)
-        => string.Equals(status, "Concluído", StringComparison.OrdinalIgnoreCase)
-        || string.Equals(status, "Falhou", StringComparison.OrdinalIgnoreCase);
+    public void Show(string title, string status = "executando") { _title.Text = title; _status.Text = status; IsVisible = true; }
+    public void AppendOutput(string text) { if (!string.IsNullOrEmpty(text)) _output.Text += text; }
+    public void Complete(bool success) => _status.Text = success ? "concluído" : "falhou";
+    public void Hide() { IsVisible = false; _activeProcessId = null; _activeWorkingDirectory = null; _output.Text = string.Empty; }
+    private static bool IsTerminalStatus(string? status) => status is "concluído" or "falhou" or "cancelado";
 
     protected override void OnParentSet()
     {
         base.OnParentSet();
-        if (Parent == null && _bound)
+        if (Parent == null)
         {
             if (_processes != null) _processes.Processes.CollectionChanged -= OnProcessesChanged;
             if (_coordinator != null)
@@ -162,8 +118,6 @@ public sealed class AgentCapabilitySurface : ContentView
                 _coordinator.Completed -= OnExecutionCompleted;
             }
             _bound = false;
-            _activeProcessId = null;
-            _activeWorkingDirectory = null;
         }
     }
 }
