@@ -6,6 +6,7 @@ namespace AURA.Mobile.Diagnostics
     {
         private const string ApiKeySecureName = "ai_api_key";
         private const string ApiKeyLegacyPref = "ai_api_key";
+        private const string ApiKeyProviderPrefix = "ai_api_key_";
 
         public static int MaxTokens
         {
@@ -45,49 +46,97 @@ namespace AURA.Mobile.Diagnostics
 
         public static string LastStatusMessage { get; private set; } = string.Empty;
 
+        /// <summary>
+        /// API key do provedor atualmente selecionado. Cada provedor possui sua
+        /// própria entrada no SecureStorage; trocar de provedor não destrói a chave anterior.
+        /// </summary>
         public static string ApiKey
         {
-            get
-            {
-                try
-                {
-                    string? secure = SecureStorage.Default.GetAsync(ApiKeySecureName).GetAwaiter().GetResult();
-                    if (!string.IsNullOrWhiteSpace(secure))
-                        return secure.Trim();
-                }
-                catch { }
-
-                string legacy = Preferences.Default.Get(ApiKeyLegacyPref, string.Empty);
-                if (string.IsNullOrWhiteSpace(legacy))
-                    return string.Empty;
-
-                try
-                {
-                    SecureStorage.Default.SetAsync(ApiKeySecureName, legacy.Trim()).GetAwaiter().GetResult();
-                    Preferences.Default.Remove(ApiKeyLegacyPref);
-                }
-                catch { }
-
-                return legacy.Trim();
-            }
-            set
-            {
-                string v = (value ?? string.Empty).Trim();
-                try
-                {
-                    if (string.IsNullOrEmpty(v))
-                        SecureStorage.Default.Remove(ApiKeySecureName);
-                    else
-                        SecureStorage.Default.SetAsync(ApiKeySecureName, v).GetAwaiter().GetResult();
-                }
-                catch { }
-
-                try { Preferences.Default.Remove(ApiKeyLegacyPref); }
-                catch { }
-            }
+            get => GetApiKeyForProvider(Provider);
+            set => SetApiKeyForProvider(Provider, value);
         }
 
-        public static void ClearApiKey() => ApiKey = string.Empty;
+        public static string GetApiKeyForProvider(string? providerId)
+        {
+            string provider = NormalizeProviderKey(providerId);
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(provider))
+                {
+                    string? scoped = SecureStorage.Default
+                        .GetAsync(ApiKeyProviderPrefix + provider)
+                        .GetAwaiter()
+                        .GetResult();
+                    if (!string.IsNullOrWhiteSpace(scoped))
+                        return scoped.Trim();
+                }
+            }
+            catch { }
+
+            // Migração transparente da única chave antiga.
+            if (string.IsNullOrWhiteSpace(provider))
+                return string.Empty;
+
+            try
+            {
+                string? legacySecure = SecureStorage.Default
+                    .GetAsync(ApiKeySecureName)
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (!string.IsNullOrWhiteSpace(legacySecure))
+                {
+                    SetApiKeyForProvider(provider, legacySecure);
+                    SecureStorage.Default.Remove(ApiKeySecureName);
+                    return legacySecure.Trim();
+                }
+            }
+            catch { }
+
+            string legacy = Preferences.Default.Get(ApiKeyLegacyPref, string.Empty);
+            if (string.IsNullOrWhiteSpace(legacy))
+                return string.Empty;
+
+            try
+            {
+                SetApiKeyForProvider(provider, legacy);
+                Preferences.Default.Remove(ApiKeyLegacyPref);
+            }
+            catch { }
+
+            return legacy.Trim();
+        }
+
+        public static void SetApiKeyForProvider(string? providerId, string? value)
+        {
+            string provider = NormalizeProviderKey(providerId);
+            string v = (value ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(provider))
+                return;
+
+            string secureName = ApiKeyProviderPrefix + provider;
+            try
+            {
+                if (string.IsNullOrEmpty(v))
+                    SecureStorage.Default.Remove(secureName);
+                else
+                    SecureStorage.Default.SetAsync(secureName, v).GetAwaiter().GetResult();
+            }
+            catch { }
+        }
+
+        public static void ClearApiKey() => SetApiKeyForProvider(Provider, string.Empty);
+
+        private static string NormalizeProviderKey(string? providerId)
+        {
+            string value = (providerId ?? string.Empty).Trim().ToLowerInvariant();
+            if (value.Length == 0)
+                return string.Empty;
+
+            var chars = value.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' ? c : '_').ToArray();
+            return new string(chars);
+        }
 
         public static string NormalizeChatBaseUrl(string? url, string? providerId)
         {
@@ -149,7 +198,7 @@ namespace AURA.Mobile.Diagnostics
             client.Options.Model = model;
             client.Options.MaxTokens = MaxTokens;
             client.Options.TimeoutSeconds = TimeoutSeconds;
-            client.Options.ApiKey = provider.NeedsKey ? (ApiKey?.Trim() ?? string.Empty) : string.Empty;
+            client.Options.ApiKey = provider.NeedsKey ? GetApiKeyForProvider(provider.Id) : string.Empty;
             client.Options.AuthHeaderName = provider.AuthHeaderName ?? string.Empty;
             client.Options.AuthScheme = provider.AuthScheme ?? string.Empty;
             client.Options.ApiFormat = provider.ApiFormat;
@@ -159,8 +208,8 @@ namespace AURA.Mobile.Diagnostics
 
         /// <summary>
         /// Validação deliberadamente genérica. O catálogo define como cada provedor
-        /// autentica; o RuntimeConfig não pode bloquear chaves legítimas por prefixo.
-        /// Prefixos são usados somente como heurística de detecção, nunca como requisito.
+        /// autentica; o RuntimeConfig não bloqueia chaves legítimas por prefixo.
+        /// Prefixos são somente heurística de detecção, nunca requisito de autenticação.
         /// </summary>
         public static string? ValidateApiKeyFormat(string? key, ProviderInfo? provider)
         {
