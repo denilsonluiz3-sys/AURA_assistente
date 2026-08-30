@@ -1,112 +1,74 @@
-using System.Text;
 using Microsoft.Maui.Controls;
+using Microsoft.Maui.Graphics;
 
 namespace AURA.Mobile.Pages;
 
 /// <summary>
-/// Inline execution cell shown in the Agent conversation.
-/// It represents one capability execution and receives incremental stdout/stderr.
+/// Inline execution card rendered in the Agent conversation.
 /// </summary>
 public sealed class AgentCapabilityBubble : Border
 {
     private readonly Label _statusLabel;
     private readonly Label _outputLabel;
-    private readonly StringBuilder _output = new();
-    private readonly string _correlationId;
-    private readonly string _title;
-    private bool _completed;
+
+    public string CorrelationId { get; }
 
     public AgentCapabilityBubble(string correlationId, string title)
     {
-        _correlationId = correlationId ?? string.Empty;
-        _title = string.IsNullOrWhiteSpace(title) ? "AURA" : title;
-
-        Padding = new Thickness(12, 8);
-        Margin = new Thickness(8, 4);
-        StrokeThickness = 1;
-        Stroke = Colors.Gray;
-        BackgroundColor = Color.FromArgb("#151922");
-        StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(12) };
+        CorrelationId = correlationId;
 
         var titleLabel = new Label
         {
-            Text = _title,
-            FontSize = 13,
+            Text = title,
             FontAttributes = FontAttributes.Bold,
-            LineBreakMode = LineBreakMode.TailTruncation
+            FontSize = 14
         };
 
         _statusLabel = new Label
         {
-            Text = "executando…",
-            FontSize = 11,
-            Opacity = 0.75
+            Text = "Executando...",
+            FontSize = 12
         };
 
         _outputLabel = new Label
         {
             FontSize = 12,
-            LineBreakMode = LineBreakMode.WordWrap,
-            IsVisible = false
+            LineBreakMode = LineBreakMode.WordWrap
         };
 
-        var header = new Grid
+        var content = new VerticalStackLayout
         {
-            ColumnDefinitions =
-            {
-                new ColumnDefinition(GridLength.Star),
-                new ColumnDefinition(GridLength.Auto)
-            },
-            ColumnSpacing = 8
+            Spacing = 4,
+            Children = { titleLabel, _statusLabel, _outputLabel }
         };
-        header.Add(titleLabel, 0, 0);
-        header.Add(_statusLabel, 1, 0);
 
-        var layout = new VerticalStackLayout { Spacing = 5 };
-        layout.Children.Add(header);
-        layout.Children.Add(_outputLabel);
-
-        Content = layout;
-        AutomationId = $"capability-{_correlationId}";
+        Content = content;
+        Padding = new Thickness(12, 8);
+        Stroke = Colors.Gray;
+        StrokeThickness = 1;
+        StrokeShape = new RoundRectangle
+        {
+            CornerRadius = new CornerRadius(12)
+        };
     }
-
-    public string CorrelationId => _correlationId;
 
     public void SetStatus(string status)
     {
-        if (_completed)
-            return;
-
-        _statusLabel.Text = string.IsNullOrWhiteSpace(status)
-            ? "executando…"
-            : status;
+        _statusLabel.Text = status;
     }
 
-    public void AppendOutput(string? text)
+    public void AppendOutput(string output)
     {
-        if (string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(output))
             return;
 
-        const int maxOutputLength = 16000;
-
-        _output.Append(text);
-        if (_output.Length > maxOutputLength)
-        {
-            var trimmed = _output.ToString();
-            _output.Clear();
-            _output.Append(trimmed[^maxOutputLength..]);
-        }
-
-        _outputLabel.Text = _output.ToString();
-        _outputLabel.IsVisible = true;
+        _outputLabel.Text += output;
     }
 
-    public void Complete(bool success, string? message = null)
+    public void Complete(bool success, string? result = null)
     {
-        if (!string.IsNullOrWhiteSpace(message))
-            AppendOutput(message);
-
-        _completed = true;
-        _statusLabel.Text = success ? "concluído" : "falhou";
+        _statusLabel.Text = success ? "Concluído" : "Falhou";
+        if (!string.IsNullOrEmpty(result))
+            _outputLabel.Text = result;
     }
 }
