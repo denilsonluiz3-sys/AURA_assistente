@@ -62,14 +62,18 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new ConfigLoader(sp.GetRequiredService<ILogger>()).LoadModules(Path.Combine(configDir, "modules.json")));
         builder.Services.AddSingleton(sp => new ModuleManager(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "modules"), Path.Combine(configDir, "modules.json"), sp.GetRequiredService<EventBus>(), localPackageProvider: ReadEmbeddedModulePackageAsync));
         builder.Services.AddSingleton(sp => new MemoryStore(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "memory.json")));
+
+        // Ollama local uses the OpenAI-compatible endpoint exposed by Ollama.
+        // The previous configuration pointed to /api/chat while selecting
+        // OpenAICompletions, which produced an incompatible request path/payload.
         builder.Services.AddSingleton(sp => new OpenRouterClient(
             new OpenRouterOptions
             {
                 Provider = "ollama",
                 ApiKey = string.Empty,
-                BaseUrl = "http://127.0.0.1:11435/api/chat",
-                Model = "aura-qwen",
-                MaxTokens = 1024,
+                BaseUrl = "http://127.0.0.1:11435/v1/chat/completions",
+                Model = "aura-qwen:latest",
+                MaxTokens = 512,
                 TimeoutSeconds = 180,
                 ApiFormat = AiApiFormat.OpenAICompletions
             },
