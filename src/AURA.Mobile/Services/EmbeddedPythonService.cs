@@ -5,12 +5,13 @@ namespace AURA.Mobile.Services;
 
 /// <summary>
 /// Interpretador Python embutido via NuGet Python3Android.
-/// Fallback seguro: se o pacote falhar no device, IsReady permanece false.
+/// Não depende do Termux nem do PATH do processo Android.
 /// </summary>
 public sealed class EmbeddedPythonService : IEmbeddedPython
 {
-    private readonly SemaphoreSlim _gate = new(1, 1);
-    private object? _env; // AndroidPythonEnvironment
+    private readonly SemaphoreSlim _initGate = new(1, 1);
+    private readonly SemaphoreSlim _runGate = new(1, 1);
+    private object? _env;
     private bool _failed;
 
     public bool IsReady => _env is not null && !_failed;
@@ -20,7 +21,7 @@ public sealed class EmbeddedPythonService : IEmbeddedPython
         if (_env is not null || _failed)
             return;
 
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        await _initGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             if (_env is not null || _failed)
@@ -29,13 +30,11 @@ public sealed class EmbeddedPythonService : IEmbeddedPython
 #if ANDROID
             try
             {
-                // Python3Android: AndroidPythonEnvironment.Create()
                 var t = Type.GetType("Python3Android.AndroidPythonEnvironment, Python3Android")
                     ?? Type.GetType("Python3Android.AndroidPythonEnvironment, python3android");
 
                 if (t is null)
                 {
-                    // fallback: assembly carregado por nome
                     foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                     {
                         t = asm.GetType("Python3Android.AndroidPythonEnvironment");
@@ -45,7 +44,7 @@ public sealed class EmbeddedPythonService : IEmbeddedPython
 
                 if (t is null)
                 {
-                    AuraLog.Warning("EmbeddedPython: tipo AndroidPythonEnvironment não encontrado (pacote ausente?).");
+                    AuraLog.Warning("EmbeddedPython: AndroidPythonEnvironment não encontrado.");
                     _failed = true;
                     return;
                 }
@@ -64,8 +63,7 @@ public sealed class EmbeddedPythonService : IEmbeddedPython
                 if (result is Task task)
                 {
                     await task.ConfigureAwait(false);
-                    var resultProp = task.GetType().GetProperty("Result");
-                    _env = resultProp?.GetValue(task);
+                    _env = task.GetType().GetProperty("Result")?.GetValue(task);
                 }
                 else
                 {
@@ -88,12 +86,11 @@ public sealed class EmbeddedPythonService : IEmbeddedPython
             }
 #else
             _failed = true;
-            await Task.CompletedTask;
 #endif
         }
         finally
         {
-            _gate.Release();
+            _initGate.Release();
         }
     }
 
@@ -106,29 +103,29 @@ public sealed class EmbeddedPythonService : IEmbeddedPython
         if (_env is null)
             throw new InvalidOperationException("Python embutido indisponível neste dispositivo/APK.");
 
-        // Prefer captura de stdout via wrapper
-        string wrapped =
-            "import sys, io\n" +
-            "_buf = io.StringIO()\n" +
-            "_old = sys.stdout\n" +
-            "sys.stdout = _buf\n" +
-            "try:\n" +
-            Indent(code) +
-            "\nfinally:\n" +
-            "    sys.stdout = _old\n" +
-            "_result = _buf.getvalue()\n";
-
-        object? raw = InvokeRun(_env, wrapped);
-        string text = raw?.ToString() ?? string.Empty;
-
-        // Alguns builds devolvem só o último expr; se vazio, tenta código direto
-        if (string.IsNullOrWhiteSpace(text))
+        // O ambiente Python é compartilhado pela aplicação. Serializar execuções
+        // evita que duas chamadas sobrescrevam sys.stdout simultaneamente.
+        await _runGate.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            raw = InvokeRun(_env, code);
-            text = raw?.ToString() ?? string.Empty;
-        }
+            string wrapped =
+                "import sys, io\n" +
+                "_aura_buf = io.StringIO()\n" +
+                "_aura_old_stdout = sys.stdout\n" +
+                "sys.stdout = _aura_buf\n" +
+                "try:\n" +
+                Indent(code) +
+                "\nfinally:\n" +
+                "    sys.stdout = _aura_old_stdout\n" +
+                "_aura_buf.getvalue()\n";
 
-        return text;
+            object? raw = InvokeRun(_env, wrapped);
+            return raw?.ToString() ?? string.Empty;
+        }
+        finally
+        {
+            _runGate.Release();
+        }
     }
 
     public async Task<string> RunFileAsync(string filePath, CancellationToken ct = default)
@@ -143,17 +140,17 @@ public sealed class EmbeddedPythonService : IEmbeddedPython
     private static object? InvokeRun(object env, string code)
     {
         var t = env.GetType();
-        var m = t.GetMethod("RunCode", new[] { typeof(string) })
+        var method = t.GetMethod("RunCode", new[] { typeof(string) })
             ?? t.GetMethod("Run", new[] { typeof(string) })
             ?? t.GetMethods().FirstOrDefault(x =>
                 x.Name.Contains("Run", StringComparison.OrdinalIgnoreCase)
                 && x.GetParameters().Length == 1
                 && x.GetParameters()[0].ParameterType == typeof(string));
 
-        if (m is null)
+        if (method is null)
             throw new MissingMethodException(t.FullName, "RunCode");
 
-        return m.Invoke(env, new object[] { code });
+        return method.Invoke(env, new object[] { code });
     }
 
     private static string Indent(string code)
