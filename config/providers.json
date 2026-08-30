@@ -1,114 +1,19 @@
 {
-  "schemaVersion": 2,
-  "description": "AURA LLM provider catalog — modelo OpenRouter fixo para tool-calling consistente",
+  "schemaVersion": 3,
+  "description": "AURA provider catalog — API keys por provedor e suporte a endpoints OpenAI-compatible/Anthropic",
   "providers": [
-    {
-      "id": "ollama",
-      "name": "Ollama (local)",
-      "baseUrl": "http://127.0.0.1:11434/v1/chat/completions",
-      "modelsUrl": "http://127.0.0.1:11434/v1/models",
-      "needsKey": false,
-      "defaultModelId": "qwen2:0.5b",
-      "authHeaderName": "",
-      "authScheme": "",
-      "apiFormat": "OpenAICompletions",
-      "keyPrefixesList": [],
-      "models": [
-        { "id": "qwen2:0.5b", "label": "Qwen2 0.5B", "category": "Local", "isFree": true },
-        { "id": "aura-qwen:latest", "label": "aura-qwen", "category": "Local", "isFree": true },
-        { "id": "qwen2.5-coder:1.5b", "label": "Qwen 2.5 Coder 1.5B", "category": "Local", "isFree": true },
-        { "id": "llama3.2:3b", "label": "Llama 3.2 3B", "category": "Local", "isFree": true }
-      ]
-    },
-    {
-      "id": "openrouter",
-      "name": "OpenRouter",
-      "baseUrl": "https://openrouter.ai/api/v1/chat/completions",
-      "modelsUrl": "https://openrouter.ai/api/v1/models",
-      "needsKey": true,
-      "keyEnv": "OPENROUTER_API_KEY",
-      "keyHint": "sk-or-…",
-      "defaultModelId": "deepseek/deepseek-chat-v3.1:free",
-      "authHeaderName": "Authorization",
-      "authScheme": "Bearer ",
-      "apiFormat": "OpenAICompletions",
-      "keyPrefixesList": ["sk-or-"],
-      "models": [
-        { "id": "deepseek/deepseek-chat-v3.1:free", "label": "DeepSeek V3.1 (free · tool-calling)", "category": "Grátis", "isFree": true },
-        { "id": "google/gemma-2-9b-it:free", "label": "Gemma 2 9B (free)", "category": "Grátis", "isFree": true },
-        { "id": "meta-llama/llama-3.2-3b-instruct:free", "label": "Llama 3.2 3B (free)", "category": "Grátis", "isFree": true },
-        { "id": "qwen/qwen-2.5-7b-instruct:free", "label": "Qwen 2.5 7B (free)", "category": "Grátis", "isFree": true }
-      ]
-    },
-    {
-      "id": "gemini",
-      "name": "Google Gemini",
-      "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-      "modelsUrl": "https://generativelanguage.googleapis.com/v1beta/openai/models",
-      "needsKey": true,
-      "keyEnv": "GEMINI_API_KEY",
-      "keyHint": "AIzaSy… (AI Studio)",
-      "defaultModelId": "gemini-2.5-flash",
-      "authHeaderName": "Authorization",
-      "authScheme": "Bearer ",
-      "apiFormat": "OpenAICompletions",
-      "keyPrefixesList": ["AIza"],
-      "models": [
-        { "id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash", "category": "Grátis", "isFree": true },
-        { "id": "gemini-2.5-flash-lite", "label": "Gemini 2.5 Flash-Lite", "category": "Grátis", "isFree": true }
-      ]
-    },
-    {
-      "id": "groq",
-      "name": "Groq (grátis)",
-      "baseUrl": "https://api.groq.com/openai/v1/chat/completions",
-      "modelsUrl": "https://api.groq.com/openai/v1/models",
-      "needsKey": true,
-      "keyEnv": "GROQ_API_KEY",
-      "keyHint": "gsk_…",
-      "defaultModelId": "llama-3.1-8b-instant",
-      "authHeaderName": "Authorization",
-      "authScheme": "Bearer ",
-      "apiFormat": "OpenAICompletions",
-      "keyPrefixesList": ["gsk_"],
-      "models": [
-        { "id": "llama-3.1-8b-instant", "label": "Llama 3.1 8B", "category": "Grátis", "isFree": true },
-        { "id": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B", "category": "Grátis", "isFree": true }
-      ]
-    },
-    {
-      "id": "deepseek",
-      "name": "DeepSeek",
-      "baseUrl": "https://api.deepseek.com/chat/completions",
-      "modelsUrl": "https://api.deepseek.com/models",
-      "needsKey": true,
-      "keyEnv": "DEEPSEEK_API_KEY",
-      "keyHint": "sk-…",
-      "defaultModelId": "deepseek-chat",
-      "authHeaderName": "Authorization",
-      "authScheme": "Bearer ",
-      "apiFormat": "OpenAICompletions",
-      "keyPrefixesList": [],
-      "models": [
-        { "id": "deepseek-chat", "label": "DeepSeek Chat", "category": "Eficiente", "isFree": false }
-      ]
-    },
-    {
-      "id": "openai",
-      "name": "OpenAI",
-      "baseUrl": "https://api.openai.com/v1/chat/completions",
-      "modelsUrl": "https://api.openai.com/v1/models",
-      "needsKey": true,
-      "keyEnv": "OPENAI_API_KEY",
-      "keyHint": "sk-…",
-      "defaultModelId": "gpt-4o-mini",
-      "authHeaderName": "Authorization",
-      "authScheme": "Bearer ",
-      "apiFormat": "OpenAICompletions",
-      "keyPrefixesList": ["sk-"],
-      "models": [
-        { "id": "gpt-4o-mini", "label": "GPT-4o Mini", "category": "Eficiente", "isFree": false }
-      ]
-    }
+    {"id":"ollama","name":"Ollama (local)","baseUrl":"http://127.0.0.1:11434/v1/chat/completions","modelsUrl":"http://127.0.0.1:11434/v1/models","needsKey":false,"defaultModelId":"qwen2:0.5b","authHeaderName":"","authScheme":"","apiFormat":"OpenAICompletions","keyPrefixesList":[],"models":[{"id":"qwen2:0.5b","label":"Qwen2 0.5B","category":"Local","isFree":true},{"id":"aura-qwen:latest","label":"aura-qwen","category":"Local","isFree":true},{"id":"qwen2.5-coder:1.5b","label":"Qwen 2.5 Coder 1.5B","category":"Local","isFree":true},{"id":"llama3.2:3b","label":"Llama 3.2 3B","category":"Local","isFree":true}]},
+    {"id":"openrouter","name":"OpenRouter","baseUrl":"https://openrouter.ai/api/v1/chat/completions","modelsUrl":"https://openrouter.ai/api/v1/models","needsKey":true,"keyEnv":"OPENROUTER_API_KEY","keyHint":"sk-or-…","defaultModelId":"deepseek/deepseek-chat-v3.1:free","authHeaderName":"Authorization","authScheme":"Bearer ","apiFormat":"OpenAICompletions","keyPrefixesList":["sk-or-"],"models":[{"id":"deepseek/deepseek-chat-v3.1:free","label":"DeepSeek V3.1 (free · tool-calling)","category":"Grátis","isFree":true},{"id":"google/gemma-2-9b-it:free","label":"Gemma 2 9B (free)","category":"Grátis","isFree":true},{"id":"meta-llama/llama-3.2-3b-instruct:free","label":"Llama 3.2 3B (free)","category":"Grátis","isFree":true},{"id":"qwen/qwen-2.5-7b-instruct:free","label":"Qwen 2.5 7B (free)","category":"Grátis","isFree":true}]},
+    {"id":"gemini","name":"Google Gemini","baseUrl":"https://generativelanguage.googleapis.com/v1beta/openai/chat/completions","modelsUrl":"https://generativelanguage.googleapis.com/v1beta/openai/models","needsKey":true,"keyEnv":"GEMINI_API_KEY","keyHint":"API key do Google AI Studio","defaultModelId":"gemini-2.5-flash","authHeaderName":"Authorization","authScheme":"Bearer ","apiFormat":"OpenAICompletions","keyPrefixesList":[],"models":[{"id":"gemini-2.5-flash","label":"Gemini 2.5 Flash","category":"Gemini","isFree":true},{"id":"gemini-2.5-flash-lite","label":"Gemini 2.5 Flash-Lite","category":"Gemini","isFree":true}]},
+    {"id":"groq","name":"Groq","baseUrl":"https://api.groq.com/openai/v1/chat/completions","modelsUrl":"https://api.groq.com/openai/v1/models","needsKey":true,"keyEnv":"GROQ_API_KEY","keyHint":"GROQ_API_KEY","defaultModelId":"llama-3.3-70b-versatile","authHeaderName":"Authorization","authScheme":"Bearer ","apiFormat":"OpenAICompletions","keyPrefixesList":[],"models":[{"id":"llama-3.3-70b-versatile","label":"Llama 3.3 70B","category":"Groq","isFree":true},{"id":"openai/gpt-oss-20b","label":"GPT-OSS 20B","category":"Groq","isFree":true}]},
+    {"id":"deepseek","name":"DeepSeek API","baseUrl":"https://api.deepseek.com/chat/completions","modelsUrl":"https://api.deepseek.com/models","needsKey":true,"keyEnv":"DEEPSEEK_API_KEY","keyHint":"DEEPSEEK_API_KEY","defaultModelId":"deepseek-chat","authHeaderName":"Authorization","authScheme":"Bearer ","apiFormat":"OpenAICompletions","keyPrefixesList":[],"models":[{"id":"deepseek-chat","label":"DeepSeek Chat","category":"DeepSeek","isFree":false},{"id":"deepseek-reasoner","label":"DeepSeek Reasoner","category":"DeepSeek","isFree":false}]},
+    {"id":"openai","name":"OpenAI","baseUrl":"https://api.openai.com/v1/chat/completions","modelsUrl":"https://api.openai.com/v1/models","needsKey":true,"keyEnv":"OPENAI_API_KEY","keyHint":"OPENAI_API_KEY","defaultModelId":"gpt-4o-mini","authHeaderName":"Authorization","authScheme":"Bearer ","apiFormat":"OpenAICompletions","keyPrefixesList":[],"models":[{"id":"gpt-4o-mini","label":"GPT-4o Mini","category":"OpenAI","isFree":false}]},
+    {"id":"anthropic","name":"Anthropic Claude","baseUrl":"https://api.anthropic.com/v1/messages","modelsUrl":"https://api.anthropic.com/v1/models","needsKey":true,"keyEnv":"ANTHROPIC_API_KEY","keyHint":"ANTHROPIC_API_KEY","defaultModelId":"claude-3-5-haiku-latest","authHeaderName":"x-api-key","authScheme":"","apiFormat":"AnthropicMessages","keyPrefixesList":[],"models":[{"id":"claude-3-5-haiku-latest","label":"Claude Haiku","category":"Anthropic","isFree":false}]},
+    {"id":"mistral","name":"Mistral","baseUrl":"https://api.mistral.ai/v1/chat/completions","modelsUrl":"https://api.mistral.ai/v1/models","needsKey":true,"keyEnv":"MISTRAL_API_KEY","keyHint":"MISTRAL_API_KEY","defaultModelId":"mistral-small-latest","authHeaderName":"Authorization","authScheme":"Bearer ","apiFormat":"OpenAICompletions","keyPrefixesList":[],"models":[{"id":"mistral-small-latest","label":"Mistral Small","category":"Mistral","isFree":false}]},
+    {"id":"xai","name":"xAI / Grok","baseUrl":"https://api.x.ai/v1/chat/completions","modelsUrl":"https://api.x.ai/v1/models","needsKey":true,"keyEnv":"XAI_API_KEY","keyHint":"XAI_API_KEY","defaultModelId":"grok-3-mini","authHeaderName":"Authorization","authScheme":"Bearer ","apiFormat":"OpenAICompletions","keyPrefixesList":[],"models":[]},
+    {"id":"together","name":"Together AI","baseUrl":"https://api.together.xyz/v1/chat/completions","modelsUrl":"https://api.together.xyz/v1/models","needsKey":true,"keyEnv":"TOGETHER_API_KEY","keyHint":"TOGETHER_API_KEY","defaultModelId":"","authHeaderName":"Authorization","authScheme":"Bearer ","apiFormat":"OpenAICompletions","keyPrefixesList":[],"models":[]},
+    {"id":"fireworks","name":"Fireworks AI","baseUrl":"https://api.fireworks.ai/inference/v1/chat/completions","modelsUrl":"https://api.fireworks.ai/inference/v1/models","needsKey":true,"keyEnv":"FIREWORKS_API_KEY","keyHint":"FIREWORKS_API_KEY","defaultModelId":"","authHeaderName":"Authorization","authScheme":"Bearer ","apiFormat":"OpenAICompletions","keyPrefixesList":[],"models":[]},
+    {"id":"cerebras","name":"Cerebras","baseUrl":"https://api.cerebras.ai/v1/chat/completions","modelsUrl":"https://api.cerebras.ai/v1/models","needsKey":true,"keyEnv":"CEREBRAS_API_KEY","keyHint":"CEREBRAS_API_KEY","defaultModelId":"","authHeaderName":"Authorization","authScheme":"Bearer ","apiFormat":"OpenAICompletions","keyPrefixesList":[],"models":[]},
+    {"id":"custom-openai","name":"OpenAI-compatible (custom)","baseUrl":"","modelsUrl":"","needsKey":true,"keyEnv":"","keyHint":"API key do serviço","defaultModelId":"","authHeaderName":"Authorization","authScheme":"Bearer ","apiFormat":"OpenAICompletions","keyPrefixesList":[],"models":[]}
   ]
 }
