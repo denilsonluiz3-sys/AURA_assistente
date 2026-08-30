@@ -61,7 +61,7 @@
                                              VerticalOptions="End"
                                              Margin="6"
                                              ZIndex="100"
-                                             AutoHideOnComplete="False" />
+                                             AutoHideOnComplete="True" />
                 </Grid>
             </ScrollView>
         </Grid>
