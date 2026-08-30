@@ -53,18 +53,14 @@
             </CollectionView>
         </Border>
 
-        <!-- O Agente ocupa a área principal. A superfície de capacidade fica fora do ScrollView,
-             portanto stdout/stderr e estado permanecem visíveis durante a execução. -->
-        <Grid x:Name="AgentPane" Grid.Row="3" IsVisible="True" RowDefinitions="*,Auto">
-            <ScrollView x:Name="ConversationScroll" Grid.Row="0">
+        <!-- O Agente ocupa a área principal. Cada execução (Shell/Git/Python/Node/Programa)
+             aparece como uma célula de capacidade própria dentro do próprio fluxo de
+             conversa (ConversationContainer), ao lado das bolhas de texto do Agente —
+             não existe mais uma superfície única flutuante fora do scroll. -->
+        <Grid x:Name="AgentPane" Grid.Row="3" IsVisible="True">
+            <ScrollView x:Name="ConversationScroll">
                 <VerticalStackLayout x:Name="ConversationContainer" Spacing="6" Padding="14,12" />
             </ScrollView>
-            <pages:AgentCapabilitySurface x:Name="CapabilitySurface"
-                                           Grid.Row="1"
-                                           HorizontalOptions="Fill"
-                                           VerticalOptions="End"
-                                           Margin="6,0,6,4"
-                                           ZIndex="100" />
         </Grid>
 
         <Grid x:Name="WebPane" Grid.Row="3" IsVisible="False" RowDefinitions="Auto,*">

@@ -31,6 +31,8 @@ public partial class AgentPage : ContentPage
     private readonly PythonExecutor? _python;
     private readonly NodeExecutor? _node;
     private readonly ProcessRegistry _processes;
+    private readonly AgentExecutionCoordinator _coordinator;
+    private readonly Dictionary<string, AgentCapabilityBubble> _capabilityBubbles = new(StringComparer.OrdinalIgnoreCase);
     private readonly AuraOrchestrator _orchestrator;
     private readonly LocalPlaybook? _playbook;
     private readonly SolutionStore? _solutions;
@@ -52,6 +54,7 @@ public partial class AgentPage : ContentPage
 
     public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
         ShellExecutor shell, ProcessRegistry processes, AuraOrchestrator orchestrator,
+        AgentExecutionCoordinator coordinator,
         LocalPlaybook? playbook = null, VoiceAssistantService? voice = null,
         SolutionStore? solutions = null, GitExecutor? git = null, PythonExecutor? python = null,
         NodeExecutor? node = null, CellProgramRegistry? cellRegistry = null, SimulationRuntime? runtime = null,
@@ -68,6 +71,7 @@ public partial class AgentPage : ContentPage
         _node = node;
         _android = android;
         _processes = processes;
+        _coordinator = coordinator;
         _orchestrator = orchestrator;
         _cellRegistry = cellRegistry;
         _runtime = runtime;
@@ -77,8 +81,111 @@ public partial class AgentPage : ContentPage
         LoadRecentsFromPrefs();
 
         _processes.Processes.CollectionChanged += OnProcessesChanged;
+
+        // Fase 1/2 da migração (relatório de estado): o Agente deixa de reportar Shell/Git/
+        // Python/Node/Programa como uma bolha de texto plano ("◆ ferramenta ...") e passa a
+        // mostrar uma célula visual própria por execução, embutida no fluxo do chat, com
+        // stdout/stderr em tempo real e identidade por CorrelationId — para que várias
+        // execuções concorrentes (ex.: Memória + Shell + Programa) não misturem saída.
+        //
+        // ProcessExecutorBase.* cobre Shell/Git/Python/Node (e o aura-sh do TryExecuteAuraShellAsync),
+        // porque todos herdam de ProcessExecutorBase e já emitem esses eventos estáticos.
+        ProcessExecutorBase.ProcessStarted += OnCapabilityProcessStarted;
+        ProcessExecutorBase.OutputReceived += OnCapabilityProcessOutput;
+        ProcessExecutorBase.ProcessCompleted += OnCapabilityProcessCompleted;
+
+        // AgentExecutionCoordinator cobre execuções que não implementam IToolExecutor
+        // (hoje: run_program, via AgentRunProgramTool.BeginManual/CompleteManual).
+        _coordinator.Started += OnCoordinatorStarted;
+        _coordinator.Output += OnCoordinatorOutput;
+        _coordinator.Completed += OnCoordinatorCompleted;
+
         UpdateProcessCardsVisibility();
         ApplyModeUi();
+    }
+
+    // ------------------------------------------------------------------
+    // Bolhas de capacidade inline (Fase 1/2 da migração do relatório de estado)
+    // ------------------------------------------------------------------
+
+    private AgentCapabilityBubble GetOrCreateCapabilityBubble(string correlationId, string title)
+    {
+        if (_capabilityBubbles.TryGetValue(correlationId, out var existing))
+            return existing;
+
+        var bubble = new AgentCapabilityBubble(correlationId, title);
+        _capabilityBubbles[correlationId] = bubble;
+        ConversationContainer.Children.Add(bubble);
+        _ = ScrollToEndAsync();
+        return bubble;
+    }
+
+    private async Task ScrollToEndAsync()
+    {
+        try
+        {
+            await Task.Delay(30);
+            if (ConversationContainer.Children.Count == 0) return;
+            var last = ConversationContainer.Children[^1];
+            await ConversationScroll.ScrollToAsync((View)last, ScrollToPosition.End, animated: false);
+        }
+        catch { /* ignore */ }
+    }
+
+    private void OnCapabilityProcessStarted(object? sender, ProcessStartedEventArgs e)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+            GetOrCreateCapabilityBubble(e.CorrelationId, e.FileName));
+    }
+
+    private void OnCapabilityProcessOutput(object? sender, ProcessOutputEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(e.CorrelationId)) return;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var bubble = GetOrCreateCapabilityBubble(e.CorrelationId!, e.FileName);
+            if (e.IsError) bubble.SetStatus("stderr");
+            bubble.AppendOutput(e.Text);
+        });
+    }
+
+    private void OnCapabilityProcessCompleted(object? sender, ProcessCompletedEventArgs e)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var bubble = GetOrCreateCapabilityBubble(e.CorrelationId, e.FileName);
+            bubble.Complete(e.Result.Success);
+            _capabilityBubbles.Remove(e.CorrelationId);
+        });
+    }
+
+    private void OnCoordinatorStarted(object? sender, AgentExecutionStartedEventArgs e)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+            GetOrCreateCapabilityBubble(e.ProcessId, e.Title));
+    }
+
+    private void OnCoordinatorOutput(object? sender, AgentExecutionOutputEventArgs e)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var bubble = GetOrCreateCapabilityBubble(e.CorrelationId, e.CorrelationId);
+            if (e.Stream == "stderr") bubble.SetStatus("stderr");
+            bubble.AppendOutput(e.Text);
+        });
+    }
+
+    private void OnCoordinatorCompleted(object? sender, AgentExecutionCompletedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(e.ProcessId)) return;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var bubble = GetOrCreateCapabilityBubble(e.ProcessId!, e.Executor);
+            string? message = !string.IsNullOrWhiteSpace(e.Result.StandardOutput) ? e.Result.StandardOutput.Trim()
+                : !string.IsNullOrWhiteSpace(e.Result.StandardError) ? e.Result.StandardError.Trim() : null;
+            bubble.Complete(e.Result.Success, message);
+            _capabilityBubbles.Remove(e.ProcessId!);
+        });
     }
 
     private void OnProcessesChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -485,7 +592,7 @@ public partial class AgentPage : ContentPage
         if (_cellRegistry != null && _runtime != null)
         {
             tools.Add(new AgentListProgramsTool(_cellRegistry));
-            tools.Add(new AgentRunProgramTool(_cellRegistry, _runtime));
+            tools.Add(new AgentRunProgramTool(_cellRegistry, _runtime, _coordinator));
         }
         if (_android != null)
             tools.Add(new AndroidCapabilityTool(_android));
@@ -868,6 +975,10 @@ public partial class AgentPage : ContentPage
         if (string.IsNullOrWhiteSpace(script))
             return;
 
+        // A partir daqui, a execução em si (stdout/stderr, status, exit code) aparece
+        // como bolha de capacidade inline própria — ShellExecutor herda de
+        // ProcessExecutorBase, cujos eventos estáticos já alimentam
+        // OnCapabilityProcessStarted/Output/Completed. Não duplicamos a saída aqui.
         await AppendBubbleAsync("▶ Executando aura-sh…", user: false, isTool: true);
         try
         {
@@ -877,11 +988,7 @@ public partial class AgentPage : ContentPage
                 WorkingDirectory = AgentWorkspace.ActiveRoot,
                 Timeout = TimeSpan.FromSeconds(60)
             };
-            ExecutionResult result = await _shell.ExecuteAsync(req);
-            string outText = result.CombineOutput();
-            if (outText.Length > 2500) outText = outText[..2500] + "…";
-            string status = result.Success ? "OK" : "FALHA";
-            await AppendBubbleAsync($"[{status} exit={result.ExitCode}]\n{outText}", user: false, isTool: true);
+            await _shell.ExecuteAsync(req);
         }
         catch (Exception ex)
         {
@@ -934,6 +1041,12 @@ public partial class AgentPage : ContentPage
                l.Contains("coordene") || l.Contains("pesquise e execute");
     }
 
+    /// <summary>Ferramentas que já ganham sua própria bolha de capacidade inline
+    /// (ver OnCapabilityProcess*/OnCoordinator* acima) e por isso não precisam também
+    /// de uma bolha de texto plano "◆ ferramenta ..." — isso duplicaria a mesma informação.</summary>
+    private static readonly HashSet<string> ToolsWithOwnCapabilityBubble =
+        new(StringComparer.OrdinalIgnoreCase) { "run_shell", "run_executor", "run_program" };
+
     private void OnAgentStep(AURA.AI.AgentStep step)
     {
         if (!string.IsNullOrWhiteSpace(_activeProcessId))
@@ -945,6 +1058,9 @@ public partial class AgentPage : ContentPage
             if (!string.IsNullOrWhiteSpace(cmd))
                 _runShellCommands.Add(cmd);
         }
+
+        if (ToolsWithOwnCapabilityBubble.Contains(step.ToolName))
+            return;
 
         _ = AppendBubbleAsync("◆ " + step.ToolName + " " + Shorten(step.Arguments, 70) + "\n" + Shorten(step.Result, 140),
             user: false, isTool: true);

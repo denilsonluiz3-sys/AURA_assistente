@@ -67,6 +67,30 @@ public sealed class AgentExecutionCoordinator : IDisposable
         Output?.Invoke(this, new AgentExecutionOutputEventArgs(correlationId, stream, text));
     }
 
+    /// <summary>
+    /// Registra manualmente o início de uma execução que não implementa IToolExecutor
+    /// (ex.: run_program via CellProgramRunner). Devolve o CorrelationId a usar em
+    /// PublishOutput/CompleteManual/FailManual para essa mesma execução.
+    /// </summary>
+    public string BeginManual(string title, string target, string? workingDirectory = null)
+    {
+        var process = _processes.Begin(title, target, "executando");
+        Started?.Invoke(this, new AgentExecutionStartedEventArgs(process.Id, title, target, workingDirectory ?? Directory.GetCurrentDirectory()));
+        return process.Id;
+    }
+
+    public void CompleteManual(string correlationId, bool success, string message)
+    {
+        if (string.IsNullOrWhiteSpace(correlationId)) return;
+        if (success) _processes.Complete(correlationId, message);
+        else _processes.Fail(correlationId, message);
+
+        var result = success
+            ? new ExecutionResult { Success = true, ExitCode = 0, StandardOutput = message }
+            : ExecutionResult.Failed(message);
+        Completed?.Invoke(this, new AgentExecutionCompletedEventArgs(correlationId, "manual", result));
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
