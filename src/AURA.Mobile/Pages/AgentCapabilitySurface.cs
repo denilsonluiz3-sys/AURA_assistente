@@ -23,18 +23,8 @@ public sealed class AgentCapabilitySurface : ContentView
 
     public AgentCapabilitySurface()
     {
-        _title = new Label
-        {
-            FontSize = 13,
-            FontAttributes = FontAttributes.Bold
-        };
-
-        _status = new Label
-        {
-            FontSize = 11,
-            Opacity = 0.75
-        };
-
+        _title = new Label { FontSize = 13, FontAttributes = FontAttributes.Bold };
+        _status = new Label { FontSize = 11, Opacity = 0.75 };
         _output = new Editor
         {
             IsReadOnly = true,
@@ -93,13 +83,12 @@ public sealed class AgentCapabilitySurface : ContentView
             if (_activeWorkingDirectory == null)
                 return;
 
-            if (!string.Equals(
-                    Path.GetFullPath(e.WorkingDirectory),
-                    Path.GetFullPath(_activeWorkingDirectory),
-                    StringComparison.OrdinalIgnoreCase))
+            var eventDirectory = System.IO.Path.GetFullPath(e.WorkingDirectory);
+            var activeDirectory = System.IO.Path.GetFullPath(_activeWorkingDirectory);
+            if (!string.Equals(eventDirectory, activeDirectory, StringComparison.OrdinalIgnoreCase))
                 return;
 
-            Show(Path.GetFileName(e.FileName), e.IsError ? "stderr" : "executando");
+            Show(System.IO.Path.GetFileName(e.FileName), e.IsError ? "stderr" : "executando");
             AppendOutput(e.IsError ? "[stderr] " + e.Text : e.Text);
         });
     }
@@ -119,7 +108,7 @@ public sealed class AgentCapabilitySurface : ContentView
             if (_activeProcessId != processId)
             {
                 _activeProcessId = processId;
-                _activeWorkingDirectory = AgentWorkspace.ActiveRoot;
+                _activeWorkingDirectory = Directory.GetCurrentDirectory();
                 Show(processId ?? "Processo", active.Status);
             }
             return;
@@ -129,7 +118,7 @@ public sealed class AgentCapabilitySurface : ContentView
         if (latest != null)
         {
             _activeProcessId = latest.Id?.ToString();
-            _activeWorkingDirectory = AgentWorkspace.ActiveRoot;
+            _activeWorkingDirectory = Directory.GetCurrentDirectory();
             Show(_activeProcessId ?? "Processo", latest.Status);
         }
     }
