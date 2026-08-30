@@ -8,7 +8,8 @@ namespace AURA.Mobile.Pages;
 
 /// <summary>
 /// Superfície visual temporária para capacidades executadas pelo agente.
-/// Observa saída incremental dos executores e apresenta o estado da execução.
+/// A associação processo → superfície é explícita quando CorrelationId é fornecido;
+/// cwd permanece apenas como fallback de compatibilidade.
 /// </summary>
 public sealed class AgentCapabilitySurface : ContentView
 {
@@ -34,20 +35,14 @@ public sealed class AgentCapabilitySurface : ContentView
             FontSize = 12,
             Text = string.Empty
         };
-
         _card = new Border
         {
             StrokeThickness = 0,
             Padding = new Thickness(12, 8),
             Margin = new Thickness(0, 4),
             StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(12) },
-            Content = new VerticalStackLayout
-            {
-                Spacing = 4,
-                Children = { _title, _status, _output }
-            }
+            Content = new VerticalStackLayout { Spacing = 4, Children = { _title, _status, _output } }
         };
-
         Content = _card;
         IsVisible = false;
     }
@@ -55,22 +50,30 @@ public sealed class AgentCapabilitySurface : ContentView
     protected override void OnHandlerChanged()
     {
         base.OnHandlerChanged();
-        if (Handler?.MauiContext?.Services is { } services)
-            Bind(services);
+        if (Handler?.MauiContext?.Services is { } services) Bind(services);
     }
 
     public void Bind(IServiceProvider services)
     {
-        if (_bound)
-            return;
-
+        if (_bound) return;
         _processes = services.GetService<ProcessRegistry>();
-        if (_processes != null)
-            _processes.Processes.CollectionChanged += OnProcessesChanged;
-
+        if (_processes != null) _processes.Processes.CollectionChanged += OnProcessesChanged;
         ProcessExecutorBase.OutputReceived += OnProcessOutput;
         _bound = true;
         RefreshFromProcesses();
+    }
+
+    /// <summary>
+    /// Liga esta superfície a uma execução específica do ProcessRegistry.
+    /// A partir daqui somente eventos com o mesmo CorrelationId são aceitos.
+    /// </summary>
+    public void BindProcess(string processId, string? workingDirectory = null, string? title = null)
+    {
+        if (string.IsNullOrWhiteSpace(processId)) return;
+        _activeProcessId = processId;
+        _activeWorkingDirectory = workingDirectory;
+        _output.Text = string.Empty;
+        Show(title ?? processId, "executando");
     }
 
     private void OnProcessesChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -80,11 +83,17 @@ public sealed class AgentCapabilitySurface : ContentView
     {
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            if (_activeWorkingDirectory == null)
+            // Correlação é a autoridade. O diretório é fallback para executores
+            // antigos que ainda não propagam CorrelationId.
+            if (!string.IsNullOrWhiteSpace(_activeProcessId))
+            {
+                if (!string.Equals(e.CorrelationId, _activeProcessId, StringComparison.OrdinalIgnoreCase))
+                    return;
+            }
+            else if (_activeWorkingDirectory == null || !SameDirectory(e.WorkingDirectory, _activeWorkingDirectory))
+            {
                 return;
-
-            if (!SameDirectory(e.WorkingDirectory, _activeWorkingDirectory))
-                return;
+            }
 
             Show(PathTitle(e.FileName), e.IsError ? "stderr" : "executando");
             AppendOutput(e.IsError ? "[stderr] " + e.Text : e.Text);
@@ -93,44 +102,38 @@ public sealed class AgentCapabilitySurface : ContentView
 
     private void RefreshFromProcesses()
     {
-        if (_processes == null)
-            return;
+        if (_processes == null) return;
+        if (!string.IsNullOrWhiteSpace(_activeProcessId))
+        {
+            var bound = _processes.Processes.FirstOrDefault(p =>
+                string.Equals(p.Id, _activeProcessId, StringComparison.OrdinalIgnoreCase));
+            if (bound != null)
+            {
+                Show(bound.Title ?? _activeProcessId, bound.Status);
+                return;
+            }
+        }
 
-        var active = _processes.Processes
-            .LastOrDefault(p => !IsTerminalStatus(p.Status));
-
+        var active = _processes.Processes.LastOrDefault(p => !IsTerminalStatus(p.Status));
         if (active != null)
         {
-            var processId = active.Id?.ToString();
-            if (_activeProcessId != processId)
-            {
-                _activeProcessId = processId;
-                _activeWorkingDirectory = AgentWorkspaceRoot();
-                _output.Text = string.Empty;
-                Show(processId ?? "Processo", active.Status);
-            }
+            BindProcess(active.Id, AgentWorkspaceRoot(), active.Title);
+            Show(active.Title ?? active.Id, active.Status);
             return;
         }
 
         var latest = _processes.Processes.LastOrDefault();
         if (latest != null)
         {
-            _activeProcessId = latest.Id?.ToString();
-            _activeWorkingDirectory = AgentWorkspaceRoot();
-            Show(_activeProcessId ?? "Processo", latest.Status);
+            BindProcess(latest.Id, AgentWorkspaceRoot(), latest.Title);
+            Show(latest.Title ?? latest.Id, latest.Status);
         }
     }
 
-    /// <summary>
-    /// Inicia uma apresentação visual para uma execução disparada diretamente
-    /// pelo Agente. O conteúdo anterior é descartado para não misturar execuções.
-    /// </summary>
     public void BeginExecution(string title, string workingDirectory)
     {
         _activeProcessId = null;
-        _activeWorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory)
-            ? Directory.GetCurrentDirectory()
-            : workingDirectory;
+        _activeWorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory) ? Directory.GetCurrentDirectory() : workingDirectory;
         _output.Text = string.Empty;
         Show(title, "executando");
     }
@@ -144,9 +147,7 @@ public sealed class AgentCapabilitySurface : ContentView
 
     public void AppendOutput(string text)
     {
-        if (string.IsNullOrEmpty(text))
-            return;
-
+        if (string.IsNullOrEmpty(text)) return;
         _output.Text += text;
         _output.CursorPosition = _output.Text.Length;
     }
@@ -168,51 +169,26 @@ public sealed class AgentCapabilitySurface : ContentView
 
     private static bool SameDirectory(string? left, string? right)
     {
-        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
-            return false;
-
-        try
-        {
-            return string.Equals(
-                System.IO.Path.GetFullPath(left),
-                System.IO.Path.GetFullPath(right),
-                StringComparison.OrdinalIgnoreCase);
-        }
-        catch
-        {
-            return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
-        }
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right)) return false;
+        try { return string.Equals(System.IO.Path.GetFullPath(left), System.IO.Path.GetFullPath(right), StringComparison.OrdinalIgnoreCase); }
+        catch { return string.Equals(left, right, StringComparison.OrdinalIgnoreCase); }
     }
 
     private static string PathTitle(string? path)
     {
-        if (string.IsNullOrWhiteSpace(path))
-            return "Execução";
-
-        try
-        {
-            return System.IO.Path.GetFileName(path);
-        }
-        catch
-        {
-            return path;
-        }
+        if (string.IsNullOrWhiteSpace(path)) return "Execução";
+        try { return System.IO.Path.GetFileName(path); }
+        catch { return path; }
     }
 
-    private static string AgentWorkspaceRoot()
-    {
-        // O AgentPage já estabelece o workspace como diretório de execução.
-        // Usamos o cwd do processo como fallback sem criar uma segunda fonte de verdade.
-        return Directory.GetCurrentDirectory();
-    }
+    private static string AgentWorkspaceRoot() => Directory.GetCurrentDirectory();
 
     protected override void OnParentSet()
     {
         base.OnParentSet();
         if (Parent == null && _bound)
         {
-            if (_processes != null)
-                _processes.Processes.CollectionChanged -= OnProcessesChanged;
+            if (_processes != null) _processes.Processes.CollectionChanged -= OnProcessesChanged;
             ProcessExecutorBase.OutputReceived -= OnProcessOutput;
             _bound = false;
             _activeProcessId = null;
