@@ -61,7 +61,15 @@
 
         <Grid x:Name="AgentPane" Grid.Row="3" IsVisible="True">
             <ScrollView x:Name="ConversationScroll">
-                <VerticalStackLayout x:Name="ConversationContainer" Spacing="6" Padding="14,12" />
+                <Grid>
+                    <VerticalStackLayout x:Name="ConversationContainer" Spacing="6" Padding="14,12" />
+                    <AgentCapabilitySurface x:Name="CapabilitySurface"
+                                             HorizontalOptions="Fill"
+                                             VerticalOptions="End"
+                                             Margin="6"
+                                             ZIndex="100"
+                                             AutoHideOnComplete="False" />
+                </Grid>
             </ScrollView>
         </Grid>
 
