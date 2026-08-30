@@ -38,7 +38,7 @@ workflows:
 
       - name: Install Android SDK deps
         script: |
-          set +e
+          set -euo pipefail
           export PATH="$DOTNET_PATH:$PATH"
           SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
           "$DOTNET_BIN" build src/AURA.Mobile/AURA.Mobile.csproj \
@@ -46,37 +46,23 @@ workflows:
             -f "$ANDROID_TFM" \
             -p:AndroidSdkDirectory="$SDK_DIR" \
             -p:AcceptAndroidSDKLicenses=True \
-            --verbosity minimal > "$CM_BUILD_DIR/android-deps.log" 2>&1
-          EXIT_CODE=$?
-          if [ "$EXIT_CODE" -ne 0 ]; then
-            echo "Android SDK dependency installation failed. Last 120 lines:"
-            tail -120 "$CM_BUILD_DIR/android-deps.log"
-          else
-            echo "Android SDK dependencies: OK"
-          fi
-          exit "$EXIT_CODE"
+            --verbosity minimal
+          echo "Android SDK dependencies: OK"
 
       - name: Build APK
         script: |
-          set +e
+          set -euo pipefail
           export PATH="$DOTNET_PATH:$PATH"
           "$DOTNET_BIN" build src/AURA.Mobile/AURA.Mobile.csproj \
             -f "$ANDROID_TFM" \
             -c Release \
             --verbosity minimal \
-            --no-restore > "$CM_BUILD_DIR/build.log" 2>&1
-          EXIT_CODE=$?
-          if [ "$EXIT_CODE" -ne 0 ]; then
-            echo "Build failed. Last 160 lines:"
-            tail -160 "$CM_BUILD_DIR/build.log"
-          else
-            echo "Build: OK"
-          fi
-          exit "$EXIT_CODE"
+            --no-restore
+          echo "Build: OK"
 
       - name: Publish APK
         script: |
-          set +e
+          set -euo pipefail
           export PATH="$DOTNET_PATH:$PATH"
           mkdir -p "$CM_BUILD_DIR/artifacts"
           "$DOTNET_BIN" publish src/AURA.Mobile/AURA.Mobile.csproj \
@@ -86,19 +72,9 @@ workflows:
             -p:ApplicationVersion="${BUILD_NUMBER:-1}" \
             -p:ApplicationDisplayVersion="$AURA_DISPLAY_VERSION" \
             --verbosity minimal \
-            -o "$CM_BUILD_DIR/artifacts" > "$CM_BUILD_DIR/publish.log" 2>&1
-          EXIT_CODE=$?
-          if [ "$EXIT_CODE" -ne 0 ]; then
-            echo "Publish failed. Last 160 lines:"
-            tail -160 "$CM_BUILD_DIR/publish.log"
-          else
-            echo "Publish: OK"
-            find "$CM_BUILD_DIR/artifacts" -type f -name '*.apk' -print
-          fi
-          exit "$EXIT_CODE"
+            -o "$CM_BUILD_DIR/artifacts"
+          echo "Publish: OK"
+          find "$CM_BUILD_DIR/artifacts" -type f -name '*.apk' -print
 
     artifacts:
       - artifacts/**/*.apk
-      - android-deps.log
-      - build.log
-      - publish.log
