@@ -71,9 +71,18 @@ public sealed class EmbeddedPythonService : IEmbeddedPython
         {
             ct.ThrowIfCancellationRequested();
 
-            // O próprio Python3Android captura o stdout produzido por RunCode.
-            // Não é necessário criar um subprocesso nem localizar um binário python3.
-            return _env.RunCode(code) ?? string.Empty;
+            // Python3Android expõe stdout, erro e exit code por parâmetros de saída.
+            string output = _env.RunCode(code, out string error, out int exitCode) ?? string.Empty;
+
+            if (exitCode != 0)
+            {
+                string detail = string.IsNullOrWhiteSpace(error)
+                    ? $"Python terminou com exit code {exitCode}."
+                    : error;
+                throw new InvalidOperationException(detail);
+            }
+
+            return output;
         }
         finally
         {
