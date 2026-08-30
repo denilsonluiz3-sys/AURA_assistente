@@ -11,7 +11,7 @@ namespace AURA.Mobile.Pages;
 /// <summary>
 /// Superfície transitória para exibir uma capacidade usada pelo Agente.
 /// A execução continua pertencendo aos motores existentes; esta classe é UI
-/// e também observa o ProcessRegistry para tornar execuções visíveis no fluxo do Agente.
+/// e observa o ProcessRegistry para tornar processos visíveis no fluxo do Agente.
 /// </summary>
 public sealed class AgentCapabilitySurface : ContentView
 {
@@ -23,6 +23,7 @@ public sealed class AgentCapabilitySurface : ContentView
     private readonly Border _frame;
     private ProcessRegistry? _processes;
     private bool _bound;
+    private string? _activeProcessId;
 
     public event EventHandler? Closed;
 
@@ -33,18 +34,8 @@ public sealed class AgentCapabilitySurface : ContentView
         IsVisible = false;
         Padding = new Thickness(12, 8);
 
-        _title = new Label
-        {
-            FontAttributes = FontAttributes.Bold,
-            FontSize = 14
-        };
-
-        _state = new Label
-        {
-            FontSize = 12,
-            Opacity = 0.75
-        };
-
+        _title = new Label { FontAttributes = FontAttributes.Bold, FontSize = 14 };
+        _state = new Label { FontSize = 12, Opacity = 0.75 };
         _busy = new ActivityIndicator
         {
             IsVisible = false,
@@ -53,7 +44,6 @@ public sealed class AgentCapabilitySurface : ContentView
             HeightRequest = 18,
             VerticalOptions = LayoutOptions.Center
         };
-
         _output = new Editor
         {
             IsReadOnly = true,
@@ -62,7 +52,6 @@ public sealed class AgentCapabilitySurface : ContentView
             MaximumHeightRequest = 220,
             FontFamily = DeviceInfo.Platform == DevicePlatform.Android ? "monospace" : null
         };
-
         _close = new Button
         {
             Text = "Fechar",
@@ -126,10 +115,26 @@ public sealed class AgentCapabilitySurface : ContentView
                               && !string.Equals(p.Status, "Falhou", StringComparison.OrdinalIgnoreCase));
 
         if (active == null)
+        {
+            if (_activeProcessId != null)
+            {
+                _activeProcessId = null;
+                Complete("concluído");
+            }
             return;
+        }
 
-        Show(active.Title ?? "AURA", active.Status ?? "executando");
+        if (!string.Equals(_activeProcessId, active.Id, StringComparison.Ordinal))
+        {
+            _activeProcessId = active.Id;
+            Show(active.Title ?? "AURA", active.Status ?? "executando");
+            return;
+        }
+
         _state.Text = string.IsNullOrWhiteSpace(active.Status) ? "executando" : active.Status;
+        _busy.IsRunning = true;
+        _busy.IsVisible = true;
+        IsVisible = true;
     }
 
     public void Show(string capability, string state = "executando")
@@ -190,6 +195,7 @@ public sealed class AgentCapabilitySurface : ContentView
             _processes.Processes.CollectionChanged -= OnProcessesChanged;
             _bound = false;
             _processes = null;
+            _activeProcessId = null;
         }
     }
 }
