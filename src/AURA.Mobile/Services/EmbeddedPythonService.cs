@@ -103,8 +103,6 @@ public sealed class EmbeddedPythonService : IEmbeddedPython
         if (_env is null)
             throw new InvalidOperationException("Python embutido indisponível neste dispositivo/APK.");
 
-        // O ambiente Python é compartilhado pela aplicação. Serializar execuções
-        // evita que duas chamadas sobrescrevam sys.stdout simultaneamente.
         await _runGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
@@ -119,7 +117,7 @@ public sealed class EmbeddedPythonService : IEmbeddedPython
                 "    sys.stdout = _aura_old_stdout\n" +
                 "_aura_buf.getvalue()\n";
 
-            object? raw = InvokeRun(_env, wrapped);
+            object? raw = await InvokeRunAsync(_env, wrapped).ConfigureAwait(false);
             return raw?.ToString() ?? string.Empty;
         }
         finally
@@ -137,7 +135,7 @@ public sealed class EmbeddedPythonService : IEmbeddedPython
         return await RunCodeAsync(code, ct).ConfigureAwait(false);
     }
 
-    private static object? InvokeRun(object env, string code)
+    private static async Task<object?> InvokeRunAsync(object env, string code)
     {
         var t = env.GetType();
         var method = t.GetMethod("RunCode", new[] { typeof(string) })
@@ -150,7 +148,14 @@ public sealed class EmbeddedPythonService : IEmbeddedPython
         if (method is null)
             throw new MissingMethodException(t.FullName, "RunCode");
 
-        return method.Invoke(env, new object[] { code });
+        object? result = method.Invoke(env, new object[] { code });
+        if (result is Task task)
+        {
+            await task.ConfigureAwait(false);
+            return task.GetType().GetProperty("Result")?.GetValue(task);
+        }
+
+        return result;
     }
 
     private static string Indent(string code)
