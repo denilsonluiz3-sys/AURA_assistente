@@ -18,6 +18,7 @@ namespace AURA.Mobile
             events.Subscribe<ModuleStateChangedEvent>(_ =>
                 MainThread.BeginInvokeOnMainThread(ScheduleRebuildTabs));
 
+            // ModuleId null = sempre visível (núcleo). Outros ainda passam por IsApplied.
             _entries = new List<(string?, string, string, Page)>
             {
                 (null, "Sistema", "Início", home),
@@ -26,11 +27,11 @@ namespace AURA.Mobile
                 ("logs", "Sistema", "Correções", fixes),
 
                 ("ai", "Assistente", "Chat", chat),
-                ("ai", "Assistente", "Agente", agent),
+                (null, "Assistente", "Agente", agent),
                 ("memory", "Assistente", "Memória", memory),
                 (null, "Assistente", "Navegador", browser),
 
-                ("terminal", "Ferramentas", "Terminal", terminal),
+                (null, "Ferramentas", "Terminal", terminal),
                 ("executors", "Ferramentas", "Executores", executors),
                 (null, "Ferramentas", "Espectro", spectrum),
                 (null, "Ferramentas", "Módulos", modules),
