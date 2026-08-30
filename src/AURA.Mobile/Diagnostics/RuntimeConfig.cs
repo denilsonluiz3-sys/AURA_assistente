@@ -51,11 +51,7 @@ namespace AURA.Mobile.Diagnostics
             {
                 try
                 {
-                    string? secure = SecureStorage.Default
-                        .GetAsync(ApiKeySecureName)
-                        .GetAwaiter()
-                        .GetResult();
-
+                    string? secure = SecureStorage.Default.GetAsync(ApiKeySecureName).GetAwaiter().GetResult();
                     if (!string.IsNullOrWhiteSpace(secure))
                         return secure.Trim();
                 }
@@ -67,10 +63,7 @@ namespace AURA.Mobile.Diagnostics
 
                 try
                 {
-                    SecureStorage.Default
-                        .SetAsync(ApiKeySecureName, legacy.Trim())
-                        .GetAwaiter()
-                        .GetResult();
+                    SecureStorage.Default.SetAsync(ApiKeySecureName, legacy.Trim()).GetAwaiter().GetResult();
                     Preferences.Default.Remove(ApiKeyLegacyPref);
                 }
                 catch { }
@@ -85,10 +78,7 @@ namespace AURA.Mobile.Diagnostics
                     if (string.IsNullOrEmpty(v))
                         SecureStorage.Default.Remove(ApiKeySecureName);
                     else
-                        SecureStorage.Default
-                            .SetAsync(ApiKeySecureName, v)
-                            .GetAwaiter()
-                            .GetResult();
+                        SecureStorage.Default.SetAsync(ApiKeySecureName, v).GetAwaiter().GetResult();
                 }
                 catch { }
 
@@ -105,17 +95,15 @@ namespace AURA.Mobile.Diagnostics
             if (string.IsNullOrEmpty(u))
                 return string.Empty;
 
-            if (u.Contains("/chat/completions", System.StringComparison.OrdinalIgnoreCase) ||
-                u.Contains("/messages", System.StringComparison.OrdinalIgnoreCase) ||
-                u.Contains("/api/chat", System.StringComparison.OrdinalIgnoreCase))
+            if (u.Contains("/chat/completions", StringComparison.OrdinalIgnoreCase) ||
+                u.Contains("/messages", StringComparison.OrdinalIgnoreCase) ||
+                u.Contains("/api/chat", StringComparison.OrdinalIgnoreCase))
                 return u;
 
-            if (string.Equals(providerId, "ollama", System.StringComparison.OrdinalIgnoreCase) ||
-                u.Contains("127.0.0.1", System.StringComparison.OrdinalIgnoreCase) ||
-                u.Contains("localhost", System.StringComparison.OrdinalIgnoreCase))
-            {
+            if (string.Equals(providerId, "ollama", StringComparison.OrdinalIgnoreCase) ||
+                u.Contains("127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+                u.Contains("localhost", StringComparison.OrdinalIgnoreCase))
                 return u + "/v1/chat/completions";
-            }
 
             return u;
         }
@@ -130,13 +118,14 @@ namespace AURA.Mobile.Diagnostics
             {
                 foreach (ProviderModel m in provider.Models)
                 {
-                    if (string.Equals(m.Id, model, System.StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(m.Id, model, StringComparison.OrdinalIgnoreCase))
                     {
                         modelBelongsToProvider = true;
                         break;
                     }
                 }
 
+                // Custom models are valid; the catalog is not an allow-list.
                 if (!modelBelongsToProvider && model.Length >= 2)
                     modelBelongsToProvider = true;
             }
@@ -160,7 +149,6 @@ namespace AURA.Mobile.Diagnostics
             client.Options.Model = model;
             client.Options.MaxTokens = MaxTokens;
             client.Options.TimeoutSeconds = TimeoutSeconds;
-            // Ollama: nunca envia chave residual de OpenRouter
             client.Options.ApiKey = provider.NeedsKey ? (ApiKey?.Trim() ?? string.Empty) : string.Empty;
             client.Options.AuthHeaderName = provider.AuthHeaderName ?? string.Empty;
             client.Options.AuthScheme = provider.AuthScheme ?? string.Empty;
@@ -169,6 +157,11 @@ namespace AURA.Mobile.Diagnostics
             LastStatusMessage = provider.Name + " · " + model + " · " + baseUrl;
         }
 
+        /// <summary>
+        /// Validação deliberadamente genérica. O catálogo define como cada provedor
+        /// autentica; o RuntimeConfig não pode bloquear chaves legítimas por prefixo.
+        /// Prefixos são usados somente como heurística de detecção, nunca como requisito.
+        /// </summary>
         public static string? ValidateApiKeyFormat(string? key, ProviderInfo? provider)
         {
             if (provider == null || !provider.NeedsKey)
@@ -178,33 +171,15 @@ namespace AURA.Mobile.Diagnostics
             if (string.IsNullOrWhiteSpace(k))
                 return null;
 
-            if (k.Length > 200 || k.IndexOfAny(new[] { ' ', '\t', '\r', '\n' }) >= 0)
-            {
-                return "Chave de API inválida (texto de log ou espaços). Cole só a chave.";
-            }
+            if (k.Length > 4096 || k.IndexOfAny(new[] { ' ', '\t', '\r', '\n' }) >= 0)
+                return "Chave de API inválida. Cole somente a chave, sem espaços ou quebras de linha.";
 
-            if (string.Equals(provider.Id, "gemini", System.StringComparison.OrdinalIgnoreCase))
-            {
-                if (k.StartsWith("AQ.", System.StringComparison.Ordinal))
-                    return "Chave AQ. não é API key do AI Studio. Use chave AIzaSy…";
+            if (string.IsNullOrWhiteSpace(provider.BaseUrl) && string.IsNullOrWhiteSpace(BaseUrlOverride))
+                return "Este provedor exige uma BASE URL. Informe o endpoint compatível com a API.";
 
-                if (!k.StartsWith("AIza", System.StringComparison.Ordinal))
-                    return "Gemini costuma usar AIzaSy…. Ou escolha Ollama (local) sem chave.";
-            }
-
-            if (string.Equals(provider.Id, "openrouter", System.StringComparison.OrdinalIgnoreCase) &&
-                !k.StartsWith("sk-or-", System.StringComparison.Ordinal))
-            {
-                return "Provedor atual é OpenRouter (precisa sk-or-…). " +
-                       "Para IA local: no seletor PROVEDOR escolha «Ollama (local)», " +
-                       "apague a chave e toque Detectar/Testar.";
-            }
-
-            if (string.Equals(provider.Id, "groq", System.StringComparison.OrdinalIgnoreCase) &&
-                !k.StartsWith("gsk_", System.StringComparison.Ordinal))
-            {
-                return "Groq espera gsk_…. Ou escolha Ollama (local) sem chave.";
-            }
+            if (string.IsNullOrWhiteSpace(Model) && provider.Models.Count == 0 &&
+                string.IsNullOrWhiteSpace(provider.DefaultModelId))
+                return "Este provedor exige um MODELO CUSTOM. Informe o ID do modelo.";
 
             return null;
         }
@@ -238,18 +213,12 @@ namespace AURA.Mobile.Diagnostics
             }
 
             if (fallback == null)
-            {
-                return "Sem chave de API. Escolha Ollama (local) no seletor ou cole uma chave.";
-            }
+                return "Sem chave de API. Selecione um provedor local ou configure uma chave.";
 
             string previous = provider.Name;
             Provider = fallback.Id;
             if (fallback.Models.Count > 0)
-            {
-                Model = string.IsNullOrWhiteSpace(fallback.DefaultModelId)
-                    ? fallback.Models[0].Id
-                    : fallback.DefaultModelId;
-            }
+                Model = string.IsNullOrWhiteSpace(fallback.DefaultModelId) ? fallback.Models[0].Id : fallback.DefaultModelId;
             Apply(client);
 
             LastStatusMessage = "Sem chave em " + previous + " — usando " + fallback.Name +
