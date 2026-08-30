@@ -7,6 +7,9 @@ namespace AURA.Mobile.Diagnostics
         private const string ApiKeySecureName = "ai_api_key";
         private const string ApiKeyLegacyPref = "ai_api_key";
         private const string ApiKeyProviderPrefix = "ai_api_key_";
+        private static string _lastProviderId = string.Empty;
+        private static string _lastProviderKey = string.Empty;
+        private static bool _providerChanged;
 
         public static int MaxTokens
         {
@@ -29,7 +32,18 @@ namespace AURA.Mobile.Diagnostics
         public static string Provider
         {
             get => Preferences.Default.Get("ai_provider", string.Empty);
-            set => Preferences.Default.Set("ai_provider", value);
+            set
+            {
+                string next = (value ?? string.Empty).Trim();
+                string current = Preferences.Default.Get("ai_provider", string.Empty).Trim();
+                if (!string.Equals(current, next, StringComparison.OrdinalIgnoreCase))
+                {
+                    _lastProviderId = current;
+                    _lastProviderKey = GetApiKeyForProvider(current);
+                    _providerChanged = true;
+                }
+                Preferences.Default.Set("ai_provider", next);
+            }
         }
 
         public static string Model
@@ -46,45 +60,53 @@ namespace AURA.Mobile.Diagnostics
 
         public static string LastStatusMessage { get; private set; } = string.Empty;
 
-        /// <summary>
-        /// API key do provedor atualmente selecionado. Cada provedor possui sua
-        /// própria entrada no SecureStorage; trocar de provedor não destrói a chave anterior.
-        /// </summary>
         public static string ApiKey
         {
             get => GetApiKeyForProvider(Provider);
-            set => SetApiKeyForProvider(Provider, value);
+            set
+            {
+                string v = (value ?? string.Empty).Trim();
+                string currentProvider = NormalizeProviderKey(Provider);
+
+                // OnProviderChanged chama ApplyAndPersist imediatamente. Não copiar
+                // silenciosamente a chave do provedor anterior para o novo provedor.
+                if (_providerChanged &&
+                    string.Equals(currentProvider, NormalizeProviderKey(Provider), StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(v, _lastProviderKey, StringComparison.Ordinal))
+                {
+                    _providerChanged = false;
+                    return;
+                }
+
+                _providerChanged = false;
+                SetApiKeyForProvider(currentProvider, v);
+            }
         }
 
         public static string GetApiKeyForProvider(string? providerId)
         {
             string provider = NormalizeProviderKey(providerId);
+            if (string.IsNullOrWhiteSpace(provider))
+                return string.Empty;
 
             try
             {
-                if (!string.IsNullOrWhiteSpace(provider))
-                {
-                    string? scoped = SecureStorage.Default
-                        .GetAsync(ApiKeyProviderPrefix + provider)
-                        .GetAwaiter()
-                        .GetResult();
-                    if (!string.IsNullOrWhiteSpace(scoped))
-                        return scoped.Trim();
-                }
+                string? scoped = SecureStorage.Default
+                    .GetAsync(ApiKeyProviderPrefix + provider)
+                    .GetAwaiter()
+                    .GetResult();
+                if (!string.IsNullOrWhiteSpace(scoped))
+                    return scoped.Trim();
             }
             catch { }
 
             // Migração transparente da única chave antiga.
-            if (string.IsNullOrWhiteSpace(provider))
-                return string.Empty;
-
             try
             {
                 string? legacySecure = SecureStorage.Default
                     .GetAsync(ApiKeySecureName)
                     .GetAwaiter()
                     .GetResult();
-
                 if (!string.IsNullOrWhiteSpace(legacySecure))
                 {
                     SetApiKeyForProvider(provider, legacySecure);
@@ -111,10 +133,10 @@ namespace AURA.Mobile.Diagnostics
         public static void SetApiKeyForProvider(string? providerId, string? value)
         {
             string provider = NormalizeProviderKey(providerId);
-            string v = (value ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(provider))
                 return;
 
+            string v = (value ?? string.Empty).Trim();
             string secureName = ApiKeyProviderPrefix + provider;
             try
             {
@@ -133,9 +155,7 @@ namespace AURA.Mobile.Diagnostics
             string value = (providerId ?? string.Empty).Trim().ToLowerInvariant();
             if (value.Length == 0)
                 return string.Empty;
-
-            var chars = value.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' ? c : '_').ToArray();
-            return new string(chars);
+            return new string(value.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' ? c : '_').ToArray());
         }
 
         public static string NormalizeChatBaseUrl(string? url, string? providerId)
@@ -161,8 +181,8 @@ namespace AURA.Mobile.Diagnostics
         {
             ProviderInfo provider = ProviderCatalog.Find(Provider) ?? ProviderCatalog.Providers[0];
             string model = Model;
-
             bool modelBelongsToProvider = false;
+
             if (!string.IsNullOrWhiteSpace(model))
             {
                 foreach (ProviderModel m in provider.Models)
@@ -173,25 +193,18 @@ namespace AURA.Mobile.Diagnostics
                         break;
                     }
                 }
-
-                // Custom models are valid; the catalog is not an allow-list.
                 if (!modelBelongsToProvider && model.Length >= 2)
                     modelBelongsToProvider = true;
             }
 
             if (!modelBelongsToProvider && provider.Models.Count > 0)
-            {
-                model = !string.IsNullOrWhiteSpace(provider.DefaultModelId)
-                    ? provider.DefaultModelId
-                    : provider.Models[0].Id;
-            }
+                model = !string.IsNullOrWhiteSpace(provider.DefaultModelId) ? provider.DefaultModelId : provider.Models[0].Id;
 
             string baseUrl = provider.BaseUrl;
             string ovr = BaseUrlOverride;
-            if (!string.IsNullOrWhiteSpace(ovr))
-                baseUrl = NormalizeChatBaseUrl(ovr, provider.Id);
-            else
-                baseUrl = NormalizeChatBaseUrl(baseUrl, provider.Id);
+            baseUrl = !string.IsNullOrWhiteSpace(ovr)
+                ? NormalizeChatBaseUrl(ovr, provider.Id)
+                : NormalizeChatBaseUrl(baseUrl, provider.Id);
 
             client.Options.Provider = provider.Id;
             client.Options.BaseUrl = baseUrl;
@@ -206,11 +219,7 @@ namespace AURA.Mobile.Diagnostics
             LastStatusMessage = provider.Name + " · " + model + " · " + baseUrl;
         }
 
-        /// <summary>
-        /// Validação deliberadamente genérica. O catálogo define como cada provedor
-        /// autentica; o RuntimeConfig não bloqueia chaves legítimas por prefixo.
-        /// Prefixos são somente heurística de detecção, nunca requisito de autenticação.
-        /// </summary>
+        /// <summary>Prefixos nunca são requisito de autenticação; servem somente para heurística.</summary>
         public static string? ValidateApiKeyFormat(string? key, ProviderInfo? provider)
         {
             if (provider == null || !provider.NeedsKey)
@@ -219,48 +228,27 @@ namespace AURA.Mobile.Diagnostics
             string k = (key ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(k))
                 return null;
-
             if (k.Length > 4096 || k.IndexOfAny(new[] { ' ', '\t', '\r', '\n' }) >= 0)
                 return "Chave de API inválida. Cole somente a chave, sem espaços ou quebras de linha.";
-
             if (string.IsNullOrWhiteSpace(provider.BaseUrl) && string.IsNullOrWhiteSpace(BaseUrlOverride))
                 return "Este provedor exige uma BASE URL. Informe o endpoint compatível com a API.";
-
-            if (string.IsNullOrWhiteSpace(Model) && provider.Models.Count == 0 &&
-                string.IsNullOrWhiteSpace(provider.DefaultModelId))
+            if (string.IsNullOrWhiteSpace(Model) && provider.Models.Count == 0 && string.IsNullOrWhiteSpace(provider.DefaultModelId))
                 return "Este provedor exige um MODELO CUSTOM. Informe o ID do modelo.";
-
             return null;
         }
 
         public static string? EnsureReadyForRequest(OpenRouterClient client)
         {
             Apply(client);
-
             ProviderInfo provider = ProviderCatalog.Find(Provider) ?? ProviderCatalog.Providers[0];
             string key = client.Options.ApiKey ?? string.Empty;
 
             if (!string.IsNullOrWhiteSpace(key))
-            {
-                string? fmt = ValidateApiKeyFormat(key, provider);
-                if (fmt != null)
-                    return fmt;
-                return null;
-            }
-
+                return ValidateApiKeyFormat(key, provider);
             if (!provider.NeedsKey)
                 return null;
 
-            ProviderInfo? fallback = null;
-            foreach (ProviderInfo p in ProviderCatalog.Providers)
-            {
-                if (!p.NeedsKey)
-                {
-                    fallback = p;
-                    break;
-                }
-            }
-
+            ProviderInfo? fallback = ProviderCatalog.Providers.FirstOrDefault(p => !p.NeedsKey);
             if (fallback == null)
                 return "Sem chave de API. Selecione um provedor local ou configure uma chave.";
 
@@ -269,9 +257,7 @@ namespace AURA.Mobile.Diagnostics
             if (fallback.Models.Count > 0)
                 Model = string.IsNullOrWhiteSpace(fallback.DefaultModelId) ? fallback.Models[0].Id : fallback.DefaultModelId;
             Apply(client);
-
-            LastStatusMessage = "Sem chave em " + previous + " — usando " + fallback.Name +
-                                " (" + client.Options.BaseUrl + ").";
+            LastStatusMessage = "Sem chave em " + previous + " — usando " + fallback.Name + " (" + client.Options.BaseUrl + ").";
             AuraLog.Info("RuntimeConfig: " + LastStatusMessage);
             return null;
         }
