@@ -90,7 +90,6 @@ public sealed class AiConfigView : ContentView
         try
         {
             RuntimeConfig.Provider = provider.Id;
-            // Trocar provedor invalida somente a seleção de modelo anterior.
             RuntimeConfig.Model = string.Empty;
             RuntimeConfig.BaseUrlOverride = string.Empty;
             _customModelEntry.Text = string.Empty;
@@ -119,7 +118,6 @@ public sealed class AiConfigView : ContentView
         RuntimeConfig.SetApiKeyForProvider(providerId, e.NewTextValue);
         RefreshStatus();
 
-        // Detecção é opcional: ela só pode mudar o provedor, nunca escolher um modelo.
         string key = e.NewTextValue?.Trim() ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(key)) _ = DetectProviderAsync(key);
     }
@@ -140,7 +138,6 @@ public sealed class AiConfigView : ContentView
                     RuntimeConfig.Provider = provider.Id;
                     SelectProvider(provider.Id);
                     _apiKeyEntry.Text = key;
-                    // Não preservar modelo de outro provedor e não aplicar DefaultModelId aqui.
                     RuntimeConfig.Model = string.Empty;
                     PopulateModels(null);
                     ApplyToClient();
@@ -233,7 +230,9 @@ public sealed class AiConfigView : ContentView
         finally { _loading = false; }
     }
 
-    private void ApplyToClient()
+    // Public porque AiConfig é a fachada compartilhada pelo Chat/Agente e
+    // precisa reaplicar a configuração ao cliente quando o estado global muda.
+    public void ApplyToClient()
     {
         if (_client != null) RuntimeConfig.Apply(_client);
     }
