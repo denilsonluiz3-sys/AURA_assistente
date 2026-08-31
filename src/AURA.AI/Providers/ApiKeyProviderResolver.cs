@@ -9,14 +9,10 @@ using AURA.AI;
 namespace AURA.AI.Providers
 {
     /// <summary>
-    /// Resolvedor padrão de provedor por API key.
-    ///
-    /// Ordem de decisão (regras 5 e 6):
-    ///  1. Determinístico: prefixos confiáveis da chave (sem rede).
-    ///  2. Se ambíguo ou sem prefixo conhecido: contexto (provedor preferido).
-    ///  3. Se ainda inconclusivo e AllowProbe=true: testa apenas endpoints
-    ///     compatíveis (GET /models) até achar o provedor.
-    /// A chave nunca é enviada a terceiros sem AllowProbe e nunca é logada.
+    /// Resolve a qual provedor de IA pertence uma API key e valida a
+    /// credencial. Desacoplado da UI: recebe um ProviderCredential e devolve
+    /// resultados estruturados. A detecção determinística por formato da chave
+    /// nunca faz rede; o teste de endpoints só ocorre com AllowProbe=true.
     /// </summary>
     public sealed class ApiKeyProviderResolver : IApiKeyProviderResolver
     {
@@ -34,9 +30,6 @@ namespace AURA.AI.Providers
                 };
             }
 
-            // 1) Formato da chave (determinístico, sem rede).
-            // Coleta o provedor cujo prefixo mais específico (mais longo)
-            // casa com a chave. Ex.: "sk-or-" vence "sk-" para chaves OpenRouter.
             var matched = new List<IAiProvider>();
             int longestPrefix = 0;
             foreach (ProviderInfo p in ProviderCatalog.Providers)
@@ -56,7 +49,6 @@ namespace AURA.AI.Providers
                         {
                             matched.Add(p);
                         }
-
                         break;
                     }
                 }
@@ -72,7 +64,6 @@ namespace AURA.AI.Providers
                 };
             }
 
-            // 2) Ambigua ou sem prefixo: usa o contexto/provedor preferido.
             if (!string.IsNullOrWhiteSpace(credential.PreferredProviderName))
             {
                 ProviderInfo? preferred = ProviderCatalog.Find(credential.PreferredProviderName);
@@ -80,13 +71,11 @@ namespace AURA.AI.Providers
                 {
                     if (matched.Count > 1 && !matched.Contains(preferred))
                     {
-                        // O formato aponta para outros; contexto não bate -> fica ambíguo.
                         return new ProviderDetectionResult
                         {
                             Candidates = matched,
                             Source = ProviderDetectionSource.None,
-                            Message = "Chave ambígua (formato compatível com vários provedores); " +
-                                      "o selecionado não é um deles."
+                            Message = "Chave ambígua (formato compatível com vários provedores); o selecionado não é um deles."
                         };
                     }
 
@@ -94,11 +83,8 @@ namespace AURA.AI.Providers
                     {
                         Provider = preferred,
                         Candidates = matched,
-                        Source = matched.Count > 0
-                            ? ProviderDetectionSource.KeyFormat
-                            : ProviderDetectionSource.Context,
-                        Message = "Sem prefixo de chave conhecido; usando o provedor selecionado: " +
-                                  preferred.Name + "."
+                        Source = matched.Count > 0 ? ProviderDetectionSource.KeyFormat : ProviderDetectionSource.Context,
+                        Message = "Sem prefixo de chave conhecido; usando o provedor selecionado: " + preferred.Name + "."
                     };
                 }
             }
@@ -109,16 +95,13 @@ namespace AURA.AI.Providers
                 {
                     Candidates = matched,
                     Source = ProviderDetectionSource.None,
-                    Message = "Chave ambígua (formato compatível com " + matched.Count +
-                              " provedores). Toque em 'Testar' para descobrir."
+                    Message = "Chave ambígua (formato compatível com " + matched.Count + " provedores). Toque em 'Testar' para descobrir."
                 };
             }
 
             return new ProviderDetectionResult
             {
-                Candidates = ProviderCatalog.KeyedProbeCandidates() is var all
-                    ? new List<IAiProvider>(all)
-                    : Array.Empty<IAiProvider>(),
+                Candidates = new List<IAiProvider>(ProviderCatalog.KeyedProbeCandidates()),
                 Source = ProviderDetectionSource.None,
                 Message = "Formato da chave desconhecido. Toque em 'Testar' para descobrir o provedor."
             };
@@ -131,7 +114,6 @@ namespace AURA.AI.Providers
         {
             ProviderDetectionResult detection = Detect(credential);
 
-            // Sem provedor candidato e sem autorização para testar.
             if (detection.Provider == null && detection.Candidates.Count == 0)
             {
                 return new ProviderHealthResult
@@ -141,14 +123,12 @@ namespace AURA.AI.Providers
                 };
             }
 
-            // Sem conclusão e sem autorização explícita: não envia a chave.
             if (detection.Provider == null && !credential.AllowProbe)
             {
                 return new ProviderHealthResult
                 {
                     Status = ProviderHealthStatus.UnknownProvider,
-                    Message = "Provedor não identificado e teste externo não autorizado. " +
-                              "Habilite a validação para testar os provedores compatíveis."
+                    Message = "Provedor não identificado e teste externo não autorizado. Habilite a validação para testar os provedores compatíveis."
                 };
             }
 
@@ -159,33 +139,32 @@ namespace AURA.AI.Providers
                 if (!candidates.Contains(c)) candidates.Add(c);
             }
 
-            // Ordena: preferido primeiro, depois por número de prefixos casados (mais específico).
             HttpClient client = http ?? new HttpClient();
             bool ownsClient = http == null;
-
             ProviderHealthResult? best = null;
-            foreach (IAiProvider provider in candidates)
+
+            try
             {
-                if (!provider.NeedsKey) continue;
-
-                ProviderHealthResult r = await ProbeAsync(
-                    client, provider, credential.ApiKey, credential.Timeout ?? DefaultTimeout, ct);
-
-                if (r.Status == ProviderHealthStatus.Valid)
+                foreach (IAiProvider provider in candidates)
                 {
-                    return r; // Achou.
-                }
+                    if (!provider.NeedsKey) continue;
 
-                // Guarda o resultado mais informativo (Unauthorized é forte).
-                if (best == null || Prefer(best.Status, r.Status))
-                {
-                    best = r;
-                }
+                    ProviderHealthResult r = await ProbeAsync(
+                        client, provider, credential.ApiKey, credential.Timeout ?? DefaultTimeout, ct);
 
-                if (!credential.AllowProbe) break; // só testa o preferido/contexto
+                    if (r.Status == ProviderHealthStatus.Valid)
+                        return r;
+
+                    if (best == null || Prefer(best.Status, r.Status))
+                        best = r;
+
+                    if (!credential.AllowProbe) break;
+                }
             }
-
-            if (ownsClient) client.Dispose();
+            finally
+            {
+                if (ownsClient) client.Dispose();
+            }
 
             if (best == null)
             {
@@ -196,11 +175,9 @@ namespace AURA.AI.Providers
                 };
             }
 
-            if (best.Status == ProviderHealthStatus.Unauthorized &&
-                candidates.Count > 1)
+            if (best.Status == ProviderHealthStatus.Unauthorized && candidates.Count > 1)
             {
-                best.Message = "Chave rejeitada pelos provedores testados (" +
-                               best.Provider!.Name + " e outros).";
+                best.Message = "Chave rejeitada pelos provedores testados (" + best.Provider!.Name + " e outros).";
             }
 
             return best;
@@ -215,7 +192,6 @@ namespace AURA.AI.Providers
 
             if (detection.Provider != null)
             {
-                // Mesmo conclusivo pelo formato, valida a credencial de verdade.
                 ProviderHealthResult health = await ValidateAsync(credential, http, ct);
                 detection.Message = detection.Message + " " + health.Message;
             }
@@ -226,8 +202,7 @@ namespace AURA.AI.Providers
                 {
                     detection.Provider = health.Provider;
                     detection.Source = ProviderDetectionSource.Probe;
-                    detection.Message = "Provedor descoberto testando os endpoints: " +
-                                        health.Provider.Name + ".";
+                    detection.Message = "Provedor descoberto testando os endpoints: " + health.Provider.Name + ".";
                 }
                 else
                 {
@@ -241,10 +216,14 @@ namespace AURA.AI.Providers
         public void ApplyToClient(OpenRouterClient client, ProviderDetectionResult result)
         {
             if (client == null || result.Provider is not ProviderInfo p)
-            {
                 return;
-            }
 
+            // A key é parte da credencial resolvida e deve acompanhar o provider.
+            // Antes, este método aplicava somente transporte/modelo e deixava a
+            // chave para uma segunda passagem pela UI. Isso criava um falso
+            // acoplamento ao OpenRouter e podia produzir chamadas sem credencial.
+            client.Options.Provider = p.Id;
+            client.Options.ApiKey = string.Empty;
             client.Options.BaseUrl = p.BaseUrl;
             client.Options.Model = string.IsNullOrWhiteSpace(p.DefaultModelId) && p.Models.Count > 0
                 ? p.Models[0].Id
@@ -254,17 +233,9 @@ namespace AURA.AI.Providers
             client.Options.ApiFormat = p.ApiFormat;
         }
 
-        // ------------------------------------------------------------------
-        // Internals
-        // ------------------------------------------------------------------
-
         private static bool Prefer(ProviderHealthStatus current, ProviderHealthStatus next)
         {
-            // Unauthorized indica chave rejeitada (provedor errado); é o sinal
-            // mais confiável para descartar um provedor. ProviderUnavailable e
-            // Invalid são mais fracos.
-            return next == ProviderHealthStatus.Unauthorized &&
-                   current != ProviderHealthStatus.Unauthorized;
+            return next == ProviderHealthStatus.Unauthorized && current != ProviderHealthStatus.Unauthorized;
         }
 
         private static async Task<ProviderHealthResult> ProbeAsync(
@@ -276,7 +247,7 @@ namespace AURA.AI.Providers
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(timeout);
 
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
             if (!string.IsNullOrWhiteSpace(key))
             {
                 request.Headers.TryAddWithoutValidation(
@@ -287,15 +258,6 @@ namespace AURA.AI.Providers
             {
                 HttpResponseMessage response = await client.SendAsync(request, cts.Token).ConfigureAwait(false);
                 result.HttpStatusCode = (int)response.StatusCode;
-                string body = string.Empty;
-                try
-                {
-                    body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                }
-                catch
-                {
-                    // corpo opcional; não é essencial para o status
-                }
 
                 switch (response.StatusCode)
                 {
@@ -303,40 +265,31 @@ namespace AURA.AI.Providers
                         result.Status = ProviderHealthStatus.Valid;
                         result.Message = "Credencial válida em " + provider.Name + ".";
                         break;
-
                     case HttpStatusCode.Unauthorized:
                     case HttpStatusCode.Forbidden:
                         result.Status = ProviderHealthStatus.Unauthorized;
-                        result.Message = "Chave rejeitada por " + provider.Name +
-                                         " (" + (int)response.StatusCode + ").";
+                        result.Message = "Chave rejeitada por " + provider.Name + " (" + (int)response.StatusCode + ").";
                         break;
-
                     case (HttpStatusCode)402:
                     case (HttpStatusCode)429:
                         result.Status = ProviderHealthStatus.InsufficientCredits;
-                        result.Message = provider.Name + " aceitou a chave mas está sem " +
-                                         "créditos/cota (" + (int)response.StatusCode + ").";
+                        result.Message = provider.Name + " aceitou a chave mas está sem créditos/cota (" + (int)response.StatusCode + ").";
                         break;
-
                     case HttpStatusCode.BadRequest:
                     case HttpStatusCode.NotFound:
                         result.Status = ProviderHealthStatus.Invalid;
-                        result.Message = "Endpoint inválido para " + provider.Name +
-                                         " (" + (int)response.StatusCode + ").";
+                        result.Message = "Endpoint inválido para " + provider.Name + " (" + (int)response.StatusCode + ").";
                         break;
-
                     default:
                         if ((int)response.StatusCode >= 500)
                         {
                             result.Status = ProviderHealthStatus.ProviderUnavailable;
-                            result.Message = provider.Name + " indisponível (" +
-                                             (int)response.StatusCode + ").";
+                            result.Message = provider.Name + " indisponível (" + (int)response.StatusCode + ").";
                         }
                         else
                         {
                             result.Status = ProviderHealthStatus.Invalid;
-                            result.Message = "Resposta inesperada de " + provider.Name +
-                                             " (" + (int)response.StatusCode + ").";
+                            result.Message = "Resposta inesperada de " + provider.Name + " (" + (int)response.StatusCode + ").";
                         }
                         break;
                 }
