@@ -1,10 +1,12 @@
 using AURA.AI;
-using AURA.AI.Providers;
 using AURA.Mobile.Diagnostics;
 
 namespace AURA.Mobile.Controls;
 
-/// <summary>Configuração independente de provedor, modelo e credencial.</summary>
+/// <summary>
+/// Configuração independente de provedor, modelo e credencial.
+/// A chave nunca seleciona modelo ou endpoint.
+/// </summary>
 public sealed class AiConfigView : ContentView
 {
     private readonly Picker _providerPicker = new() { Title = "Escolha o provedor" };
@@ -39,11 +41,23 @@ public sealed class AiConfigView : ContentView
         Content = new VerticalStackLayout
         {
             Spacing = 8,
-            Children = { grid, Field("CHAVE DE API", _apiKeyEntry), Field("MODELO CUSTOM", _customModelEntry), Field("BASE URL", _baseUrlEntry), new HorizontalStackLayout { Spacing = 8, Children = { _testButton, _clearModelButton } }, _status }
+            Children =
+            {
+                grid,
+                Field("CHAVE DE API", _apiKeyEntry),
+                Field("MODELO CUSTOM", _customModelEntry),
+                Field("BASE URL", _baseUrlEntry),
+                new HorizontalStackLayout { Spacing = 8, Children = { _testButton, _clearModelButton } },
+                _status
+            }
         };
     }
 
-    private static VerticalStackLayout Field(string title, View view) => new() { Spacing = 2, Children = { new Label { Text = title, FontSize = 10, TextColor = Color.FromArgb("#7a7a90") }, view } };
+    private static VerticalStackLayout Field(string title, View view) => new()
+    {
+        Spacing = 2,
+        Children = { new Label { Text = title, FontSize = 10, TextColor = Color.FromArgb("#7a7a90") }, view }
+    };
 
     public void Load(OpenRouterClient client)
     {
@@ -56,14 +70,42 @@ public sealed class AiConfigView : ContentView
                 _providerPicker.ItemsSource = ProviderCatalog.Providers;
                 _providerPicker.ItemDisplayBinding = new Binding(nameof(ProviderInfo.Name));
             }
+
             SelectProvider(RuntimeConfig.Provider);
             string providerId = (_providerPicker.SelectedItem as ProviderInfo)?.Id ?? RuntimeConfig.Provider;
+
+            // Sanitiza estado antigo antes de repopular a UI. Uma configuração
+            // criada para outro provedor jamais reaparece como modelo atual.
+            SanitizePersistedState(providerId);
+
             _apiKeyEntry.Text = RuntimeConfig.GetApiKeyForProvider(providerId);
             _baseUrlEntry.Text = RuntimeConfig.BaseUrlOverride;
             PopulateModels(RuntimeConfig.Model);
             RefreshStatus();
         }
         finally { _loading = false; }
+    }
+
+    private static void SanitizePersistedState(string providerId)
+    {
+        ProviderInfo? provider = ProviderCatalog.Find(providerId);
+        if (provider == null)
+        {
+            RuntimeConfig.Model = string.Empty;
+            RuntimeConfig.BaseUrlOverride = string.Empty;
+            return;
+        }
+
+        string model = RuntimeConfig.Model;
+        if (!string.IsNullOrWhiteSpace(model) && ProviderCatalog.FindModel(provider.Id, model) == null)
+            RuntimeConfig.Model = string.Empty;
+
+        // OpenRouter, Gemini, OpenAI, Groq etc. devem usar o endpoint do catálogo.
+        // A URL local do Ollama não pode sobreviver à troca para um provedor remoto.
+        string baseUrl = RuntimeConfig.BaseUrlOverride;
+        if (provider.Id.Equals("openrouter", StringComparison.OrdinalIgnoreCase) &&
+            (baseUrl.Contains("127.0.0.1", StringComparison.OrdinalIgnoreCase) || baseUrl.Contains("localhost", StringComparison.OrdinalIgnoreCase)))
+            RuntimeConfig.BaseUrlOverride = string.Empty;
     }
 
     private void OnProviderChanged(object? sender, EventArgs e)
@@ -73,7 +115,6 @@ public sealed class AiConfigView : ContentView
         try
         {
             RuntimeConfig.Provider = provider.Id;
-            // O modelo é específico do provedor; nunca reaproveitar o anterior.
             RuntimeConfig.Model = string.Empty;
             RuntimeConfig.BaseUrlOverride = string.Empty;
             _apiKeyEntry.Text = RuntimeConfig.GetApiKeyForProvider(provider.Id);
@@ -99,7 +140,7 @@ public sealed class AiConfigView : ContentView
         if (_loading) return;
         string providerId = (_providerPicker.SelectedItem as ProviderInfo)?.Id ?? RuntimeConfig.Provider;
         RuntimeConfig.SetApiKeyForProvider(providerId, e.NewTextValue);
-        // Credencial nunca seleciona modelo nem muda provedor.
+        // Credencial é somente credencial. Não altera provedor, modelo ou URL.
         RefreshStatus();
     }
 
@@ -122,7 +163,6 @@ public sealed class AiConfigView : ContentView
                     return;
                 }
             }
-            // Um modelo desconhecido não é reintroduzido automaticamente como custom.
         }
         finally { _modelPicker.SelectedIndexChanged += OnModelChanged; }
     }
