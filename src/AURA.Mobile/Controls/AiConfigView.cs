@@ -4,14 +4,9 @@ using AURA.Mobile.Diagnostics;
 
 namespace AURA.Mobile.Controls;
 
-/// <summary>
-/// Configuração independente: chave, provedor e modelo são estados diferentes.
-/// A chave nunca escolhe nem altera o modelo; o provedor selecionado determina
-/// endpoint e esquema de autenticação.
-/// </summary>
+/// <summary>Configuração independente de provedor, modelo e credencial.</summary>
 public sealed class AiConfigView : ContentView
 {
-    private readonly IApiKeyProviderResolver _resolver = new ApiKeyProviderResolver();
     private readonly Picker _providerPicker = new() { Title = "Escolha o provedor" };
     private readonly Picker _modelPicker = new() { Title = "Escolha o modelo" };
     private readonly Entry _apiKeyEntry = new() { Placeholder = "Chave de API", IsPassword = true };
@@ -44,23 +39,11 @@ public sealed class AiConfigView : ContentView
         Content = new VerticalStackLayout
         {
             Spacing = 8,
-            Children =
-            {
-                grid,
-                Field("CHAVE DE API", _apiKeyEntry),
-                Field("MODELO CUSTOM", _customModelEntry),
-                Field("BASE URL", _baseUrlEntry),
-                new HorizontalStackLayout { Spacing = 8, Children = { _testButton, _clearModelButton } },
-                _status
-            }
+            Children = { grid, Field("CHAVE DE API", _apiKeyEntry), Field("MODELO CUSTOM", _customModelEntry), Field("BASE URL", _baseUrlEntry), new HorizontalStackLayout { Spacing = 8, Children = { _testButton, _clearModelButton } }, _status }
         };
     }
 
-    private static VerticalStackLayout Field(string title, View view) => new()
-    {
-        Spacing = 2,
-        Children = { new Label { Text = title, FontSize = 10, TextColor = Color.FromArgb("#7a7a90") }, view }
-    };
+    private static VerticalStackLayout Field(string title, View view) => new() { Spacing = 2, Children = { new Label { Text = title, FontSize = 10, TextColor = Color.FromArgb("#7a7a90") }, view } };
 
     public void Load(OpenRouterClient client)
     {
@@ -73,11 +56,10 @@ public sealed class AiConfigView : ContentView
                 _providerPicker.ItemsSource = ProviderCatalog.Providers;
                 _providerPicker.ItemDisplayBinding = new Binding(nameof(ProviderInfo.Name));
             }
-
             SelectProvider(RuntimeConfig.Provider);
             string providerId = (_providerPicker.SelectedItem as ProviderInfo)?.Id ?? RuntimeConfig.Provider;
             _apiKeyEntry.Text = RuntimeConfig.GetApiKeyForProvider(providerId);
-            _baseUrlEntry.Text = RuntimeConfig.GetBaseUrlOverrideForProvider(providerId);
+            _baseUrlEntry.Text = RuntimeConfig.BaseUrlOverride;
             PopulateModels(RuntimeConfig.Model);
             RefreshStatus();
         }
@@ -90,11 +72,12 @@ public sealed class AiConfigView : ContentView
         _loading = true;
         try
         {
-            // Trocar provedor é uma nova configuração: nunca carregar o modelo,
-            // endpoint ou chave do provedor anterior.
-            RuntimeConfig.SelectProvider(provider.Id);
+            RuntimeConfig.Provider = provider.Id;
+            // O modelo é específico do provedor; nunca reaproveitar o anterior.
+            RuntimeConfig.Model = string.Empty;
+            RuntimeConfig.BaseUrlOverride = string.Empty;
             _apiKeyEntry.Text = RuntimeConfig.GetApiKeyForProvider(provider.Id);
-            _baseUrlEntry.Text = RuntimeConfig.GetBaseUrlOverrideForProvider(provider.Id);
+            _baseUrlEntry.Text = provider.Id.Equals("ollama", StringComparison.OrdinalIgnoreCase) ? provider.BaseUrl : string.Empty;
             PopulateModels(null);
             ApplyToClient();
             RefreshStatus();
@@ -116,8 +99,7 @@ public sealed class AiConfigView : ContentView
         if (_loading) return;
         string providerId = (_providerPicker.SelectedItem as ProviderInfo)?.Id ?? RuntimeConfig.Provider;
         RuntimeConfig.SetApiKeyForProvider(providerId, e.NewTextValue);
-        // A chave é somente credencial. Não detectar/trocar provedor ou modelo
-        // automaticamente: isso era a origem da configuração aparentemente travada.
+        // Credencial nunca seleciona modelo nem muda provedor.
         RefreshStatus();
     }
 
@@ -126,19 +108,12 @@ public sealed class AiConfigView : ContentView
         _modelPicker.SelectedIndexChanged -= OnModelChanged;
         try
         {
-            if (_providerPicker.SelectedItem is not ProviderInfo provider)
-            {
-                _modelPicker.ItemsSource = null;
-                return;
-            }
-
+            if (_providerPicker.SelectedItem is not ProviderInfo provider) { _modelPicker.ItemsSource = null; return; }
             _modelPicker.ItemsSource = provider.Models;
             _modelPicker.ItemDisplayBinding = new Binding(nameof(ProviderModel.Label));
             _modelPicker.SelectedIndex = -1;
             _customModelEntry.Text = string.Empty;
-
             if (string.IsNullOrWhiteSpace(selectedModel)) return;
-
             for (int i = 0; i < provider.Models.Count; i++)
             {
                 if (string.Equals(provider.Models[i].Id, selectedModel, StringComparison.OrdinalIgnoreCase))
@@ -147,9 +122,7 @@ public sealed class AiConfigView : ContentView
                     return;
                 }
             }
-
-            // Não reintroduzir um modelo persistido que não pertence ao provedor.
-            // Modelo custom só é aceito quando o usuário o informa explicitamente.
+            // Um modelo desconhecido não é reintroduzido automaticamente como custom.
         }
         finally { _modelPicker.SelectedIndexChanged += OnModelChanged; }
     }
@@ -161,12 +134,7 @@ public sealed class AiConfigView : ContentView
         for (int i = 0; i < ProviderCatalog.Providers.Count; i++)
         {
             var provider = ProviderCatalog.Providers[i];
-            if (string.Equals(provider.Id, providerId, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(provider.Name, providerId, StringComparison.OrdinalIgnoreCase))
-            {
-                _providerPicker.SelectedIndex = i;
-                return;
-            }
+            if (string.Equals(provider.Id, providerId, StringComparison.OrdinalIgnoreCase) || string.Equals(provider.Name, providerId, StringComparison.OrdinalIgnoreCase)) { _providerPicker.SelectedIndex = i; return; }
         }
     }
 
@@ -184,8 +152,7 @@ public sealed class AiConfigView : ContentView
     private void OnBaseUrlChanged(object? sender, TextChangedEventArgs e)
     {
         if (_loading) return;
-        string providerId = (_providerPicker.SelectedItem as ProviderInfo)?.Id ?? RuntimeConfig.Provider;
-        RuntimeConfig.SetBaseUrlOverrideForProvider(providerId, e.NewTextValue);
+        RuntimeConfig.BaseUrlOverride = e.NewTextValue?.Trim() ?? string.Empty;
         ApplyToClient();
     }
 
@@ -195,7 +162,7 @@ public sealed class AiConfigView : ContentView
         _loading = true;
         try
         {
-            RuntimeConfig.ClearModel();
+            RuntimeConfig.Model = string.Empty;
             _modelPicker.SelectedIndex = -1;
             _customModelEntry.Text = string.Empty;
             ApplyToClient();
@@ -204,10 +171,7 @@ public sealed class AiConfigView : ContentView
         finally { _loading = false; }
     }
 
-    public void ApplyToClient()
-    {
-        if (_client != null) RuntimeConfig.Apply(_client);
-    }
+    public void ApplyToClient() { if (_client != null) RuntimeConfig.Apply(_client); }
 
     private void RefreshStatus()
     {
@@ -226,7 +190,6 @@ public sealed class AiConfigView : ContentView
             if (provider == null) { _status.Text = "Escolha um provedor."; return; }
             if (string.IsNullOrWhiteSpace(RuntimeConfig.Model)) { _status.Text = "Escolha um modelo."; return; }
             if (provider.NeedsKey && string.IsNullOrWhiteSpace(RuntimeConfig.GetApiKeyForProvider(provider.Id))) { _status.Text = "Informe a chave de API."; return; }
-
             ApplyToClient();
             _testButton.IsEnabled = false;
             _status.Text = "Testando " + provider.Name + " · " + RuntimeConfig.Model + "…";
@@ -235,11 +198,7 @@ public sealed class AiConfigView : ContentView
             if (snippet.Length > 120) snippet = snippet[..120] + "…";
             _status.Text = "OK · " + provider.Name + " · " + RuntimeConfig.Model + " · " + snippet;
         }
-        catch (Exception ex)
-        {
-            _status.Text = "Falha: " + ex.Message;
-            AuraLog.Exception("AiConfigView.Test", ex);
-        }
+        catch (Exception ex) { _status.Text = "Falha: " + ex.Message; AuraLog.Exception("AiConfigView.Test", ex); }
         finally { _testButton.IsEnabled = true; }
     }
 }
