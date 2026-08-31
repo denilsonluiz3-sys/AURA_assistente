@@ -5,603 +5,270 @@ using AURA.Mobile.Diagnostics;
 namespace AURA.Mobile.Controls;
 
 /// <summary>
-/// Painel de configuração da IA (provedor + modelo + chave + base URL).
-/// Sem API key: prioriza Ollama (local) no Picker.
+/// Configuração independente: chave, provedor e modelo são estados diferentes.
+/// A chave pode detectar o provedor quando houver evidência, mas nunca fixa o modelo.
 /// </summary>
 public sealed class AiConfigView : ContentView
 {
     private readonly IApiKeyProviderResolver _resolver = new ApiKeyProviderResolver();
-
-    private readonly Picker _providerPicker = new() { Title = "Provedor" };
-    private readonly Picker _modelPicker = new() { Title = "Modelo" };
-    private readonly Entry _customModelEntry = new()
-    {
-        Placeholder = "Modelo custom (ex.: aura-qwen:latest)",
-        FontSize = 12,
-    };
-    private readonly Entry _baseUrlEntry = new()
-    {
-        Placeholder = "http://127.0.0.1:11434/v1/chat/completions",
-        FontSize = 12,
-        Keyboard = Keyboard.Url,
-    };
-    private readonly Label _apiKeyLabel = new()
-    {
-        Text = "CHAVE DE API",
-        FontSize = 10,
-        TextColor = Color.FromArgb("#7a7a90"),
-    };
-    private readonly Entry _apiKeyEntry = new()
-    {
-        Placeholder = "Vazio = Ollama local | ou cole sk-or- / AIza…",
-        IsPassword = true,
-    };
-    private readonly Button _detectButton = new()
-    {
-        Text = "Detectar/Testar provedor",
-        FontSize = 12,
-    };
-    private readonly Label _detectStatus = new()
-    {
-        FontSize = 11,
-        TextColor = Color.FromArgb("#a0a0b8"),
-        LineBreakMode = LineBreakMode.WordWrap,
-    };
-
+    private readonly Picker _providerPicker = new() { Title = "Escolha o provedor" };
+    private readonly Picker _modelPicker = new() { Title = "Escolha o modelo" };
+    private readonly Entry _apiKeyEntry = new() { Placeholder = "Chave de API", IsPassword = true };
+    private readonly Entry _customModelEntry = new() { Placeholder = "Modelo custom (opcional)", FontSize = 12 };
+    private readonly Entry _baseUrlEntry = new() { Placeholder = "BASE URL (opcional)", FontSize = 12, Keyboard = Keyboard.Url };
+    private readonly Label _status = new() { FontSize = 11, TextColor = Color.FromArgb("#a0a0b8"), LineBreakMode = LineBreakMode.WordWrap };
+    private readonly Button _testButton = new() { Text = "Testar", FontSize = 12 };
+    private readonly Button _clearModelButton = new() { Text = "Limpar modelo", FontSize = 12 };
     private OpenRouterClient? _client;
-    private bool _applying;
+    private bool _loading;
 
     public AiConfigView()
     {
         _providerPicker.SelectedIndexChanged += OnProviderChanged;
-        _apiKeyEntry.TextChanged += OnKeyTextChanged;
+        _modelPicker.SelectedIndexChanged += OnModelChanged;
+        _apiKeyEntry.TextChanged += OnApiKeyChanged;
         _customModelEntry.TextChanged += OnCustomModelChanged;
         _baseUrlEntry.TextChanged += OnBaseUrlChanged;
-        _detectButton.Clicked += OnDetectClicked;
+        _testButton.Clicked += OnTestClicked;
+        _clearModelButton.Clicked += OnClearModelClicked;
 
-        var providerCol = new VerticalStackLayout
+        var grid = new Grid
         {
-            Spacing = 3,
-            Children =
-            {
-                new Label { Text = "PROVEDOR", FontSize = 10, TextColor = Color.FromArgb("#7a7a90") },
-                _providerPicker,
-            },
+            ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Star) },
+            ColumnSpacing = 8
         };
-
-        var modelCol = new VerticalStackLayout
-        {
-            Spacing = 3,
-            Children =
-            {
-                new Label { Text = "MODELO", FontSize = 10, TextColor = Color.FromArgb("#7a7a90") },
-                _modelPicker,
-            },
-        };
+        grid.Add(Field("PROVEDOR", _providerPicker), 0, 0);
+        grid.Add(Field("MODELO", _modelPicker), 1, 0);
 
         Content = new VerticalStackLayout
         {
-            Spacing = 10,
+            Spacing = 8,
             Children =
             {
-                new Grid
-                {
-                    ColumnDefinitions =
-                    {
-                        new ColumnDefinition(GridLength.Star),
-                        new ColumnDefinition(GridLength.Star),
-                    },
-                    ColumnSpacing = 10,
-                    Children = { providerCol, modelCol },
-                },
-                new VerticalStackLayout
-                {
-                    Spacing = 3,
-                    Children =
-                    {
-                        new Label
-                        {
-                            Text = "MODELO CUSTOM",
-                            FontSize = 10,
-                            TextColor = Color.FromArgb("#7a7a90"),
-                        },
-                        _customModelEntry,
-                    },
-                },
-                new VerticalStackLayout
-                {
-                    Spacing = 3,
-                    Children =
-                    {
-                        new Label
-                        {
-                            Text = "BASE URL (Ollama — vazio = catálogo)",
-                            FontSize = 10,
-                            TextColor = Color.FromArgb("#7a7a90"),
-                        },
-                        _baseUrlEntry,
-                    },
-                },
-                new VerticalStackLayout
-                {
-                    Spacing = 3,
-                    Children = { _apiKeyLabel, _apiKeyEntry },
-                },
-                new HorizontalStackLayout
-                {
-                    Spacing = 10,
-                    Children = { _detectButton },
-                },
-                _detectStatus,
-            },
+                grid,
+                Field("CHAVE DE API", _apiKeyEntry),
+                Field("MODELO CUSTOM", _customModelEntry),
+                Field("BASE URL", _baseUrlEntry),
+                new HorizontalStackLayout { Spacing = 8, Children = { _testButton, _clearModelButton } },
+                _status
+            }
         };
     }
+
+    private static VerticalStackLayout Field(string title, View view) => new()
+    {
+        Spacing = 2,
+        Children = { new Label { Text = title, FontSize = 10, TextColor = Color.FromArgb("#7a7a90") }, view }
+    };
 
     public void Load(OpenRouterClient client)
     {
         _client = client;
-        _applying = true;
+        _loading = true;
         try
         {
-            string savedProvider = RuntimeConfig.Provider;
-            string savedModel = RuntimeConfig.Model;
-            string key = RuntimeConfig.ApiKey;
-            _apiKeyEntry.Text = key;
-            _baseUrlEntry.Text = RuntimeConfig.BaseUrlOverride;
-
             if (_providerPicker.ItemsSource == null)
             {
                 _providerPicker.ItemsSource = ProviderCatalog.Providers;
                 _providerPicker.ItemDisplayBinding = new Binding(nameof(ProviderInfo.Name));
             }
 
-            // Sem chave: não ficar preso em OpenRouter/Auto grátis
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                bool needsKey = true;
-                if (!string.IsNullOrWhiteSpace(savedProvider))
-                {
-                    var saved = ProviderCatalog.Find(savedProvider);
-                    needsKey = saved?.NeedsKey ?? true;
-                }
-
-                if (needsKey || string.IsNullOrWhiteSpace(savedProvider))
-                {
-                    savedProvider = "ollama";
-                    RuntimeConfig.Provider = "ollama";
-                    if (string.IsNullOrWhiteSpace(savedModel) ||
-                        savedModel.Contains("openrouter", StringComparison.OrdinalIgnoreCase) ||
-                        savedModel.Contains("free", StringComparison.OrdinalIgnoreCase))
-                    {
-                        savedModel = "qwen2:0.5b";
-                        RuntimeConfig.Model = savedModel;
-                    }
-                }
-            }
-
-            int providerIndex = 0;
-            for (int i = 0; i < ProviderCatalog.Providers.Count; i++)
-            {
-                var p = ProviderCatalog.Providers[i];
-                if (string.Equals(p.Id, savedProvider, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(p.Name, savedProvider, StringComparison.OrdinalIgnoreCase))
-                {
-                    providerIndex = i;
-                    break;
-                }
-            }
-
-            // Se não achou, índice 0 = Ollama (primeiro no catálogo)
-            _providerPicker.SelectedIndex = providerIndex;
-            PopulateModels(savedModel);
-            ApplyToClient();
-            RefreshStatusLine();
+            string providerId = RuntimeConfig.Provider;
+            SelectProvider(providerId);
+            _apiKeyEntry.Text = RuntimeConfig.GetApiKeyForProvider(providerId);
+            _baseUrlEntry.Text = RuntimeConfig.BaseUrlOverride;
+            PopulateModels(RuntimeConfig.Model);
+            RefreshStatus();
         }
-        finally
-        {
-            _applying = false;
-        }
+        finally { _loading = false; }
     }
 
     private void OnProviderChanged(object? sender, EventArgs e)
     {
-        if (_applying) return;
-        _customModelEntry.Text = string.Empty;
-
-        if (_providerPicker.SelectedItem is ProviderInfo p &&
-            string.Equals(p.Id, "ollama", StringComparison.OrdinalIgnoreCase))
+        if (_loading || _providerPicker.SelectedItem is not ProviderInfo provider) return;
+        _loading = true;
+        try
         {
-            _applying = true;
-            try
-            {
-                // Limpa chave ao ir para local — evita validação sk-or-
-                if (!string.IsNullOrWhiteSpace(_apiKeyEntry.Text))
-                    _apiKeyEntry.Text = string.Empty;
-
-                if (string.IsNullOrWhiteSpace(_baseUrlEntry.Text))
-                {
-                    _baseUrlEntry.Text = string.IsNullOrWhiteSpace(p.BaseUrl)
-                        ? "http://127.0.0.1:11434/v1/chat/completions"
-                        : p.BaseUrl;
-                }
-            }
-            finally { _applying = false; }
+            RuntimeConfig.Provider = provider.Id;
+            // Trocar provedor invalida somente a seleção de modelo anterior.
+            RuntimeConfig.Model = string.Empty;
+            RuntimeConfig.BaseUrlOverride = string.Empty;
+            _customModelEntry.Text = string.Empty;
+            _baseUrlEntry.Text = provider.Id.Equals("ollama", StringComparison.OrdinalIgnoreCase) ? provider.BaseUrl : string.Empty;
+            _apiKeyEntry.Text = RuntimeConfig.GetApiKeyForProvider(provider.Id);
+            PopulateModels(null);
+            ApplyToClient();
+            RefreshStatus();
         }
-
-        PopulateModels(null);
-        ApplyAndPersist();
+        finally { _loading = false; }
     }
 
     private void OnModelChanged(object? sender, EventArgs e)
     {
-        if (_applying) return;
-        if (_modelPicker.SelectedItem is ProviderModel)
+        if (_loading || _modelPicker.SelectedItem is not ProviderModel model) return;
+        _customModelEntry.Text = string.Empty;
+        RuntimeConfig.Model = model.Id;
+        ApplyToClient();
+        RefreshStatus();
+    }
+
+    private void OnApiKeyChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (_loading) return;
+        string providerId = (_providerPicker.SelectedItem as ProviderInfo)?.Id ?? RuntimeConfig.Provider;
+        RuntimeConfig.SetApiKeyForProvider(providerId, e.NewTextValue);
+        RefreshStatus();
+
+        // Detecção é opcional: ela só pode mudar o provedor, nunca escolher um modelo.
+        string key = e.NewTextValue?.Trim() ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(key)) _ = DetectProviderAsync(key);
+    }
+
+    private async Task DetectProviderAsync(string key)
+    {
+        try
+        {
+            var result = await _resolver.ResolveAsync(new ProviderCredential(key, allowProbe: false));
+            if (!result.IsConclusive || result.Provider is not ProviderInfo provider) return;
+
+            await MainThread.InvokeOnMainThreadAsync(() =>
+            {
+                if (_loading) return;
+                _loading = true;
+                try
+                {
+                    RuntimeConfig.Provider = provider.Id;
+                    SelectProvider(provider.Id);
+                    _apiKeyEntry.Text = key;
+                    // Não preservar modelo de outro provedor e não aplicar DefaultModelId aqui.
+                    RuntimeConfig.Model = string.Empty;
+                    PopulateModels(null);
+                    ApplyToClient();
+                    RefreshStatus();
+                }
+                finally { _loading = false; }
+            });
+        }
+        catch (Exception ex) { AuraLog.Exception("AiConfigView.DetectProvider", ex); }
+    }
+
+    private void PopulateModels(string? selectedModel)
+    {
+        _modelPicker.SelectedIndexChanged -= OnModelChanged;
+        try
+        {
+            if (_providerPicker.SelectedItem is not ProviderInfo provider)
+            {
+                _modelPicker.ItemsSource = null;
+                return;
+            }
+
+            _modelPicker.ItemsSource = provider.Models;
+            _modelPicker.ItemDisplayBinding = new Binding(nameof(ProviderModel.Label));
+            _modelPicker.SelectedIndex = -1;
             _customModelEntry.Text = string.Empty;
-        ApplyAndPersist();
+
+            if (string.IsNullOrWhiteSpace(selectedModel)) return;
+
+            for (int i = 0; i < provider.Models.Count; i++)
+            {
+                if (string.Equals(provider.Models[i].Id, selectedModel, StringComparison.OrdinalIgnoreCase))
+                {
+                    _modelPicker.SelectedIndex = i;
+                    return;
+                }
+            }
+
+            _customModelEntry.Text = selectedModel;
+        }
+        finally { _modelPicker.SelectedIndexChanged += OnModelChanged; }
+    }
+
+    private void SelectProvider(string? providerId)
+    {
+        _providerPicker.SelectedIndex = -1;
+        if (string.IsNullOrWhiteSpace(providerId)) return;
+        for (int i = 0; i < ProviderCatalog.Providers.Count; i++)
+        {
+            var provider = ProviderCatalog.Providers[i];
+            if (string.Equals(provider.Id, providerId, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(provider.Name, providerId, StringComparison.OrdinalIgnoreCase))
+            {
+                _providerPicker.SelectedIndex = i;
+                return;
+            }
+        }
     }
 
     private void OnCustomModelChanged(object? sender, TextChangedEventArgs e)
     {
-        if (_applying) return;
-        ApplyAndPersist();
+        if (_loading) return;
+        string model = e.NewTextValue?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(model)) return;
+        _modelPicker.SelectedIndex = -1;
+        RuntimeConfig.Model = model;
+        ApplyToClient();
+        RefreshStatus();
     }
 
     private void OnBaseUrlChanged(object? sender, TextChangedEventArgs e)
     {
-        if (_applying) return;
-        ApplyAndPersist();
-    }
-
-    private void OnKeyTextChanged(object? sender, TextChangedEventArgs e)
-    {
-        if (_applying) return;
-        ApplyAndPersist();
-        TryAutoDetect();
-    }
-
-    private void TryAutoDetect()
-    {
-        string key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(key) || _client == null)
-            return;
-
-        // Não tratar nome de modelo Ollama como chave OpenRouter
-        if (key.Contains(':') && !key.StartsWith("sk-", StringComparison.Ordinal) &&
-            !key.StartsWith("AIza", StringComparison.Ordinal) &&
-            !key.StartsWith("gsk_", StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        var detection = _resolver.Detect(new ProviderCredential(key));
-        if (!detection.IsConclusive || detection.Provider == null)
-        {
-            if (detection.Candidates.Count > 0)
-                _ = TryAutoProbeAsync(key);
-            return;
-        }
-
-        ProviderInfo detected = (ProviderInfo)detection.Provider;
-        if (_providerPicker.SelectedItem is ProviderInfo current &&
-            string.Equals(current.Id, detected.Id, StringComparison.OrdinalIgnoreCase))
-        {
-            _detectStatus.Text = "Provedor reconhecido: " + detected.Name + ".";
-            return;
-        }
-
-        _detectStatus.Text = "Provedor reconhecido pela chave: " + detected.Name + ".";
-        SelectProviderById(detected.Id);
-    }
-
-    private async Task TryAutoProbeAsync(string key)
-    {
-        if (_client == null) return;
-
-        _detectStatus.Text = "Detectando provedor…";
-        try
-        {
-            var credential = new ProviderCredential(key, allowProbe: true);
-            ProviderDetectionResult result = await _resolver.ResolveAsync(credential);
-
-            if (result.Provider != null && result.IsConclusive)
-            {
-                _resolver.ApplyToClient(_client, result);
-                if (result.Provider is ProviderInfo pi)
-                    SelectProviderById(pi.Id);
-                else
-                    SelectProviderById(result.Provider.Name);
-                _detectStatus.Text = result.Message;
-            }
-            else
-            {
-                _detectStatus.Text = result.Message;
-            }
-        }
-        catch (Exception ex)
-        {
-            _detectStatus.Text = "Falha ao detectar.";
-            AuraLog.Exception("AiConfigView.TryAutoProbe", ex);
-        }
-    }
-
-    private async void OnDetectClicked(object sender, EventArgs e)
-    {
-        if (_client == null) return;
-
-        string key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
-
-        // Chave vazia → força Ollama e testa (não fica em OpenRouter)
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            SelectProviderById("ollama");
-            ApplyAndPersist();
-
-            _detectButton.IsEnabled = false;
-            _detectStatus.Text = "Testando Ollama (local)…";
-            try
-            {
-                RuntimeConfig.Apply(_client);
-                string probe = await _client.ChatAsync("Responda apenas: OK");
-                string snippet = (probe ?? string.Empty).Trim();
-                if (snippet.Length > 120)
-                    snippet = snippet.Substring(0, 120) + "…";
-                _detectStatus.Text = string.IsNullOrWhiteSpace(snippet)
-                    ? "Sem resposta do Ollama em " + _client.Options.BaseUrl +
-                      "\nAjuste BASE URL (11434 ou 11435) e o modelo (ollama list)."
-                    : "OK · Ollama · " + _client.Options.BaseUrl + " · " + snippet;
-            }
-            catch (Exception ex)
-            {
-                _detectStatus.Text = "Falha Ollama: " + ex.Message +
-                                     "\nURL: " + (_client.Options.BaseUrl ?? "?") +
-                                     "\nConfira: ollama serve e a porta na BASE URL.";
-                AuraLog.Exception("AiConfigView.TestOllama", ex);
-            }
-            finally
-            {
-                _detectButton.IsEnabled = true;
-            }
-            return;
-        }
-
-        ApplyAndPersist();
-
-        if (_providerPicker.SelectedItem is ProviderInfo localProv && !localProv.NeedsKey)
-        {
-            _detectButton.IsEnabled = false;
-            _detectStatus.Text = "Testando " + localProv.Name + "…";
-            try
-            {
-                RuntimeConfig.Apply(_client);
-                string probe = await _client.ChatAsync("Responda apenas: OK");
-                string snippet = (probe ?? string.Empty).Trim();
-                if (snippet.Length > 120)
-                    snippet = snippet.Substring(0, 120) + "…";
-                _detectStatus.Text = string.IsNullOrWhiteSpace(snippet)
-                    ? "Sem resposta em " + _client.Options.BaseUrl
-                    : "OK · " + localProv.Name + " · " + _client.Options.BaseUrl + " · " + snippet;
-            }
-            catch (Exception ex)
-            {
-                _detectStatus.Text = "Falha local: " + ex.Message;
-                AuraLog.Exception("AiConfigView.TestLocal", ex);
-            }
-            finally
-            {
-                _detectButton.IsEnabled = true;
-            }
-            return;
-        }
-
-        if (_providerPicker.SelectedItem is ProviderInfo sel)
-        {
-            string? fmt = RuntimeConfig.ValidateApiKeyFormat(key, sel);
-            if (fmt != null)
-            {
-                _detectStatus.Text = fmt;
-                return;
-            }
-        }
-
-        string? preferred = (_providerPicker.SelectedItem as ProviderInfo)?.Name;
-        _detectButton.IsEnabled = false;
-        _detectStatus.Text = "Testando provedor…";
-
-        try
-        {
-            var credential = new ProviderCredential(key, allowProbe: true)
-            {
-                PreferredProviderName = preferred
-            };
-
-            ProviderDetectionResult result = await _resolver.ResolveAsync(credential);
-
-            if (result.Provider != null && result.IsConclusive)
-            {
-                _resolver.ApplyToClient(_client, result);
-                if (result.Provider is ProviderInfo pi)
-                    SelectProviderById(pi.Id);
-                else
-                    SelectProviderById(result.Provider.Name);
-                _detectStatus.Text = result.Message;
-            }
-            else
-            {
-                _detectStatus.Text = result.Message;
-            }
-        }
-        catch (Exception ex)
-        {
-            _detectStatus.Text = "Falha ao testar provedor.";
-            AuraLog.Exception("AiConfigView.OnDetectClicked", ex);
-        }
-        finally
-        {
-            _detectButton.IsEnabled = true;
-        }
-    }
-
-    private void SelectProviderById(string idOrName)
-    {
-        _applying = true;
-        try
-        {
-            for (int i = 0; i < ProviderCatalog.Providers.Count; i++)
-            {
-                var p = ProviderCatalog.Providers[i];
-                if (string.Equals(p.Id, idOrName, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(p.Name, idOrName, StringComparison.OrdinalIgnoreCase))
-                {
-                    _providerPicker.SelectedIndex = i;
-                    break;
-                }
-            }
-
-            PopulateModels(null);
-            ApplyAndPersist();
-        }
-        finally
-        {
-            _applying = false;
-        }
-    }
-
-    private void PopulateModels(string? savedModel)
-    {
-        _modelPicker.SelectedIndexChanged -= OnModelChanged;
-
-        if (_providerPicker.SelectedItem is not ProviderInfo provider)
-        {
-            _modelPicker.ItemsSource = null;
-            return;
-        }
-
-        _modelPicker.ItemsSource = provider.Models;
-        _modelPicker.ItemDisplayBinding = new Binding(nameof(ProviderModel.Label));
-
-        string model = string.Empty;
-        bool inList = false;
-        if (!string.IsNullOrWhiteSpace(savedModel))
-        {
-            foreach (var m in provider.Models)
-            {
-                if (string.Equals(m.Id, savedModel, StringComparison.OrdinalIgnoreCase))
-                {
-                    model = m.Id;
-                    inList = true;
-                    break;
-                }
-            }
-
-            if (!inList)
-            {
-                _customModelEntry.Text = savedModel;
-                model = savedModel;
-            }
-        }
-
-        int modelIndex = 0;
-        var models = provider.Models;
-        if (models.Count > 0)
-        {
-            if (inList && !string.IsNullOrWhiteSpace(model))
-            {
-                for (int i = 0; i < models.Count; i++)
-                {
-                    if (string.Equals(models[i].Id, model, StringComparison.OrdinalIgnoreCase))
-                    {
-                        modelIndex = i;
-                        break;
-                    }
-                }
-            }
-            else if (string.IsNullOrWhiteSpace(model) || !inList)
-            {
-                int freeIdx = -1;
-                for (int i = 0; i < models.Count; i++)
-                {
-                    if (models[i].IsFree)
-                    {
-                        freeIdx = i;
-                        break;
-                    }
-                }
-
-                if (freeIdx >= 0)
-                    modelIndex = freeIdx;
-                else if (!string.IsNullOrWhiteSpace(provider.DefaultModelId))
-                {
-                    for (int i = 0; i < models.Count; i++)
-                    {
-                        if (string.Equals(models[i].Id, provider.DefaultModelId, StringComparison.OrdinalIgnoreCase))
-                        {
-                            modelIndex = i;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        _modelPicker.SelectedIndex = models.Count > 0 ? modelIndex : -1;
-
-        _apiKeyEntry.Placeholder = provider.NeedsKey
-            ? (string.IsNullOrWhiteSpace(provider.KeyHint) ? "Chave de API" : provider.KeyHint)
-            : "Deixe VAZIO para Ollama local";
-        _apiKeyLabel.Text = provider.NeedsKey ? "Chave de API" : "Chave (não use em Ollama)";
-
-        if (string.Equals(provider.Id, "ollama", StringComparison.OrdinalIgnoreCase))
-            _baseUrlEntry.Placeholder = provider.BaseUrl;
-
-        _modelPicker.SelectedIndexChanged += OnModelChanged;
-    }
-
-    private void ApplyAndPersist()
-    {
-        OpenRouterClient? client = _client;
-        if (client == null || _providerPicker.SelectedItem is not ProviderInfo provider)
-            return;
-
-        RuntimeConfig.Provider = provider.Id;
-
-        string custom = _customModelEntry.Text?.Trim() ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(custom))
-            RuntimeConfig.Model = custom;
-        else if (_modelPicker.SelectedItem is ProviderModel pm)
-            RuntimeConfig.Model = pm.Id;
-
-        RuntimeConfig.BaseUrlOverride = _baseUrlEntry.Text?.Trim() ?? string.Empty;
-
-        string apiKey = _apiKeyEntry.Text?.Trim() ?? string.Empty;
-        // Em Ollama nunca grava "chave" que seja lixo
-        if (!provider.NeedsKey)
-            apiKey = string.Empty;
-        RuntimeConfig.ApiKey = apiKey;
-
-        string? fmt = RuntimeConfig.ValidateApiKeyFormat(apiKey, provider);
-        if (fmt != null && !string.IsNullOrWhiteSpace(apiKey))
-            _detectStatus.Text = fmt;
-        else
-            RefreshStatusLine();
-
+        if (_loading) return;
+        RuntimeConfig.BaseUrlOverride = e.NewTextValue?.Trim() ?? string.Empty;
         ApplyToClient();
     }
 
-    private void RefreshStatusLine()
+    private void OnClearModelClicked(object? sender, EventArgs e)
     {
-        if (_client != null)
-            RuntimeConfig.Apply(_client);
-
-        string status = RuntimeConfig.LastStatusMessage;
-        if (string.IsNullOrWhiteSpace(status) && _providerPicker.SelectedItem is ProviderInfo p)
-            status = p.Name + " · " + RuntimeConfig.Model;
-
-        _detectStatus.Text = status;
+        if (_loading) return;
+        _loading = true;
+        try
+        {
+            RuntimeConfig.Model = string.Empty;
+            _modelPicker.SelectedIndex = -1;
+            _customModelEntry.Text = string.Empty;
+            ApplyToClient();
+            RefreshStatus();
+        }
+        finally { _loading = false; }
     }
 
-    public void ApplyToClient()
+    private void ApplyToClient()
+    {
+        if (_client != null) RuntimeConfig.Apply(_client);
+    }
+
+    private void RefreshStatus()
+    {
+        string provider = (_providerPicker.SelectedItem as ProviderInfo)?.Name ?? "nenhum provedor";
+        string model = string.IsNullOrWhiteSpace(RuntimeConfig.Model) ? "nenhum modelo escolhido" : RuntimeConfig.Model;
+        string key = string.IsNullOrWhiteSpace(_apiKeyEntry.Text) ? "sem chave" : "chave configurada";
+        _status.Text = provider + " · " + key + " · " + model;
+    }
+
+    private async void OnTestClicked(object? sender, EventArgs e)
     {
         if (_client == null) return;
-        RuntimeConfig.Apply(_client);
+        try
+        {
+            ApplyToClient();
+            ProviderInfo? provider = ProviderCatalog.Find(RuntimeConfig.Provider);
+            if (provider == null) { _status.Text = "Escolha um provedor."; return; }
+            if (string.IsNullOrWhiteSpace(RuntimeConfig.Model)) { _status.Text = "Escolha um modelo."; return; }
+            if (provider.NeedsKey && string.IsNullOrWhiteSpace(RuntimeConfig.GetApiKeyForProvider(provider.Id))) { _status.Text = "Informe a chave de API."; return; }
+
+            _testButton.IsEnabled = false;
+            _status.Text = "Testando " + provider.Name + " · " + RuntimeConfig.Model + "…";
+            string response = await _client.ChatAsync("Responda apenas: OK");
+            string snippet = (response ?? string.Empty).Trim();
+            if (snippet.Length > 120) snippet = snippet[..120] + "…";
+            _status.Text = "OK · " + provider.Name + " · " + RuntimeConfig.Model + " · " + snippet;
+        }
+        catch (Exception ex)
+        {
+            _status.Text = "Falha: " + ex.Message;
+            AuraLog.Exception("AiConfigView.Test", ex);
+        }
+        finally { _testButton.IsEnabled = true; }
     }
 }
