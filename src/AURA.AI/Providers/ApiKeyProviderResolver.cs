@@ -113,51 +113,32 @@ namespace AURA.AI.Providers
             CancellationToken ct = default)
         {
             ProviderDetectionResult detection = Detect(credential);
-
             if (detection.Provider == null && detection.Candidates.Count == 0)
-            {
-                return new ProviderHealthResult
-                {
-                    Status = ProviderHealthStatus.UnknownProvider,
-                    Message = "Não foi possível identificar o provedor."
-                };
-            }
+                return new ProviderHealthResult { Status = ProviderHealthStatus.UnknownProvider, Message = "Não foi possível identificar o provedor." };
 
             if (detection.Provider == null && !credential.AllowProbe)
-            {
                 return new ProviderHealthResult
                 {
                     Status = ProviderHealthStatus.UnknownProvider,
                     Message = "Provedor não identificado e teste externo não autorizado. Habilite a validação para testar os provedores compatíveis."
                 };
-            }
 
             var candidates = new List<IAiProvider>();
             if (detection.Provider != null) candidates.Add(detection.Provider);
             foreach (IAiProvider c in detection.Candidates)
-            {
                 if (!candidates.Contains(c)) candidates.Add(c);
-            }
 
             HttpClient client = http ?? new HttpClient();
             bool ownsClient = http == null;
             ProviderHealthResult? best = null;
-
             try
             {
                 foreach (IAiProvider provider in candidates)
                 {
                     if (!provider.NeedsKey) continue;
-
-                    ProviderHealthResult r = await ProbeAsync(
-                        client, provider, credential.ApiKey, credential.Timeout ?? DefaultTimeout, ct);
-
-                    if (r.Status == ProviderHealthStatus.Valid)
-                        return r;
-
-                    if (best == null || Prefer(best.Status, r.Status))
-                        best = r;
-
+                    ProviderHealthResult r = await ProbeAsync(client, provider, credential.ApiKey, credential.Timeout ?? DefaultTimeout, ct);
+                    if (r.Status == ProviderHealthStatus.Valid) return r;
+                    if (best == null || Prefer(best.Status, r.Status)) best = r;
                     if (!credential.AllowProbe) break;
                 }
             }
@@ -166,21 +147,11 @@ namespace AURA.AI.Providers
                 if (ownsClient) client.Dispose();
             }
 
-            if (best == null)
+            return best ?? new ProviderHealthResult
             {
-                return new ProviderHealthResult
-                {
-                    Status = ProviderHealthStatus.UnknownProvider,
-                    Message = "Nenhum provedor compatível pôde ser testado."
-                };
-            }
-
-            if (best.Status == ProviderHealthStatus.Unauthorized && candidates.Count > 1)
-            {
-                best.Message = "Chave rejeitada pelos provedores testados (" + best.Provider!.Name + " e outros).";
-            }
-
-            return best;
+                Status = ProviderHealthStatus.UnknownProvider,
+                Message = "Nenhum provedor compatível pôde ser testado."
+            };
         }
 
         public async Task<ProviderDetectionResult> ResolveAsync(
@@ -189,7 +160,6 @@ namespace AURA.AI.Providers
             CancellationToken ct = default)
         {
             ProviderDetectionResult detection = Detect(credential);
-
             if (detection.Provider != null)
             {
                 ProviderHealthResult health = await ValidateAsync(credential, http, ct);
@@ -209,21 +179,17 @@ namespace AURA.AI.Providers
                     detection.Message = detection.Message + " " + health.Message;
                 }
             }
-
             return detection;
         }
 
         public void ApplyToClient(OpenRouterClient client, ProviderDetectionResult result)
         {
-            if (client == null || result.Provider is not ProviderInfo p)
-                return;
+            if (client == null || result.Provider is not ProviderInfo p) return;
 
-            // A key é parte da credencial resolvida e deve acompanhar o provider.
-            // Antes, este método aplicava somente transporte/modelo e deixava a
-            // chave para uma segunda passagem pela UI. Isso criava um falso
-            // acoplamento ao OpenRouter e podia produzir chamadas sem credencial.
+            // O resolver determina o transporte. A credencial permanece sob o
+            // controle do RuntimeConfig, que a lê do armazenamento seguro por
+            // provider. Assim a detecção não precisa transportar ou persistir a chave.
             client.Options.Provider = p.Id;
-            client.Options.ApiKey = string.Empty;
             client.Options.BaseUrl = p.BaseUrl;
             client.Options.Model = string.IsNullOrWhiteSpace(p.DefaultModelId) && p.Models.Count > 0
                 ? p.Models[0].Id
@@ -233,32 +199,25 @@ namespace AURA.AI.Providers
             client.Options.ApiFormat = p.ApiFormat;
         }
 
-        private static bool Prefer(ProviderHealthStatus current, ProviderHealthStatus next)
-        {
-            return next == ProviderHealthStatus.Unauthorized && current != ProviderHealthStatus.Unauthorized;
-        }
+        private static bool Prefer(ProviderHealthStatus current, ProviderHealthStatus next) =>
+            next == ProviderHealthStatus.Unauthorized && current != ProviderHealthStatus.Unauthorized;
 
         private static async Task<ProviderHealthResult> ProbeAsync(
             HttpClient client, IAiProvider provider, string key, TimeSpan timeout, CancellationToken ct)
         {
             var result = new ProviderHealthResult { Provider = provider };
             string url = string.IsNullOrWhiteSpace(provider.ModelsUrl) ? provider.BaseUrl : provider.ModelsUrl;
-
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(timeout);
-
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
+
             if (!string.IsNullOrWhiteSpace(key))
-            {
-                request.Headers.TryAddWithoutValidation(
-                    provider.AuthHeaderName, provider.AuthScheme + key);
-            }
+                request.Headers.TryAddWithoutValidation(provider.AuthHeaderName, provider.AuthScheme + key);
 
             try
             {
                 HttpResponseMessage response = await client.SendAsync(request, cts.Token).ConfigureAwait(false);
                 result.HttpStatusCode = (int)response.StatusCode;
-
                 switch (response.StatusCode)
                 {
                     case HttpStatusCode.OK:
@@ -281,16 +240,10 @@ namespace AURA.AI.Providers
                         result.Message = "Endpoint inválido para " + provider.Name + " (" + (int)response.StatusCode + ").";
                         break;
                     default:
-                        if ((int)response.StatusCode >= 500)
-                        {
-                            result.Status = ProviderHealthStatus.ProviderUnavailable;
-                            result.Message = provider.Name + " indisponível (" + (int)response.StatusCode + ").";
-                        }
-                        else
-                        {
-                            result.Status = ProviderHealthStatus.Invalid;
-                            result.Message = "Resposta inesperada de " + provider.Name + " (" + (int)response.StatusCode + ").";
-                        }
+                        result.Status = (int)response.StatusCode >= 500
+                            ? ProviderHealthStatus.ProviderUnavailable
+                            : ProviderHealthStatus.Invalid;
+                        result.Message = provider.Name + " respondeu (" + (int)response.StatusCode + ").";
                         break;
                 }
             }
@@ -305,12 +258,11 @@ namespace AURA.AI.Providers
                 result.Message = "Falha de rede ao contatar " + provider.Name +
                                  (hre.InnerException != null ? " (" + hre.InnerException.GetType().Name + ")" : string.Empty) + ".";
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception)
             {
                 result.Status = ProviderHealthStatus.ProviderUnavailable;
                 result.Message = "Falha ao contatar " + provider.Name + ".";
             }
-
             return result;
         }
     }
