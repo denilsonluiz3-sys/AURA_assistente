@@ -39,7 +39,6 @@ public sealed class AiConfigView : ContentView
         _loadModelsButton.Clicked += OnLoadModelsClicked;
         _testButton.Clicked += OnTestClicked;
         _clearButton.Clicked += OnClearClicked;
-
         _formatPicker.ItemsSource = ApiFormats;
 
         var grid = new Grid
@@ -94,13 +93,11 @@ public sealed class AiConfigView : ContentView
     private void SelectProvider(string? providerId)
     {
         _providerPicker.SelectedIndex = -1;
-        if (string.IsNullOrWhiteSpace(providerId))
-            return;
+        if (string.IsNullOrWhiteSpace(providerId)) return;
         for (int i = 0; i < ProviderCatalog.Providers.Count; i++)
         {
             var p = ProviderCatalog.Providers[i];
-            if (string.Equals(p.Id, providerId, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(p.Name, providerId, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(p.Id, providerId, StringComparison.OrdinalIgnoreCase) || string.Equals(p.Name, providerId, StringComparison.OrdinalIgnoreCase))
             {
                 _providerPicker.SelectedIndex = i;
                 return;
@@ -114,6 +111,8 @@ public sealed class AiConfigView : ContentView
         _baseUrlEntry.Text = string.IsNullOrWhiteSpace(RuntimeConfig.BaseUrlOverride) ? provider.BaseUrl : RuntimeConfig.BaseUrlOverride;
         _modelsUrlEntry.Text = provider.ModelsUrl;
 
+        if (!string.Equals(provider.Id, "custom-openai", StringComparison.OrdinalIgnoreCase))
+            RuntimeConfig.ApiFormat = provider.ApiFormat;
         _formatPicker.SelectedIndex = RuntimeConfig.ApiFormat == AiApiFormat.AnthropicMessages ? 1 : 0;
         PopulateModels(provider, selectedModel);
     }
@@ -126,8 +125,7 @@ public sealed class AiConfigView : ContentView
             _modelPicker.ItemsSource = provider.Models;
             _modelPicker.ItemDisplayBinding = new Binding(nameof(ProviderModel.Label));
             _modelPicker.SelectedIndex = -1;
-            if (string.IsNullOrWhiteSpace(selectedModel))
-                return;
+            if (string.IsNullOrWhiteSpace(selectedModel)) return;
 
             for (int i = 0; i < provider.Models.Count; i++)
             {
@@ -137,7 +135,6 @@ public sealed class AiConfigView : ContentView
                     return;
                 }
             }
-
             _customModelEntry.Text = selectedModel;
         }
         finally { _modelPicker.SelectedIndexChanged += OnModelChanged; }
@@ -145,16 +142,15 @@ public sealed class AiConfigView : ContentView
 
     private void OnProviderChanged(object? sender, EventArgs e)
     {
-        if (_loading || _providerPicker.SelectedItem is not ProviderInfo provider)
-            return;
-
+        if (_loading || _providerPicker.SelectedItem is not ProviderInfo provider) return;
         _loading = true;
         try
         {
             RuntimeConfig.Provider = provider.Id;
             RuntimeConfig.Model = string.Empty;
             RuntimeConfig.BaseUrlOverride = string.Empty;
-            RuntimeConfig.ApiFormat = provider.ApiFormat;
+            if (!string.Equals(provider.Id, "custom-openai", StringComparison.OrdinalIgnoreCase))
+                RuntimeConfig.ApiFormat = provider.ApiFormat;
             _customModelEntry.Text = string.Empty;
             PopulateProvider(provider, null);
             ApplyToClient();
@@ -165,19 +161,15 @@ public sealed class AiConfigView : ContentView
 
     private void OnFormatChanged(object? sender, EventArgs e)
     {
-        if (_loading)
-            return;
-        RuntimeConfig.ApiFormat = _formatPicker.SelectedIndex == 1
-            ? AiApiFormat.AnthropicMessages
-            : AiApiFormat.OpenAICompletions;
+        if (_loading) return;
+        RuntimeConfig.ApiFormat = _formatPicker.SelectedIndex == 1 ? AiApiFormat.AnthropicMessages : AiApiFormat.OpenAICompletions;
         ApplyToClient();
         RefreshStatus();
     }
 
     private void OnModelChanged(object? sender, EventArgs e)
     {
-        if (_loading || _modelPicker.SelectedItem is not ProviderModel model)
-            return;
+        if (_loading || _modelPicker.SelectedItem is not ProviderModel model) return;
         _customModelEntry.TextChanged -= OnCustomModelChanged;
         try { _customModelEntry.Text = string.Empty; }
         finally { _customModelEntry.TextChanged += OnCustomModelChanged; }
@@ -188,10 +180,8 @@ public sealed class AiConfigView : ContentView
 
     private void OnCustomModelChanged(object? sender, TextChangedEventArgs e)
     {
-        if (_loading)
-            return;
-        string model = e.NewTextValue?.Trim() ?? string.Empty;
-        RuntimeConfig.Model = model;
+        if (_loading) return;
+        RuntimeConfig.Model = e.NewTextValue?.Trim() ?? string.Empty;
         _modelPicker.SelectedIndex = -1;
         ApplyToClient();
         RefreshStatus();
@@ -199,8 +189,7 @@ public sealed class AiConfigView : ContentView
 
     private void OnApiKeyChanged(object? sender, TextChangedEventArgs e)
     {
-        if (_loading)
-            return;
+        if (_loading) return;
         string providerId = (_providerPicker.SelectedItem as ProviderInfo)?.Id ?? RuntimeConfig.Provider;
         RuntimeConfig.SetApiKeyForProvider(providerId, e.NewTextValue);
         ApplyToClient();
@@ -209,16 +198,14 @@ public sealed class AiConfigView : ContentView
 
     private void OnBaseUrlChanged(object? sender, TextChangedEventArgs e)
     {
-        if (_loading)
-            return;
+        if (_loading) return;
         RuntimeConfig.BaseUrlOverride = e.NewTextValue?.Trim() ?? string.Empty;
         ApplyToClient();
     }
 
     private void OnModelsUrlChanged(object? sender, TextChangedEventArgs e)
     {
-        if (_loading)
-            return;
+        if (_loading) return;
         if (_providerPicker.SelectedItem is ProviderInfo provider)
             provider.ModelsUrl = e.NewTextValue?.Trim() ?? string.Empty;
     }
@@ -246,8 +233,7 @@ public sealed class AiConfigView : ContentView
             if (!string.IsNullOrWhiteSpace(key))
             {
                 string header = string.IsNullOrWhiteSpace(provider.AuthHeaderName) ? "Authorization" : provider.AuthHeaderName;
-                string scheme = provider.AuthScheme ?? string.Empty;
-                http.DefaultRequestHeaders.TryAddWithoutValidation(header, scheme + key);
+                http.DefaultRequestHeaders.TryAddWithoutValidation(header, (provider.AuthScheme ?? string.Empty) + key);
             }
 
             string body = await http.GetStringAsync(url);
@@ -266,9 +252,7 @@ public sealed class AiConfigView : ContentView
                 IsFree = false
             }).ToList();
 
-            RuntimeConfig.Model = ids.Contains(RuntimeConfig.Model, StringComparer.OrdinalIgnoreCase)
-                ? RuntimeConfig.Model
-                : ids[0];
+            RuntimeConfig.Model = ids.Contains(RuntimeConfig.Model, StringComparer.OrdinalIgnoreCase) ? RuntimeConfig.Model : ids[0];
             PopulateModels(provider, RuntimeConfig.Model);
             ApplyToClient();
             RefreshStatus($"{ids.Count} modelos carregados");
@@ -291,9 +275,7 @@ public sealed class AiConfigView : ContentView
             ? data.EnumerateArray()
             : root.ValueKind == JsonValueKind.Object && root.TryGetProperty("models", out var models) && models.ValueKind == JsonValueKind.Array
                 ? models.EnumerateArray()
-                : root.ValueKind == JsonValueKind.Array
-                    ? root.EnumerateArray()
-                    : Enumerable.Empty<JsonElement>();
+                : root.ValueKind == JsonValueKind.Array ? root.EnumerateArray() : Enumerable.Empty<JsonElement>();
 
         foreach (var item in candidates)
         {
@@ -302,8 +284,7 @@ public sealed class AiConfigView : ContentView
                 Add(item.GetString());
                 continue;
             }
-            if (item.ValueKind != JsonValueKind.Object)
-                continue;
+            if (item.ValueKind != JsonValueKind.Object) continue;
             foreach (string name in new[] { "id", "name", "model" })
             {
                 if (item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String)
@@ -318,15 +299,13 @@ public sealed class AiConfigView : ContentView
         void Add(string? value)
         {
             string id = value?.Trim() ?? string.Empty;
-            if (!string.IsNullOrWhiteSpace(id) && !result.Contains(id, StringComparer.OrdinalIgnoreCase))
-                result.Add(id);
+            if (!string.IsNullOrWhiteSpace(id) && !result.Contains(id, StringComparer.OrdinalIgnoreCase)) result.Add(id);
         }
     }
 
     public void ApplyToClient()
     {
-        if (_client != null)
-            RuntimeConfig.Apply(_client);
+        if (_client != null) RuntimeConfig.Apply(_client);
     }
 
     private void RefreshStatus(string? prefix = null)
@@ -334,15 +313,12 @@ public sealed class AiConfigView : ContentView
         string provider = (_providerPicker.SelectedItem as ProviderInfo)?.Name ?? "nenhum provedor";
         string model = string.IsNullOrWhiteSpace(RuntimeConfig.Model) ? "nenhum modelo" : RuntimeConfig.Model;
         string key = string.IsNullOrWhiteSpace(_apiKeyEntry.Text) ? "sem chave" : "chave configurada";
-        _status.Text = string.IsNullOrWhiteSpace(prefix)
-            ? provider + " · " + key + " · " + model
-            : prefix + " · " + provider + " · " + model;
+        _status.Text = string.IsNullOrWhiteSpace(prefix) ? provider + " · " + key + " · " + model : prefix + " · " + provider + " · " + model;
     }
 
     private async void OnTestClicked(object? sender, EventArgs e)
     {
-        if (_client == null)
-            return;
+        if (_client == null) return;
         try
         {
             var provider = ProviderCatalog.Find(RuntimeConfig.Provider);
@@ -368,8 +344,7 @@ public sealed class AiConfigView : ContentView
 
     private void OnClearClicked(object? sender, EventArgs e)
     {
-        if (_loading)
-            return;
+        if (_loading) return;
         RuntimeConfig.Model = string.Empty;
         RuntimeConfig.BaseUrlOverride = string.Empty;
         _modelPicker.SelectedIndex = -1;
