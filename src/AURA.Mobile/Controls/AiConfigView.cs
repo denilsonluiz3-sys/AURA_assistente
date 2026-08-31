@@ -6,7 +6,8 @@ namespace AURA.Mobile.Controls;
 
 /// <summary>
 /// Configuração independente: chave, provedor e modelo são estados diferentes.
-/// A chave pode detectar o provedor quando houver evidência, mas nunca fixa o modelo.
+/// A chave nunca escolhe nem altera o modelo; o provedor selecionado determina
+/// endpoint e esquema de autenticação.
 /// </summary>
 public sealed class AiConfigView : ContentView
 {
@@ -73,10 +74,10 @@ public sealed class AiConfigView : ContentView
                 _providerPicker.ItemDisplayBinding = new Binding(nameof(ProviderInfo.Name));
             }
 
-            string providerId = RuntimeConfig.Provider;
-            SelectProvider(providerId);
+            SelectProvider(RuntimeConfig.Provider);
+            string providerId = (_providerPicker.SelectedItem as ProviderInfo)?.Id ?? RuntimeConfig.Provider;
             _apiKeyEntry.Text = RuntimeConfig.GetApiKeyForProvider(providerId);
-            _baseUrlEntry.Text = RuntimeConfig.BaseUrlOverride;
+            _baseUrlEntry.Text = RuntimeConfig.GetBaseUrlOverrideForProvider(providerId);
             PopulateModels(RuntimeConfig.Model);
             RefreshStatus();
         }
@@ -89,12 +90,11 @@ public sealed class AiConfigView : ContentView
         _loading = true;
         try
         {
-            RuntimeConfig.Provider = provider.Id;
-            RuntimeConfig.Model = string.Empty;
-            RuntimeConfig.BaseUrlOverride = string.Empty;
-            _customModelEntry.Text = string.Empty;
-            _baseUrlEntry.Text = provider.Id.Equals("ollama", StringComparison.OrdinalIgnoreCase) ? provider.BaseUrl : string.Empty;
+            // Trocar provedor é uma nova configuração: nunca carregar o modelo,
+            // endpoint ou chave do provedor anterior.
+            RuntimeConfig.SelectProvider(provider.Id);
             _apiKeyEntry.Text = RuntimeConfig.GetApiKeyForProvider(provider.Id);
+            _baseUrlEntry.Text = RuntimeConfig.GetBaseUrlOverrideForProvider(provider.Id);
             PopulateModels(null);
             ApplyToClient();
             RefreshStatus();
@@ -116,37 +116,9 @@ public sealed class AiConfigView : ContentView
         if (_loading) return;
         string providerId = (_providerPicker.SelectedItem as ProviderInfo)?.Id ?? RuntimeConfig.Provider;
         RuntimeConfig.SetApiKeyForProvider(providerId, e.NewTextValue);
+        // A chave é somente credencial. Não detectar/trocar provedor ou modelo
+        // automaticamente: isso era a origem da configuração aparentemente travada.
         RefreshStatus();
-
-        string key = e.NewTextValue?.Trim() ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(key)) _ = DetectProviderAsync(key);
-    }
-
-    private async Task DetectProviderAsync(string key)
-    {
-        try
-        {
-            var result = await _resolver.ResolveAsync(new ProviderCredential(key, allowProbe: false));
-            if (!result.IsConclusive || result.Provider is not ProviderInfo provider) return;
-
-            await MainThread.InvokeOnMainThreadAsync(() =>
-            {
-                if (_loading) return;
-                _loading = true;
-                try
-                {
-                    RuntimeConfig.Provider = provider.Id;
-                    SelectProvider(provider.Id);
-                    _apiKeyEntry.Text = key;
-                    RuntimeConfig.Model = string.Empty;
-                    PopulateModels(null);
-                    ApplyToClient();
-                    RefreshStatus();
-                }
-                finally { _loading = false; }
-            });
-        }
-        catch (Exception ex) { AuraLog.Exception("AiConfigView.DetectProvider", ex); }
     }
 
     private void PopulateModels(string? selectedModel)
@@ -176,7 +148,8 @@ public sealed class AiConfigView : ContentView
                 }
             }
 
-            _customModelEntry.Text = selectedModel;
+            // Não reintroduzir um modelo persistido que não pertence ao provedor.
+            // Modelo custom só é aceito quando o usuário o informa explicitamente.
         }
         finally { _modelPicker.SelectedIndexChanged += OnModelChanged; }
     }
@@ -211,7 +184,8 @@ public sealed class AiConfigView : ContentView
     private void OnBaseUrlChanged(object? sender, TextChangedEventArgs e)
     {
         if (_loading) return;
-        RuntimeConfig.BaseUrlOverride = e.NewTextValue?.Trim() ?? string.Empty;
+        string providerId = (_providerPicker.SelectedItem as ProviderInfo)?.Id ?? RuntimeConfig.Provider;
+        RuntimeConfig.SetBaseUrlOverrideForProvider(providerId, e.NewTextValue);
         ApplyToClient();
     }
 
@@ -221,7 +195,7 @@ public sealed class AiConfigView : ContentView
         _loading = true;
         try
         {
-            RuntimeConfig.Model = string.Empty;
+            RuntimeConfig.ClearModel();
             _modelPicker.SelectedIndex = -1;
             _customModelEntry.Text = string.Empty;
             ApplyToClient();
@@ -230,8 +204,6 @@ public sealed class AiConfigView : ContentView
         finally { _loading = false; }
     }
 
-    // Public porque AiConfig é a fachada compartilhada pelo Chat/Agente e
-    // precisa reaplicar a configuração ao cliente quando o estado global muda.
     public void ApplyToClient()
     {
         if (_client != null) RuntimeConfig.Apply(_client);
@@ -250,12 +222,12 @@ public sealed class AiConfigView : ContentView
         if (_client == null) return;
         try
         {
-            ApplyToClient();
             ProviderInfo? provider = ProviderCatalog.Find(RuntimeConfig.Provider);
             if (provider == null) { _status.Text = "Escolha um provedor."; return; }
             if (string.IsNullOrWhiteSpace(RuntimeConfig.Model)) { _status.Text = "Escolha um modelo."; return; }
             if (provider.NeedsKey && string.IsNullOrWhiteSpace(RuntimeConfig.GetApiKeyForProvider(provider.Id))) { _status.Text = "Informe a chave de API."; return; }
 
+            ApplyToClient();
             _testButton.IsEnabled = false;
             _status.Text = "Testando " + provider.Name + " · " + RuntimeConfig.Model + "…";
             string response = await _client.ChatAsync("Responda apenas: OK");
