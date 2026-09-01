@@ -1,5 +1,6 @@
 using AURA.AI;
 using AURA.AI.Providers;
+using AURA.AI.UniversalAI;
 using AURA.Agents;
 using AURA.Agents.Programs;
 using AURA.Abstractions;
@@ -57,7 +58,15 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new ConfigLoader(sp.GetRequiredService<ILogger>()).LoadModules(Path.Combine(configDir, "modules.json")));
         builder.Services.AddSingleton(sp => new ModuleManager(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "modules"), Path.Combine(configDir, "modules.json"), sp.GetRequiredService<EventBus>(), localPackageProvider: ReadEmbeddedModulePackageAsync));
         builder.Services.AddSingleton(sp => new MemoryStore(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "memory.json")));
-        builder.Services.AddSingleton(sp => new OpenRouterClient(new OpenRouterOptions { Provider = "ollama", ApiKey = string.Empty, BaseUrl = "http://127.0.0.1:11435/v1/chat/completions", Model = "aura-qwen:latest", MaxTokens = 512, TimeoutSeconds = 180, ApiFormat = AiApiFormat.OpenAICompletions }, sp.GetRequiredService<ILogger>()));
+
+        // The AI client is now created only by the universal runtime. No provider/model/endpoint is selected here.
+        builder.Services.AddSingleton<UniversalAiRuntime>();
+        builder.Services.AddSingleton<OpenRouterClient>(sp =>
+        {
+            var runtime = sp.GetRequiredService<UniversalAiRuntime>();
+            return runtime.CreateClientFromRuntimeConfig();
+        });
+
         builder.Services.AddSingleton<AiDiagnosticsService>();
         builder.Services.AddSingleton<AiAssistant>();
         builder.Services.AddSingleton<ISpeechService, HybridSpeechService>();
@@ -100,7 +109,7 @@ public static class MauiProgram
 #endif
         ));
         builder.Services.AddSingleton<ChatPage>();
-        builder.Services.AddSingleton<AgentPage>(sp => new AgentPage(sp.GetRequiredService<OpenRouterClient>(), sp.GetRequiredService<MemoryStore>(), sp.GetRequiredService<ISpeechService>(), sp.GetRequiredService<ShellExecutor>(), sp.GetRequiredService<ProcessRegistry>(), sp.GetRequiredService<AuraOrchestrator>(), sp.GetRequiredService<AgentExecutionCoordinator>(), sp.GetService<LocalPlaybook>(), sp.GetService<VoiceAssistantService>(), sp.GetRequiredService<SolutionStore>(), sp.GetService<GitExecutor>(), sp.GetService<PythonExecutor>(), sp.GetService<NodeExecutor>(), sp.GetService<CellProgramRegistry>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetRequiredService<IAndroidCapabilityService>()));
+        builder.Services.AddSingleton<AgentPage>(sp => new AgentPage(sp.GetRequiredService<OpenRouterClient>(), sp.GetRequiredService<MemoryStore>(), sp.GetRequiredService<ISpeechService>(), sp.GetRequiredService<ShellExecutor>(), sp.GetRequiredService<ProcessRegistry>(), sp.GetRequiredService<AuraOrchestrator>(), sp.GetRequiredService<AgentExecutionCoordinator>(), sp.GetService<LocalPlaybook>(), sp.GetService<VoiceAssistantService>(), sp.GetRequiredService<SolutionStore>(), sp.GetService<GitExecutor>(), sp.GetRequiredService<PythonExecutor>(), sp.GetRequiredService<NodeExecutor>(), sp.GetService<CellProgramRegistry>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetRequiredService<IAndroidCapabilityService>()));
         builder.Services.AddSingleton<MemoryPage>();
         builder.Services.AddSingleton<ExecutorsPage>();
         builder.Services.AddSingleton<SpectrumPage>(sp => new SpectrumPage(sp.GetService<IAndroidCapabilityService>()));
