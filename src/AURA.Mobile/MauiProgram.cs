@@ -54,7 +54,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<IUniversalAiClient>(sp =>
         {
             var client = new UniversalAiClient(new UniversalAiClientOptions());
-            if (!string.IsNullOrWhiteSpace(RuntimeConfig.Provider) && !string.IsNullOrWhiteSpace(RuntimeConfig.Model) && !string.IsNullOrWhiteSpace(RuntimeConfig.BaseUrlOverride)) RuntimeConfig.Apply(client);
+            // Sempre hidratar (incluindo API key). Apply é soft e não exige config completa.
+            try { RuntimeConfig.Apply(client); }
+            catch (Exception ex) { AuraLog.Exception("MauiProgram.RuntimeConfig.Apply", ex); }
             return client;
         });
         builder.Services.AddSingleton<AiDiagnosticsService>();
@@ -99,7 +101,7 @@ public static class MauiProgram
 #endif
         ));
         builder.Services.AddSingleton<ChatPage>();
-        builder.Services.AddSingleton<AgentPage>(sp => new AgentPage(sp.GetRequiredService<IUniversalAiClient>(), sp.GetRequiredService<MemoryStore>(), sp.GetRequiredService<ISpeechService>(), sp.GetRequiredService<ShellExecutor>(), sp.GetRequiredService<ProcessRegistry>(), sp.GetRequiredService<AuraOrchestrator>(), sp.GetRequiredService<AgentExecutionCoordinator>(), sp.GetService<LocalPlaybook>(), sp.GetService<VoiceAssistantService>(), sp.GetRequiredService<SolutionStore>(), sp.GetService<GitExecutor>(), sp.GetService<PythonExecutor>(), sp.GetService<NodeExecutor>(), sp.GetService<CellProgramRegistry>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetRequiredService<IAndroidCapabilityService>()));
+        builder.Services.AddSingleton<AgentPage>(sp => new AgentPage(sp.GetRequiredService<IUniversalAiClient>(), sp.GetRequiredService<MemoryStore>(), sp.GetRequiredService<ISpeechService>(), sp.GetRequiredService<ShellExecutor>(), sp.GetRequiredService<ProcessRegistry>(), sp.GetRequiredService<AuraOrchestrator>(), sp.GetRequiredService<AgentExecutionCoordinator>(), sp.GetService<LocalPlaybook>(), sp.GetService<VoiceAssistantService>(), sp.GetRequiredService<SolutionStore>(), sp.GetService<GitExecutor>(), sp.GetService<PythonExecutor>(), sp.GetService<NodeExecutor>(), sp.GetService<CellProgramRegistry>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetService<IAndroidCapabilityService>()));
         builder.Services.AddSingleton<MemoryPage>();
         builder.Services.AddSingleton<ExecutorsPage>();
         builder.Services.AddSingleton<SpectrumPage>(sp => new SpectrumPage(sp.GetService<IAndroidCapabilityService>()));
