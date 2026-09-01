@@ -3,7 +3,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.Agents;
-using AURA.AI;
+using AURA.AI.UniversalAI;
 using AURA.Abstractions.Execution;
 using AURA.Core;
 using AURA.Core.Abstractions;
@@ -32,7 +32,6 @@ public sealed class AuraOrchestratorIntegrationTests
     {
         using var fixture = new OrchestratorFixture();
 
-        // Pre-populate memory
         fixture.Memory.Record("pesquise e execute a tarefa", "orchestration", "resultado da memória", success: true);
 
         string result = await fixture.Orchestrator.ExecuteAsync("pesquise e execute a tarefa");
@@ -44,9 +43,7 @@ public sealed class AuraOrchestratorIntegrationTests
     [Fact]
     public async Task ExecuteAsync_NoMemoryHit_DelegatesToAgentSession()
     {
-        // Cliente sem ApiKey: o AgentSession delega e falha de forma
-        // determinística antes de qualquer chamada de rede.
-        using var fixture = new OrchestratorFixture(new OpenRouterClient(new OpenRouterOptions { ApiKey = "" }));
+        using var fixture = new OrchestratorFixture(new FakeUniversalAiClient());
 
         string result = await fixture.Orchestrator.ExecuteAsync("comando totalmente novo que não existe na memória");
 
@@ -61,7 +58,7 @@ public sealed class AuraOrchestratorIntegrationTests
         public SolutionStore Memory { get; }
         public AuraOrchestrator Orchestrator { get; }
 
-        public OrchestratorFixture(OpenRouterClient? aiClient = null)
+        public OrchestratorFixture(IUniversalAiClient? aiClient = null)
         {
             Directory.CreateDirectory(_root);
             var logger = new ConsoleLogger();
@@ -93,6 +90,22 @@ public sealed class AuraOrchestratorIntegrationTests
             _runtime.Dispose();
             try { Directory.Delete(_root, recursive: true); } catch { }
         }
+    }
+
+    private sealed class FakeUniversalAiClient : IUniversalAiClient
+    {
+        public UniversalAiClientOptions Options { get; } = new();
+
+        public Task<string> ChatAsync(string question, HttpClient? httpClient = null, string? systemPrompt = null, CancellationToken ct = default)
+            => Task.FromResult("fake");
+
+        public Task<AgentChatResponse> ChatToolsAsync(
+            IReadOnlyList<AgentMessage> messages,
+            IReadOnlyList<AgentToolDefinition> tools,
+            HttpClient? httpClient = null,
+            CancellationToken ct = default,
+            string? systemPrompt = null)
+            => Task.FromResult(new AgentChatResponse { Error = "fake", ErrorKind = AgentErrorKind.ProviderError });
     }
 
     private sealed class FakeExecutor : IToolExecutor
