@@ -49,7 +49,7 @@ public sealed class AiConfigView : ContentView
     };
     private readonly Entry _modelEntry = new()
     {
-        Placeholder = "Modelo (OpenRouter: …:free · DeepSeek: deepseek-v4-flash)",
+        Placeholder = "Modelo (OpenRouter: openrouter/free · DeepSeek: deepseek-v4-flash)",
         FontSize = 13
     };
     private readonly Picker _modelPicker = new()
@@ -205,8 +205,11 @@ public sealed class AiConfigView : ContentView
         _apiKeyEntry.Text = RuntimeConfig.GetApiKeyForProvider(
             string.IsNullOrEmpty(RuntimeConfig.Provider) ? Presets[idx].Id : RuntimeConfig.Provider);
 
-        // Migrar modelo DeepSeek legado se ainda gravado
+        // Migrar modelo DeepSeek legado / free descontinuado no OpenRouter
         var model = RuntimeConfig.Model;
+        var migrated = UniversalModelDiscovery.MigrateDeprecatedOpenRouterModel(model);
+        if (migrated != null)
+            model = migrated;
         if (Presets[idx].Id == "deepseek" &&
             (string.IsNullOrWhiteSpace(model) || model.Contains('/')))
             model = Presets[idx].ModelHint;
@@ -473,6 +476,15 @@ public sealed class AiConfigView : ContentView
                 _modelEntry.Text = model;
             }
 
+            // Migrar IDs free DeepSeek descontinuados no OpenRouter
+            var migrated = UniversalModelDiscovery.MigrateDeprecatedOpenRouterModel(model);
+            if (migrated != null)
+            {
+                model = migrated;
+                _modelEntry.Text = model;
+                SetStatus("Modelo free DeepSeek descontinuado → openrouter/free.", true);
+            }
+
             if (string.IsNullOrWhiteSpace(model))
             {
                 SetStatus("Informe o modelo.", false);
@@ -492,14 +504,14 @@ public sealed class AiConfigView : ContentView
             {
                 if (model.StartsWith("deepseek-", StringComparison.OrdinalIgnoreCase) && !model.Contains('/'))
                 {
-                    SetStatus("No OpenRouter use IDs tipo deepseek/deepseek-r1:free ou openrouter/free.", false);
+                    SetStatus("No OpenRouter use IDs tipo openrouter/free ou deepseek/deepseek-r1 (pago).", false);
                     _modelEntry.Text = "openrouter/free";
                     return;
                 }
                 // Se usuário digitou modelo sem :free e sem barra, orientar
                 if (!model.Contains('/') && !model.Equals("openrouter/free", StringComparison.OrdinalIgnoreCase))
                 {
-                    SetStatus("OpenRouter precisa do ID completo (ex.: meta-llama/llama-3.3-70b-instruct:free).", false);
+                    SetStatus("OpenRouter precisa do ID completo (ex.: openrouter/free ou google/gemma-4-31b-it:free).", false);
                     return;
                 }
             }
