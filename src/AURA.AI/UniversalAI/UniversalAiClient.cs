@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -8,14 +7,12 @@ namespace AURA.AI.UniversalAI;
 public sealed class UniversalAiClient : IUniversalAiClient
 {
     public UniversalAiClientOptions Options { get; }
+    public UniversalAiClient(UniversalAiClientOptions options) => Options = options ?? throw new ArgumentNullException(nameof(options));
 
-    public UniversalAiClient(UniversalAiClientOptions options)
-        => Options = options ?? throw new ArgumentNullException(nameof(options));
-
-    public async Task<string> ChatAsync(string question, HttpClient? httpClient = null, CancellationToken ct = default)
+    public async Task<string> ChatAsync(string question, HttpClient? httpClient = null, string? systemPrompt = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(question)) throw new ArgumentException("Pergunta obrigatória.", nameof(question));
-        var response = await SendAsync(new[] { new AgentMessage { Role = "user", Content = question } }, Array.Empty<AgentToolDefinition>(), httpClient, ct, null).ConfigureAwait(false);
+        var response = await SendAsync(new[] { new AgentMessage { Role = "user", Content = question } }, Array.Empty<AgentToolDefinition>(), httpClient, ct, systemPrompt).ConfigureAwait(false);
         if (!string.IsNullOrWhiteSpace(response.Error)) throw new AgentLlmException(response.Error, response.ErrorKind);
         return response.Content ?? string.Empty;
     }
@@ -26,7 +23,7 @@ public sealed class UniversalAiClient : IUniversalAiClient
     private async Task<AgentChatResponse> SendAsync(IReadOnlyList<AgentMessage> messages, IReadOnlyList<AgentToolDefinition> tools, HttpClient? httpClient, CancellationToken ct, string? systemPrompt)
     {
         Validate();
-        using var own = httpClient == null ? new HttpClient() : null;
+        using var own = httpClient == null ? new HttpClient { Timeout = TimeSpan.FromSeconds(Math.Max(1, Options.TimeoutSeconds)) } : null;
         var http = httpClient ?? own!;
         using var request = new HttpRequestMessage(HttpMethod.Post, Options.BaseUrl);
         AddAuthentication(request);
@@ -49,10 +46,7 @@ public sealed class UniversalAiClient : IUniversalAiClient
     {
         if (string.IsNullOrWhiteSpace(Options.BaseUrl)) throw new InvalidOperationException("Endpoint não configurado.");
         if (string.IsNullOrWhiteSpace(Options.Model)) throw new InvalidOperationException("Modelo não configurado.");
-        if (Options.ApiFormat != UniversalApiFormat.OpenAiCompatible && Options.ApiFormat != UniversalApiFormat.AnthropicMessages && Options.ApiFormat != UniversalApiFormat.Gemini)
-            throw new InvalidOperationException("Formato de API não suportado.");
-        if (Options.ApiFormat != UniversalApiFormat.OpenAiCompatible && string.IsNullOrWhiteSpace(Options.AuthHeaderName) && !string.IsNullOrWhiteSpace(Options.ApiKey))
-            throw new InvalidOperationException("Header de autenticação não configurado.");
+        if (Options.ApiFormat is < UniversalApiFormat.OpenAiCompatible or > UniversalApiFormat.Gemini) throw new InvalidOperationException("Formato de API não suportado.");
     }
 
     private void AddAuthentication(HttpRequestMessage request)
@@ -60,19 +54,15 @@ public sealed class UniversalAiClient : IUniversalAiClient
         if (string.IsNullOrWhiteSpace(Options.ApiKey)) return;
         var header = string.IsNullOrWhiteSpace(Options.AuthHeaderName) ? "Authorization" : Options.AuthHeaderName;
         var scheme = Options.AuthScheme?.Trim() ?? string.Empty;
-        var value = string.IsNullOrEmpty(scheme) ? Options.ApiKey.Trim() : scheme + " " + Options.ApiKey.Trim();
-        request.Headers.TryAddWithoutValidation(header, value);
+        request.Headers.TryAddWithoutValidation(header, string.IsNullOrEmpty(scheme) ? Options.ApiKey.Trim() : scheme + " " + Options.ApiKey.Trim());
     }
 
-    private string BuildPayload(IReadOnlyList<AgentMessage> messages, IReadOnlyList<AgentToolDefinition> tools, string? systemPrompt)
+    private string BuildPayload(IReadOnlyList<AgentMessage> messages, IReadOnlyList<AgentToolDefinition> tools, string? systemPrompt) => Options.ApiFormat switch
     {
-        return Options.ApiFormat switch
-        {
-            UniversalApiFormat.AnthropicMessages => BuildAnthropic(messages, tools, systemPrompt),
-            UniversalApiFormat.Gemini => BuildGemini(messages, tools, systemPrompt),
-            _ => BuildOpenAi(messages, tools, systemPrompt)
-        };
-    }
+        UniversalApiFormat.AnthropicMessages => BuildAnthropic(messages, tools, systemPrompt),
+        UniversalApiFormat.Gemini => BuildGemini(messages, tools, systemPrompt),
+        _ => BuildOpenAi(messages, tools, systemPrompt)
+    };
 
     private string BuildOpenAi(IReadOnlyList<AgentMessage> messages, IReadOnlyList<AgentToolDefinition> tools, string? systemPrompt)
     {
