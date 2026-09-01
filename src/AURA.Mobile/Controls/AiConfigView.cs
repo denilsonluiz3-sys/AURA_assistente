@@ -1,10 +1,10 @@
-using System.Text.Json;
 using AURA.AI;
+using AURA.AI.UniversalAI;
 using AURA.Mobile.Diagnostics;
 
 namespace AURA.Mobile.Controls;
 
-/// <summary>Configuração simples e universal: chave -> carregar modelos -> selecionar -> salvar.</summary>
+/// <summary>Configuração universal: API key -> carregar modelos -> selecionar -> salvar.</summary>
 public sealed class AiConfigView : ContentView
 {
     private readonly Entry _apiKeyEntry = new() { Placeholder = "API key", IsPassword = true, ClearButtonVisibility = ClearButtonVisibility.WhileEditing };
@@ -12,10 +12,9 @@ public sealed class AiConfigView : ContentView
     private readonly Picker _modelPicker = new() { Title = "Selecione o modelo", IsEnabled = false, HorizontalOptions = LayoutOptions.Fill };
     private readonly Button _saveButton = new() { Text = "SALVAR", IsEnabled = false, HorizontalOptions = LayoutOptions.Fill };
     private readonly Label _status = new() { FontSize = 12, LineBreakMode = LineBreakMode.WordWrap };
-    private readonly ActivityIndicator _busy = new() { IsVisible = false, IsRunning = false, HorizontalOptions = LayoutOptions.Center };
     private readonly List<string> _models = new();
     private OpenRouterClient? _client;
-    private bool _loading;
+    private UniversalProvider? _discoveredProvider;
 
     public AiConfigView()
     {
@@ -23,7 +22,6 @@ public sealed class AiConfigView : ContentView
         _loadModelsButton.Clicked += OnLoadModelsClicked;
         _saveButton.Clicked += OnSaveClicked;
         Loaded += (_, _) => LoadExisting();
-
         Content = new ScrollView
         {
             Content = new VerticalStackLayout
@@ -35,7 +33,7 @@ public sealed class AiConfigView : ContentView
                     new Label { Text = "API KEY", FontAttributes = FontAttributes.Bold },
                     _apiKeyEntry,
                     _loadModelsButton,
-                    _busy,
+                    new ActivityIndicator { IsVisible = false },
                     new Label { Text = "MODELO", FontAttributes = FontAttributes.Bold },
                     _modelPicker,
                     _saveButton,
@@ -45,154 +43,97 @@ public sealed class AiConfigView : ContentView
         };
     }
 
-    // Compatibility contract used by AiConfig and existing Chat/Agent code.
     public void Load(OpenRouterClient client)
     {
         _client = client;
         LoadExisting();
     }
 
-    // Compatibility contract used by AiConfig.ApplyToClient().
+    // Preserva o contrato usado por AiConfig/fluxos antigos.
     public void ApplyToClient()
     {
-        if (_client == null)
-            return;
-
-        if (!string.IsNullOrWhiteSpace(_modelPicker.SelectedItem?.ToString()))
-            RuntimeConfig.Model = _modelPicker.SelectedItem.ToString()!;
-
-        if (!string.IsNullOrWhiteSpace(_apiKeyEntry.Text))
-            RuntimeConfig.SetApiKeyForProvider(RuntimeConfig.Provider, _apiKeyEntry.Text.Trim());
-
-        RuntimeConfig.Apply(_client);
+        if (_client == null || _discoveredProvider == null) return;
+        var model = _modelPicker.SelectedItem?.ToString();
+        if (string.IsNullOrWhiteSpace(model)) return;
+        RuntimeConfig.ApplyUniversal(_client, _discoveredProvider.Id, _apiKeyEntry.Text?.Trim() ?? string.Empty, model, _discoveredProvider.BaseUrl, _discoveredProvider.ModelsUrl);
     }
 
     private void LoadExisting()
     {
-        if (_loading) return;
-        _loading = true;
-        try
+        var provider = UniversalProviderRegistry.BuiltIns.FirstOrDefault(p => string.Equals(p.Id, RuntimeConfig.Provider, StringComparison.OrdinalIgnoreCase));
+        if (provider == null) return;
+        _discoveredProvider = provider;
+        _apiKeyEntry.Text = RuntimeConfig.GetApiKeyForProvider(provider.Id);
+        if (!string.IsNullOrWhiteSpace(RuntimeConfig.Model))
         {
-            string provider = RuntimeConfig.Provider;
-            if (!string.IsNullOrWhiteSpace(provider))
-                _apiKeyEntry.Text = RuntimeConfig.GetApiKeyForProvider(provider);
-
-            string model = RuntimeConfig.Model;
-            if (!string.IsNullOrWhiteSpace(model))
-            {
-                _models.Clear();
-                _models.Add(model);
-                _modelPicker.ItemsSource = null;
-                _modelPicker.ItemsSource = _models;
-                _modelPicker.SelectedItem = model;
-                _modelPicker.IsEnabled = true;
-                _saveButton.IsEnabled = !string.IsNullOrWhiteSpace(_apiKeyEntry.Text);
-            }
+            _models.Clear(); _models.Add(RuntimeConfig.Model);
+            _modelPicker.ItemsSource = null; _modelPicker.ItemsSource = _models;
+            _modelPicker.SelectedItem = RuntimeConfig.Model;
+            _modelPicker.IsEnabled = true; _saveButton.IsEnabled = !string.IsNullOrWhiteSpace(_apiKeyEntry.Text);
         }
-        catch { }
-        finally { _loading = false; }
     }
 
     private async void OnLoadModelsClicked(object? sender, EventArgs e)
     {
-        if (_loading) return;
-        string key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
+        var key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(key)) { SetStatus("Informe a API key.", false); return; }
-
         SetBusy(true);
-        _models.Clear();
-        _modelPicker.ItemsSource = null;
-        _modelPicker.IsEnabled = false;
-        _saveButton.IsEnabled = false;
-
         try
         {
-            var discovered = await DiscoverProviderAndModelsAsync(key);
-            if (discovered == null)
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(Math.Clamp(RuntimeConfig.TimeoutSeconds, 5, 30)) };
+            UniversalProvider? provider = null;
+            IReadOnlyList<UniversalModel>? models = null;
+
+            // Primeiro tenta os endpoints conhecidos. O primeiro /models autenticado com sucesso define o provider.
+            foreach (var candidate in UniversalProviderRegistry.BuiltIns.Where(p => p.RequiresApiKey))
             {
-                SetStatus("Não foi possível identificar o provedor ou carregar os modelos com essa chave.", false);
+                try
+                {
+                    var discovery = new UniversalModelDiscovery(http);
+                    var found = await discovery.LoadAsync(candidate, key);
+                    if (found.Count > 0) { provider = candidate; models = found; break; }
+                }
+                catch { }
+            }
+
+            if (provider == null || models == null || models.Count == 0)
+            {
+                SetStatus("Não foi possível carregar modelos. Verifique a chave e o provedor.", false);
                 return;
             }
 
-            RuntimeConfig.Provider = discovered.Provider.Id;
-            RuntimeConfig.ApiFormat = discovered.Provider.ApiFormat;
-            RuntimeConfig.BaseUrlOverride = string.Empty;
-            RuntimeConfig.ModelsUrlOverride = discovered.Provider.ModelsUrl;
-            RuntimeConfig.SetApiKeyForProvider(discovered.Provider.Id, key);
+            _discoveredProvider = provider;
+            RuntimeConfig.Provider = provider.Id;
+            RuntimeConfig.SetApiKeyForProvider(provider.Id, key);
+            RuntimeConfig.ApiFormat = provider.Format switch
+            {
+                UniversalApiFormat.AnthropicMessages => AURA.AI.AiApiFormat.AnthropicMessages,
+                UniversalApiFormat.Gemini => AURA.AI.AiApiFormat.GeminiGenerateContent,
+                _ => AURA.AI.AiApiFormat.OpenAICompletions
+            };
 
-            _models.AddRange(discovered.Models);
-            _modelPicker.ItemsSource = _models;
-            _modelPicker.IsEnabled = _models.Count > 0;
-            if (_models.Count > 0) _modelPicker.SelectedItem = _models[0];
-            _saveButton.IsEnabled = _models.Count > 0;
-            SetStatus($"{discovered.Provider.Name}: {_models.Count} modelo(s) carregado(s).", true);
+            _models.Clear(); _models.AddRange(models.Select(m => m.Id));
+            _modelPicker.ItemsSource = null; _modelPicker.ItemsSource = _models;
+            _modelPicker.IsEnabled = true; _modelPicker.SelectedIndex = 0; _saveButton.IsEnabled = true;
+            SetStatus($"{provider.Name}: {_models.Count} modelo(s) carregado(s).", true);
         }
         catch (Exception ex)
         {
             SetStatus("Falha ao carregar modelos: " + ex.Message, false);
-            AuraLog.Exception("AiConfigView.DiscoverModels", ex);
+            AuraLog.Exception("AiConfigView.LoadModels", ex);
         }
         finally { SetBusy(false); }
     }
 
-    private async Task<DiscoveryResult?> DiscoverProviderAndModelsAsync(string key)
+    private void OnSaveClicked(object? sender, EventArgs e)
     {
-        var candidates = ProviderCatalog.Providers.Where(p => p.NeedsKey && !string.IsNullOrWhiteSpace(p.ModelsUrl)).ToList();
-        if (candidates.Count == 0) return null;
-
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(Math.Clamp(RuntimeConfig.TimeoutSeconds, 5, 30)) };
-        foreach (var provider in candidates)
-        {
-            try
-            {
-                using var request = new HttpRequestMessage(HttpMethod.Get, provider.ModelsUrl);
-                request.Headers.TryAddWithoutValidation(
-                    string.IsNullOrWhiteSpace(provider.AuthHeaderName) ? "Authorization" : provider.AuthHeaderName,
-                    (provider.AuthScheme ?? "Bearer ") + key);
-                using var response = await http.SendAsync(request).ConfigureAwait(false);
-                if (!response.IsSuccessStatusCode) continue;
-                var models = ExtractModelIds(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
-                if (models.Count > 0) return new DiscoveryResult(provider, models);
-            }
-            catch { }
-        }
-        return null;
-    }
-
-    private static List<string> ExtractModelIds(string body)
-    {
-        var result = new List<string>();
-        using var document = JsonDocument.Parse(body);
-        JsonElement root = document.RootElement;
-        IEnumerable<JsonElement> items = root.ValueKind == JsonValueKind.Object && root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array
-            ? data.EnumerateArray()
-            : root.ValueKind == JsonValueKind.Object && root.TryGetProperty("models", out var models) && models.ValueKind == JsonValueKind.Array
-                ? models.EnumerateArray()
-                : root.ValueKind == JsonValueKind.Array ? root.EnumerateArray() : Enumerable.Empty<JsonElement>();
-
-        foreach (var item in items)
-        {
-            string? value = null;
-            if (item.ValueKind == JsonValueKind.String) value = item.GetString();
-            else if (item.ValueKind == JsonValueKind.Object)
-                foreach (var property in new[] { "id", "name", "model" })
-                    if (item.TryGetProperty(property, out var v) && v.ValueKind == JsonValueKind.String) { value = v.GetString(); break; }
-            if (!string.IsNullOrWhiteSpace(value) && !result.Contains(value.Trim(), StringComparer.OrdinalIgnoreCase)) result.Add(value.Trim());
-        }
-        return result;
-    }
-
-    private async void OnSaveClicked(object? sender, EventArgs e)
-    {
-        string key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
-        string model = _modelPicker.SelectedItem?.ToString() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(model)) { SetStatus("Carregue os modelos e selecione um modelo.", false); return; }
         try
         {
-            RuntimeConfig.SetApiKeyForProvider(RuntimeConfig.Provider, key);
-            RuntimeConfig.Model = model;
-            ApplyToClient();
-            await Task.CompletedTask;
+            var model = _modelPicker.SelectedItem?.ToString();
+            var key = _apiKeyEntry.Text?.Trim();
+            if (_discoveredProvider == null || string.IsNullOrWhiteSpace(model) || string.IsNullOrWhiteSpace(key))
+            { SetStatus("Carregue os modelos e selecione um modelo.", false); return; }
+            RuntimeConfig.ApplyUniversal(_client!, _discoveredProvider.Id, key, model, _discoveredProvider.BaseUrl, _discoveredProvider.ModelsUrl);
             SetStatus("Configuração salva.", true);
         }
         catch (Exception ex) { SetStatus("Falha ao salvar: " + ex.Message, false); }
@@ -200,14 +141,13 @@ public sealed class AiConfigView : ContentView
 
     private void SetBusy(bool busy)
     {
-        _busy.IsVisible = busy; _busy.IsRunning = busy;
         _apiKeyEntry.IsEnabled = !busy; _loadModelsButton.IsEnabled = !busy;
+        _loadModelsButton.Text = busy ? "CARREGANDO..." : "CARREGAR MODELOS";
     }
 
     private void SetStatus(string message, bool success)
     {
-        _status.Text = message; _status.TextColor = success ? Colors.Green : Colors.Red;
+        _status.Text = message;
+        _status.TextColor = success ? Colors.Green : Colors.Red;
     }
-
-    private sealed record DiscoveryResult(ProviderInfo Provider, List<string> Models);
 }
