@@ -4,24 +4,18 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.Core.Abstractions;
+using AURA.AI.UniversalAI;
 
 namespace AURA.AI
 {
-    /// <summary>
-    /// Pesquisa na web e extrai o código necessário para executar uma tarefa.
-    /// Usa o LLM quando há chave de API; senão, fallback heurístico.
-    /// </summary>
+    /// <summary>Pesquisa na web e extrai código usando opcionalmente o cliente universal.</summary>
     public sealed class CodeExtractorTool : AgentTool
     {
-        private readonly OpenRouterClient? _client;
+        private readonly IUniversalAiClient? _client;
         private readonly IWebSearch _webSearch;
-        private const string SystemPrompt =
-            "Você é um assistente especializado em extrair código de exemplos da web. " +
-            "Receba o conteúdo de uma página web e o pedido do usuário, e retorne APENAS o código necessário " +
-            "para executar a tarefa, sem explicações extras. " +
-            "Responda apenas com o código, sem markdown.";
+        private const string SystemPrompt = "Você é um assistente especializado em extrair código de exemplos da web. Receba o conteúdo de uma página web e o pedido do usuário, e retorne APENAS o código necessário para executar a tarefa, sem explicações extras. Responda apenas com o código, sem markdown.";
 
-        public CodeExtractorTool(IWebSearch webSearch, OpenRouterClient? client = null)
+        public CodeExtractorTool(IWebSearch webSearch, IUniversalAiClient? client = null)
         {
             _webSearch = webSearch ?? throw new ArgumentNullException(nameof(webSearch));
             _client = client;
@@ -33,16 +27,8 @@ namespace AURA.AI
             Description = "Pesquisa na web e extrai o código necessário para executar uma tarefa.",
             Parameters =
             {
-                ["task"] = new AgentToolParameter
-                {
-                    Type = "string",
-                    Description = "Descrição da tarefa a ser executada"
-                },
-                ["language"] = new AgentToolParameter
-                {
-                    Type = "string",
-                    Description = "Linguagem de programação (python, bash, csharp)"
-                }
+                ["task"] = new AgentToolParameter { Type = "string", Description = "Descrição da tarefa a ser executada" },
+                ["language"] = new AgentToolParameter { Type = "string", Description = "Linguagem de programação (python, bash, csharp)" }
             },
             Required = { "task" }
         };
@@ -53,35 +39,24 @@ namespace AURA.AI
             string language = "python";
             using (JsonDocument doc = JsonDocument.Parse(argumentsJson))
             {
-                var root = doc.RootElement;
-                if (root.TryGetProperty("task", out var t)) task = t.GetString() ?? "";
-                if (root.TryGetProperty("language", out var l)) language = l.GetString() ?? "python";
+                JsonElement root = doc.RootElement;
+                if (root.TryGetProperty("task", out JsonElement t)) task = t.GetString() ?? "";
+                if (root.TryGetProperty("language", out JsonElement l)) language = l.GetString() ?? "python";
             }
+            if (string.IsNullOrWhiteSpace(task)) return "ERRO: task vazia.";
 
-            if (string.IsNullOrWhiteSpace(task))
-                return "ERRO: task vazia.";
-
-            string searchQuery = $"{task} {language} exemplo código";
-            string searchResults = await _webSearch.SearchWithRefinementAsync(searchQuery, ct);
-
-            if (string.IsNullOrWhiteSpace(searchResults))
-                return "ERRO: nenhum resultado encontrado.";
+            string searchResults = await _webSearch.SearchWithRefinementAsync($"{task} {language} exemplo código", ct);
+            if (string.IsNullOrWhiteSpace(searchResults)) return "ERRO: nenhum resultado encontrado.";
 
             string code = await ExtractCodeWithAIAsync(task, searchResults, language, ct);
-            if (string.IsNullOrWhiteSpace(code))
-                code = ExtractCodeWithHeuristics(searchResults, language);
-
-            if (string.IsNullOrWhiteSpace(code))
-                return "ERRO: não foi possível extrair código.";
-
+            if (string.IsNullOrWhiteSpace(code)) code = ExtractCodeWithHeuristics(searchResults, language);
+            if (string.IsNullOrWhiteSpace(code)) return "ERRO: não foi possível extrair código.";
             return $"```{language}\n{code}\n```\n\nExecute com: {(language == "python" ? "python3" : language)}";
         }
 
         private async Task<string> ExtractCodeWithAIAsync(string task, string content, string language, CancellationToken ct)
         {
-            if (_client == null || string.IsNullOrEmpty(_client.Options.ApiKey))
-                return string.Empty;
-
+            if (_client == null || string.IsNullOrWhiteSpace(_client.Options.ApiKey)) return string.Empty;
             try
             {
                 string prompt = $"Tarefa: {task}\nLinguagem: {language}\n\nConteúdo:\n{content}\n\nExtraia APENAS o código:";
@@ -94,13 +69,10 @@ namespace AURA.AI
             catch { return string.Empty; }
         }
 
-        private string ExtractCodeWithHeuristics(string content, string language)
+        private static string ExtractCodeWithHeuristics(string content, string language)
         {
-            string pattern = $@"```{language}\s*([\s\S]*?)```";
-            var match = Regex.Match(content, pattern, RegexOptions.Multiline);
-            if (match.Success && match.Groups[1].Success)
-                return match.Groups[1].Value.Trim();
-            return string.Empty;
+            Match match = Regex.Match(content, $@"```{Regex.Escape(language)}\s*([\s\S]*?)```", RegexOptions.Multiline);
+            return match.Success && match.Groups[1].Success ? match.Groups[1].Value.Trim() : string.Empty;
         }
     }
 }
