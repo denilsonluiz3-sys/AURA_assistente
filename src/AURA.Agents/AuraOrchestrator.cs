@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AURA.Abstractions.Execution;
 using AURA.Abstractions.Orchestration;
-using AURA.AI;
+using AURA.AI.UniversalAI;
 using AURA.Core.Abstractions;
 using AURA.Core.Events;
 using AURA.Core.Launchers;
@@ -30,7 +30,7 @@ namespace AURA.Agents
         private readonly SimulationRuntime _runtime;
         private readonly IToolExecutor _shell;
         private readonly IWebSearch _webSearch;
-        private readonly OpenRouterClient? _aiClient;
+        private readonly IUniversalAiClient? _aiClient;
         private readonly EventBus? _events;
         private readonly IIntentResolver _intentResolver;
         private readonly PolicyGuard _policyGuard;
@@ -43,7 +43,7 @@ namespace AURA.Agents
             SimulationRuntime runtime,
             IToolExecutor shell,
             IWebSearch webSearch,
-            OpenRouterClient? aiClient = null,
+            IUniversalAiClient? aiClient = null,
             HttpClient? httpClient = null,
             EventBus? events = null,
             IIntentResolver? intentResolver = null,
@@ -138,7 +138,7 @@ namespace AURA.Agents
                 {
                     try
                     {
-                        string fallbackResult = await _aiClient.ChatAsync(userCommand, HttpClient, ct).ConfigureAwait(false);
+                        string fallbackResult = await _aiClient.ChatAsync(userCommand, HttpClient, null, ct).ConfigureAwait(false);
                         string output = "🤖 IA fallback:\n" + fallbackResult;
                         _memory.Record(userCommand, "ai_fallback", output, success: true);
                         Publish(processId, "Orquestração", "IA", "Concluído", "Fallback entregue", 1);
@@ -190,7 +190,7 @@ namespace AURA.Agents
                         {
                             return new ToolResult(
                                 true,
-                                await _aiClient.ChatAsync(command, HttpClient, ct).ConfigureAwait(false));
+                                await _aiClient.ChatAsync(command, HttpClient, null, ct).ConfigureAwait(false));
                         }
                         catch (Exception ex) when (ex is not OperationCanceledException)
                         {
