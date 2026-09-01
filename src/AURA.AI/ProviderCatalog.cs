@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text.Json;
 using AURA.AI.Providers;
 
@@ -41,25 +40,12 @@ namespace AURA.AI
         private const string EmbeddedName = "AURA.AI.config.providers.json";
         private static readonly List<ProviderInfo> ProvidersList = Load();
         public static List<ProviderInfo> Providers => ProvidersList;
-
-        public static void Reload()
-        {
-            ProvidersList.Clear();
-            ProvidersList.AddRange(Load());
-        }
-
-        public static IReadOnlyList<IAiProvider> KeyedProbeCandidates() =>
-            ProvidersList.Where(p => p.NeedsKey).Cast<IAiProvider>().ToList();
+        public static void Reload() { ProvidersList.Clear(); ProvidersList.AddRange(Load()); }
+        public static IReadOnlyList<IAiProvider> KeyedProbeCandidates() => ProvidersList.Where(p => p.NeedsKey).Cast<IAiProvider>().ToList();
 
         private static List<ProviderInfo> Load()
         {
-            try
-            {
-                var list = TryDeserialize(ReadEmbeddedJson());
-                if (list != null) return list;
-            }
-            catch (Exception ex) { Console.Error.WriteLine("[AURA] Embedded providers.json: " + ex.Message); }
-
+            try { var list = TryDeserialize(ReadEmbeddedJson()); if (list != null) return list; } catch { }
             try
             {
                 string? path = FindCatalogFile();
@@ -69,8 +55,7 @@ namespace AURA.AI
                     if (list != null) return list;
                 }
             }
-            catch (Exception ex) { Console.Error.WriteLine("[AURA] File providers.json: " + ex.Message); }
-
+            catch { }
             return BuildFallback();
         }
 
@@ -85,8 +70,7 @@ namespace AURA.AI
         private static List<ProviderInfo>? TryDeserialize(string? json)
         {
             if (string.IsNullOrWhiteSpace(json)) return null;
-            var catalog = JsonSerializer.Deserialize<ProviderCatalogFile>(json,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var catalog = JsonSerializer.Deserialize<ProviderCatalogFile>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             if (catalog?.Providers == null || catalog.Providers.Count == 0) return null;
             Normalize(catalog.Providers);
             return catalog.Providers;
@@ -95,19 +79,17 @@ namespace AURA.AI
         private static string? FindCatalogFile()
         {
             string current = Directory.GetCurrentDirectory();
-            string? baseDir = AppContext.BaseDirectory;
-            var candidates = new[]
+            string baseDir = AppContext.BaseDirectory;
+            foreach (string candidate in new[]
             {
                 Path.Combine(current, "config", "providers.json"),
                 Path.Combine(current, "..", "config", "providers.json"),
                 Path.Combine(current, "..", "..", "config", "providers.json"),
                 Path.Combine(baseDir, "config", "providers.json"),
                 Path.Combine(baseDir, "..", "..", "..", "..", "config", "providers.json")
-            };
-            foreach (string candidate in candidates)
+            })
             {
-                try { string full = Path.GetFullPath(candidate); if (File.Exists(full)) return full; }
-                catch { }
+                try { string full = Path.GetFullPath(candidate); if (File.Exists(full)) return full; } catch { }
             }
             return null;
         }
@@ -118,12 +100,9 @@ namespace AURA.AI
             {
                 if (string.IsNullOrWhiteSpace(provider.Id)) provider.Id = NormalizeId(provider.Name);
                 provider.Models ??= new List<ProviderModel>();
-                if (string.IsNullOrWhiteSpace(provider.DefaultModelId) && provider.Models.Count > 0)
-                    provider.DefaultModelId = provider.Models[0].Id;
+                if (string.IsNullOrWhiteSpace(provider.DefaultModelId) && provider.Models.Count > 0) provider.DefaultModelId = provider.Models[0].Id;
                 if (string.IsNullOrWhiteSpace(provider.ModelsUrl) && !string.IsNullOrWhiteSpace(provider.BaseUrl))
-                    provider.ModelsUrl = provider.BaseUrl
-                        .Replace("/chat/completions", "/models", StringComparison.OrdinalIgnoreCase)
-                        .Replace("/v1/messages", "/v1/models", StringComparison.OrdinalIgnoreCase);
+                    provider.ModelsUrl = provider.BaseUrl.Replace("/chat/completions", "/models", StringComparison.OrdinalIgnoreCase).Replace("/v1/messages", "/v1/models", StringComparison.OrdinalIgnoreCase);
                 if (string.IsNullOrWhiteSpace(provider.AuthHeaderName)) provider.AuthHeaderName = "Authorization";
                 provider.AuthScheme ??= "Bearer ";
                 provider.KeyPrefixesList ??= new List<string>();
@@ -135,35 +114,25 @@ namespace AURA.AI
             }
         }
 
-        private static string NormalizeId(string? value) => string.IsNullOrWhiteSpace(value)
-            ? string.Empty
-            : new string(value.Trim().ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
+        private static string NormalizeId(string? value) => string.IsNullOrWhiteSpace(value) ? string.Empty : new string(value.Trim().ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
 
+        // Empty provider means "not configured". It must not silently resolve to the first catalog entry (usually Ollama).
         public static ProviderInfo? Find(string? name)
         {
-            if (string.IsNullOrWhiteSpace(name)) return ProvidersList.FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(name)) return null;
             string wanted = name.Trim();
-            return ProvidersList.FirstOrDefault(p =>
-                string.Equals(p.Id, wanted, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(p.Name, wanted, StringComparison.OrdinalIgnoreCase));
+            return ProvidersList.FirstOrDefault(p => string.Equals(p.Id, wanted, StringComparison.OrdinalIgnoreCase) || string.Equals(p.Name, wanted, StringComparison.OrdinalIgnoreCase));
         }
 
         public static ProviderModel? FindModel(string? provider, string? model)
         {
             if (string.IsNullOrWhiteSpace(model)) return null;
-            return Find(provider)?.Models.FirstOrDefault(m =>
-                string.Equals(m.Id, model.Trim(), StringComparison.OrdinalIgnoreCase));
+            return Find(provider)?.Models.FirstOrDefault(m => string.Equals(m.Id, model.Trim(), StringComparison.OrdinalIgnoreCase));
         }
 
         private static List<ProviderInfo> BuildFallback() => new()
         {
-            new ProviderInfo
-            {
-                Id = "ollama", Name = "Ollama (local)",
-                BaseUrl = "http://127.0.0.1:11434/v1/chat/completions",
-                ModelsUrl = "http://127.0.0.1:11434/v1/models", NeedsKey = false,
-                ApiFormat = AiApiFormat.OpenAICompletions
-            }
+            new ProviderInfo { Id = "ollama", Name = "Ollama (local)", BaseUrl = "http://127.0.0.1:11434/v1/chat/completions", ModelsUrl = "http://127.0.0.1:11434/v1/models", NeedsKey = false, ApiFormat = AiApiFormat.OpenAICompletions }
         };
 
         private sealed class ProviderCatalogFile
