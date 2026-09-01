@@ -1,5 +1,6 @@
 using AURA.AI;
 using AURA.AI.Providers;
+using AURA.AI.UniversalAI;
 
 namespace AURA.Mobile.Diagnostics
 {
@@ -57,8 +58,6 @@ namespace AURA.Mobile.Diagnostics
             if (client == null) throw new ArgumentNullException(nameof(client));
             var configuredProvider = Provider;
             ProviderInfo? provider = ProviderCatalog.Find(configuredProvider);
-
-            // Never replace an explicit cloud/client configuration with the first catalog entry (normally Ollama).
             if (provider == null && !string.IsNullOrWhiteSpace(configuredProvider))
                 throw new InvalidOperationException($"Provedor configurado não encontrado: {configuredProvider}");
 
@@ -83,6 +82,21 @@ namespace AURA.Mobile.Diagnostics
             client.Options.ApiKey = provider.NeedsKey ? GetApiKeyForProvider(provider.Id) : string.Empty;
             client.Options.AuthHeaderName = provider.AuthHeaderName ?? string.Empty; client.Options.AuthScheme = provider.AuthScheme ?? string.Empty; client.Options.ApiFormat = ApiFormat;
             LastStatusMessage = provider.Name + " · " + model + " · " + baseUrl;
+        }
+
+        /// <summary>Aplica a configuração universal no cliente legado consumido pelo Agent/Chat.</summary>
+        public static OpenRouterClient ApplyUniversal(string providerId, string apiKey, string model, string? baseUrl = null, string? modelsUrl = null)
+        {
+            var connection = UniversalRuntimeAdapter.CreateConnection(providerId, apiKey, model, baseUrl, modelsUrl);
+            var client = UniversalAiClientFactory.Create(connection, MaxTokens, TimeoutSeconds);
+            Provider = connection.Provider.Id;
+            Model = connection.Model;
+            BaseUrlOverride = connection.Provider.BaseUrl;
+            ModelsUrlOverride = connection.Provider.ModelsUrl;
+            ApiFormat = client.Options.ApiFormat;
+            SetApiKeyForProvider(connection.Provider.Id, connection.ApiKey);
+            LastStatusMessage = connection.Provider.Name + " · " + connection.Model + " · " + connection.Provider.BaseUrl;
+            return client;
         }
 
         public static string? ValidateApiKeyFormat(string? key, ProviderInfo? provider)
