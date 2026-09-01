@@ -16,24 +16,29 @@ public static class UniversalAiClientFactory
         if (string.IsNullOrWhiteSpace(connection.Provider.BaseUrl))
             throw new ArgumentException("Endpoint do provider obrigatório.", nameof(connection));
 
-        return new OpenRouterClient(new OpenRouterOptions
+        var format = MapFormat(connection.Provider.Format);
+        if (format == AiApiFormat.OpenAICompletions || format == AiApiFormat.AnthropicMessages)
         {
-            Provider = connection.Provider.Id,
-            ApiKey = connection.ApiKey.Trim(),
-            BaseUrl = connection.Provider.BaseUrl,
-            Model = connection.Model,
-            MaxTokens = maxTokens,
-            TimeoutSeconds = timeoutSeconds,
-            AuthHeaderName = connection.Provider.AuthHeader,
-            AuthScheme = connection.Provider.AuthScheme,
-            ApiFormat = MapFormat(connection.Provider.Format)
-        });
+            return new OpenRouterClient(new OpenRouterOptions
+            {
+                Provider = connection.Provider.Id,
+                ApiKey = connection.ApiKey.Trim(),
+                BaseUrl = connection.Provider.BaseUrl,
+                Model = connection.Model,
+                MaxTokens = maxTokens,
+                TimeoutSeconds = timeoutSeconds,
+                AuthHeaderName = connection.Provider.AuthHeader,
+                AuthScheme = connection.Provider.AuthScheme,
+                ApiFormat = format
+            });
+        }
+
+        throw new NotSupportedException($"Formato universal '{connection.Provider.Format}' ainda não possui adapter compatível com OpenRouterClient.");
     }
 
     private static AiApiFormat MapFormat(UniversalApiFormat format) => format switch
     {
         UniversalApiFormat.AnthropicMessages => AiApiFormat.AnthropicMessages,
-        UniversalApiFormat.Gemini => AiApiFormat.GeminiGenerateContent,
         _ => AiApiFormat.OpenAICompletions
     };
 }
