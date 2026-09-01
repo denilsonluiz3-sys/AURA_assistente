@@ -1,24 +1,22 @@
 namespace AURA.AI.UniversalAI;
 
-/// <summary>Cria uma conexão universal sem alterar o contrato do AgentSession.</summary>
+/// <summary>Transforma exclusivamente a configuração escolhida pelo usuário em uma conexão universal.</summary>
 public static class UniversalRuntimeAdapter
 {
-    public static UniversalConnection CreateConnection(string providerId, string apiKey, string model, string? baseUrl = null, string? modelsUrl = null)
+    public static UniversalConnection CreateConnection(
+        string providerId,
+        string apiKey,
+        string model,
+        string baseUrl,
+        string? modelsUrl = null,
+        UniversalApiFormat format = UniversalApiFormat.OpenAiCompatible,
+        string authHeader = "Authorization",
+        string authScheme = "Bearer",
+        bool requiresApiKey = true)
     {
-        var provider = UniversalProviderRegistry.BuiltIns.FirstOrDefault(p => string.Equals(p.Id, providerId, StringComparison.OrdinalIgnoreCase));
-        if (provider is null)
-        {
-            if (string.IsNullOrWhiteSpace(baseUrl)) throw new ArgumentException("Base URL obrigatória para provider customizado.", nameof(baseUrl));
-            provider = UniversalProviderRegistry.Custom(baseUrl, modelsUrl);
-        }
-        else if (!string.IsNullOrWhiteSpace(baseUrl) || !string.IsNullOrWhiteSpace(modelsUrl))
-        {
-            provider = provider with
-            {
-                BaseUrl = string.IsNullOrWhiteSpace(baseUrl) ? provider.BaseUrl : baseUrl.TrimEnd('/'),
-                ModelsUrl = string.IsNullOrWhiteSpace(modelsUrl) ? provider.ModelsUrl : modelsUrl.TrimEnd('/')
-            };
-        }
-        return new UniversalConnection(provider, apiKey ?? string.Empty, model ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(providerId)) throw new ArgumentException("Provider obrigatório.", nameof(providerId));
+        if (string.IsNullOrWhiteSpace(model)) throw new ArgumentException("Modelo obrigatório.", nameof(model));
+        var provider = UniversalProviderRegistry.Custom(providerId, baseUrl, modelsUrl, format, authHeader, authScheme, requiresApiKey);
+        return new UniversalConnection(provider, apiKey ?? string.Empty, model.Trim());
     }
 }
