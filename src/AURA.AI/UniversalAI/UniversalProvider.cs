@@ -14,7 +14,7 @@ public sealed record UniversalProvider(
     string ModelsUrl,
     UniversalApiFormat Format = UniversalApiFormat.OpenAiCompatible,
     string AuthHeader = "Authorization",
-    string AuthScheme = "Bearer ");
+    string AuthScheme = "Bearer");
 
 public sealed record UniversalModel(string Id, string DisplayName, string ProviderId, string? OwnedBy = null);
 
