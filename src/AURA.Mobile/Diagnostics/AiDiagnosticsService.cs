@@ -1,3 +1,4 @@
+using AURA.AI.UniversalAI;
 using System.Text;
 using AURA.AI;
 
@@ -9,9 +10,9 @@ namespace AURA.Mobile.Diagnostics;
 /// </summary>
 public sealed class AiDiagnosticsService
 {
-    private readonly OpenRouterClient _client;
+    private readonly IUniversalAiClient _client;
 
-    public AiDiagnosticsService(OpenRouterClient client)
+    public AiDiagnosticsService(IUniversalAiClient client)
     {
         _client = client;
     }

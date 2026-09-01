@@ -1,3 +1,4 @@
+using AURA.AI.UniversalAI;
 using AURA.AI;
 using AURA.AI.Providers;
 using AURA.Agents;
@@ -57,7 +58,7 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new ConfigLoader(sp.GetRequiredService<ILogger>()).LoadModules(Path.Combine(configDir, "modules.json")));
         builder.Services.AddSingleton(sp => new ModuleManager(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "modules"), Path.Combine(configDir, "modules.json"), sp.GetRequiredService<EventBus>(), localPackageProvider: ReadEmbeddedModulePackageAsync));
         builder.Services.AddSingleton(sp => new MemoryStore(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "memory.json")));
-        builder.Services.AddSingleton(sp => new OpenRouterClient(new OpenRouterOptions { Provider = "ollama", ApiKey = string.Empty, BaseUrl = "http://127.0.0.1:11435/v1/chat/completions", Model = "aura-qwen:latest", MaxTokens = 512, TimeoutSeconds = 180, ApiFormat = AiApiFormat.OpenAICompletions }, sp.GetRequiredService<ILogger>()));
+        builder.Services.AddSingleton(sp => new IUniversalAiClient(new UniversalAiClientOptions { Provider = "ollama", ApiKey = string.Empty, BaseUrl = "http://127.0.0.1:11435/v1/chat/completions", Model = "aura-qwen:latest", MaxTokens = 512, TimeoutSeconds = 180, ApiFormat = UniversalApiFormat.OpenAICompletions }, sp.GetRequiredService<ILogger>()));
         builder.Services.AddSingleton<AiDiagnosticsService>();
         builder.Services.AddSingleton<AiAssistant>();
         builder.Services.AddSingleton<ISpeechService, HybridSpeechService>();
@@ -86,7 +87,21 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new SolutionStore(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "aura")));
         builder.Services.AddSingleton(sp => new LocalPlaybook(sp.GetRequiredService<SolutionStore>(), sp.GetRequiredService<MemoryStore>()));
         builder.Services.AddSingleton<FileTool>(sp => new FileTool(AgentWorkspace.ActiveRoot));
-        builder.Services.AddSingleton<AuraOrchestrator>(sp => new AuraOrchestrator(sp.GetRequiredService<ILogger>(), sp.GetRequiredService<SolutionStore>(), sp.GetRequiredService<Runner>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetRequiredService<IToolExecutor>(), sp.GetRequiredService<AURA.Core.Abstractions.IWebSearch>(), sp.GetRequiredService<OpenRouterClient>(), events: sp.GetRequiredService<EventBus>(), intentResolver: sp.GetRequiredService<IIntentResolver>(), policyGuard: sp.GetRequiredService<PolicyGuard>()));
+        builder.Services.AddSingleton<IUniversalAiClient>(sp =>
+        {
+            var client = new UniversalAiClient(new UniversalAiClientOptions());
+
+            if (!string.IsNullOrWhiteSpace(RuntimeConfig.Provider) &&
+                !string.IsNullOrWhiteSpace(RuntimeConfig.Model) &&
+                !string.IsNullOrWhiteSpace(RuntimeConfig.BaseUrlOverride))
+            {
+                RuntimeConfig.Apply(client);
+            }
+
+            return client;
+        });
+
+        builder.Services.AddSingleton<AuraOrchestrator>(sp => new AuraOrchestrator(sp.GetRequiredService<ILogger>(), sp.GetRequiredService<SolutionStore>(), sp.GetRequiredService<Runner>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetRequiredService<IToolExecutor>(), sp.GetRequiredService<AURA.Core.Abstractions.IWebSearch>(), sp.GetRequiredService<IUniversalAiClient>(), events: sp.GetRequiredService<EventBus>(), intentResolver: sp.GetRequiredService<IIntentResolver>(), policyGuard: sp.GetRequiredService<PolicyGuard>()));
         builder.Services.AddSingleton<IOrchestrator>(sp => sp.GetRequiredService<AuraOrchestrator>());
         builder.Services.AddSingleton<AURA.Abstractions.Process.IProcessOrchestrator>(sp => new AURA.Agents.LegalProcessEngine(sp.GetRequiredService<ILogger>(), sp.GetServices<AURA.Core.Abstractions.IAgent>(), sp.GetRequiredService<IOrchestrator>(), sp.GetRequiredService<EventBus>()));
         builder.Services.AddSingleton<MainPage>();
@@ -100,7 +115,7 @@ public static class MauiProgram
 #endif
         ));
         builder.Services.AddSingleton<ChatPage>();
-        builder.Services.AddSingleton<AgentPage>(sp => new AgentPage(sp.GetRequiredService<OpenRouterClient>(), sp.GetRequiredService<MemoryStore>(), sp.GetRequiredService<ISpeechService>(), sp.GetRequiredService<ShellExecutor>(), sp.GetRequiredService<ProcessRegistry>(), sp.GetRequiredService<AuraOrchestrator>(), sp.GetRequiredService<AgentExecutionCoordinator>(), sp.GetService<LocalPlaybook>(), sp.GetService<VoiceAssistantService>(), sp.GetRequiredService<SolutionStore>(), sp.GetService<GitExecutor>(), sp.GetService<PythonExecutor>(), sp.GetService<NodeExecutor>(), sp.GetService<CellProgramRegistry>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetRequiredService<IAndroidCapabilityService>()));
+        builder.Services.AddSingleton<AgentPage>(sp => new AgentPage(sp.GetRequiredService<IUniversalAiClient>(), sp.GetRequiredService<MemoryStore>(), sp.GetRequiredService<ISpeechService>(), sp.GetRequiredService<ShellExecutor>(), sp.GetRequiredService<ProcessRegistry>(), sp.GetRequiredService<AuraOrchestrator>(), sp.GetRequiredService<AgentExecutionCoordinator>(), sp.GetService<LocalPlaybook>(), sp.GetService<VoiceAssistantService>(), sp.GetRequiredService<SolutionStore>(), sp.GetService<GitExecutor>(), sp.GetService<PythonExecutor>(), sp.GetService<NodeExecutor>(), sp.GetService<CellProgramRegistry>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetRequiredService<IAndroidCapabilityService>()));
         builder.Services.AddSingleton<MemoryPage>();
         builder.Services.AddSingleton<ExecutorsPage>();
         builder.Services.AddSingleton<SpectrumPage>(sp => new SpectrumPage(sp.GetService<IAndroidCapabilityService>()));

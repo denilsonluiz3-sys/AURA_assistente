@@ -17,9 +17,9 @@ namespace AURA.Mobile.Diagnostics
         public static string Model { get => Preferences.Default.Get("ai_model", string.Empty); set => Preferences.Default.Set("ai_model", (value ?? string.Empty).Trim()); }
         public static string BaseUrlOverride { get => Preferences.Default.Get("ai_base_url", string.Empty); set => Preferences.Default.Set("ai_base_url", (value ?? string.Empty).Trim()); }
         public static string ModelsUrlOverride { get => Preferences.Default.Get("ai_models_url", string.Empty); set => Preferences.Default.Set("ai_models_url", (value ?? string.Empty).Trim()); }
-        public static AiApiFormat ApiFormat
+        public static UniversalApiFormat ApiFormat
         {
-            get { string value = Preferences.Default.Get("ai_api_format", string.Empty); return Enum.TryParse<AiApiFormat>(value, true, out var format) ? format : (ProviderCatalog.Find(Provider)?.ApiFormat ?? AiApiFormat.OpenAICompletions); }
+            get { string value = Preferences.Default.Get("ai_api_format", string.Empty); return Enum.TryParse<UniversalApiFormat>(value, true, out var format) ? format : (ProviderCatalog.Find(Provider)?.ApiFormat ?? UniversalApiFormat.OpenAICompletions); }
             set => Preferences.Default.Set("ai_api_format", value.ToString());
         }
         public static string LastStatusMessage { get; private set; } = string.Empty;
@@ -53,7 +53,7 @@ namespace AURA.Mobile.Diagnostics
             return u;
         }
 
-        public static void Apply(OpenRouterClient client)
+        public static void Apply(IUniversalAiClient client)
         {
             if (client == null) throw new ArgumentNullException(nameof(client));
             var configuredProvider = Provider;
@@ -83,7 +83,7 @@ namespace AURA.Mobile.Diagnostics
         }
 
         /// <summary>Aplica uma conexão universal diretamente na instância já injetada no Agent/Chat.</summary>
-        public static void ApplyUniversal(OpenRouterClient client, string providerId, string apiKey, string model, string? baseUrl = null, string? modelsUrl = null)
+        public static void ApplyUniversal(IUniversalAiClient client, string providerId, string apiKey, string model, string? baseUrl = null, string? modelsUrl = null)
         {
             if (client == null) throw new ArgumentNullException(nameof(client));
             var connection = UniversalRuntimeAdapter.CreateConnection(providerId, apiKey, model, baseUrl, modelsUrl);
@@ -112,7 +112,7 @@ namespace AURA.Mobile.Diagnostics
             if (k.Length > 4096 || k.IndexOfAny(new[] { ' ', '\t', '\r', '\n' }) >= 0) return "Chave de API inválida. Cole somente a chave, sem espaços ou quebras de linha.";
             return null;
         }
-        public static string? EnsureReadyForRequest(OpenRouterClient client)
+        public static string? EnsureReadyForRequest(IUniversalAiClient client)
         {
             Apply(client); ProviderInfo? provider = ProviderCatalog.Find(Provider);
             string key = client.Options.ApiKey ?? string.Empty; if (!string.IsNullOrWhiteSpace(key)) return ValidateApiKeyFormat(key, provider);

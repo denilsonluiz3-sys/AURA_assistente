@@ -1,3 +1,4 @@
+using AURA.AI.UniversalAI;
 using AURA.AI;
 using AURA.Agents;
 using AURA.Agents.Programs;
@@ -22,7 +23,7 @@ public partial class AgentPage : ContentPage
     private const string UrlDeepSeek = "https://chat.deepseek.com";
     private const string UrlChatGpt = "https://chatgpt.com";
 
-    private readonly OpenRouterClient _client;
+    private readonly IUniversalAiClient _client;
     private readonly MemoryStore _memory;
     private readonly ISpeechService _speech;
     private readonly VoiceAssistantService? _voice;
@@ -52,7 +53,7 @@ public partial class AgentPage : ContentPage
     private string? _lastUserQuery;
     private string? _lastAssistantText;
 
-    public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
+    public AgentPage(IUniversalAiClient client, MemoryStore memory, ISpeechService speech,
         ShellExecutor shell, ProcessRegistry processes, AuraOrchestrator orchestrator,
         AgentExecutionCoordinator coordinator,
         LocalPlaybook? playbook = null, VoiceAssistantService? voice = null,

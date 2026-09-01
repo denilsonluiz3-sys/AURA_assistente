@@ -14,7 +14,7 @@ public sealed class AiConfigView : ContentView
     private readonly Button _saveButton = new() { Text = "SALVAR", IsEnabled = false, HorizontalOptions = LayoutOptions.Fill };
     private readonly Label _status = new() { FontSize = 12, LineBreakMode = LineBreakMode.WordWrap };
     private readonly List<string> _models = new();
-    private OpenRouterClient? _client;
+    private IUniversalAiClient? _client;
     private UniversalProvider? _discoveredProvider;
 
     public AiConfigView()
@@ -30,7 +30,7 @@ public sealed class AiConfigView : ContentView
         }};
     }
 
-    public void Load(OpenRouterClient client) { _client = client; LoadExisting(); }
+    public void Load(IUniversalAiClient client) { _client = client; LoadExisting(); }
     public void ApplyToClient()
     {
         if (_client == null || _discoveredProvider == null) return;
@@ -67,8 +67,8 @@ public sealed class AiConfigView : ContentView
             RuntimeConfig.SetApiKeyForProvider(provider.Id, key);
             RuntimeConfig.ApiFormat = provider.Format switch
             {
-                UniversalApiFormat.AnthropicMessages => AiApiFormat.AnthropicMessages,
-                _ => AiApiFormat.OpenAICompletions
+                UniversalApiFormat.AnthropicMessages => UniversalApiFormat.AnthropicMessages,
+                _ => UniversalApiFormat.OpenAICompletions
             };
             _models.Clear(); _models.AddRange(models.Select(m => m.Id)); _modelPicker.ItemsSource = null; _modelPicker.ItemsSource = _models; _modelPicker.IsEnabled = true; _modelPicker.SelectedIndex = 0; _saveButton.IsEnabled = true;
             SetStatus($"{provider.Name}: {_models.Count} modelo(s) carregado(s).", true);

@@ -1,3 +1,4 @@
+using AURA.AI.UniversalAI;
 using AURA.AI;
 using AURA.Abstractions.Orchestration;
 using AURA.Abstractions.Process;
@@ -9,7 +10,7 @@ namespace AURA.Mobile.Pages;
 
 public partial class ChatPage : ContentPage
 {
-    private readonly OpenRouterClient _client;
+    private readonly IUniversalAiClient _client;
     private readonly AURA.Memory.MemoryStore _memory;
     private readonly IProcessOrchestrator _processEngine;
     private readonly IOrchestrator _orchestrator;
@@ -18,7 +19,7 @@ public partial class ChatPage : ContentPage
     private readonly AURA.Mobile.ProcessRegistry _processes;
 
     public ChatPage(
-        OpenRouterClient client,
+        IUniversalAiClient client,
         AURA.Memory.MemoryStore memory,
         IProcessOrchestrator processEngine,
         IOrchestrator orchestrator,
