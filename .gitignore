@@ -76,3 +76,11 @@ src/AURA.Mobile/Resources/Raw/kokoro-v1.0.int8.onnx
 backups/
 backups_aura_professor/
 .venv/
+
+# AURA local audit artifacts
+agent-auth-audit.txt
+agent-auth-mini.txt
+audit-agent-auth-mini.sh
+audit-agent-auth.sh
+audit-warnings.sh
+warnings-audit.txt
