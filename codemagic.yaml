@@ -11,7 +11,7 @@ workflows:
         DOTNET_BIN: $CM_BUILD_DIR/dotnet/dotnet
         DOTNET_VERSION: "10.0.110"
         ANDROID_TFM: net10.0-android
-        AURA_DISPLAY_VERSION: "2.1"
+        AURA_DISPLAY_VERSION: "2.4"
 
     scripts:
       - name: Install .NET 10
@@ -64,17 +64,37 @@ workflows:
         script: |
           set -euo pipefail
           export PATH="$DOTNET_PATH:$PATH"
-          mkdir -p "$CM_BUILD_DIR/artifacts"
+          OUT="$CM_BUILD_DIR/artifacts"
+          mkdir -p "$OUT"
+
           "$DOTNET_BIN" publish src/AURA.Mobile/AURA.Mobile.csproj \
             -f "$ANDROID_TFM" \
             -c Release \
             -p:AndroidPackageFormats=apk \
-            -p:ApplicationVersion="${BUILD_NUMBER:-1}" \
+            -p:ApplicationVersion="${PROJECT_BUILD_NUMBER:-${BUILD_NUMBER:-24}}" \
             -p:ApplicationDisplayVersion="$AURA_DISPLAY_VERSION" \
             --verbosity minimal \
-            -o "$CM_BUILD_DIR/artifacts"
+            -o "$OUT"
+
           echo "Publish: OK"
-          find "$CM_BUILD_DIR/artifacts" -type f -name '*.apk' -print
+          echo "--- APKs em artifacts ---"
+          find "$OUT" -type f -name '*.apk' -print || true
+
+          # Fallback: bin do projeto (alguns hosts MAUI não copiam para -o)
+          if ! find "$OUT" -type f -name '*.apk' | grep -q .; then
+            echo "Nenhum APK em artifacts; buscando em src/AURA.Mobile/bin…"
+            find src/AURA.Mobile/bin -type f -name '*.apk' -print || true
+            while IFS= read -r apk; do
+              cp -f "$apk" "$OUT/"
+            done < <(find src/AURA.Mobile/bin -type f -name '*.apk' 2>/dev/null || true)
+          fi
+
+          echo "--- APKs finais ---"
+          find "$OUT" -type f -name '*.apk' -print
+          if ! find "$OUT" -type f -name '*.apk' | grep -q .; then
+            echo "ERRO: nenhum .apk gerado"
+            exit 1
+          fi
 
     artifacts:
       - artifacts/**/*.apk
