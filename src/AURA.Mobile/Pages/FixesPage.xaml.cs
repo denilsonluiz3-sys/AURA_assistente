@@ -1,15 +1,15 @@
-using AURA.AI;
+using AURA.AI.UniversalAI;
 using AURA.Mobile.Diagnostics;
 
 namespace AURA.Mobile.Pages;
 
 public partial class FixesPage : ContentPage
 {
-    private readonly OpenRouterClient _client;
+    private readonly IUniversalAiClient _client;
     private readonly AiDiagnosticsService _diagnostics;
     private List<FixProposal> _pending = new();
 
-    public FixesPage(OpenRouterClient client, AiDiagnosticsService diagnostics)
+    public FixesPage(IUniversalAiClient client, AiDiagnosticsService diagnostics)
     {
         InitializeComponent();
         _client = client;

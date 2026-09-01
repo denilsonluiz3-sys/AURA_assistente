@@ -1,16 +1,16 @@
 using System.Net;
 using System.Net.Http;
-using AURA.AI;
+using AURA.AI.UniversalAI;
 using AURA.Mobile.Diagnostics;
 
 namespace AURA.Mobile.Pages;
 
 public partial class LogsPage : ContentPage
 {
-    private readonly OpenRouterClient _client;
+    private readonly IUniversalAiClient _client;
     private readonly AiDiagnosticsService _diagnostics;
 
-    public LogsPage(OpenRouterClient client, AiDiagnosticsService diagnostics)
+    public LogsPage(IUniversalAiClient client, AiDiagnosticsService diagnostics)
     {
         InitializeComponent();
         _client = client;
