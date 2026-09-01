@@ -23,7 +23,6 @@
             </Grid>
         </Border>
 
-        <!-- Superfície curta: somente os atalhos de uso frequente ficam na frente. O restante permanece no menu ⚡. -->
         <ScrollView Grid.Row="1" Orientation="Horizontal" HorizontalScrollBarVisibility="Never" HeightRequest="42">
             <HorizontalStackLayout Spacing="6" Padding="12,5,12,3">
                 <Button x:Name="ModeAgentBtn" Text="Agente" Clicked="OnModeAgentClicked" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="16" />
@@ -53,10 +52,6 @@
             </CollectionView>
         </Border>
 
-        <!-- O Agente ocupa a área principal. Cada execução (Shell/Git/Python/Node/Programa)
-             aparece como uma célula de capacidade própria dentro do próprio fluxo de
-             conversa (ConversationContainer), ao lado das bolhas de texto do Agente —
-             não existe mais uma superfície única flutuante fora do scroll. -->
         <Grid x:Name="AgentPane" Grid.Row="3" IsVisible="True">
             <ScrollView x:Name="ConversationScroll">
                 <VerticalStackLayout x:Name="ConversationContainer" Spacing="6" Padding="14,12" />
@@ -73,11 +68,22 @@
         </Grid>
 
         <Border Grid.Row="4" ZIndex="50" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,8">
-            <VerticalStackLayout Spacing="7">
-                <ContentView x:Name="ConfigHost" IsVisible="False" />
+            <VerticalStackLayout Spacing="6">
+                <!-- Painel de config limitado: não ocupa a tela inteira -->
+                <Border x:Name="ConfigPanel" IsVisible="False"
+                        BackgroundColor="{DynamicResource AuraSurface2}"
+                        Stroke="{DynamicResource AuraBorder}"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 10"
+                        Padding="0"
+                        MaximumHeightRequest="280">
+                    <ScrollView MaximumHeightRequest="280" VerticalScrollBarVisibility="Default">
+                        <ContentView x:Name="ConfigHost" />
+                    </ScrollView>
+                </Border>
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                     <Border Grid.Column="0" BackgroundColor="{DynamicResource AuraSurface2}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,5" StrokeShape="RoundRectangle 12,12,12,12">
-                        <Editor x:Name="CommandEditor" MinimumHeightRequest="40" MaximumHeightRequest="110" Placeholder="Instrua o agente… (ex.: ls, diagnostique, execute o programa X)" AutoSize="TextChanges" BackgroundColor="Transparent" />
+                        <Editor x:Name="CommandEditor" MinimumHeightRequest="40" MaximumHeightRequest="110" Placeholder="Instrua o agente… (ex.: ls, diagnostique)" AutoSize="TextChanges" BackgroundColor="Transparent" />
                     </Border>
                     <Grid Grid.Column="1" WidthRequest="56" HeightRequest="56" VerticalOptions="End" ZIndex="51">
                         <ActivityIndicator x:Name="BusyIndicator" IsRunning="False" IsVisible="False" InputTransparent="True" Color="White" WidthRequest="22" HeightRequest="22" HorizontalOptions="Center" VerticalOptions="Center" />
