@@ -22,7 +22,7 @@ public sealed class AiAssistant
     public async Task<string> AskAsync(string question, HttpClient? httpClient = null, CancellationToken ct = default)
     {
         _memory.Append(MemoryEntry.Question(question));
-        var answer = await _client.ChatAsync(question, httpClient, ct).ConfigureAwait(false);
+        var answer = await _client.ChatAsync(question, httpClient, null, ct).ConfigureAwait(false);
         _memory.Append(MemoryEntry.Answer(answer));
         _logger.Info("AI: pergunta registrada e respondida.");
         return answer;
