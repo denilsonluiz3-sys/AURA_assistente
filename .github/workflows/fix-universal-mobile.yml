@@ -1,0 +1,65 @@
+name: Fix universal mobile consumers
+
+on:
+  push:
+    branches: [fix/universal-mobile-consumers]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ !contains(github.event.head_commit.message, '[auto-universal-mobile-fix]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Replace remaining legacy client types
+        shell: python
+        run: |
+          from pathlib import Path
+          files = [
+              Path('src/AURA.Mobile/Pages/AgentPage.xaml.cs'),
+              Path('src/AURA.Mobile/Pages/FixesPage.xaml.cs'),
+              Path('src/AURA.Mobile/Pages/LogsPage.xaml.cs'),
+          ]
+          for p in files:
+              s = p.read_text(encoding='utf-8')
+              s = s.replace('OpenRouterClient', 'IUniversalAiClient')
+              if 'IUniversalAiClient' in s and 'using AURA.AI.UniversalAI;' not in s:
+                  s = 'using AURA.AI.UniversalAI;\n' + s
+              p.write_text(s, encoding='utf-8')
+
+          p = Path('src/AURA.Mobile/Controls/AiConfig.cs')
+          if p.exists():
+              p.unlink()
+      - name: Remove invalid AiConfig legacy facade references
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('src/AURA.Mobile/Pages/AgentPage.xaml.cs')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('        cfg.Load(_client);\n', '        cfg.LoadExistingConfiguration();\n')
+          p.write_text(s, encoding='utf-8')
+      - name: Expose existing universal configuration loader
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('src/AURA.Mobile/Controls/AiConfigView.cs')
+          s = p.read_text(encoding='utf-8')
+          marker = '    private void LoadExisting()'
+          if 'public void LoadExistingConfiguration()' not in s:
+              s = s.replace(marker, '    public void LoadExistingConfiguration() => LoadExisting();\n\n' + marker)
+              p.write_text(s, encoding='utf-8')
+      - name: Verify no legacy mobile client symbols
+        run: |
+          if grep -RniE 'OpenRouterClient|OpenRouterOptions' src/AURA.Mobile --include='*.cs'; then exit 1; fi
+      - name: Commit
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'AURA Universal Migration'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/AURA.Mobile .github/workflows/fix-universal-mobile.yml
+          git commit -m 'fix(universal): migrate remaining mobile consumers [auto-universal-mobile-fix]'
+          git push origin HEAD:fix/universal-mobile-consumers
