@@ -1,17 +1,28 @@
 name: AURA Android APK
 
-# APK principal: Codemagic (aura-mobile-apk).
-# Este workflow fica só para validação manual no GitHub quando necessário.
+# Caminho oficial do APK (Codemagic esgotou builds).
+# Disparo: manual ou push na main.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/AURA.Mobile/**"
+      - "src/AURA.*/**"
+      - ".github/workflows/build-android-apk.yml"
+      - "global.json"
+      - "NuGet.Config"
+      - "AURA.sln"
 
 concurrency:
-  group: aura-android-manual
+  group: aura-android-apk-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
-  DOTNET_NOLOGO: '1'
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+  AURA_DISPLAY_VERSION: "2.4"
 
 permissions:
   contents: read
@@ -19,7 +30,7 @@ permissions:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -28,13 +39,13 @@ jobs:
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: "10.0.x"
 
       - name: Setup JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Setup Android SDK tools
         uses: android-actions/setup-android@v3
@@ -89,11 +100,16 @@ jobs:
             echo "KEYSTORE_PRESENT=1" >> "$GITHUB_ENV"
           else
             echo "KEYSTORE_PRESENT=0" >> "$GITHUB_ENV"
+            echo "::warning::Secrets de keystore ausentes — APK será gerado sem assinatura de release"
           fi
 
-      - name: Build APK
-        id: build
+      - name: Publish APK
+        id: publish
         run: |
+          set -euo pipefail
+          OUT="$GITHUB_WORKSPACE/artifacts"
+          mkdir -p "$OUT"
+
           SIGN_ARGS=""
           if [ "${KEYSTORE_PRESENT:-0}" = "1" ]; then
             SIGN_ARGS="-p:AndroidSigningKeyStore=keystore/aura-release.jks \
@@ -102,17 +118,40 @@ jobs:
               -p:AndroidSigningStorePass=${{ secrets.AURA_KEYSTORE_PASS }} \
               -p:AndroidUseDebugSigning=false"
           fi
-          dotnet build src/AURA.Mobile/AURA.Mobile.csproj \
-            -c Release --no-restore \
+
+          dotnet publish src/AURA.Mobile/AURA.Mobile.csproj \
+            -f net10.0-android \
+            -c Release \
+            --no-restore \
             -p:AndroidPackageFormats=apk \
-            $SIGN_ARGS
+            -p:ApplicationVersion="${{ github.run_number }}" \
+            -p:ApplicationDisplayVersion="$AURA_DISPLAY_VERSION" \
+            $SIGN_ARGS \
+            -o "$OUT"
+
+          echo "--- APKs em artifacts ---"
+          find "$OUT" -type f -name '*.apk' -print || true
+
+          # Fallback: bin do projeto
+          if ! find "$OUT" -type f -name '*.apk' | grep -q .; then
+            echo "Nenhum APK em artifacts; buscando em src/AURA.Mobile/bin…"
+            while IFS= read -r apk; do
+              cp -f "$apk" "$OUT/"
+            done < <(find src/AURA.Mobile/bin -type f -name '*.apk' 2>/dev/null || true)
+          fi
+
+          echo "--- APKs finais ---"
+          find "$OUT" -type f -name '*.apk' -print
+          if ! find "$OUT" -type f -name '*.apk' | grep -q .; then
+            echo "ERRO: nenhum .apk gerado"
+            exit 1
+          fi
 
       - name: Upload APK
         if: success()
-        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: aura-mobile-apk-manual-${{ github.run_id }}
-          path: src/AURA.Mobile/bin/Release/net10.0-android/*.apk
-          if-no-files-found: warn
-          retention-days: 3
+          name: aura-mobile-apk-${{ github.run_number }}
+          path: artifacts/**/*.apk
+          if-no-files-found: error
+          retention-days: 14

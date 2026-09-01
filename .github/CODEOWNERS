@@ -1,0 +1,14 @@
+# AURA — ownership crítico
+# Impede merge sem review do owner em arquivos sensíveis.
+
+* @denilsonluiz3-sys
+
+# CI / build / secrets surface
+.github/ @denilsonluiz3-sys
+codemagic.yaml @denilsonluiz3-sys
+global.json @denilsonluiz3-sys
+NuGet.Config @denilsonluiz3-sys
+
+# App mobile e solução
+src/AURA.Mobile/ @denilsonluiz3-sys
+AURA.sln @denilsonluiz3-sys
