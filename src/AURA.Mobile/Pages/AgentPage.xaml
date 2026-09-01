@@ -69,7 +69,6 @@
 
         <Border Grid.Row="4" ZIndex="50" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,8">
             <VerticalStackLayout Spacing="6">
-                <!-- SetConfigVisible liga IsVisible aqui; altura máxima evita cobrir a tela -->
                 <ScrollView x:Name="ConfigHost"
                             IsVisible="False"
                             MaximumHeightRequest="260"
@@ -81,7 +80,8 @@
                     </Border>
                     <Grid Grid.Column="1" WidthRequest="56" HeightRequest="56" VerticalOptions="End" ZIndex="51">
                         <ActivityIndicator x:Name="BusyIndicator" IsRunning="False" IsVisible="False" InputTransparent="True" Color="White" WidthRequest="22" HeightRequest="22" HorizontalOptions="Center" VerticalOptions="Center" />
-                        <Button x:Name="RunButton" Text="▶" Clicked="OnRunClicked" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="28" FontSize="18" Padding="0" WidthRequest="56" HeightRequest="56" />
+                        <!-- ▶ envia · ■ para (mesmo botão) -->
+                        <Button x:Name="RunButton" Text="▶" Clicked="OnRunOrStopClicked" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="28" FontSize="18" Padding="0" WidthRequest="56" HeightRequest="56" />
                     </Grid>
                 </Grid>
             </VerticalStackLayout>
