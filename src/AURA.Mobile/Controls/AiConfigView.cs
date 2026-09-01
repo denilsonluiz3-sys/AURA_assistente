@@ -5,7 +5,7 @@ namespace AURA.Mobile.Controls;
 
 /// <summary>
 /// Config mínima: preset → key → modelo → Conectar.
-/// Avançado (endpoint/formato) fica recolhido.
+/// DeepSeek e OpenRouter com free prioritários.
 /// </summary>
 public sealed class AiConfigView : ContentView
 {
@@ -20,13 +20,13 @@ public sealed class AiConfigView : ContentView
 
     private static readonly Preset[] Presets =
     {
-        new("openrouter", "OpenRouter",
+        new("openrouter", "OpenRouter (free)",
             "https://openrouter.ai/api/v1/chat/completions",
             "https://openrouter.ai/api/v1/models",
-            UniversalApiFormat.OpenAiCompatible, true, "openai/gpt-4o-mini"),
+            UniversalApiFormat.OpenAiCompatible, true, "deepseek/deepseek-r1:free"),
         new("deepseek", "DeepSeek",
-            "https://api.deepseek.com/chat/completions",
-            "https://api.deepseek.com/models",
+            "https://api.deepseek.com/v1/chat/completions",
+            "https://api.deepseek.com/v1/models",
             UniversalApiFormat.OpenAiCompatible, true, "deepseek-chat"),
         new("openai", "OpenAI",
             "https://api.openai.com/v1/chat/completions",
@@ -42,19 +42,19 @@ public sealed class AiConfigView : ContentView
     private readonly Picker _presetPicker = new() { Title = "Provedor" };
     private readonly Entry _apiKeyEntry = new()
     {
-        Placeholder = "API key",
+        Placeholder = "API key (DeepSeek: sk-… · OpenRouter: sk-or-…)",
         IsPassword = true,
         ClearButtonVisibility = ClearButtonVisibility.WhileEditing,
         FontSize = 13
     };
     private readonly Entry _modelEntry = new()
     {
-        Placeholder = "Modelo (ex.: deepseek-chat)",
+        Placeholder = "Modelo (ex.: deepseek-chat ou nome:free)",
         FontSize = 13
     };
     private readonly Picker _modelPicker = new()
     {
-        Title = "Modelos carregados",
+        Title = "Modelos (free primeiro)",
         IsVisible = false,
         FontSize = 13
     };
@@ -79,6 +79,12 @@ public sealed class AiConfigView : ContentView
         Padding = new Thickness(0, 2),
         HorizontalOptions = LayoutOptions.Start
     };
+    private readonly Button _loadModelsButton = new()
+    {
+        Text = "Listar modelos",
+        FontSize = 12,
+        HeightRequest = 36
+    };
     private readonly Button _connectButton = new()
     {
         Text = "Conectar",
@@ -91,7 +97,7 @@ public sealed class AiConfigView : ContentView
     {
         FontSize = 11,
         LineBreakMode = LineBreakMode.WordWrap,
-        MaxLines = 3
+        MaxLines = 4
     };
     private readonly List<string> _models = new();
     private bool _advancedOpen;
@@ -105,9 +111,14 @@ public sealed class AiConfigView : ContentView
         _modelPicker.SelectedIndexChanged += (_, _) =>
         {
             if (_modelPicker.SelectedItem is string m)
-                _modelEntry.Text = m;
+            {
+                // remover sufixo visual " (free)" se o usuário escolheu display
+                var id = m.Replace(" (free)", "", StringComparison.OrdinalIgnoreCase).Trim();
+                _modelEntry.Text = id;
+            }
         };
         _advancedToggle.Clicked += OnAdvancedToggle;
+        _loadModelsButton.Clicked += OnLoadModelsClicked;
         _connectButton.Clicked += OnConnectClicked;
         Loaded += (_, _) => LoadExisting();
 
@@ -127,6 +138,7 @@ public sealed class AiConfigView : ContentView
                 _apiKeyEntry,
                 _modelEntry,
                 _modelPicker,
+                _loadModelsButton,
                 _advancedToggle,
                 _baseUrlEntry,
                 _modelsUrlEntry,
@@ -171,16 +183,15 @@ public sealed class AiConfigView : ContentView
         {
             idx = Array.FindIndex(Presets, p =>
                 !string.IsNullOrEmpty(p.BaseUrl) &&
-                string.Equals(
-                    EndpointValidator.Normalize(p.BaseUrl),
-                    EndpointValidator.Normalize(RuntimeConfig.BaseUrlOverride),
+                RuntimeConfig.BaseUrlOverride.Contains(
+                    new Uri(p.BaseUrl).Host,
                     StringComparison.OrdinalIgnoreCase));
         }
 
         if (idx < 0)
             idx = string.IsNullOrEmpty(provider) && string.IsNullOrEmpty(RuntimeConfig.BaseUrlOverride)
                 ? 0
-                : Presets.Length - 1; // custom
+                : Presets.Length - 1;
 
         _presetPicker.SelectedIndex = idx;
         ApplyPresetFields(Presets[idx], keepExistingUrls: true);
@@ -192,6 +203,9 @@ public sealed class AiConfigView : ContentView
             : RuntimeConfig.Model;
 
         _apiKeyEntry.IsVisible = Presets[idx].RequiresKey || Presets[idx].Id == "custom";
+
+        // Semente de modelos free / deepseek offline
+        SeedFallbackModels(Presets[idx].Id);
         RefreshStatusLine();
     }
 
@@ -203,12 +217,12 @@ public sealed class AiConfigView : ContentView
 
         ApplyPresetFields(p, keepExistingUrls: false);
         _apiKeyEntry.IsVisible = p.RequiresKey || p.Id == "custom";
-        if (string.IsNullOrWhiteSpace(_modelEntry.Text) && !string.IsNullOrEmpty(p.ModelHint))
-            _modelEntry.Text = p.ModelHint;
+        _modelEntry.Text = p.ModelHint;
 
         if (p.Id == "custom")
             SetAdvanced(true);
 
+        SeedFallbackModels(p.Id);
         _status.Text = string.Empty;
     }
 
@@ -216,11 +230,7 @@ public sealed class AiConfigView : ContentView
     {
         if (p.Id == "custom")
         {
-            if (!keepExistingUrls)
-            {
-                // mantém o que o usuário já digitou
-            }
-            else
+            if (keepExistingUrls)
             {
                 _baseUrlEntry.Text = RuntimeConfig.BaseUrlOverride;
                 _modelsUrlEntry.Text = RuntimeConfig.ModelsUrlOverride;
@@ -239,6 +249,24 @@ public sealed class AiConfigView : ContentView
             _modelsUrlEntry.Text = RuntimeConfig.ModelsUrlOverride;
     }
 
+    private void SeedFallbackModels(string providerId)
+    {
+        var fb = UniversalModelDiscovery.FallbackSuggestions(providerId);
+        if (fb.Count == 0)
+            return;
+        ApplyModelList(fb.Select(m => m.Id).ToList());
+    }
+
+    private void ApplyModelList(IList<string> ids)
+    {
+        _models.Clear();
+        foreach (var id in ids.Distinct(StringComparer.OrdinalIgnoreCase))
+            _models.Add(id);
+        _modelPicker.ItemsSource = null;
+        _modelPicker.ItemsSource = _models.ToList();
+        _modelPicker.IsVisible = _models.Count > 0;
+    }
+
     private void OnAdvancedToggle(object? sender, EventArgs e)
         => SetAdvanced(!_advancedOpen);
 
@@ -248,6 +276,72 @@ public sealed class AiConfigView : ContentView
         _baseUrlEntry.IsVisible = open;
         _modelsUrlEntry.IsVisible = open;
         _advancedToggle.Text = open ? "▾ Avançado" : "▸ Avançado";
+    }
+
+    private async void OnLoadModelsClicked(object? sender, EventArgs e)
+    {
+        if (_busy) return;
+        _busy = true;
+        _loadModelsButton.IsEnabled = false;
+        try
+        {
+            SetStatus("Carregando modelos…", true);
+            var count = await LoadModelsFromApiAsync();
+            if (count > 0)
+                SetStatus($"{count} modelo(s) · free no topo da lista.", true);
+            else
+                SetStatus("Lista da API vazia — usando sugestões free/offline.", true);
+        }
+        catch (Exception ex)
+        {
+            var p = SelectedPreset();
+            SeedFallbackModels(p?.Id ?? "openrouter");
+            SetStatus("API models falhou — sugestões offline. " + Short(ex.Message, 80), false);
+        }
+        finally
+        {
+            _busy = false;
+            _loadModelsButton.IsEnabled = true;
+        }
+    }
+
+    private async Task<int> LoadModelsFromApiAsync()
+    {
+        var preset = SelectedPreset() ?? Presets[0];
+        var modelsUrl = EndpointValidator.Normalize(
+            string.IsNullOrWhiteSpace(_modelsUrlEntry.Text) ? preset.ModelsUrl : _modelsUrlEntry.Text);
+        var baseUrl = EndpointValidator.Normalize(
+            string.IsNullOrWhiteSpace(_baseUrlEntry.Text) ? preset.BaseUrl : _baseUrlEntry.Text);
+        var key = ApiKeyValidator.Normalize(_apiKeyEntry.Text);
+        var provider = preset.Id;
+
+        if (string.IsNullOrWhiteSpace(modelsUrl))
+        {
+            SeedFallbackModels(provider);
+            return _models.Count;
+        }
+
+        var p = UniversalProviderRegistry.Custom(
+            provider, baseUrl, modelsUrl, preset.Format,
+            RuntimeConfig.AuthHeader, RuntimeConfig.AuthScheme, RuntimeConfig.RequiresApiKey);
+
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
+        IReadOnlyList<UniversalModel> list;
+        try
+        {
+            list = await new UniversalModelDiscovery(http).LoadAsync(p, key);
+        }
+        catch
+        {
+            list = UniversalModelDiscovery.FallbackSuggestions(provider);
+        }
+
+        list = UniversalModelDiscovery.PrioritizeFree(list, max: 200);
+        if (list.Count == 0)
+            list = UniversalModelDiscovery.FallbackSuggestions(provider);
+
+        ApplyModelList(list.Select(x => x.Id).ToList());
+        return _models.Count;
     }
 
     private async void OnConnectClicked(object? sender, EventArgs e)
@@ -266,17 +360,24 @@ public sealed class AiConfigView : ContentView
 
             if (preset.Id == "custom" && _presetPicker.SelectedIndex == Presets.Length - 1)
             {
-                // permitir nome curto no endpoint host
                 var host = HostHint(_baseUrlEntry.Text);
                 if (!string.IsNullOrEmpty(host))
                     provider = host;
+            }
+
+            // DeepSeek: sempre forçar URLs oficiais se o usuário não abriu Avançado com override
+            if (preset.Id == "deepseek" && !_advancedOpen)
+            {
+                _baseUrlEntry.Text = preset.BaseUrl;
+                _modelsUrlEntry.Text = preset.ModelsUrl;
             }
 
             var baseUrl = EndpointValidator.Normalize(
                 string.IsNullOrWhiteSpace(_baseUrlEntry.Text) ? preset.BaseUrl : _baseUrlEntry.Text);
             var modelsUrl = EndpointValidator.Normalize(
                 string.IsNullOrWhiteSpace(_modelsUrlEntry.Text) ? preset.ModelsUrl : _modelsUrlEntry.Text);
-            var model = _modelEntry.Text?.Trim() ?? string.Empty;
+            var model = (_modelEntry.Text ?? string.Empty).Trim()
+                .Replace(" (free)", "", StringComparison.OrdinalIgnoreCase);
             var key = ApiKeyValidator.Normalize(_apiKeyEntry.Text);
 
             if (string.IsNullOrWhiteSpace(baseUrl))
@@ -296,31 +397,45 @@ public sealed class AiConfigView : ContentView
 
             if (string.IsNullOrWhiteSpace(model))
             {
+                model = preset.ModelHint;
+                _modelEntry.Text = model;
+            }
+
+            if (string.IsNullOrWhiteSpace(model))
+            {
                 SetStatus("Informe o modelo.", false);
                 return;
             }
 
-            var requiresKey = preset.RequiresKey;
-            if (preset.Id == "custom")
-                requiresKey = !string.IsNullOrEmpty(key); // custom local pode sem key
-
-            if (requiresKey || preset.Id != "ollama")
+            // DeepSeek: modelo deve ser deepseek-chat ou deepseek-reasoner (não openrouter/...)
+            if (preset.Id == "deepseek" && model.Contains('/', StringComparison.Ordinal))
             {
-                // ollama: key opcional
-                if (preset.Id != "ollama")
+                SetStatus("DeepSeek API direta: use deepseek-chat ou deepseek-reasoner (não IDs OpenRouter).", false);
+                _modelEntry.Text = "deepseek-chat";
+                return;
+            }
+
+            // OpenRouter free: lembrar sufixo :free se o usuário escolheu deepseek sem provider
+            if (preset.Id == "openrouter" &&
+                model.StartsWith("deepseek-", StringComparison.OrdinalIgnoreCase) &&
+                !model.Contains('/'))
+            {
+                SetStatus("No OpenRouter use IDs tipo deepseek/deepseek-r1:free (ou Listar modelos).", false);
+                return;
+            }
+
+            if (preset.Id != "ollama")
+            {
+                var keyCheck = ApiKeyValidator.ValidateFormat(key, provider, required: true);
+                if (!keyCheck.Success)
                 {
-                    var keyCheck = ApiKeyValidator.ValidateFormat(key, provider, required: true);
-                    if (!keyCheck.Success)
-                    {
-                        SetStatus(keyCheck.Message, false);
-                        return;
-                    }
+                    SetStatus(keyCheck.Message, false);
+                    return;
                 }
             }
 
             SetStatus("Conectando…", true);
 
-            // Persistir
             RuntimeConfig.Provider = provider;
             RuntimeConfig.BaseUrlOverride = baseUrl;
             RuntimeConfig.ModelsUrlOverride = modelsUrl;
@@ -333,64 +448,46 @@ public sealed class AiConfigView : ContentView
             if (client != null)
                 RuntimeConfig.Apply(client);
 
-            // Probe leve da key (pula se ollama sem key)
             if (preset.Id != "ollama" && !string.IsNullOrEmpty(key))
             {
                 var live = await ApiKeyValidator.VerifyLiveAsync(
                     key, baseUrl, model, preset.Format,
                     RuntimeConfig.AuthHeader, RuntimeConfig.AuthScheme,
-                    provider, timeoutSeconds: 20);
+                    provider, timeoutSeconds: 25);
 
                 if (!live.Success)
                 {
-                    SetStatus(live.Message, false);
-                    return;
+                    // Ainda grava a config — usuário pode testar depois; mostra erro claro
+                    SetStatus(live.Message + " (config salva; corrija key/modelo e tente de novo)", false);
+                    // não return duro em 402/rede: config já persistida
+                    if (live.Message.Contains("401") || live.Message.Contains("rejeitada"))
+                        return;
                 }
-
-                SetStatus(Short(live.Message, 120), true);
+                else
+                {
+                    SetStatus(Short(live.Message, 120), true);
+                }
             }
             else
             {
                 var probe = await EndpointValidator.ProbeAsync(baseUrl, key, timeoutSeconds: 12);
-                if (!probe.Success)
-                {
-                    SetStatus(probe.Message, false);
-                    return;
-                }
-                SetStatus("Conectado · " + Short(probe.Message, 80), true);
+                SetStatus(probe.Success
+                    ? "Conectado · " + Short(probe.Message, 80)
+                    : probe.Message, probe.Success);
             }
 
-            // Tentar listar modelos em silêncio (não bloqueia sucesso)
-            if (!string.IsNullOrWhiteSpace(modelsUrl))
+            // Modelos: free no topo
+            try
             {
-                try
-                {
-                    var p = UniversalProviderRegistry.Custom(
-                        provider, baseUrl, modelsUrl, preset.Format,
-                        RuntimeConfig.AuthHeader, RuntimeConfig.AuthScheme, RuntimeConfig.RequiresApiKey);
-                    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-                    var list = await new UniversalModelDiscovery(http).LoadAsync(p, key);
-                    _models.Clear();
-                    _models.AddRange(list.Select(x => x.Id).Take(40));
-                    _modelPicker.ItemsSource = null;
-                    _modelPicker.ItemsSource = _models;
-                    _modelPicker.IsVisible = _models.Count > 0;
-                    if (_models.Count > 0 && string.IsNullOrWhiteSpace(_modelEntry.Text))
-                    {
-                        _modelEntry.Text = _models[0];
-                        RuntimeConfig.Model = _models[0];
-                        if (client != null)
-                            RuntimeConfig.Apply(client);
-                    }
-                }
-                catch
-                {
-                    // lista opcional
-                }
+                await LoadModelsFromApiAsync();
+            }
+            catch
+            {
+                SeedFallbackModels(provider);
             }
 
             RefreshStatusLine();
-            if (string.IsNullOrEmpty(_status.Text) || _status.TextColor == Colors.Green)
+            if (_status.TextColor != Color.FromArgb("#e2555c"))
                 SetStatus("Pronto · " + AiStatusText.ForClient(client), true);
         }
         catch (Exception ex)
