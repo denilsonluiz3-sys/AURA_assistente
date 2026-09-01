@@ -6,7 +6,7 @@ namespace AURA.AI.UniversalAI;
 public interface IUniversalAiClient
 {
     UniversalAiClientOptions Options { get; }
-    Task<string> ChatAsync(string question, HttpClient? httpClient = null, CancellationToken ct = default);
+    Task<string> ChatAsync(string question, HttpClient? httpClient = null, string? systemPrompt = null, CancellationToken ct = default);
     Task<AgentChatResponse> ChatToolsAsync(IReadOnlyList<AgentMessage> messages, IReadOnlyList<AgentToolDefinition> tools, HttpClient? httpClient = null, CancellationToken ct = default, string? systemPrompt = null);
 }
 
