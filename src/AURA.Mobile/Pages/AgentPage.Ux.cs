@@ -4,16 +4,42 @@ using AURA.Mobile.Diagnostics;
 namespace AURA.Mobile.Pages;
 
 /// <summary>
-/// UX extra do Agente: stop da execução, TTS por bolha, status curto.
-/// Partial — não reescreve o AgentPage.xaml.cs inteiro.
+/// UX: stop (■) no enviar, botão 🔊 nas respostas, status curto.
+/// Evita reescrever o AgentPage.xaml.cs de 1200+ linhas.
 /// </summary>
 public partial class AgentPage
 {
     private CancellationTokenSource? _runCts;
+    private bool _uxHooked;
 
-    /// <summary>Se já estiver rodando, cancela; senão delega ao fluxo normal.</summary>
+    partial void OnAppearingUx()
+    {
+        HookBubbleSpeakInjector();
+        RefreshModelStatusLabel();
+    }
+
+    /// <summary>Chamado no fim do ctor via partial method se existir — fallback no OnAppearing.</summary>
+    private void HookBubbleSpeakInjector()
+    {
+        if (_uxHooked) return;
+        _uxHooked = true;
+
+        try
+        {
+            ConversationContainer.ChildAdded += (_, args) =>
+            {
+                if (args.Element is Border border)
+                    MainThread.BeginInvokeOnMainThread(() => TryInjectSpeakButton(border));
+            };
+        }
+        catch { /* ignore */ }
+    }
+
+    /// <summary>▶ envia · ■ cancela.</summary>
     private void OnRunOrStopClicked(object? sender, EventArgs e)
     {
+        HookBubbleSpeakInjector();
+
         if (_runInFlight)
         {
             RequestStopRun();
@@ -21,26 +47,25 @@ public partial class AgentPage
         }
 
         OnRunClicked(sender, e);
+
+        // Reabilita como ■ (OnRunClicked desabilita o botão)
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            await Task.Delay(100);
+            if (_runInFlight)
+                SetRunButtonBusy(true);
+        });
     }
 
     private void RequestStopRun()
     {
-        try
-        {
-            _runCts?.Cancel();
-        }
-        catch { /* ignore */ }
-
+        try { _runCts?.Cancel(); } catch { /* ignore */ }
         try { _ = _speech.StopAsync(); } catch { /* ignore */ }
 
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            try
-            {
-                RunButton.Text = "▶";
-                RunButton.BackgroundColor = (Color)Application.Current!.Resources["AuraAccent"];
-            }
-            catch { /* ignore */ }
+            SetRunButtonBusy(false);
+            _runInFlight = false;
         });
 
         _ = AppendBubbleAsync("⏹ Execução interrompida.", user: false, isTool: true);
@@ -61,7 +86,7 @@ public partial class AgentPage
             if (busy)
             {
                 RunButton.Text = "■";
-                RunButton.IsEnabled = true; // precisa permanecer clicável para stop
+                RunButton.IsEnabled = true;
                 BusyIndicator.IsRunning = true;
                 BusyIndicator.IsVisible = true;
             }
@@ -82,58 +107,79 @@ public partial class AgentPage
         catch { /* ignore */ }
     }
 
-    private HorizontalStackLayout BuildBubbleActions(string payload, bool showSpeak)
+    /// <summary>
+    /// Se a bolha tem só 📋, acrescenta 🔊 (respostas do agente, não do usuário).
+    /// </summary>
+    private void TryInjectSpeakButton(Border border)
     {
-        var row = new HorizontalStackLayout
+        try
         {
-            Spacing = 4,
-            HorizontalOptions = LayoutOptions.End
-        };
+            // Bolhas do usuário alinham à direita
+            if (border.HorizontalOptions == LayoutOptions.End)
+                return;
 
-        var copyBtn = new Button
-        {
-            Text = "📋",
-            FontSize = 11,
-            Padding = new Thickness(6, 2),
-            HeightRequest = 28,
-            WidthRequest = 36,
-            BackgroundColor = Colors.Transparent,
-            TextColor = Color.FromArgb("#8a9bb8")
-        };
-        copyBtn.Clicked += async (_, _) =>
-        {
-            try
-            {
-                await Clipboard.Default.SetTextAsync(payload);
-                AuraLog.Info("AgentPage: texto copiado (botão)");
-            }
-            catch (Exception ex) { AuraLog.Exception("CopyBtn", ex); }
-        };
-        row.Children.Add(copyBtn);
+            if (border.Content is not VerticalStackLayout stack || stack.Children.Count < 2)
+                return;
 
-        if (showSpeak)
-        {
-            var speakBtn = new Button
+            // Já tem speak?
+            foreach (var child in stack.Children)
             {
-                Text = "🔊",
-                FontSize = 11,
-                Padding = new Thickness(6, 2),
-                HeightRequest = 28,
-                WidthRequest = 36,
-                BackgroundColor = Colors.Transparent,
-                TextColor = Color.FromArgb("#8a9bb8")
-            };
-            speakBtn.Clicked += async (_, _) =>
-            {
-                try
+                if (child is Button b && b.Text == "🔊")
+                    return;
+                if (child is HorizontalStackLayout hs)
                 {
-                    await SpeakAsync(payload);
+                    foreach (var c in hs.Children)
+                        if (c is Button bb && bb.Text == "🔊")
+                            return;
                 }
-                catch (Exception ex) { AuraLog.Exception("SpeakBtn", ex); }
-            };
-            row.Children.Add(speakBtn);
-        }
+            }
 
-        return row;
+            string? payload = null;
+            if (stack.Children[0] is Label lbl)
+                payload = lbl.Text;
+            if (string.IsNullOrWhiteSpace(payload))
+                return;
+
+            // Localizar botão copiar e colocar speak ao lado
+            Button? copyBtn = null;
+            for (int i = 0; i < stack.Children.Count; i++)
+            {
+                if (stack.Children[i] is Button btn && btn.Text == "📋")
+                {
+                    copyBtn = btn;
+                    var row = new HorizontalStackLayout
+                    {
+                        Spacing = 4,
+                        HorizontalOptions = LayoutOptions.End
+                    };
+                    stack.Children.RemoveAt(i);
+                    row.Children.Add(btn);
+
+                    var speakBtn = new Button
+                    {
+                        Text = "🔊",
+                        FontSize = 11,
+                        Padding = new Thickness(6, 2),
+                        HeightRequest = 28,
+                        WidthRequest = 36,
+                        BackgroundColor = Colors.Transparent,
+                        TextColor = Color.FromArgb("#8a9bb8")
+                    };
+                    string text = payload;
+                    speakBtn.Clicked += async (_, _) =>
+                    {
+                        try { await SpeakAsync(text); }
+                        catch (Exception ex) { AuraLog.Exception("SpeakBtn", ex); }
+                    };
+                    row.Children.Add(speakBtn);
+                    stack.Children.Insert(i, row);
+                    return;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("TryInjectSpeakButton", ex);
+        }
     }
 }
