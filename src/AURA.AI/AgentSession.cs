@@ -17,6 +17,12 @@ public sealed class AgentSession
     private readonly int _maxRounds;
     private const int MaxHistoryMessages = 16;
 
+    /// <summary>
+    /// Histórico entre recriações de sessão (AgentPage zera _session a cada run).
+    /// </summary>
+    private static readonly List<AgentMessage> SharedHistory = new();
+    private static readonly object SharedGate = new();
+
     public AgentSession(IUniversalAiClient client, IEnumerable<AgentTool> tools, string? systemPrompt = null, ILogger? logger = null, MemoryStore? memory = null, int maxRounds = 12)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
@@ -25,10 +31,21 @@ public sealed class AgentSession
         _logger = logger ?? new ConsoleLogger();
         _memory = memory;
         _maxRounds = Math.Max(1, maxRounds);
+
+        lock (SharedGate)
+        {
+            if (SharedHistory.Count > 0)
+                _messages.AddRange(SharedHistory);
+        }
     }
 
     public event Action<AgentStep>? Step;
     public IReadOnlyList<AgentMessage> Messages => _messages;
+
+    public static void ClearSharedHistory()
+    {
+        lock (SharedGate) SharedHistory.Clear();
+    }
 
     public async Task<string> RunAsync(string userText, HttpClient? httpClient = null, CancellationToken ct = default)
     {
@@ -59,15 +76,26 @@ public sealed class AgentSession
                     _messages.Add(new AgentMessage { Role = "tool", ToolCallId = call.Id, Content = result });
                     Step?.Invoke(new AgentStep(call.Name, call.ArgumentsJson, result, !result.StartsWith("ERRO:", StringComparison.OrdinalIgnoreCase)));
                 }
+                PersistShared();
                 continue;
             }
 
             var answer = response.Content ?? string.Empty;
             _messages.Add(new AgentMessage { Role = "assistant", Content = answer });
             _memory?.Append(MemoryEntry.Answer(answer));
+            PersistShared();
             return answer;
         }
         throw new AgentLlmException("O agente atingiu o limite de rodadas.", AgentErrorKind.Unknown);
+    }
+
+    private void PersistShared()
+    {
+        lock (SharedGate)
+        {
+            SharedHistory.Clear();
+            SharedHistory.AddRange(_messages);
+        }
     }
 
     private string BuildSystemPrompt()
