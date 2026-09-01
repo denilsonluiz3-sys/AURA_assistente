@@ -28,8 +28,7 @@ jobs:
               s = s.replace('OpenRouterClient', 'IUniversalAiClient').replace('OpenRouterOptions', 'UniversalAiClientOptions')
               s = s.replace('AiApiFormat.OpenAICompletions', 'UniversalApiFormat.OpenAiCompatible').replace('AiApiFormat.AnthropicMessages', 'UniversalApiFormat.AnthropicMessages')
               s = s.replace('new IUniversalAiClient(new UniversalAiClientOptions(), _logger)', 'UniversalCliRuntime.Create()')
-              if 'IUniversalAiClient' in s and 'using AURA.AI.UniversalAI;' not in s:
-                  s = 'using AURA.AI.UniversalAI;\n' + s
+              if 'IUniversalAiClient' in s and 'using AURA.AI.UniversalAI;' not in s: s = 'using AURA.AI.UniversalAI;\n' + s
               if p.as_posix().endswith('AURA.CLI/Program.cs'):
                   start = s.find('        private static IUniversalAiClient EnsureAiClient(')
                   if start >= 0:
@@ -45,8 +44,7 @@ jobs:
                   a = s.find('    private bool HasLocalLlmWithoutKey()')
                   if a >= 0:
                       b = s.find('    private void EnsureSession()', a)
-                      if b > a:
-                          s = s[:a] + '    private bool HasLocalLlmWithoutKey() => !string.IsNullOrWhiteSpace(_client.Options.BaseUrl) && string.IsNullOrWhiteSpace(_client.Options.ApiKey);\n\n' + s[b:]
+                      if b > a: s = s[:a] + '    private bool HasLocalLlmWithoutKey() => !string.IsNullOrWhiteSpace(_client.Options.BaseUrl) && string.IsNullOrWhiteSpace(_client.Options.ApiKey);\n\n' + s[b:]
               if s != old: p.write_text(s, encoding='utf-8')
           providers = Path('config/providers.json')
           if providers.exists(): providers.write_text('{\n  "providers": []\n}\n', encoding='utf-8')
@@ -56,7 +54,7 @@ jobs:
           echo '=== LEGACY REFERENCES ==='
           grep -RniE 'OpenRouterClient|OpenRouterOptions|AiApiFormat|ProviderCatalog|ProviderInfo|OPENROUTER' src config --include='*.cs' --include='*.json' || true
           echo '=== UNIVERSAL REFERENCES ==='
-          grep -RniE 'IUniversalAiClient|UniversalAiClientFactory|UniversalRuntimeAdapter|UniversalApiFormat' src --include='*.cs' | head -120 || true
+          (grep -RniE 'IUniversalAiClient|UniversalAiClientFactory|UniversalRuntimeAdapter|UniversalApiFormat' src --include='*.cs' | head -120) || true
       - name: Build solution
         run: dotnet build AURA.sln --configuration Release --nologo
       - name: Commit migration
