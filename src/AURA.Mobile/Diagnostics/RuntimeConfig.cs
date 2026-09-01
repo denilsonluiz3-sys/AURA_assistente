@@ -45,13 +45,13 @@ public static class RuntimeConfig
     public static string BaseUrlOverride
     {
         get => Preferences.Default.Get("ai_base_url", string.Empty);
-        set => Preferences.Default.Set("ai_base_url", (value ?? string.Empty).Trim());
+        set => Preferences.Default.Set("ai_base_url", EndpointValidator.Normalize(value));
     }
 
     public static string ModelsUrlOverride
     {
         get => Preferences.Default.Get("ai_models_url", string.Empty);
-        set => Preferences.Default.Set("ai_models_url", (value ?? string.Empty).Trim());
+        set => Preferences.Default.Set("ai_models_url", EndpointValidator.Normalize(value));
     }
 
     public static UniversalApiFormat ApiFormat
@@ -88,15 +88,10 @@ public static class RuntimeConfig
         set => SetApiKeyForProvider(Provider, value);
     }
 
-    /// <summary>
-    /// Lê a chave: Preferences (confiável) → SecureStorage → legados.
-    /// Nunca lança; retorna vazio se não houver chave.
-    /// </summary>
     public static string GetApiKeyForProvider(string? providerId)
     {
         var id = Normalize(providerId);
 
-        // 1) Preferences por provider (caminho principal — não depende de SecureStorage)
         if (!string.IsNullOrEmpty(id))
         {
             try
@@ -108,19 +103,16 @@ public static class RuntimeConfig
             catch { /* ignore */ }
         }
 
-        // 2) SecureStorage por provider
         if (!string.IsNullOrEmpty(id))
         {
             var fromSecure = ReadSecure(ApiKeyPrefix + id);
             if (!string.IsNullOrEmpty(fromSecure))
             {
-                // Replicar para Preferences para próximas leituras estáveis
                 try { Preferences.Default.Set(ApiKeyPrefix + id, fromSecure); } catch { /* ignore */ }
                 return fromSecure;
             }
         }
 
-        // 3) Legado global Preferences
         try
         {
             var legacy = Preferences.Default.Get(LegacyApiKeyPref, string.Empty)?.Trim();
@@ -129,7 +121,6 @@ public static class RuntimeConfig
         }
         catch { /* ignore */ }
 
-        // 4) Legado SecureStorage sem prefixo
         var legacySecure = ReadSecure(LegacyApiKeySecure);
         if (!string.IsNullOrEmpty(legacySecure))
             return legacySecure;
@@ -137,10 +128,6 @@ public static class RuntimeConfig
         return string.Empty;
     }
 
-    /// <summary>
-    /// Grava a chave em Preferences (sempre) e tenta SecureStorage.
-    /// Provider vazio → grava no slot legado global para não perder a key.
-    /// </summary>
     public static void SetApiKeyForProvider(string? providerId, string? value)
     {
         var id = Normalize(providerId);
@@ -148,7 +135,6 @@ public static class RuntimeConfig
 
         if (string.IsNullOrEmpty(id))
         {
-            // Sem provider: manter no slot legado para a key não "sumir"
             try
             {
                 if (v.Length == 0)
@@ -178,7 +164,6 @@ public static class RuntimeConfig
             AuraLog.Exception("RuntimeConfig.SetApiKey.pref", ex);
         }
 
-        // Espelho no legado para GetApiKey funcionar mesmo se o provider mudar de nome
         try
         {
             if (v.Length == 0)
@@ -195,7 +180,19 @@ public static class RuntimeConfig
     public static void ClearApiKey() => SetApiKeyForProvider(Provider, string.Empty);
 
     public static string NormalizeChatBaseUrl(string? url, string? providerId = null)
-        => (url ?? string.Empty).Trim().TrimEnd('/');
+        => EndpointValidator.Normalize(url);
+
+    /// <summary>Valida o endpoint de chat atual. null = OK.</summary>
+    public static string? ValidateCurrentEndpoint()
+    {
+        var hint = ApiFormat switch
+        {
+            UniversalApiFormat.AnthropicMessages => UniversalApiFormatHint.AnthropicMessages,
+            UniversalApiFormat.Gemini => UniversalApiFormatHint.Gemini,
+            _ => UniversalApiFormatHint.OpenAiCompatible
+        };
+        return EndpointValidator.ValidateFormat(BaseUrlOverride, hint);
+    }
 
     public static UniversalConnection CreateConnection()
     {
@@ -209,21 +206,19 @@ public static class RuntimeConfig
         if (string.IsNullOrWhiteSpace(baseUrl))
             throw new InvalidOperationException("Endpoint não configurado.");
 
+        var endpointError = ValidateCurrentEndpoint();
+        if (endpointError != null)
+            throw new InvalidOperationException(endpointError);
+
         var apiKey = GetApiKeyForProvider(provider);
         return UniversalRuntimeAdapter.CreateConnection(
             provider, apiKey, model, baseUrl, ModelsUrlOverride,
             ApiFormat, AuthHeader, AuthScheme, RequiresApiKey);
     }
 
-    /// <summary>
-    /// Aplica config no cliente. Nunca engole a API key: se CreateConnection falhar,
-    /// ainda copia provider/model/url/key parciais para Options.
-    /// </summary>
     public static void Apply(IUniversalAiClient client)
     {
         ArgumentNullException.ThrowIfNull(client);
-
-        // Sempre hidratar o que já temos — inclusive a key
         ApplyPartial(client);
 
         try
@@ -243,13 +238,11 @@ public static class RuntimeConfig
         }
         catch (Exception ex)
         {
-            // Config incompleta ou factory recusou: partial já deixou a key no cliente
             LastStatusMessage = "Config parcial: " + ex.Message;
             AuraLog.Info("RuntimeConfig.Apply partial: " + ex.Message);
         }
     }
 
-    /// <summary>Copia Preferences → Options sem exigir config completa.</summary>
     public static void ApplyPartial(IUniversalAiClient client)
     {
         ArgumentNullException.ThrowIfNull(client);
@@ -270,12 +263,22 @@ public static class RuntimeConfig
         if (client == null)
             return "Cliente de IA não configurado.";
 
-        // Rehidratar key na hora da chamada (pode ter sido salva depois do DI)
         ApplyPartial(client);
 
         if (string.IsNullOrWhiteSpace(client.Options.BaseUrl))
-            return "Configure o endpoint do provider (⚙)."
-                ;
+            return "Configure o endpoint do provider (⚙).";
+
+        var endpointError = EndpointValidator.ValidateFormat(
+            client.Options.BaseUrl,
+            client.Options.ApiFormat switch
+            {
+                UniversalApiFormat.AnthropicMessages => UniversalApiFormatHint.AnthropicMessages,
+                UniversalApiFormat.Gemini => UniversalApiFormatHint.Gemini,
+                _ => UniversalApiFormatHint.OpenAiCompatible
+            });
+        if (endpointError != null)
+            return endpointError;
+
         if (string.IsNullOrWhiteSpace(client.Options.Model))
             return "Configure o modelo (⚙).";
 
@@ -303,7 +306,6 @@ public static class RuntimeConfig
     {
         try
         {
-            // Evitar deadlock: SecureStorage async em thread de pool
             return Task.Run(async () =>
             {
                 try
