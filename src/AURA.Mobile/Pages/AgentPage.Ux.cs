@@ -4,7 +4,8 @@ using AURA.Mobile.Diagnostics;
 namespace AURA.Mobile.Pages;
 
 /// <summary>
-/// UX: stop (■) com CancellationToken real, 🔊 nas respostas, status curto.
+/// UX alinhada à visão: status curto, stop com CT, 🔊, limpar histórico compartilhado.
+/// Partial — não reescreve o AgentPage.xaml.cs grande.
 /// </summary>
 public partial class AgentPage
 {
@@ -41,10 +42,11 @@ public partial class AgentPage
         }
     }
 
-    /// <summary>▶ envia · ■ cancela via AgentSession.CancelAmbientRun + CTS.</summary>
+    /// <summary>▶ envia · ■ cancela via AgentSession.CancelAmbientRun.</summary>
     private void OnRunOrStopClicked(object? sender, EventArgs e)
     {
         HookBubbleSpeakInjector();
+        try { RefreshModelStatusLabel(); } catch { /* ignore */ }
 
         if (_runInFlight)
         {
@@ -52,7 +54,6 @@ public partial class AgentPage
             return;
         }
 
-        // Token ambiente: RunAsync (mesmo sem CT explícito no OnRunClicked) liga neste CTS
         try
         {
             _runCts = AgentSession.BeginAmbientRun();
@@ -65,7 +66,6 @@ public partial class AgentPage
 
         OnRunClicked(sender, e);
 
-        // OnRunClicked desabilita o botão — reabilita como ■ para permitir stop
         MainThread.BeginInvokeOnMainThread(async () =>
         {
             await Task.Delay(80);
@@ -82,8 +82,6 @@ public partial class AgentPage
 
         MainThread.BeginInvokeOnMainThread(() => SetRunButtonBusy(false));
 
-        // A bolha de interrupção também pode vir do retorno de RunAsync ("⏹ Execução interrompida.")
-        // Evita duplicar: só mostra se o fluxo ainda estiver marcado em voo.
         if (_runInFlight)
             _ = AppendBubbleAsync("⏹ Cancelando…", user: false, isTool: true);
     }
@@ -116,7 +114,16 @@ public partial class AgentPage
         catch { /* ignore */ }
     }
 
-    /// <summary>Injeta 🔊 ao lado do 📋 nas bolhas do agente (não nas do usuário).</summary>
+    /// <summary>
+    /// Limpa bolhas + histórico compartilhado do AgentSession (continuidade sob controle).
+    /// Pode ser chamado do menu se o handler legado não limpar SharedHistory.
+    /// </summary>
+    private void ResetConversationContinuity()
+    {
+        try { AgentSession.ClearSharedHistory(); } catch { /* ignore */ }
+        try { _session = null; } catch { /* ignore */ }
+    }
+
     private void TryInjectSpeakButton(Border border)
     {
         try

@@ -18,33 +18,25 @@ namespace AURA.Mobile
             events.Subscribe<ModuleStateChangedEvent>(_ =>
                 MainThread.BeginInvokeOnMainThread(ScheduleRebuildTabs));
 
-            // ModuleId null = sempre visível (núcleo). Outros ainda passam por IsApplied.
+            // Visão: Agente útil + Terminal padrão + o mínimo que ainda ajuda.
+            // Páginas fora da lista continuam no DI (ctor), mas NÃO aparecem nas abas.
+            // Chat / Células / Programas / Executores / Módulos / etc. ficam escondidos
+            // até haver uso real — não apagar ainda (evita quebrar registro de serviços).
             _entries = new List<(string?, string, string, Page)>
             {
-                (null, "Sistema", "Início", home),
-                (null, "Sistema", "Ecossistema", ecosystem),
-                ("system", "Sistema", "Diagnóstico", diagnostico),
-                ("logs", "Sistema", "Correções", fixes),
-
-                ("ai", "Assistente", "Chat", chat),
                 (null, "Assistente", "Agente", agent),
-                ("memory", "Assistente", "Memória", memory),
-                (null, "Assistente", "Navegador", browser),
-
                 (null, "Ferramentas", "Terminal", terminal),
-                ("executors", "Ferramentas", "Executores", executors),
-                (null, "Ferramentas", "Espectro", spectrum),
-                (null, "Ferramentas", "Módulos", modules),
-                ("logs", "Ferramentas", "Logs", logs),
-
-                (null, "Apps", "Programas", programs),
-                ("cells", "Apps", "Células", cells),
-                ("cells", "Apps", "Rodar programa", run)
+                (null, "Sistema", "Início", home),
+                ("system", "Sistema", "Diagnóstico", diagnostico),
             };
+
+            // Referências mantidas para o compilador/DI não reclamar de parâmetros não usados
+            // e para NavigateToProcessAsync poder achar páginas se o processo apontar para elas.
+            _ = (chat, memory, executors, modules, logs, fixes, browser, cells, run, programs, ecosystem, spectrum);
 
             BarBackgroundColor = Color.FromArgb("#0c0c12");
             BarTextColor = Color.FromArgb("#e8e8f0");
-            AuraLog.Info("MainPage.ctor OK");
+            AuraLog.Info("MainPage.ctor OK (abas reduzidas)");
         }
 
         protected override async void OnAppearing()

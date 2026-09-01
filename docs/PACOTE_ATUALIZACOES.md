@@ -1,32 +1,34 @@
-# Pacote de atualizações AURA (estado no main)
+# Pacote AURA — visão e estado
 
-## Já aplicado
+## Visão (prioridade)
 
-| Item | Onde |
-|------|------|
-| API key persistente (Preferences + SecureStorage) | `RuntimeConfig` |
-| Validação de endpoint | `EndpointValidator` |
-| Validação de API key (formato + live) | `ApiKeyValidator` |
-| Config compacta (preset → key → modelo → Conectar) | `AiConfigView` |
-| Painel ⚙ limitado (~260px) | `AgentPage.xaml` ConfigHost |
-| Regras shell padrão no núcleo | `DefaultAgentSystemPrompt` + `AgentSession.Merge` |
-| Continuidade entre recriações de sessão | `AgentSession` SharedHistory |
-| Terminal com comandos padrão | `TerminalPage` |
-| Status curto key/modelo | `AiStatusText` |
+**Agente útil + terminal padrão + config simples + continuar de onde parou + menos abas.**
 
-## Ainda recomendado no AgentPage (cirúrgico, sem rewrite)
+## Abas visíveis (MainPage)
 
-1. `ModelLabel.Text = AiStatusText.ForClient(_client);`
-2. `string systemPrompt = AgentSystemPrompt.Build();`
-3. Remover `_session = null` antes de `EnsureSession` no run (SharedHistory já cobre)
-4. Em Limpar chat: `AgentSession.ClearSharedHistory();`
-5. `HasLocalLlmWithoutKey`: honrar `!RuntimeConfig.RequiresApiKey`
+| Seção | Aba |
+|-------|-----|
+| Assistente | **Agente** |
+| Ferramentas | **Terminal** |
+| Sistema | Início, Diagnóstico (se módulo system) |
 
-**Não** substituir o arquivo inteiro do AgentPage (risco PLACEHOLDER).
+Chat, Células, Programas, Executores, Módulos, Logs, Navegador separado, etc. **não** entram nas abas (código/DI preservados).
 
-## Como validar no aparelho
+Web AI fica **dentro** do Agente (modo Web AI).
 
-1. ⚙ → preset → key → modelo → **Conectar**
-2. Mensagem curta “Pronto · key: ok”
-3. Pedir `ls` ou `pwd` no Agente
-4. Terminal: `help` lista comandos padrão
+## Já no núcleo
+
+- Config: preset → key → modelo → **Conectar** (painel curto)
+- Key/endpoint validados
+- Shell padrão no `DefaultAgentSystemPrompt`
+- Continuidade: `AgentSession` SharedHistory
+- Stop: `BeginAmbientRun` / `CancelAmbientRun` + CT no HTTP
+- UX: ▶/■, 🔊 nas bolhas, status `AiStatusText`
+
+## Validar no APK
+
+1. Só ver poucas abas (Agente + Terminal + Início…)
+2. ⚙ Conectar → key ok
+3. `ls` / continue na 2ª mensagem
+4. ■ cancela run
+5. 🔊 lê resposta
