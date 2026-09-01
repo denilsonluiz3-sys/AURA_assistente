@@ -15,7 +15,7 @@ namespace AURA.AI
     {
         public string Provider { get; set; } = "openai";
         public string ApiKey { get; set; } = string.Empty;
-        public string BaseUrl { get; set; } = "https://api.openai.com/v1/chat/completions";
+        public string BaseUrl { get; set; } = "https://openrouter.ai/api/v1/chat/completions";
         public string Model { get; set; } = "gpt-5-mini";
         public int MaxTokens { get; set; } = 1500;
         public int TimeoutSeconds { get; set; } = 90;

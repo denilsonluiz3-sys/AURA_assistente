@@ -5,71 +5,123 @@ using Microsoft.Maui.Graphics;
 namespace AURA.Mobile.Pages;
 
 /// <summary>
-/// Inline execution card rendered in the Agent conversation.
+/// Célula visual de uma execução específica, identificada por CorrelationId.
+/// Permite múltiplas execuções independentes no fluxo da conversa.
 /// </summary>
-public sealed class AgentCapabilityBubble : Border
+public sealed class AgentCapabilityBubble : ContentView
 {
-    private readonly Label _statusLabel;
-    private readonly Label _outputLabel;
-
     public string CorrelationId { get; }
+    public bool IsFinished { get; private set; }
 
-    public AgentCapabilityBubble(string correlationId, string title)
+    private readonly Label _title;
+    private readonly Label _status;
+    private readonly Editor _output;
+
+    public AgentCapabilityBubble(
+        string correlationId,
+        string title,
+        string status = "Executando...")
     {
-        CorrelationId = correlationId;
+        CorrelationId = string.IsNullOrWhiteSpace(correlationId)
+            ? Guid.NewGuid().ToString("N")
+            : correlationId;
 
-        var titleLabel = new Label
+        _title = new Label
         {
             Text = title,
-            FontAttributes = FontAttributes.Bold,
-            FontSize = 14
-        };
-
-        _statusLabel = new Label
-        {
-            Text = "Executando...",
-            FontSize = 12
-        };
-
-        _outputLabel = new Label
-        {
             FontSize = 12,
-            LineBreakMode = LineBreakMode.WordWrap
+            FontAttributes = FontAttributes.Bold,
+            TextColor = Color.FromArgb("#8fb3ff")
         };
 
-        var content = new VerticalStackLayout
+        _status = new Label
         {
-            Spacing = 4,
-            Children = { titleLabel, _statusLabel, _outputLabel }
+            Text = status,
+            FontSize = 10,
+            Opacity = 0.85,
+            TextColor = Color.FromArgb("#8a9bb8")
         };
 
-        Content = content;
-        Padding = new Thickness(12, 8);
-        Stroke = Colors.Gray;
-        StrokeThickness = 1;
-        StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
+        _output = new Editor
         {
-            CornerRadius = new CornerRadius(12)
+            IsReadOnly = true,
+            AutoSize = EditorAutoSizeOption.TextChanges,
+            MinimumHeightRequest = 0,
+            MaximumHeightRequest = 220,
+            FontSize = 11,
+            BackgroundColor = Colors.Transparent,
+            IsVisible = false,
+            Text = string.Empty
         };
+
+        var card = new Border
+        {
+            BackgroundColor = Color.FromArgb("#0f1420"),
+            Stroke = Color.FromArgb("#242438"),
+            StrokeThickness = 1,
+            Padding = new Thickness(12, 8),
+            Margin = new Thickness(0, 2),
+            StrokeShape = new RoundRectangle
+            {
+                CornerRadius = new CornerRadius(10)
+            },
+            HorizontalOptions = LayoutOptions.Fill,
+            Content = new VerticalStackLayout
+            {
+                Spacing = 3,
+                Children =
+                {
+                    _title,
+                    _status,
+                    _output
+                }
+            }
+        };
+
+        Content = card;
+    }
+
+    public void SetTitle(string title)
+    {
+        if (IsFinished || string.IsNullOrWhiteSpace(title))
+            return;
+
+        _title.Text = title;
     }
 
     public void SetStatus(string status)
     {
-        _statusLabel.Text = status;
-    }
-
-    public void AppendOutput(string output)
-    {
-        if (string.IsNullOrEmpty(output))
+        if (IsFinished || string.IsNullOrWhiteSpace(status))
             return;
 
-        _outputLabel.Text += output;
+        _status.Text = status;
     }
 
-    public void Complete(bool success, string? result = null)
+    public void AppendOutput(string text)
     {
-        _statusLabel.Text = success ? "Concluído" : "Falhou";
-        if (!string.IsNullOrEmpty(result))
-            _outputLabel.Text = result;
+        if (IsFinished || string.IsNullOrEmpty(text))
+            return;
+
+        _output.IsVisible = true;
+        _output.Text += text;
+    }
+
+    public void Complete(bool success, string? finalMessage = null)
+    {
+        if (IsFinished)
+            return;
+
+        IsFinished = true;
+
+        if (!string.IsNullOrEmpty(finalMessage))
+        {
+            _output.IsVisible = true;
+            _output.Text = finalMessage;
+        }
+
+        _status.Text = success ? "Concluído" : "Falhou";
+        _status.TextColor = success
+            ? Color.FromArgb("#7fd99a")
+            : Color.FromArgb("#f0c0c4");
     }
 }
