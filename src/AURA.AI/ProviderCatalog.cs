@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text.Json;
 using AURA.AI.Providers;
+using AURA.AI.UniversalAI;
 
 namespace AURA.AI
 {
+    /// <summary>Compatibilidade legada para consumidores que ainda usam ProviderModel.</summary>
     public sealed class ProviderModel
     {
         public string Id { get; set; } = string.Empty;
@@ -16,6 +16,7 @@ namespace AURA.AI
         public override string ToString() => IsFree ? $"{Label} (grátis)" : Label;
     }
 
+    /// <summary>Compatibilidade legada; os dados reais vêm de UniversalProviderRegistry.</summary>
     public sealed class ProviderInfo : IAiProvider
     {
         public string Id { get; set; } = string.Empty;
@@ -35,111 +36,61 @@ namespace AURA.AI
         public IReadOnlyList<string> KeyPrefixes => KeyPrefixesList;
     }
 
+    /// <summary>
+    /// Fachada de compatibilidade. Não possui catálogo próprio: UniversalProviderRegistry
+    /// é a única fonte de providers e modelos.
+    /// </summary>
     public static class ProviderCatalog
     {
-        private const string EmbeddedName = "AURA.AI.config.providers.json";
-        private static readonly List<ProviderInfo> ProvidersList = Load();
-        public static List<ProviderInfo> Providers => ProvidersList;
-        public static void Reload() { ProvidersList.Clear(); ProvidersList.AddRange(Load()); }
-        public static IReadOnlyList<IAiProvider> KeyedProbeCandidates() => ProvidersList.Where(p => p.NeedsKey).Cast<IAiProvider>().ToList();
+        private static List<ProviderInfo> _providers = Map();
+        public static List<ProviderInfo> Providers => _providers;
 
-        private static List<ProviderInfo> Load()
-        {
-            try { var list = TryDeserialize(ReadEmbeddedJson()); if (list != null) return list; } catch { }
-            try
-            {
-                string? path = FindCatalogFile();
-                if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
-                {
-                    var list = TryDeserialize(File.ReadAllText(path));
-                    if (list != null) return list;
-                }
-            }
-            catch { }
-            return BuildFallback();
-        }
+        public static void Reload() => _providers = Map();
 
-        private static string? ReadEmbeddedJson()
-        {
-            using Stream? stream = typeof(ProviderCatalog).Assembly.GetManifestResourceStream(EmbeddedName);
-            if (stream == null) return null;
-            using var reader = new StreamReader(stream);
-            return reader.ReadToEnd();
-        }
+        public static IReadOnlyList<IAiProvider> KeyedProbeCandidates() =>
+            _providers.Where(p => p.NeedsKey).Cast<IAiProvider>().ToList();
 
-        private static List<ProviderInfo>? TryDeserialize(string? json)
-        {
-            if (string.IsNullOrWhiteSpace(json)) return null;
-            var catalog = JsonSerializer.Deserialize<ProviderCatalogFile>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            if (catalog?.Providers == null || catalog.Providers.Count == 0) return null;
-            Normalize(catalog.Providers);
-            return catalog.Providers;
-        }
-
-        private static string? FindCatalogFile()
-        {
-            string current = Directory.GetCurrentDirectory();
-            string baseDir = AppContext.BaseDirectory;
-            foreach (string candidate in new[]
-            {
-                Path.Combine(current, "config", "providers.json"),
-                Path.Combine(current, "..", "config", "providers.json"),
-                Path.Combine(current, "..", "..", "config", "providers.json"),
-                Path.Combine(baseDir, "config", "providers.json"),
-                Path.Combine(baseDir, "..", "..", "..", "..", "config", "providers.json")
-            })
-            {
-                try { string full = Path.GetFullPath(candidate); if (File.Exists(full)) return full; } catch { }
-            }
-            return null;
-        }
-
-        private static void Normalize(List<ProviderInfo> providers)
-        {
-            foreach (ProviderInfo provider in providers)
-            {
-                if (string.IsNullOrWhiteSpace(provider.Id)) provider.Id = NormalizeId(provider.Name);
-                provider.Models ??= new List<ProviderModel>();
-                if (string.IsNullOrWhiteSpace(provider.DefaultModelId) && provider.Models.Count > 0) provider.DefaultModelId = provider.Models[0].Id;
-                if (string.IsNullOrWhiteSpace(provider.ModelsUrl) && !string.IsNullOrWhiteSpace(provider.BaseUrl))
-                    provider.ModelsUrl = provider.BaseUrl.Replace("/chat/completions", "/models", StringComparison.OrdinalIgnoreCase).Replace("/v1/messages", "/v1/models", StringComparison.OrdinalIgnoreCase);
-                if (string.IsNullOrWhiteSpace(provider.AuthHeaderName)) provider.AuthHeaderName = "Authorization";
-                provider.AuthScheme ??= "Bearer ";
-                provider.KeyPrefixesList ??= new List<string>();
-                foreach (ProviderModel model in provider.Models)
-                {
-                    if (string.IsNullOrWhiteSpace(model.Label)) model.Label = model.Id;
-                    if (string.IsNullOrWhiteSpace(model.Category)) model.Category = model.IsFree ? "Grátis" : "Modelo";
-                }
-            }
-        }
-
-        private static string NormalizeId(string? value) => string.IsNullOrWhiteSpace(value) ? string.Empty : new string(value.Trim().ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
-
-        // Empty provider means "not configured". It must not silently resolve to the first catalog entry (usually Ollama).
         public static ProviderInfo? Find(string? name)
         {
             if (string.IsNullOrWhiteSpace(name)) return null;
             string wanted = name.Trim();
-            return ProvidersList.FirstOrDefault(p => string.Equals(p.Id, wanted, StringComparison.OrdinalIgnoreCase) || string.Equals(p.Name, wanted, StringComparison.OrdinalIgnoreCase));
+            return _providers.FirstOrDefault(p =>
+                string.Equals(p.Id, wanted, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(p.Name, wanted, StringComparison.OrdinalIgnoreCase));
         }
 
         public static ProviderModel? FindModel(string? provider, string? model)
         {
             if (string.IsNullOrWhiteSpace(model)) return null;
-            return Find(provider)?.Models.FirstOrDefault(m => string.Equals(m.Id, model.Trim(), StringComparison.OrdinalIgnoreCase));
+            return Find(provider)?.Models.FirstOrDefault(m =>
+                string.Equals(m.Id, model.Trim(), StringComparison.OrdinalIgnoreCase));
         }
 
-        private static List<ProviderInfo> BuildFallback() => new()
+        private static List<ProviderInfo> Map() => UniversalProviderRegistry.BuiltIns.Select(p => new ProviderInfo
         {
-            new ProviderInfo { Id = "ollama", Name = "Ollama (local)", BaseUrl = "http://127.0.0.1:11434/v1/chat/completions", ModelsUrl = "http://127.0.0.1:11434/v1/models", NeedsKey = false, ApiFormat = AiApiFormat.OpenAICompletions }
-        };
-
-        private sealed class ProviderCatalogFile
-        {
-            public int SchemaVersion { get; set; }
-            public string Description { get; set; } = string.Empty;
-            public List<ProviderInfo> Providers { get; set; } = new();
-        }
+            Id = p.Id,
+            Name = p.Name,
+            BaseUrl = p.BaseUrl,
+            ModelsUrl = p.ModelsUrl,
+            NeedsKey = p.RequiresApiKey,
+            KeyEnv = p.KeyEnv,
+            KeyHint = p.KeyHint,
+            DefaultModelId = p.DefaultModelId,
+            AuthHeaderName = p.AuthHeader,
+            AuthScheme = string.IsNullOrWhiteSpace(p.AuthScheme) ? string.Empty : p.AuthScheme.TrimEnd() + " ",
+            ApiFormat = p.Format switch
+            {
+                UniversalApiFormat.AnthropicMessages => AiApiFormat.AnthropicMessages,
+                _ => AiApiFormat.OpenAICompletions
+            },
+            KeyPrefixesList = p.KeyPrefixes.ToList(),
+            Models = p.Models.Select(m => new ProviderModel
+            {
+                Id = m.Id,
+                Label = m.DisplayName,
+                Category = m.Category,
+                IsFree = m.IsFree
+            }).ToList()
+        }).ToList();
     }
 }
