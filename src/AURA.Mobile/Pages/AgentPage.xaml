@@ -69,18 +69,12 @@
 
         <Border Grid.Row="4" ZIndex="50" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,8">
             <VerticalStackLayout Spacing="6">
-                <!-- Painel de config limitado: não ocupa a tela inteira -->
-                <Border x:Name="ConfigPanel" IsVisible="False"
-                        BackgroundColor="{DynamicResource AuraSurface2}"
-                        Stroke="{DynamicResource AuraBorder}"
-                        StrokeThickness="1"
-                        StrokeShape="RoundRectangle 10"
-                        Padding="0"
-                        MaximumHeightRequest="280">
-                    <ScrollView MaximumHeightRequest="280" VerticalScrollBarVisibility="Default">
-                        <ContentView x:Name="ConfigHost" />
-                    </ScrollView>
-                </Border>
+                <!-- SetConfigVisible liga IsVisible aqui; altura máxima evita cobrir a tela -->
+                <ScrollView x:Name="ConfigHost"
+                            IsVisible="False"
+                            MaximumHeightRequest="260"
+                            VerticalScrollBarVisibility="Default"
+                            BackgroundColor="{DynamicResource AuraSurface2}" />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                     <Border Grid.Column="0" BackgroundColor="{DynamicResource AuraSurface2}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,5" StrokeShape="RoundRectangle 12,12,12,12">
                         <Editor x:Name="CommandEditor" MinimumHeightRequest="40" MaximumHeightRequest="110" Placeholder="Instrua o agente… (ex.: ls, diagnostique)" AutoSize="TextChanges" BackgroundColor="Transparent" />
