@@ -1,0 +1,88 @@
+name: Complete Universal AI Migration
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate-and-build:
+    if: ${{ !contains(github.event.head_commit.message, 'universal-migration-complete') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+      - name: Remove legacy client references
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          root = Path('.')
+          for p in root.rglob('*.cs'):
+              if '.git' in p.parts or 'bin' in p.parts or 'obj' in p.parts:
+                  continue
+              s = p.read_text(encoding='utf-8')
+              old = s
+              s = s.replace('using AURA.AI.Providers;\n', '')
+              if 'OpenRouterClient' in s:
+                  s = s.replace('OpenRouterClient', 'IUniversalAiClient')
+                  if 'using AURA.AI.UniversalAI;' not in s:
+                      s = 'using AURA.AI.UniversalAI;\n' + s
+              s = s.replace('new IUniversalAiClient(new OpenRouterOptions(), _logger)', 'UniversalCliRuntime.Create()')
+              s = s.replace('OpenRouterOptions', 'UniversalAiClientOptions')
+              s = s.replace('AiApiFormat.OpenAICompletions', 'UniversalApiFormat.OpenAiCompatible')
+              s = s.replace('AiApiFormat.AnthropicMessages', 'UniversalApiFormat.AnthropicMessages')
+              if p.as_posix().endswith('AURA.CLI/Program.cs'):
+                  start = s.find('        private static IUniversalAiClient EnsureAiClient(')
+                  if start >= 0:
+                      brace = s.find('{', start)
+                      depth = 0
+                      end = -1
+                      for i in range(brace, len(s)):
+                          if s[i] == '{': depth += 1
+                          elif s[i] == '}':
+                              depth -= 1
+                              if depth == 0:
+                                  end = i + 1
+                                  break
+                      if end > 0:
+                          method = '''        private static IUniversalAiClient EnsureAiClient(string? model = null)\n        {\n            return UniversalCliRuntime.Create(model);\n        }'''
+                          s = s[:start] + method + s[end:]
+                  s = s.replace('Environment.GetEnvironmentVariable("OPENROUTER_API_KEY")', 'Environment.GetEnvironmentVariable("AURA_API_KEY")')
+                  s = s.replace('OPENROUTER_API_KEY', 'AURA_API_KEY')
+                  s = s.replace('sk-or-...', 'API_KEY')
+                  s = s.replace('OpenRouter', 'provider configurado')
+                  s = s.replace('qwen/qwen-plus', 'modelo configurado')
+              if s != old:
+                  p.write_text(s, encoding='utf-8')
+
+          # No provider/model catalog is shipped by default. The user supplies all runtime values.
+          providers = Path('config/providers.json')
+          if providers.exists():
+              providers.write_text('{\n  "providers": []\n}\n', encoding='utf-8')
+      - name: Verify no legacy symbols remain
+        run: |
+          if grep -RniE 'OpenRouterClient|OpenRouterOptions|AiApiFormat|ProviderCatalog|ProviderInfo|OPENROUTER' src config --include='*.cs' --include='*.json'; then
+            echo 'Legacy provider/client references remain.'
+            exit 1
+          fi
+      - name: Build solution
+        run: dotnet build AURA.sln --configuration Release --nologo
+      - name: Commit migration
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'No migration changes needed.'
+            exit 0
+          fi
+          git config user.name 'AURA Universal Migration'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src config
+          git commit -m 'chore(universal): complete universal migration [universal-migration-complete]'
+          git push origin HEAD:main
