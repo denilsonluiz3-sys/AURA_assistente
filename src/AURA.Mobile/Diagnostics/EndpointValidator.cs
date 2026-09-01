@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http;
-using System.Text.RegularExpressions;
 
 namespace AURA.Mobile.Diagnostics;
 
@@ -43,18 +42,10 @@ public static class EndpointValidator
         if (string.IsNullOrWhiteSpace(uri.Host))
             return "Endpoint sem host.";
 
-        // localhost / IPs privados são válidos (Ollama no aparelho ou LAN)
-        if (uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
-            || uri.Host == "127.0.0.1"
-            || uri.Host == "[::1]")
-        {
-            // ok
-        }
-
         if (s.Contains(' '))
             return "Endpoint não pode conter espaços.";
 
-        // Avisos leves (não bloqueiam): formato OpenAI costuma terminar em chat/completions
+        // Formato OpenAI costuma exigir path (ex.: /api/v1/chat/completions)
         if (format == UniversalApiFormatHint.OpenAiCompatible)
         {
             var path = uri.AbsolutePath.TrimEnd('/');
@@ -66,7 +57,7 @@ public static class EndpointValidator
     }
 
     /// <summary>
-    /// Probe de rede: HEAD (ou GET) na origem do endpoint. Não envia body nem gasta tokens.
+    /// Probe de rede: HEAD/GET na origem + POST leve no path de chat.
     /// </summary>
     public static async Task<EndpointProbeResult> ProbeAsync(
         string? url,
@@ -96,26 +87,20 @@ public static class EndpointValidator
                 Timeout = TimeSpan.FromSeconds(Math.Clamp(timeoutSeconds, 5, 60))
             };
 
-            // 1) Alcance do host
             using (var probe = new HttpRequestMessage(HttpMethod.Head, origin))
             {
                 try
                 {
                     using var ping = await http.SendAsync(probe, ct).ConfigureAwait(false);
-                    // Qualquer resposta HTTP conta como host alcançável
                 }
                 catch (HttpRequestException)
                 {
-                    // Alguns hosts rejeitam HEAD — tentar GET leve na origem
                     using var get = new HttpRequestMessage(HttpMethod.Get, origin);
                     using var ping2 = await http.SendAsync(get, ct).ConfigureAwait(false);
                 }
             }
 
-            // 2) Opcional: POST vazio não — só confirma que a URL de chat responde algo ≠ DNS fail
-            // OPTIONS ou GET no path completo pode 404/405; isso ainda é “endpoint alcançável”
             int? status = null;
-            string detail;
             try
             {
                 using var pathReq = new HttpRequestMessage(HttpMethod.Post, normalized);
@@ -131,7 +116,7 @@ public static class EndpointValidator
 
                 using var pathResp = await http.SendAsync(pathReq, ct).ConfigureAwait(false);
                 status = (int)pathResp.StatusCode;
-                detail = status switch
+                var detail = status switch
                 {
                     401 or 403 => "Host OK. Endpoint respondeu " + status + " (auth — key ou permissão).",
                     400 or 422 => "Host OK. Endpoint respondeu " + status + " (caminho de chat alcançável).",
@@ -142,7 +127,6 @@ public static class EndpointValidator
                     _ => "Host alcançável. HTTP " + status + " no path de chat."
                 };
 
-                // 404 no path é aviso, não falha dura de rede
                 if (status == 404)
                     return EndpointProbeResult.Warn(detail, status);
 
