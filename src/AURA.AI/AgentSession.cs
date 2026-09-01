@@ -73,7 +73,7 @@ public sealed class AgentSession
     private string BuildSystemPrompt()
     {
         var sb = new StringBuilder();
-        if (!string.IsNullOrWhiteSpace(_systemPrompt)) sb.Append(_systemPrompt.Trim());
+        sb.Append(DefaultAgentSystemPrompt.Merge(_systemPrompt));
         if (_tools.Count > 0)
         {
             sb.Append("\n\nFERRAMENTAS REGISTRADAS:\n");
