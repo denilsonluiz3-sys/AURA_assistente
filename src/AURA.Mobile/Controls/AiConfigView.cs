@@ -11,8 +11,9 @@ public sealed class AiConfigView : ContentView
     private readonly Entry _modelsUrlEntry = new() { Placeholder = "Endpoint de modelos (opcional)" };
     private readonly Picker _formatPicker = new() { Title = "Formato da API" };
     private readonly Entry _apiKeyEntry = new() { Placeholder = "API key", IsPassword = true, ClearButtonVisibility = ClearButtonVisibility.WhileEditing };
-    private readonly Button _loadModelsButton = new() { Text = "CARREGAR MODELOS", HorizontalOptions = LayoutOptions.Fill };
+    private readonly Button _validateKeyButton = new() { Text = "VALIDAR API KEY", HorizontalOptions = LayoutOptions.Fill };
     private readonly Button _validateEndpointButton = new() { Text = "VALIDAR ENDPOINT", HorizontalOptions = LayoutOptions.Fill };
+    private readonly Button _loadModelsButton = new() { Text = "CARREGAR MODELOS", HorizontalOptions = LayoutOptions.Fill };
     private readonly Entry _modelEntry = new() { Placeholder = "ID do modelo (ex.: qwen/qwen-plus)" };
     private readonly Picker _modelPicker = new() { Title = "Ou selecione o modelo", IsEnabled = false, HorizontalOptions = LayoutOptions.Fill };
     private readonly Button _saveButton = new() { Text = "SALVAR", IsEnabled = true, HorizontalOptions = LayoutOptions.Fill };
@@ -24,8 +25,9 @@ public sealed class AiConfigView : ContentView
         _formatPicker.ItemsSource = Enum.GetValues<UniversalApiFormat>().Select(x => x.ToString()).ToArray();
         _formatPicker.SelectedItem = UniversalApiFormat.OpenAiCompatible.ToString();
         _modelPicker.ItemsSource = _models;
-        _loadModelsButton.Clicked += OnLoadModelsClicked;
+        _validateKeyButton.Clicked += OnValidateKeyClicked;
         _validateEndpointButton.Clicked += OnValidateEndpointClicked;
+        _loadModelsButton.Clicked += OnLoadModelsClicked;
         _saveButton.Clicked += OnSaveClicked;
         Loaded += (_, _) => LoadExisting();
         Content = new ScrollView
@@ -42,6 +44,7 @@ public sealed class AiConfigView : ContentView
                     new Label { Text = "MODELOS (opcional)" }, _modelsUrlEntry,
                     new Label { Text = "FORMATO" }, _formatPicker,
                     new Label { Text = "API KEY" }, _apiKeyEntry,
+                    _validateKeyButton,
                     _validateEndpointButton,
                     _loadModelsButton,
                     new Label { Text = "MODELO" }, _modelEntry, _modelPicker,
@@ -88,18 +91,87 @@ public sealed class AiConfigView : ContentView
         _saveButton.IsEnabled = true;
     }
 
+    private UniversalApiFormat CurrentApiFormat()
+        => Enum.TryParse<UniversalApiFormat>(_formatPicker.SelectedItem?.ToString(), out var f)
+            ? f
+            : UniversalApiFormat.OpenAiCompatible;
+
     private UniversalApiFormatHint CurrentFormatHint()
-    {
-        if (Enum.TryParse<UniversalApiFormat>(_formatPicker.SelectedItem?.ToString(), out var f))
+        => CurrentApiFormat() switch
         {
-            return f switch
+            UniversalApiFormat.AnthropicMessages => UniversalApiFormatHint.AnthropicMessages,
+            UniversalApiFormat.Gemini => UniversalApiFormatHint.Gemini,
+            _ => UniversalApiFormatHint.OpenAiCompatible
+        };
+
+    private string ResolveModel()
+    {
+        var model = _modelPicker.SelectedItem?.ToString();
+        if (string.IsNullOrWhiteSpace(model))
+            model = _modelEntry.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(model))
+            model = RuntimeConfig.Model;
+        return model?.Trim() ?? string.Empty;
+    }
+
+    private void ShowValidation(ApiKeyValidationResult result)
+    {
+        SetStatus(result.Message, result.Success && !result.IsWarning);
+        if (result.IsWarning)
+            _status.TextColor = Colors.Orange;
+    }
+
+    private async void OnValidateKeyClicked(object? sender, EventArgs e)
+    {
+        _validateKeyButton.IsEnabled = false;
+        try
+        {
+            var provider = _providerEntry.Text?.Trim();
+            var key = ApiKeyValidator.Normalize(_apiKeyEntry.Text);
+            _apiKeyEntry.Text = key;
+
+            var formatOnly = ApiKeyValidator.ValidateFormat(key, provider, required: RuntimeConfig.RequiresApiKey);
+            if (!formatOnly.Success)
             {
-                UniversalApiFormat.AnthropicMessages => UniversalApiFormatHint.AnthropicMessages,
-                UniversalApiFormat.Gemini => UniversalApiFormatHint.Gemini,
-                _ => UniversalApiFormatHint.OpenAiCompatible
-            };
+                ShowValidation(formatOnly);
+                return;
+            }
+
+            var baseUrl = EndpointValidator.Normalize(_baseUrlEntry.Text);
+            _baseUrlEntry.Text = baseUrl;
+            var model = ResolveModel();
+
+            if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(model))
+            {
+                // Só formato — sem endpoint/modelo não dá para probe ao vivo
+                ShowValidation(formatOnly.IsWarning
+                    ? formatOnly
+                    : ApiKeyValidationResult.Warn(
+                        formatOnly.Message + " Informe endpoint e modelo para testar a key no provider.", key));
+                return;
+            }
+
+            SetStatus("Verificando API key no endpoint…", true);
+            var live = await ApiKeyValidator.VerifyLiveAsync(
+                key,
+                baseUrl,
+                model,
+                CurrentApiFormat(),
+                RuntimeConfig.AuthHeader,
+                RuntimeConfig.AuthScheme,
+                provider,
+                Math.Clamp(RuntimeConfig.TimeoutSeconds, 5, 30));
+
+            ShowValidation(live);
         }
-        return UniversalApiFormatHint.OpenAiCompatible;
+        catch (Exception ex)
+        {
+            SetStatus("Falha ao validar key: " + ex.Message, false);
+        }
+        finally
+        {
+            _validateKeyButton.IsEnabled = true;
+        }
     }
 
     private async void OnValidateEndpointClicked(object? sender, EventArgs e)
@@ -118,7 +190,7 @@ public sealed class AiConfigView : ContentView
             }
 
             SetStatus("Validando endpoint…", true);
-            var key = _apiKeyEntry.Text?.Trim();
+            var key = ApiKeyValidator.Normalize(_apiKeyEntry.Text);
             var result = await EndpointValidator.ProbeAsync(
                 baseUrl,
                 key,
@@ -163,11 +235,11 @@ public sealed class AiConfigView : ContentView
                 return;
             }
 
-            RuntimeConfig.SetApiKeyForProvider(provider, _apiKeyEntry.Text);
+            var keyNorm = ApiKeyValidator.Normalize(_apiKeyEntry.Text);
+            _apiKeyEntry.Text = keyNorm;
+            RuntimeConfig.SetApiKeyForProvider(provider, keyNorm);
 
-            var format = Enum.TryParse<UniversalApiFormat>(_formatPicker.SelectedItem?.ToString(), out var f)
-                ? f
-                : UniversalApiFormat.OpenAiCompatible;
+            var format = CurrentApiFormat();
             var p = UniversalProviderRegistry.Custom(
                 provider, baseUrl, modelsUrl, format,
                 RuntimeConfig.AuthHeader, RuntimeConfig.AuthScheme, RuntimeConfig.RequiresApiKey);
@@ -213,12 +285,7 @@ public sealed class AiConfigView : ContentView
             var provider = _providerEntry.Text?.Trim();
             var baseUrl = EndpointValidator.Normalize(_baseUrlEntry.Text);
             _baseUrlEntry.Text = baseUrl;
-
-            var model = _modelPicker.SelectedItem?.ToString();
-            if (string.IsNullOrWhiteSpace(model))
-                model = _modelEntry.Text?.Trim();
-            if (string.IsNullOrWhiteSpace(model))
-                model = RuntimeConfig.Model;
+            var model = ResolveModel();
 
             if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(model))
             {
@@ -226,26 +293,33 @@ public sealed class AiConfigView : ContentView
                 return;
             }
 
-            var formatError = EndpointValidator.ValidateFormat(baseUrl, CurrentFormatHint());
-            if (formatError != null)
+            var endpointError = EndpointValidator.ValidateFormat(baseUrl, CurrentFormatHint());
+            if (endpointError != null)
             {
-                SetStatus(formatError, false);
+                SetStatus(endpointError, false);
+                return;
+            }
+
+            var key = ApiKeyValidator.Normalize(_apiKeyEntry.Text);
+            _apiKeyEntry.Text = key;
+
+            var keyCheck = ApiKeyValidator.ValidateFormat(key, provider, required: RuntimeConfig.RequiresApiKey);
+            if (!keyCheck.Success)
+            {
+                ShowValidation(keyCheck);
                 return;
             }
 
             RuntimeConfig.Provider = provider;
             RuntimeConfig.BaseUrlOverride = baseUrl;
             RuntimeConfig.ModelsUrlOverride = EndpointValidator.Normalize(_modelsUrlEntry.Text);
-            RuntimeConfig.ApiFormat = Enum.TryParse<UniversalApiFormat>(_formatPicker.SelectedItem?.ToString(), out var f)
-                ? f
-                : UniversalApiFormat.OpenAiCompatible;
+            RuntimeConfig.ApiFormat = CurrentApiFormat();
             RuntimeConfig.Model = model;
-            RuntimeConfig.SetApiKeyForProvider(provider, _apiKeyEntry.Text);
+            RuntimeConfig.SetApiKeyForProvider(provider, key);
 
             var stored = RuntimeConfig.GetApiKeyForProvider(provider);
-            var keyOk = !string.IsNullOrWhiteSpace(stored)
-                        && (string.IsNullOrWhiteSpace(_apiKeyEntry.Text)
-                            || string.Equals(stored, _apiKeyEntry.Text.Trim(), StringComparison.Ordinal));
+            var keyOk = string.IsNullOrWhiteSpace(key)
+                        || string.Equals(stored, key, StringComparison.Ordinal);
 
             var client = Handler?.MauiContext?.Services.GetService(typeof(IUniversalAiClient)) as IUniversalAiClient;
             if (client != null)
@@ -253,23 +327,27 @@ public sealed class AiConfigView : ContentView
 
             var clientHasKey = client != null && !string.IsNullOrWhiteSpace(client.Options.ApiKey);
 
-            if (!string.IsNullOrWhiteSpace(_apiKeyEntry.Text) && !keyOk)
+            if (!string.IsNullOrWhiteSpace(key) && !keyOk)
             {
                 SetStatus("Falha: a API key não foi persistida. Tente de novo.", false);
                 return;
             }
 
-            if (!string.IsNullOrWhiteSpace(_apiKeyEntry.Text) && !clientHasKey)
+            if (!string.IsNullOrWhiteSpace(key) && !clientHasKey)
             {
                 SetStatus("Key gravada, mas o cliente ainda está sem key — reabra o Agente.", false);
                 return;
             }
 
-            SetStatus(
-                string.IsNullOrWhiteSpace(_apiKeyEntry.Text)
-                    ? "Configuração salva (endpoint OK, sem API key)."
-                    : "Configuração, endpoint e API key salvos. Pode usar o Agente.",
-                true);
+            var msg = string.IsNullOrWhiteSpace(key)
+                ? "Configuração salva (sem API key)."
+                : "Configuração e API key salvas.";
+            if (keyCheck.IsWarning)
+                msg += " Aviso: " + keyCheck.Message;
+
+            SetStatus(msg, true);
+            if (keyCheck.IsWarning)
+                _status.TextColor = Colors.Orange;
         }
         catch (Exception ex)
         {
