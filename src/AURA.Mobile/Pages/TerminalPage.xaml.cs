@@ -21,8 +21,9 @@ public partial class TerminalPage : ContentPage
         _currentDir = FileSystem.AppDataDirectory;
         UpdateDirLabel();
 
-        AppendLine("AURA Terminal — comandos via /bin/sh (sandbox do app).");
-        AppendLine("Comandos internos: clear, cd <dir>, pwd, help, capabilities.", dim: true);
+        AppendLine("AURA Terminal — /bin/sh (toybox) no sandbox do app.");
+        AppendLine("Comandos padrão: ls, pwd, cat, grep, find, df, echo, getprop…", dim: true);
+        AppendLine("Internos: clear · cd <dir> · pwd · help · capabilities", dim: true);
         AppendLine();
     }
 
@@ -34,9 +35,7 @@ public partial class TerminalPage : ContentPage
     private void OnHistoryUpClicked(object sender, EventArgs e)
     {
         if (_history.Count == 0)
-        {
             return;
-        }
 
         _historyIndex = Math.Max(0, _historyIndex - 1);
         CommandEntry.Text = _history[_historyIndex];
@@ -46,9 +45,7 @@ public partial class TerminalPage : ContentPage
     private void OnHistoryDownClicked(object sender, EventArgs e)
     {
         if (_history.Count == 0)
-        {
             return;
-        }
 
         _historyIndex = Math.Min(_history.Count, _historyIndex + 1);
         CommandEntry.Text = _historyIndex >= _history.Count ? string.Empty : _history[_historyIndex];
@@ -66,23 +63,17 @@ public partial class TerminalPage : ContentPage
         foreach (var child in OutputStack.Children)
         {
             if (child is Label label && !string.IsNullOrEmpty(label.Text))
-            {
                 sb.AppendLine(label.Text);
-            }
         }
 
         string output = sb.ToString();
         if (string.IsNullOrWhiteSpace(output))
-        {
             return;
-        }
 
         await Clipboard.Default.SetTextAsync(output.TrimEnd());
         var button = sender as Button;
         if (button == null)
-        {
             return;
-        }
 
         string original = button.Text;
         button.Text = "✓";
@@ -94,9 +85,7 @@ public partial class TerminalPage : ContentPage
     {
         string command = input?.Trim() ?? string.Empty;
         if (command.Length == 0)
-        {
             return;
-        }
 
         _history.Add(command);
         _historyIndex = _history.Count;
@@ -106,7 +95,7 @@ public partial class TerminalPage : ContentPage
 
         string lower = command.ToLowerInvariant();
 
-        if (lower == "clear" || lower == "cls")
+        if (lower is "clear" or "cls")
         {
             OutputStack.Children.Clear();
             return;
@@ -114,13 +103,15 @@ public partial class TerminalPage : ContentPage
 
         if (lower == "help")
         {
-            AppendLine("Comandos internos: clear, cd <dir>, pwd, help, capabilities.");
-            AppendLine("capabilities = laboratório nativo da AURA; teste somente leitura.", dim: true);
-            AppendLine("Qualquer outro comando roda via sh -c no diretório atual.", dim: true);
+            AppendLine("Comandos shell padrão (toybox): ls, pwd, cat, head, tail, grep, find, df, du, echo, date, getprop, ps");
+            AppendLine("Internos da AURA: clear, cd <dir>, pwd, help, capabilities");
+            AppendLine("capabilities = laboratório nativo (somente leitura).", dim: true);
+            AppendLine("Qualquer outro texto roda via sh -c no diretório atual.", dim: true);
+            AppendLine("Não há apt/pip/npm neste sandbox.", dim: true);
             return;
         }
 
-        if (lower == "capabilities" || lower == "aura capabilities" || lower == "aura test")
+        if (lower is "capabilities" or "aura capabilities" or "aura test")
         {
 #if ANDROID
             try
@@ -148,7 +139,9 @@ public partial class TerminalPage : ContentPage
             string target = command.Substring(3).Trim();
             if (target.Length > 0)
             {
-                string newDir = Path.Combine(_currentDir, target);
+                string newDir = Path.IsPathRooted(target)
+                    ? target
+                    : Path.Combine(_currentDir, target);
                 if (Directory.Exists(newDir))
                 {
                     _currentDir = Path.GetFullPath(newDir);
@@ -176,18 +169,12 @@ public partial class TerminalPage : ContentPage
 
             string output = result.CombineOutput();
             if (string.IsNullOrWhiteSpace(output))
-            {
                 AppendLine("(sem saída)");
-            }
             else
-            {
                 AppendLine(output, error: !result.Success);
-            }
 
             if (!result.Success)
-            {
                 AppendLine($"exit {result.ExitCode} em {result.Duration.TotalSeconds:0.0}s", dim: true);
-            }
         }
         catch (Exception ex)
         {
