@@ -18,25 +18,25 @@ namespace AURA.Mobile
             events.Subscribe<ModuleStateChangedEvent>(_ =>
                 MainThread.BeginInvokeOnMainThread(ScheduleRebuildTabs));
 
-            // Visão: Agente útil + Terminal padrão + o mínimo que ainda ajuda.
-            // Páginas fora da lista continuam no DI (ctor), mas NÃO aparecem nas abas.
-            // Chat / Células / Programas / Executores / Módulos / etc. ficam escondidos
-            // até haver uso real — não apagar ainda (evita quebrar registro de serviços).
+            // Núcleo: Agente + Terminal + Navegador + Módulos (ativar funções).
+            // Demais páginas ficam no DI, fora das abas.
             _entries = new List<(string?, string, string, Page)>
             {
                 (null, "Assistente", "Agente", agent),
+                (null, "Assistente", "Navegador", browser),
+
                 (null, "Ferramentas", "Terminal", terminal),
+                (null, "Ferramentas", "Módulos", modules),
+
                 (null, "Sistema", "Início", home),
                 ("system", "Sistema", "Diagnóstico", diagnostico),
             };
 
-            // Referências mantidas para o compilador/DI não reclamar de parâmetros não usados
-            // e para NavigateToProcessAsync poder achar páginas se o processo apontar para elas.
-            _ = (chat, memory, executors, modules, logs, fixes, browser, cells, run, programs, ecosystem, spectrum);
+            _ = (chat, memory, executors, logs, fixes, cells, run, programs, ecosystem, spectrum);
 
             BarBackgroundColor = Color.FromArgb("#0c0c12");
             BarTextColor = Color.FromArgb("#e8e8f0");
-            AuraLog.Info("MainPage.ctor OK (abas reduzidas)");
+            AuraLog.Info("MainPage.ctor OK (Agente/Navegador/Terminal/Módulos)");
         }
 
         protected override async void OnAppearing()
