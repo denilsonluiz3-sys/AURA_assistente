@@ -5,23 +5,27 @@ namespace AURA.Mobile.Pages;
 
 /// <summary>
 /// UX: stop (■) no enviar, botão 🔊 nas respostas, status curto.
-/// Evita reescrever o AgentPage.xaml.cs de 1200+ linhas.
+/// Partial — sem reescrever o AgentPage.xaml.cs de 1200+ linhas.
 /// </summary>
 public partial class AgentPage
 {
     private CancellationTokenSource? _runCts;
     private bool _uxHooked;
 
-    partial void OnAppearingUx()
+    protected override void OnHandlerChanged()
     {
+        base.OnHandlerChanged();
+        if (Handler == null)
+            return;
+
         HookBubbleSpeakInjector();
-        RefreshModelStatusLabel();
+        try { RefreshModelStatusLabel(); } catch { /* ignore */ }
     }
 
-    /// <summary>Chamado no fim do ctor via partial method se existir — fallback no OnAppearing.</summary>
     private void HookBubbleSpeakInjector()
     {
-        if (_uxHooked) return;
+        if (_uxHooked)
+            return;
         _uxHooked = true;
 
         try
@@ -32,10 +36,13 @@ public partial class AgentPage
                     MainThread.BeginInvokeOnMainThread(() => TryInjectSpeakButton(border));
             };
         }
-        catch { /* ignore */ }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("HookBubbleSpeakInjector", ex);
+        }
     }
 
-    /// <summary>▶ envia · ■ cancela.</summary>
+    /// <summary>▶ envia · ■ cancela (XAML: Clicked=OnRunOrStopClicked).</summary>
     private void OnRunOrStopClicked(object? sender, EventArgs e)
     {
         HookBubbleSpeakInjector();
@@ -48,7 +55,7 @@ public partial class AgentPage
 
         OnRunClicked(sender, e);
 
-        // Reabilita como ■ (OnRunClicked desabilita o botão)
+        // OnRunClicked desabilita o botão — reabilita como ■ para permitir stop
         MainThread.BeginInvokeOnMainThread(async () =>
         {
             await Task.Delay(100);
@@ -69,14 +76,6 @@ public partial class AgentPage
         });
 
         _ = AppendBubbleAsync("⏹ Execução interrompida.", user: false, isTool: true);
-    }
-
-    private CancellationToken BeginRunToken()
-    {
-        try { _runCts?.Cancel(); } catch { /* ignore */ }
-        try { _runCts?.Dispose(); } catch { /* ignore */ }
-        _runCts = new CancellationTokenSource();
-        return _runCts.Token;
     }
 
     private void SetRunButtonBusy(bool busy)
@@ -107,24 +106,20 @@ public partial class AgentPage
         catch { /* ignore */ }
     }
 
-    /// <summary>
-    /// Se a bolha tem só 📋, acrescenta 🔊 (respostas do agente, não do usuário).
-    /// </summary>
+    /// <summary>Injeta 🔊 ao lado do 📋 nas bolhas do agente (não nas do usuário).</summary>
     private void TryInjectSpeakButton(Border border)
     {
         try
         {
-            // Bolhas do usuário alinham à direita
             if (border.HorizontalOptions == LayoutOptions.End)
                 return;
 
             if (border.Content is not VerticalStackLayout stack || stack.Children.Count < 2)
                 return;
 
-            // Já tem speak?
             foreach (var child in stack.Children)
             {
-                if (child is Button b && b.Text == "🔊")
+                if (child is Button b0 && b0.Text == "🔊")
                     return;
                 if (child is HorizontalStackLayout hs)
                 {
@@ -140,41 +135,38 @@ public partial class AgentPage
             if (string.IsNullOrWhiteSpace(payload))
                 return;
 
-            // Localizar botão copiar e colocar speak ao lado
-            Button? copyBtn = null;
             for (int i = 0; i < stack.Children.Count; i++)
             {
-                if (stack.Children[i] is Button btn && btn.Text == "📋")
-                {
-                    copyBtn = btn;
-                    var row = new HorizontalStackLayout
-                    {
-                        Spacing = 4,
-                        HorizontalOptions = LayoutOptions.End
-                    };
-                    stack.Children.RemoveAt(i);
-                    row.Children.Add(btn);
+                if (stack.Children[i] is not Button btn || btn.Text != "📋")
+                    continue;
 
-                    var speakBtn = new Button
-                    {
-                        Text = "🔊",
-                        FontSize = 11,
-                        Padding = new Thickness(6, 2),
-                        HeightRequest = 28,
-                        WidthRequest = 36,
-                        BackgroundColor = Colors.Transparent,
-                        TextColor = Color.FromArgb("#8a9bb8")
-                    };
-                    string text = payload;
-                    speakBtn.Clicked += async (_, _) =>
-                    {
-                        try { await SpeakAsync(text); }
-                        catch (Exception ex) { AuraLog.Exception("SpeakBtn", ex); }
-                    };
-                    row.Children.Add(speakBtn);
-                    stack.Children.Insert(i, row);
-                    return;
-                }
+                stack.Children.RemoveAt(i);
+                var row = new HorizontalStackLayout
+                {
+                    Spacing = 4,
+                    HorizontalOptions = LayoutOptions.End
+                };
+                row.Children.Add(btn);
+
+                string text = payload!;
+                var speakBtn = new Button
+                {
+                    Text = "🔊",
+                    FontSize = 11,
+                    Padding = new Thickness(6, 2),
+                    HeightRequest = 28,
+                    WidthRequest = 36,
+                    BackgroundColor = Colors.Transparent,
+                    TextColor = Color.FromArgb("#8a9bb8")
+                };
+                speakBtn.Clicked += async (_, _) =>
+                {
+                    try { await SpeakAsync(text); }
+                    catch (Exception ex) { AuraLog.Exception("SpeakBtn", ex); }
+                };
+                row.Children.Add(speakBtn);
+                stack.Children.Insert(i, row);
+                return;
             }
         }
         catch (Exception ex)
