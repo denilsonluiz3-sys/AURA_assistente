@@ -1,94 +1,78 @@
-using AURA.AI;
-using AURA.AI.Providers;
 using AURA.AI.UniversalAI;
 using AURA.Mobile.Diagnostics;
 
 namespace AURA.Mobile.Controls;
 
-/// <summary>Configuração universal: API key -> carregar modelos -> selecionar -> salvar.</summary>
+/// <summary>Configuração universal: provider, endpoint, autenticação e modelo são definidos pelo usuário.</summary>
 public sealed class AiConfigView : ContentView
 {
-    private readonly Entry _apiKeyEntry = new() { Placeholder = "API key", IsPassword = true, ClearButtonVisibility = ClearButtonVisibility.WhileEditing };
+    private readonly Entry _providerEntry = new() { Placeholder = "Identificador do provider" };
+    private readonly Entry _baseUrlEntry = new() { Placeholder = "Endpoint de chat" };
+    private readonly Entry _modelsUrlEntry = new() { Placeholder = "Endpoint de modelos (opcional)" };
+    private readonly Picker _formatPicker = new() { Title = "Formato da API" };
+    private readonly Entry _apiKeyEntry = new() { Placeholder = "API key (opcional)", IsPassword = true, ClearButtonVisibility = ClearButtonVisibility.WhileEditing };
     private readonly Button _loadModelsButton = new() { Text = "CARREGAR MODELOS", HorizontalOptions = LayoutOptions.Fill };
     private readonly Picker _modelPicker = new() { Title = "Selecione o modelo", IsEnabled = false, HorizontalOptions = LayoutOptions.Fill };
     private readonly Button _saveButton = new() { Text = "SALVAR", IsEnabled = false, HorizontalOptions = LayoutOptions.Fill };
     private readonly Label _status = new() { FontSize = 12, LineBreakMode = LineBreakMode.WordWrap };
     private readonly List<string> _models = new();
-    private OpenRouterClient? _client;
-    private UniversalProvider? _discoveredProvider;
 
     public AiConfigView()
     {
+        _formatPicker.ItemsSource = Enum.GetValues<UniversalApiFormat>().Select(x => x.ToString()).ToArray();
         _modelPicker.ItemsSource = _models;
-        _loadModelsButton.Clicked += OnLoadModelsClicked;
-        _saveButton.Clicked += OnSaveClicked;
-        Loaded += (_, _) => LoadExisting();
-        Content = new ScrollView { Content = new VerticalStackLayout
-        {
-            Padding = new Thickness(20, 16), Spacing = 12,
-            Children = { new Label { Text = "Configuração de IA", FontSize = 24, FontAttributes = FontAttributes.Bold }, new Label { Text = "API KEY", FontAttributes = FontAttributes.Bold }, _apiKeyEntry, _loadModelsButton, new Label { Text = "MODELO", FontAttributes = FontAttributes.Bold }, _modelPicker, _saveButton, _status }
-        }};
-    }
-
-    public void Load(OpenRouterClient client) { _client = client; LoadExisting(); }
-    public void ApplyToClient()
-    {
-        if (_client == null || _discoveredProvider == null) return;
-        var model = _modelPicker.SelectedItem?.ToString();
-        if (!string.IsNullOrWhiteSpace(model)) RuntimeConfig.ApplyUniversal(_client, _discoveredProvider.Id, _apiKeyEntry.Text?.Trim() ?? string.Empty, model, _discoveredProvider.BaseUrl, _discoveredProvider.ModelsUrl);
+        _loadModelsButton.Clicked += OnLoadModelsClicked; _saveButton.Clicked += OnSaveClicked; Loaded += (_, _) => LoadExisting();
+        Content = new ScrollView { Content = new VerticalStackLayout { Padding = new Thickness(20, 16), Spacing = 12, Children = {
+            new Label { Text = "Configuração de IA", FontSize = 24, FontAttributes = FontAttributes.Bold },
+            new Label { Text = "PROVIDER" }, _providerEntry,
+            new Label { Text = "ENDPOINT" }, _baseUrlEntry,
+            new Label { Text = "MODELOS (opcional)" }, _modelsUrlEntry,
+            new Label { Text = "FORMATO" }, _formatPicker,
+            new Label { Text = "API KEY" }, _apiKeyEntry,
+            _loadModelsButton, new Label { Text = "MODELO" }, _modelPicker, _saveButton, _status
+        }}};
     }
 
     private void LoadExisting()
     {
-        var provider = UniversalProviderRegistry.BuiltIns.FirstOrDefault(p => string.Equals(p.Id, RuntimeConfig.Provider, StringComparison.OrdinalIgnoreCase));
-        if (provider == null) return;
-        _discoveredProvider = provider;
-        _apiKeyEntry.Text = RuntimeConfig.GetApiKeyForProvider(provider.Id);
-        if (!string.IsNullOrWhiteSpace(RuntimeConfig.Model)) { _models.Clear(); _models.Add(RuntimeConfig.Model); _modelPicker.ItemsSource = null; _modelPicker.ItemsSource = _models; _modelPicker.SelectedItem = RuntimeConfig.Model; _modelPicker.IsEnabled = true; _saveButton.IsEnabled = !string.IsNullOrWhiteSpace(_apiKeyEntry.Text); }
+        _providerEntry.Text = RuntimeConfig.Provider; _baseUrlEntry.Text = RuntimeConfig.BaseUrlOverride; _modelsUrlEntry.Text = RuntimeConfig.ModelsUrlOverride;
+        _apiKeyEntry.Text = RuntimeConfig.GetApiKeyForProvider(RuntimeConfig.Provider);
+        _formatPicker.SelectedItem = RuntimeConfig.ApiFormat.ToString();
+        if (!string.IsNullOrWhiteSpace(RuntimeConfig.Model)) { _models.Clear(); _models.Add(RuntimeConfig.Model); _modelPicker.ItemsSource = null; _modelPicker.ItemsSource = _models; _modelPicker.SelectedIndex = 0; _modelPicker.IsEnabled = true; _saveButton.IsEnabled = true; }
     }
 
     private async void OnLoadModelsClicked(object? sender, EventArgs e)
     {
-        var key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(key)) { SetStatus("Informe a API key.", false); return; }
-        SetBusy(true);
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(Math.Clamp(RuntimeConfig.TimeoutSeconds, 5, 30)) };
-            UniversalProvider? provider = null; IReadOnlyList<UniversalModel>? models = null;
-            foreach (var candidate in UniversalProviderRegistry.BuiltIns.Where(p => p.RequiresApiKey))
-            {
-                try { var found = await new UniversalModelDiscovery(http).LoadAsync(candidate, key); if (found.Count > 0) { provider = candidate; models = found; break; } }
-                catch { }
-            }
-            if (provider == null || models == null || models.Count == 0) { SetStatus("Não foi possível carregar modelos. Verifique a chave e o provedor.", false); return; }
-            _discoveredProvider = provider;
-            RuntimeConfig.Provider = provider.Id;
-            RuntimeConfig.SetApiKeyForProvider(provider.Id, key);
-            RuntimeConfig.ApiFormat = provider.Format switch
-            {
-                UniversalApiFormat.AnthropicMessages => AiApiFormat.AnthropicMessages,
-                _ => AiApiFormat.OpenAICompletions
-            };
-            _models.Clear(); _models.AddRange(models.Select(m => m.Id)); _modelPicker.ItemsSource = null; _modelPicker.ItemsSource = _models; _modelPicker.IsEnabled = true; _modelPicker.SelectedIndex = 0; _saveButton.IsEnabled = true;
-            SetStatus($"{provider.Name}: {_models.Count} modelo(s) carregado(s).", true);
+            var provider = _providerEntry.Text?.Trim(); var baseUrl = _baseUrlEntry.Text?.Trim(); var modelsUrl = _modelsUrlEntry.Text?.Trim();
+            if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(baseUrl)) { SetStatus("Informe provider e endpoint.", false); return; }
+            var format = Enum.TryParse<UniversalApiFormat>(_formatPicker.SelectedItem?.ToString(), out var f) ? f : UniversalApiFormat.OpenAiCompatible;
+            var p = UniversalProviderRegistry.Custom(provider, baseUrl, modelsUrl, format, RuntimeConfig.AuthHeader, RuntimeConfig.AuthScheme, RuntimeConfig.RequiresApiKey);
+            var key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(Math.Clamp(RuntimeConfig.TimeoutSeconds, 5, 120)) };
+            if (string.IsNullOrWhiteSpace(p.ModelsUrl)) { SetStatus("Endpoint de modelos não informado; selecione um modelo manualmente antes de salvar.", false); _modelPicker.IsEnabled = true; _saveButton.IsEnabled = true; return; }
+            var models = await new UniversalModelDiscovery(http).LoadAsync(p, key);
+            _models.Clear(); _models.AddRange(models.Select(x => x.Id)); _modelPicker.ItemsSource = null; _modelPicker.ItemsSource = _models; _modelPicker.IsEnabled = _models.Count > 0; if (_models.Count > 0) _modelPicker.SelectedIndex = 0; _saveButton.IsEnabled = true;
+            SetStatus($"{_models.Count} modelo(s) carregado(s).", true);
         }
-        catch (Exception ex) { SetStatus("Falha ao carregar modelos: " + ex.Message, false); AuraLog.Exception("AiConfigView.LoadModels", ex); }
-        finally { SetBusy(false); }
+        catch (Exception ex) { SetStatus("Falha ao carregar modelos: " + ex.Message, false); }
     }
 
     private void OnSaveClicked(object? sender, EventArgs e)
     {
         try
         {
-            var model = _modelPicker.SelectedItem?.ToString(); var key = _apiKeyEntry.Text?.Trim();
-            if (_discoveredProvider == null || string.IsNullOrWhiteSpace(model) || string.IsNullOrWhiteSpace(key)) { SetStatus("Carregue os modelos e selecione um modelo.", false); return; }
-            if (_client == null) { SetStatus("Cliente de IA não está disponível.", false); return; }
-            RuntimeConfig.ApplyUniversal(_client, _discoveredProvider.Id, key, model, _discoveredProvider.BaseUrl, _discoveredProvider.ModelsUrl); SetStatus("Configuração salva.", true);
+            var provider = _providerEntry.Text?.Trim(); var baseUrl = _baseUrlEntry.Text?.Trim(); var model = _modelPicker.SelectedItem?.ToString() ?? RuntimeConfig.Model;
+            if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(model)) { SetStatus("Provider, endpoint e modelo são obrigatórios.", false); return; }
+            RuntimeConfig.Provider = provider; RuntimeConfig.BaseUrlOverride = baseUrl; RuntimeConfig.ModelsUrlOverride = _modelsUrlEntry.Text?.Trim() ?? string.Empty;
+            RuntimeConfig.ApiFormat = Enum.TryParse<UniversalApiFormat>(_formatPicker.SelectedItem?.ToString(), out var f) ? f : UniversalApiFormat.OpenAiCompatible;
+            RuntimeConfig.SetApiKeyForProvider(provider, _apiKeyEntry.Text); RuntimeConfig.Model = model;
+            var client = (IUniversalAiClient)Handler?.MauiContext?.Services.GetService(typeof(IUniversalAiClient)); if (client != null) RuntimeConfig.Apply(client);
+            SetStatus("Configuração salva.", true);
         }
         catch (Exception ex) { SetStatus("Falha ao salvar: " + ex.Message, false); }
     }
 
-    private void SetBusy(bool busy) { _apiKeyEntry.IsEnabled = !busy; _loadModelsButton.IsEnabled = !busy; _loadModelsButton.Text = busy ? "CARREGANDO..." : "CARREGAR MODELOS"; }
     private void SetStatus(string message, bool success) { _status.Text = message; _status.TextColor = success ? Colors.Green : Colors.Red; }
 }
