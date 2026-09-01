@@ -71,34 +71,51 @@ public sealed class UniversalModelDiscovery
         return false;
     }
 
+    /// <summary>
+    /// Modelo free DeepSeek no OpenRouter foi descontinuado (404).
+    /// Migra IDs mortos para openrouter/free.
+    /// </summary>
+    public static string? MigrateDeprecatedOpenRouterModel(string? modelId)
+    {
+        if (string.IsNullOrWhiteSpace(modelId))
+            return null;
+        var id = modelId.Trim();
+        // deepseek/*:free e variantes antigas sem endpoint
+        if (id.StartsWith("deepseek/", StringComparison.OrdinalIgnoreCase) &&
+            id.Contains(":free", StringComparison.OrdinalIgnoreCase))
+            return "openrouter/free";
+        if (id.Equals("deepseek/deepseek-r1:free", StringComparison.OrdinalIgnoreCase) ||
+            id.Equals("deepseek/deepseek-chat-v3.1:free", StringComparison.OrdinalIgnoreCase) ||
+            id.Equals("deepseek/deepseek-chat-v3-0324:free", StringComparison.OrdinalIgnoreCase) ||
+            id.Equals("deepseek/deepseek-r1-0528:free", StringComparison.OrdinalIgnoreCase))
+            return "openrouter/free";
+        return null;
+    }
+
     /// <summary>Sugestões offline quando a API de models falha ou está vazia.</summary>
     public static IReadOnlyList<UniversalModel> FallbackSuggestions(string providerId)
     {
         var id = (providerId ?? string.Empty).Trim().ToLowerInvariant();
         if (id.Contains("openrouter"))
         {
-            // Catálogo free típico OpenRouter (set/2026) — IDs reais com :free
+            // Catálogo free verificado OpenRouter (set/2026) — sem deepseek/*:free (descontinuado)
             string[] free =
             {
                 "openrouter/free",
-                "meta-llama/llama-3.3-70b-instruct:free",
-                "meta-llama/llama-3.2-3b-instruct:free",
                 "google/gemma-4-31b-it:free",
                 "google/gemma-4-26b-a4b-it:free",
-                "qwen/qwen3-coder:free",
-                "qwen/qwen3-next-80b-a3b-instruct:free",
-                "openai/gpt-oss-120b:free",
-                "openai/gpt-oss-20b:free",
-                "nvidia/nemotron-3-nano-30b-a3b:free",
+                "z-ai/glm-5.2:free",
+                "nvidia/nemotron-3-super-120b-a12b:free",
                 "nvidia/nemotron-3-ultra-550b-a55b:free",
-                "cohere/north-mini-code:free",
-                "nousresearch/hermes-3-llama-3.1-405b:free",
-                "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
-                "liquid/lfm-2.5-1.2b-instruct:free",
+                "poolside/laguna-xs-2.1:free",
+                "poolside/laguna-s-2.1:free",
                 "minimax/minimax-m3:free",
-                "poolside/laguna-xs.2:free",
-                "deepseek/deepseek-r1:free",
-                "deepseek/deepseek-chat-v3-0324:free"
+                "minimax/minimax-m2.7:free",
+                "cohere/north-mini-code:free",
+                "liquid/lfm-2.5-2.6b:free",
+                "inclusionai/ling-3.0-flash-fin:free",
+                "thinkingmachines/inkling:free",
+                "thinkingmachines/inkling-small:free"
             };
             return free.Select(x => new UniversalModel(x, x.Contains(":free") || x.EndsWith("/free") ? x + " (free)" : x, "openrouter")).ToArray();
         }
