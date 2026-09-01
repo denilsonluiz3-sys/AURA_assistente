@@ -17,9 +17,11 @@ public sealed class UniversalModelDiscovery
                     ? apiKey.Trim()
                     : provider.AuthScheme + " " + apiKey.Trim());
 
-        // OpenRouter: pedir catálogo completo quando possível
         if (provider.ModelsUrl.Contains("openrouter.ai", StringComparison.OrdinalIgnoreCase))
+        {
             request.Headers.TryAddWithoutValidation("HTTP-Referer", "https://github.com/denilsonluiz3-sys/AURA_assistente");
+            request.Headers.TryAddWithoutValidation("X-Title", "AURA Assistente");
+        }
 
         using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -31,9 +33,10 @@ public sealed class UniversalModelDiscovery
     }
 
     /// <summary>
-    /// Free primeiro (OpenRouter :free), depois o resto. Limite alto para o picker.
+    /// Free primeiro (OpenRouter :free ou pricing 0). freeOnly=true descarta pagos.
     /// </summary>
-    public static IReadOnlyList<UniversalModel> PrioritizeFree(IEnumerable<UniversalModel> models, int max = 200)
+    public static IReadOnlyList<UniversalModel> PrioritizeFree(
+        IEnumerable<UniversalModel> models, int max = 300, bool freeOnly = false)
     {
         var list = models
             .Where(m => !string.IsNullOrWhiteSpace(m.Id))
@@ -45,10 +48,12 @@ public sealed class UniversalModelDiscovery
             .Where(IsFree)
             .OrderBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        var paid = list
-            .Where(m => !IsFree(m))
-            .OrderBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var paid = freeOnly
+            ? new List<UniversalModel>()
+            : list
+                .Where(m => !IsFree(m))
+                .OrderBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
         return free.Concat(paid).Take(Math.Max(20, max)).ToArray();
     }
@@ -56,8 +61,14 @@ public sealed class UniversalModelDiscovery
     public static bool IsFree(UniversalModel m)
     {
         var id = m.Id ?? string.Empty;
-        return id.Contains(":free", StringComparison.OrdinalIgnoreCase)
-            || id.EndsWith("/free", StringComparison.OrdinalIgnoreCase);
+        if (id.Contains(":free", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (id.Equals("openrouter/free", StringComparison.OrdinalIgnoreCase))
+            return true;
+        // Display marcado (pricing zero no parse)
+        if ((m.DisplayName ?? string.Empty).Contains("(free)", StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
     }
 
     /// <summary>Sugestões offline quando a API de models falha ou está vazia.</summary>
@@ -66,34 +77,41 @@ public sealed class UniversalModelDiscovery
         var id = (providerId ?? string.Empty).Trim().ToLowerInvariant();
         if (id.Contains("openrouter"))
         {
-            // IDs free comuns no OpenRouter (atualize conforme o catálogo mudar)
+            // Catálogo free típico OpenRouter (set/2026) — IDs reais com :free
             string[] free =
             {
-                "deepseek/deepseek-r1:free",
-                "deepseek/deepseek-chat-v3-0324:free",
-                "deepseek/deepseek-r1-0528:free",
-                "google/gemma-3-27b-it:free",
-                "google/gemma-3-12b-it:free",
-                "google/gemma-3-4b-it:free",
+                "openrouter/free",
                 "meta-llama/llama-3.3-70b-instruct:free",
                 "meta-llama/llama-3.2-3b-instruct:free",
-                "meta-llama/llama-3.1-8b-instruct:free",
-                "qwen/qwen3-4b:free",
-                "qwen/qwen2.5-vl-32b-instruct:free",
-                "mistralai/mistral-small-3.1-24b-instruct:free",
-                "mistralai/mistral-7b-instruct:free",
-                "nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
-                "openrouter/free"
+                "google/gemma-4-31b-it:free",
+                "google/gemma-4-26b-a4b-it:free",
+                "qwen/qwen3-coder:free",
+                "qwen/qwen3-next-80b-a3b-instruct:free",
+                "openai/gpt-oss-120b:free",
+                "openai/gpt-oss-20b:free",
+                "nvidia/nemotron-3-nano-30b-a3b:free",
+                "nvidia/nemotron-3-ultra-550b-a55b:free",
+                "cohere/north-mini-code:free",
+                "nousresearch/hermes-3-llama-3.1-405b:free",
+                "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+                "liquid/lfm-2.5-1.2b-instruct:free",
+                "minimax/minimax-m3:free",
+                "poolside/laguna-xs.2:free",
+                "deepseek/deepseek-r1:free",
+                "deepseek/deepseek-chat-v3-0324:free"
             };
-            return free.Select(x => new UniversalModel(x, x + " (free)", "openrouter")).ToArray();
+            return free.Select(x => new UniversalModel(x, x.Contains(":free") || x.EndsWith("/free") ? x + " (free)" : x, "openrouter")).ToArray();
         }
 
         if (id.Contains("deepseek"))
         {
+            // Docs oficiais 2026: v4; aliases legados ainda podem responder
             return new[]
             {
-                new UniversalModel("deepseek-chat", "deepseek-chat", "deepseek"),
-                new UniversalModel("deepseek-reasoner", "deepseek-reasoner", "deepseek")
+                new UniversalModel("deepseek-v4-flash", "deepseek-v4-flash (recomendado)", "deepseek"),
+                new UniversalModel("deepseek-v4-pro", "deepseek-v4-pro", "deepseek"),
+                new UniversalModel("deepseek-chat", "deepseek-chat (legado)", "deepseek"),
+                new UniversalModel("deepseek-reasoner", "deepseek-reasoner (legado)", "deepseek")
             };
         }
 
@@ -126,9 +144,10 @@ public sealed class UniversalModelDiscovery
                     continue;
 
                 string? owned = item.TryGetProperty("owned_by", out var o) ? o.GetString() : null;
-                // OpenRouter: pricing zerado ≈ free (além do sufixo :free)
                 var display = value!;
                 if (IsPricingFree(item) && !value!.Contains(":free", StringComparison.OrdinalIgnoreCase))
+                    display = value + " (free)";
+                else if (value.Contains(":free", StringComparison.OrdinalIgnoreCase))
                     display = value + " (free)";
 
                 result.Add(new UniversalModel(value!, display, providerId, owned));
@@ -147,7 +166,7 @@ public sealed class UniversalModelDiscovery
             }
         }
 
-        return PrioritizeFree(result, max: 300);
+        return PrioritizeFree(result, max: 400);
     }
 
     private static bool IsPricingFree(JsonElement item)
