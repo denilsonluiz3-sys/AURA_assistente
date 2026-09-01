@@ -60,7 +60,6 @@ namespace AURA.Mobile.Diagnostics
             ProviderInfo? provider = ProviderCatalog.Find(configuredProvider);
             if (provider == null && !string.IsNullOrWhiteSpace(configuredProvider))
                 throw new InvalidOperationException($"Provedor configurado não encontrado: {configuredProvider}");
-
             if (provider == null)
             {
                 if (!string.IsNullOrWhiteSpace(client.Options.Provider) && !string.Equals(client.Options.Provider, "ollama", StringComparison.OrdinalIgnoreCase))
@@ -73,7 +72,6 @@ namespace AURA.Mobile.Diagnostics
                 provider = ProviderCatalog.Find("ollama");
                 if (provider == null) throw new InvalidOperationException("Nenhum provedor configurado.");
             }
-
             string model = Model;
             if (string.IsNullOrWhiteSpace(model) && provider.Models.Count > 0) model = !string.IsNullOrWhiteSpace(provider.DefaultModelId) ? provider.DefaultModelId : provider.Models[0].Id;
             string baseUrl = !string.IsNullOrWhiteSpace(BaseUrlOverride) ? NormalizeChatBaseUrl(BaseUrlOverride, provider.Id) : NormalizeChatBaseUrl(provider.BaseUrl, provider.Id);
@@ -84,19 +82,28 @@ namespace AURA.Mobile.Diagnostics
             LastStatusMessage = provider.Name + " · " + model + " · " + baseUrl;
         }
 
-        /// <summary>Aplica a configuração universal no cliente legado consumido pelo Agent/Chat.</summary>
-        public static OpenRouterClient ApplyUniversal(string providerId, string apiKey, string model, string? baseUrl = null, string? modelsUrl = null)
+        /// <summary>Aplica uma conexão universal diretamente na instância já injetada no Agent/Chat.</summary>
+        public static void ApplyUniversal(OpenRouterClient client, string providerId, string apiKey, string model, string? baseUrl = null, string? modelsUrl = null)
         {
+            if (client == null) throw new ArgumentNullException(nameof(client));
             var connection = UniversalRuntimeAdapter.CreateConnection(providerId, apiKey, model, baseUrl, modelsUrl);
-            var client = UniversalAiClientFactory.Create(connection, MaxTokens, TimeoutSeconds);
+            var configured = UniversalAiClientFactory.Create(connection, MaxTokens, TimeoutSeconds);
+            client.Options.Provider = configured.Options.Provider;
+            client.Options.ApiKey = configured.Options.ApiKey;
+            client.Options.BaseUrl = configured.Options.BaseUrl;
+            client.Options.Model = configured.Options.Model;
+            client.Options.MaxTokens = configured.Options.MaxTokens;
+            client.Options.TimeoutSeconds = configured.Options.TimeoutSeconds;
+            client.Options.AuthHeaderName = configured.Options.AuthHeaderName;
+            client.Options.AuthScheme = configured.Options.AuthScheme;
+            client.Options.ApiFormat = configured.Options.ApiFormat;
             Provider = connection.Provider.Id;
             Model = connection.Model;
             BaseUrlOverride = connection.Provider.BaseUrl;
             ModelsUrlOverride = connection.Provider.ModelsUrl;
-            ApiFormat = client.Options.ApiFormat;
+            ApiFormat = configured.Options.ApiFormat;
             SetApiKeyForProvider(connection.Provider.Id, connection.ApiKey);
             LastStatusMessage = connection.Provider.Name + " · " + connection.Model + " · " + connection.Provider.BaseUrl;
-            return client;
         }
 
         public static string? ValidateApiKeyFormat(string? key, ProviderInfo? provider)
