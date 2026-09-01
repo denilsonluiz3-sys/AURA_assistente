@@ -1,44 +1,30 @@
-using AURA.AI.Providers;
-
 namespace AURA.AI.UniversalAI;
 
-/// <summary>Adapta a configuração universal ao cliente de IA existente da AURA.</summary>
+/// <summary>Único ponto autorizado a transformar configuração universal em cliente executável.</summary>
 public static class UniversalAiClientFactory
 {
-    public static OpenRouterClient Create(UniversalConnection connection, int maxTokens = 1500, int timeoutSeconds = 90)
+    public static IUniversalAiClient Create(UniversalConnection connection, int maxTokens = 1500, int timeoutSeconds = 90)
     {
-        if (connection is null) throw new ArgumentNullException(nameof(connection));
-        if (connection.Provider is null) throw new ArgumentException("Provider obrigatório.", nameof(connection));
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(connection.Provider);
         if (connection.Provider.RequiresApiKey && string.IsNullOrWhiteSpace(connection.ApiKey))
-            throw new ArgumentException("API key obrigatória para este provider.", nameof(connection));
+            throw new ArgumentException("API key obrigatória para o provider configurado.", nameof(connection));
         if (string.IsNullOrWhiteSpace(connection.Model))
             throw new ArgumentException("Modelo obrigatório.", nameof(connection));
         if (string.IsNullOrWhiteSpace(connection.Provider.BaseUrl))
-            throw new ArgumentException("Endpoint do provider obrigatório.", nameof(connection));
+            throw new ArgumentException("Endpoint obrigatório.", nameof(connection));
 
-        var format = MapFormat(connection.Provider.Format);
-        if (format == AiApiFormat.OpenAICompletions || format == AiApiFormat.AnthropicMessages)
+        return new UniversalAiClient(new UniversalAiClientOptions
         {
-            return new OpenRouterClient(new OpenRouterOptions
-            {
-                Provider = connection.Provider.Id,
-                ApiKey = connection.ApiKey.Trim(),
-                BaseUrl = connection.Provider.BaseUrl,
-                Model = connection.Model,
-                MaxTokens = maxTokens,
-                TimeoutSeconds = timeoutSeconds,
-                AuthHeaderName = connection.Provider.AuthHeader,
-                AuthScheme = connection.Provider.AuthScheme,
-                ApiFormat = format
-            });
-        }
-
-        throw new NotSupportedException($"Formato universal '{connection.Provider.Format}' ainda não possui adapter compatível com OpenRouterClient.");
+            Provider = connection.Provider.Id,
+            ApiKey = connection.ApiKey.Trim(),
+            BaseUrl = connection.Provider.BaseUrl.Trim(),
+            Model = connection.Model.Trim(),
+            MaxTokens = Math.Max(1, maxTokens),
+            TimeoutSeconds = Math.Max(1, timeoutSeconds),
+            AuthHeaderName = connection.Provider.AuthHeader,
+            AuthScheme = connection.Provider.AuthScheme,
+            ApiFormat = connection.Provider.Format
+        });
     }
-
-    private static AiApiFormat MapFormat(UniversalApiFormat format) => format switch
-    {
-        UniversalApiFormat.AnthropicMessages => AiApiFormat.AnthropicMessages,
-        _ => AiApiFormat.OpenAICompletions
-    };
 }
