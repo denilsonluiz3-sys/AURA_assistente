@@ -6,20 +6,22 @@ namespace AURA.Mobile.Controls;
 /// <summary>Configuração universal: provider, endpoint, autenticação e modelo são definidos pelo usuário.</summary>
 public sealed class AiConfigView : ContentView
 {
-    private readonly Entry _providerEntry = new() { Placeholder = "Identificador do provider" };
-    private readonly Entry _baseUrlEntry = new() { Placeholder = "Endpoint de chat" };
+    private readonly Entry _providerEntry = new() { Placeholder = "ex.: openrouter, ollama, deepseek" };
+    private readonly Entry _baseUrlEntry = new() { Placeholder = "https://.../chat/completions" };
     private readonly Entry _modelsUrlEntry = new() { Placeholder = "Endpoint de modelos (opcional)" };
     private readonly Picker _formatPicker = new() { Title = "Formato da API" };
-    private readonly Entry _apiKeyEntry = new() { Placeholder = "API key (opcional)", IsPassword = true, ClearButtonVisibility = ClearButtonVisibility.WhileEditing };
+    private readonly Entry _apiKeyEntry = new() { Placeholder = "API key", IsPassword = true, ClearButtonVisibility = ClearButtonVisibility.WhileEditing };
     private readonly Button _loadModelsButton = new() { Text = "CARREGAR MODELOS", HorizontalOptions = LayoutOptions.Fill };
-    private readonly Picker _modelPicker = new() { Title = "Selecione o modelo", IsEnabled = false, HorizontalOptions = LayoutOptions.Fill };
-    private readonly Button _saveButton = new() { Text = "SALVAR", IsEnabled = false, HorizontalOptions = LayoutOptions.Fill };
+    private readonly Entry _modelEntry = new() { Placeholder = "ID do modelo (ex.: qwen/qwen-plus)" };
+    private readonly Picker _modelPicker = new() { Title = "Ou selecione o modelo", IsEnabled = false, HorizontalOptions = LayoutOptions.Fill };
+    private readonly Button _saveButton = new() { Text = "SALVAR", IsEnabled = true, HorizontalOptions = LayoutOptions.Fill };
     private readonly Label _status = new() { FontSize = 12, LineBreakMode = LineBreakMode.WordWrap };
     private readonly List<string> _models = new();
 
     public AiConfigView()
     {
         _formatPicker.ItemsSource = Enum.GetValues<UniversalApiFormat>().Select(x => x.ToString()).ToArray();
+        _formatPicker.SelectedItem = UniversalApiFormat.OpenAiCompatible.ToString();
         _modelPicker.ItemsSource = _models;
         _loadModelsButton.Clicked += OnLoadModelsClicked;
         _saveButton.Clicked += OnSaveClicked;
@@ -39,7 +41,7 @@ public sealed class AiConfigView : ContentView
                     new Label { Text = "FORMATO" }, _formatPicker,
                     new Label { Text = "API KEY" }, _apiKeyEntry,
                     _loadModelsButton,
-                    new Label { Text = "MODELO" }, _modelPicker,
+                    new Label { Text = "MODELO" }, _modelEntry, _modelPicker,
                     _saveButton,
                     _status
                 }
@@ -70,6 +72,7 @@ public sealed class AiConfigView : ContentView
         _modelsUrlEntry.Text = RuntimeConfig.ModelsUrlOverride;
         _apiKeyEntry.Text = RuntimeConfig.GetApiKeyForProvider(RuntimeConfig.Provider);
         _formatPicker.SelectedItem = RuntimeConfig.ApiFormat.ToString();
+        _modelEntry.Text = RuntimeConfig.Model;
         if (!string.IsNullOrWhiteSpace(RuntimeConfig.Model))
         {
             _models.Clear();
@@ -78,8 +81,8 @@ public sealed class AiConfigView : ContentView
             _modelPicker.ItemsSource = _models;
             _modelPicker.SelectedIndex = 0;
             _modelPicker.IsEnabled = true;
-            _saveButton.IsEnabled = true;
         }
+        _saveButton.IsEnabled = true;
     }
 
     private async void OnLoadModelsClicked(object? sender, EventArgs e)
@@ -95,13 +98,16 @@ public sealed class AiConfigView : ContentView
                 return;
             }
 
+            // Gravar key antes de buscar modelos (muitos providers exigem)
+            RuntimeConfig.SetApiKeyForProvider(provider, _apiKeyEntry.Text);
+
             var format = Enum.TryParse<UniversalApiFormat>(_formatPicker.SelectedItem?.ToString(), out var f)
                 ? f
                 : UniversalApiFormat.OpenAiCompatible;
             var p = UniversalProviderRegistry.Custom(
                 provider, baseUrl, modelsUrl, format,
                 RuntimeConfig.AuthHeader, RuntimeConfig.AuthScheme, RuntimeConfig.RequiresApiKey);
-            var key = _apiKeyEntry.Text?.Trim() ?? string.Empty;
+            var key = RuntimeConfig.GetApiKeyForProvider(provider);
             using var http = new HttpClient
             {
                 Timeout = TimeSpan.FromSeconds(Math.Clamp(RuntimeConfig.TimeoutSeconds, 5, 120))
@@ -109,7 +115,7 @@ public sealed class AiConfigView : ContentView
 
             if (string.IsNullOrWhiteSpace(p.ModelsUrl))
             {
-                SetStatus("Endpoint de modelos não informado; selecione um modelo manualmente antes de salvar.", false);
+                SetStatus("Sem URL de modelos — digite o modelo manualmente e toque SALVAR.", false);
                 _modelPicker.IsEnabled = true;
                 _saveButton.IsEnabled = true;
                 return;
@@ -122,13 +128,17 @@ public sealed class AiConfigView : ContentView
             _modelPicker.ItemsSource = _models;
             _modelPicker.IsEnabled = _models.Count > 0;
             if (_models.Count > 0)
+            {
                 _modelPicker.SelectedIndex = 0;
+                _modelEntry.Text = _models[0];
+            }
             _saveButton.IsEnabled = true;
-            SetStatus($"{_models.Count} modelo(s) carregado(s).", true);
+            SetStatus($"{_models.Count} modelo(s). Key {(string.IsNullOrEmpty(key) ? "ausente" : "ok")}.", true);
         }
         catch (Exception ex)
         {
             SetStatus("Falha ao carregar modelos: " + ex.Message, false);
+            _saveButton.IsEnabled = true;
         }
     }
 
@@ -138,7 +148,12 @@ public sealed class AiConfigView : ContentView
         {
             var provider = _providerEntry.Text?.Trim();
             var baseUrl = _baseUrlEntry.Text?.Trim();
-            var model = _modelPicker.SelectedItem?.ToString() ?? RuntimeConfig.Model;
+            var model = _modelPicker.SelectedItem?.ToString();
+            if (string.IsNullOrWhiteSpace(model))
+                model = _modelEntry.Text?.Trim();
+            if (string.IsNullOrWhiteSpace(model))
+                model = RuntimeConfig.Model;
+
             if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(model))
             {
                 SetStatus("Provider, endpoint e modelo são obrigatórios.", false);
@@ -151,14 +166,41 @@ public sealed class AiConfigView : ContentView
             RuntimeConfig.ApiFormat = Enum.TryParse<UniversalApiFormat>(_formatPicker.SelectedItem?.ToString(), out var f)
                 ? f
                 : UniversalApiFormat.OpenAiCompatible;
-            RuntimeConfig.SetApiKeyForProvider(provider, _apiKeyEntry.Text);
             RuntimeConfig.Model = model;
 
+            // 1) Gravar key
+            RuntimeConfig.SetApiKeyForProvider(provider, _apiKeyEntry.Text);
+
+            // 2) Confirmar leitura
+            var stored = RuntimeConfig.GetApiKeyForProvider(provider);
+            var keyOk = !string.IsNullOrWhiteSpace(stored)
+                        && (string.IsNullOrWhiteSpace(_apiKeyEntry.Text)
+                            || string.Equals(stored, _apiKeyEntry.Text.Trim(), StringComparison.Ordinal));
+
+            // 3) Aplicar no cliente singleton
             var client = Handler?.MauiContext?.Services.GetService(typeof(IUniversalAiClient)) as IUniversalAiClient;
             if (client != null)
                 RuntimeConfig.Apply(client);
 
-            SetStatus("Configuração salva.", true);
+            var clientHasKey = client != null && !string.IsNullOrWhiteSpace(client.Options.ApiKey);
+
+            if (!string.IsNullOrWhiteSpace(_apiKeyEntry.Text) && !keyOk)
+            {
+                SetStatus("Falha: a API key não foi persistida. Tente de novo.", false);
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(_apiKeyEntry.Text) && !clientHasKey)
+            {
+                SetStatus("Key gravada, mas o cliente ainda está sem key — reabra o Agente.", false);
+                return;
+            }
+
+            SetStatus(
+                string.IsNullOrWhiteSpace(_apiKeyEntry.Text)
+                    ? "Configuração salva (sem API key)."
+                    : "Configuração e API key salvas. Pode usar o Agente.",
+                true);
         }
         catch (Exception ex)
         {
