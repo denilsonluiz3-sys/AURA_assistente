@@ -1,0 +1,646 @@
+name: Rebuild Universal AI Runtime
+
+on:
+  push:
+    branches:
+      - migration/universal-ai-clean
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Rebuild provider/model layer
+        shell: python
+        run: |
+          import json
+          import os
+          import pathlib
+          import re
+          import subprocess
+
+          root = pathlib.Path.cwd()
+
+          # Mechanical cleanup: the runtime no longer has a vendor-specific client/options type.
+          replacements = {
+              "OpenRouterClient": "AiClient",
+              "OpenRouterOptions": "AiClientOptions",
+              "AURA_OPENROUTER_KEY": "AURA_API_KEY",
+              "AURA.AI.Providers": "AURA.AI.UniversalAI",
+          }
+          for path in root.rglob("*"):
+              if not path.is_file() or ".git" in path.parts:
+                  continue
+              if path.suffix.lower() not in {".cs", ".csproj", ".json", ".xaml", ".md", ".yml", ".yaml"}:
+                  continue
+              try:
+                  text = path.read_text(encoding="utf-8")
+              except UnicodeDecodeError:
+                  continue
+              original = text
+              for old, new in replacements.items():
+                  text = text.replace(old, new)
+              if text != original:
+                  path.write_text(text, encoding="utf-8")
+
+          # Remove the old provider catalog. AURA must not ship a list of vendors/models.
+          for path in [root / "config/providers.json", root / "src/AURA.AI/UniversalAI/UniversalProviderRegistry.cs"]:
+              if path.exists():
+                  path.unlink()
+
+          # Generic provider model: no vendor names, URLs, models or credentials are embedded.
+          (root / "src/AURA.AI/UniversalAI/UniversalProvider.cs").write_text(r'''namespace AURA.AI.UniversalAI;
+
+public enum UniversalApiFormat
+{
+    OpenAiCompatible,
+    AnthropicMessages,
+    GeminiGenerateContent
+}
+
+public enum UniversalApiKeyLocation
+{
+    Header,
+    Query,
+    None
+}
+
+public sealed record UniversalProvider(
+    string Id,
+    string Name,
+    string BaseUrl,
+    string ModelsUrl,
+    UniversalApiFormat Format = UniversalApiFormat.OpenAiCompatible,
+    string AuthHeader = "Authorization",
+    string AuthScheme = "Bearer",
+    bool RequiresApiKey = true,
+    UniversalApiKeyLocation ApiKeyLocation = UniversalApiKeyLocation.Header,
+    string ApiKeyQueryParameter = "key",
+    string HeadersJson = "{}");
+
+public sealed record UniversalModel(string Id, string DisplayName, string ProviderId, string? OwnedBy = null);
+
+public sealed record UniversalConnection(UniversalProvider Provider, string ApiKey, string Model);
+''', encoding="utf-8")
+
+          (root / "src/AURA.AI/UniversalAI/UniversalRuntimeAdapter.cs").write_text(r'''namespace AURA.AI.UniversalAI;
+
+public static class UniversalRuntimeAdapter
+{
+    public static UniversalConnection CreateConnection(
+        string providerId,
+        string providerName,
+        string apiKey,
+        string model,
+        string baseUrl,
+        string modelsUrl,
+        UniversalApiFormat format,
+        string authHeader,
+        string authScheme,
+        UniversalApiKeyLocation keyLocation,
+        string keyQueryParameter,
+        string headersJson)
+    {
+        if (string.IsNullOrWhiteSpace(providerId)) throw new ArgumentException("Identificador do provedor obrigatório.", nameof(providerId));
+        if (string.IsNullOrWhiteSpace(providerName)) providerName = providerId;
+        if (string.IsNullOrWhiteSpace(model)) throw new ArgumentException("Modelo obrigatório.", nameof(model));
+        if (string.IsNullOrWhiteSpace(baseUrl)) throw new ArgumentException("Endpoint obrigatório.", nameof(baseUrl));
+        if (string.IsNullOrWhiteSpace(modelsUrl)) throw new ArgumentException("Endpoint de modelos obrigatório.", nameof(modelsUrl));
+
+        var provider = new UniversalProvider(
+            providerId.Trim(), providerName.Trim(), baseUrl.Trim(), modelsUrl.Trim(), format,
+            string.IsNullOrWhiteSpace(authHeader) ? "Authorization" : authHeader.Trim(),
+            authScheme?.Trim() ?? string.Empty,
+            keyLocation != UniversalApiKeyLocation.None,
+            keyLocation,
+            string.IsNullOrWhiteSpace(keyQueryParameter) ? "key" : keyQueryParameter.Trim(),
+            string.IsNullOrWhiteSpace(headersJson) ? "{}" : headersJson.Trim());
+
+        return new UniversalConnection(provider, apiKey?.Trim() ?? string.Empty, model.Trim());
+    }
+}
+''', encoding="utf-8")
+
+          (root / "src/AURA.AI/UniversalAI/UniversalAiClientFactory.cs").write_text(r'''namespace AURA.AI.UniversalAI;
+
+public static class UniversalAiClientFactory
+{
+    public static AiClient Create(UniversalConnection connection, int maxTokens = 1500, int timeoutSeconds = 90)
+    {
+        if (connection is null) throw new ArgumentNullException(nameof(connection));
+        var provider = connection.Provider ?? throw new ArgumentException("Configuração do provedor obrigatória.", nameof(connection));
+        if (provider.RequiresApiKey && string.IsNullOrWhiteSpace(connection.ApiKey))
+            throw new ArgumentException("API key obrigatória para o provedor configurado.", nameof(connection));
+        if (string.IsNullOrWhiteSpace(connection.Model)) throw new ArgumentException("Modelo obrigatório.", nameof(connection));
+        if (string.IsNullOrWhiteSpace(provider.BaseUrl)) throw new ArgumentException("Endpoint obrigatório.", nameof(connection));
+
+        return new AiClient(new AiClientOptions
+        {
+            Provider = provider.Id,
+            ApiKey = connection.ApiKey,
+            BaseUrl = provider.BaseUrl,
+            ModelsUrl = provider.ModelsUrl,
+            Model = connection.Model,
+            MaxTokens = maxTokens,
+            TimeoutSeconds = timeoutSeconds,
+            ApiFormat = provider.Format,
+            AuthHeaderName = provider.AuthHeader,
+            AuthScheme = provider.AuthScheme,
+            ApiKeyLocation = provider.ApiKeyLocation,
+            ApiKeyQueryParameter = provider.ApiKeyQueryParameter,
+            HeadersJson = provider.HeadersJson
+        });
+    }
+}
+''', encoding="utf-8")
+
+          (root / "src/AURA.AI/UniversalAI/UniversalModelDiscovery.cs").write_text(r'''using System.Text.Json;
+
+namespace AURA.AI.UniversalAI;
+
+public sealed class UniversalModelDiscovery
+{
+    private readonly HttpClient _http;
+    public UniversalModelDiscovery(HttpClient http) => _http = http ?? throw new ArgumentNullException(nameof(http));
+
+    public async Task<IReadOnlyList<UniversalModel>> LoadAsync(UniversalProvider provider, string apiKey, CancellationToken ct = default)
+    {
+        if (provider is null) throw new ArgumentNullException(nameof(provider));
+        if (string.IsNullOrWhiteSpace(provider.ModelsUrl)) throw new InvalidOperationException("Endpoint de modelos não configurado.");
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, AddApiKey(provider.ModelsUrl, provider, apiKey));
+        ApplyHeaders(request, provider, apiKey);
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        string body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"Falha ao carregar modelos: {(int)response.StatusCode} {response.ReasonPhrase}. {body[..Math.Min(body.Length, 500)]}");
+        return Parse(provider.Id, body);
+    }
+
+    private static string AddApiKey(string url, UniversalProvider provider, string key)
+    {
+        if (provider.ApiKeyLocation != UniversalApiKeyLocation.Query || string.IsNullOrWhiteSpace(key)) return url;
+        string separator = url.Contains('?') ? "&" : "?";
+        return url + separator + Uri.EscapeDataString(provider.ApiKeyQueryParameter) + "=" + Uri.EscapeDataString(key);
+    }
+
+    private static void ApplyHeaders(HttpRequestMessage request, UniversalProvider provider, string key)
+    {
+        if (provider.ApiKeyLocation == UniversalApiKeyLocation.Header && !string.IsNullOrWhiteSpace(key))
+            request.Headers.TryAddWithoutValidation(provider.AuthHeader, string.IsNullOrWhiteSpace(provider.AuthScheme) ? key : provider.AuthScheme + " " + key);
+        try
+        {
+            using var doc = JsonDocument.Parse(provider.HeadersJson ?? "{}");
+            if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                foreach (var p in doc.RootElement.EnumerateObject())
+                    if (p.Value.ValueKind == JsonValueKind.String)
+                        request.Headers.TryAddWithoutValidation(p.Name, p.Value.GetString());
+        }
+        catch (JsonException) { }
+    }
+
+    private static IReadOnlyList<UniversalModel> Parse(string providerId, string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        var result = new List<UniversalModel>();
+        JsonElement collection = root;
+        if (root.ValueKind == JsonValueKind.Object)
+        {
+            if (root.TryGetProperty("data", out var data)) collection = data;
+            else if (root.TryGetProperty("models", out var models)) collection = models;
+        }
+        if (collection.ValueKind != JsonValueKind.Array) return result;
+        foreach (var item in collection.EnumerateArray())
+        {
+            string? id = null;
+            string? owned = null;
+            if (item.ValueKind == JsonValueKind.String) id = item.GetString();
+            else if (item.ValueKind == JsonValueKind.Object)
+            {
+                if (item.TryGetProperty("id", out var idNode)) id = idNode.GetString();
+                if (string.IsNullOrWhiteSpace(id) && item.TryGetProperty("name", out var nameNode)) id = nameNode.GetString();
+                if (item.TryGetProperty("owned_by", out var ownerNode)) owned = ownerNode.GetString();
+            }
+            if (!string.IsNullOrWhiteSpace(id)) result.Add(new UniversalModel(id!, id!, providerId, owned));
+        }
+        return result.OrderBy(x => x.DisplayName, StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+}
+''', encoding="utf-8")
+
+          (root / "src/AURA.AI/AiClient.cs").write_text(r'''using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using AURA.Core.Logging;
+
+namespace AURA.AI;
+
+public sealed class AiClientOptions
+{
+    public string Provider { get; set; } = string.Empty;
+    public string ApiKey { get; set; } = string.Empty;
+    public string BaseUrl { get; set; } = string.Empty;
+    public string ModelsUrl { get; set; } = string.Empty;
+    public string Model { get; set; } = string.Empty;
+    public int MaxTokens { get; set; } = 1500;
+    public int TimeoutSeconds { get; set; } = 90;
+    public UniversalAI.UniversalApiFormat ApiFormat { get; set; } = UniversalAI.UniversalApiFormat.OpenAiCompatible;
+    public string AuthHeaderName { get; set; } = "Authorization";
+    public string AuthScheme { get; set; } = "Bearer";
+    public UniversalAI.UniversalApiKeyLocation ApiKeyLocation { get; set; } = UniversalAI.UniversalApiKeyLocation.Header;
+    public string ApiKeyQueryParameter { get; set; } = "key";
+    public string HeadersJson { get; set; } = "{}";
+    public string AppReference { get; set; } = "AURA";
+}
+
+public sealed class AiClient
+{
+    public AiClientOptions Options { get; }
+    private readonly ILogger _logger;
+
+    public AiClient(AiClientOptions options, ILogger? logger = null)
+    {
+        Options = options ?? throw new ArgumentNullException(nameof(options));
+        _logger = logger ?? new ConsoleLogger();
+    }
+
+    public async Task<string> ChatAsync(string question, HttpClient? httpClient = null, CancellationToken ct = default)
+        => await ChatAsync(question, null, httpClient, ct).ConfigureAwait(false);
+
+    public async Task<string> ChatAsync(string question, string? systemPrompt = null, HttpClient? httpClient = null, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(question)) throw new ArgumentException("A pergunta não pode ser vazia.", nameof(question));
+        var messages = new List<AgentMessage>();
+        if (!string.IsNullOrWhiteSpace(systemPrompt)) messages.Add(new AgentMessage { Role = "system", Content = systemPrompt });
+        messages.Add(new AgentMessage { Role = "user", Content = question });
+        AgentChatResponse response = await SendAsync(messages, null, httpClient, ct).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(response.Error)) throw new AgentLlmException(response.Error, response.ErrorKind);
+        return response.Content ?? string.Empty;
+    }
+
+    public async Task<AgentChatResponse> ChatToolsAsync(IReadOnlyList<AgentMessage> messages, IReadOnlyList<AgentToolDefinition> tools, HttpClient? httpClient = null, CancellationToken ct = default, string? systemPrompt = null)
+    {
+        var all = new List<AgentMessage>();
+        if (!string.IsNullOrWhiteSpace(systemPrompt)) all.Add(new AgentMessage { Role = "system", Content = systemPrompt });
+        all.AddRange(messages);
+        return await SendAsync(all, tools, httpClient, ct).ConfigureAwait(false);
+    }
+
+    private async Task<AgentChatResponse> SendAsync(IReadOnlyList<AgentMessage> messages, IReadOnlyList<AgentToolDefinition>? tools, HttpClient? httpClient, CancellationToken ct)
+    {
+        EnsureConfigured();
+        using var client = httpClient is null ? new HttpClient() : null;
+        HttpClient http = httpClient ?? client!;
+        http.Timeout = TimeSpan.FromSeconds(Math.Clamp(Options.TimeoutSeconds, 5, 600));
+        try
+        {
+            using var request = BuildRequest(messages, tools);
+            using HttpResponseMessage response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            string body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+                return new AgentChatResponse { Error = $"Falha na chamada LLM ({(int)response.StatusCode} {response.StatusCode}): {body}", ErrorKind = Classify(response.StatusCode) };
+            return ParseResponse(body);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return new AgentChatResponse { Error = "Tempo limite excedido ao chamar o provedor configurado.", ErrorKind = AgentErrorKind.Timeout };
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.Error("LLM network error: " + ex.Message);
+            return new AgentChatResponse { Error = ex.Message, ErrorKind = AgentErrorKind.Network };
+        }
+    }
+
+    private HttpRequestMessage BuildRequest(IReadOnlyList<AgentMessage> messages, IReadOnlyList<AgentToolDefinition>? tools)
+    {
+        string url = Options.BaseUrl.Trim();
+        if (Options.ApiFormat == UniversalAI.UniversalApiFormat.GeminiGenerateContent)
+            url = url.Replace("{model}", Uri.EscapeDataString(Options.Model), StringComparison.Ordinal);
+
+        if (Options.ApiKeyLocation == UniversalAI.UniversalApiKeyLocation.Query && !string.IsNullOrWhiteSpace(Options.ApiKey))
+            url += (url.Contains('?') ? "&" : "?") + Uri.EscapeDataString(Options.ApiKeyQueryParameter) + "=" + Uri.EscapeDataString(Options.ApiKey);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, url);
+        if (Options.ApiKeyLocation == UniversalAI.UniversalApiKeyLocation.Header && !string.IsNullOrWhiteSpace(Options.ApiKey))
+        {
+            string value = string.IsNullOrWhiteSpace(Options.AuthScheme) ? Options.ApiKey : Options.AuthScheme + " " + Options.ApiKey;
+            request.Headers.TryAddWithoutValidation(Options.AuthHeaderName, value);
+        }
+        ApplyCustomHeaders(request);
+        object payload = Options.ApiFormat switch
+        {
+            UniversalAI.UniversalApiFormat.AnthropicMessages => BuildAnthropicPayload(messages),
+            UniversalAI.UniversalApiFormat.GeminiGenerateContent => BuildGeminiPayload(messages),
+            _ => BuildOpenAiPayload(messages, tools)
+        };
+        request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        return request;
+    }
+
+    private object BuildOpenAiPayload(IReadOnlyList<AgentMessage> messages, IReadOnlyList<AgentToolDefinition>? tools)
+    {
+        var msg = messages.Select(m => new Dictionary<string, object?>
+        {
+            ["role"] = m.Role,
+            ["content"] = m.Content,
+            ["tool_call_id"] = m.ToolCallId,
+            ["tool_calls"] = m.ToolCalls?.Select(c => new { id = c.Id, type = "function", function = new { name = c.Name, arguments = c.ArgumentsJson } }).ToArray()
+        }).ToArray();
+        var payload = new Dictionary<string, object?> { ["model"] = Options.Model, ["messages"] = msg, ["max_tokens"] = Options.MaxTokens };
+        if (tools is { Count: > 0 }) payload["tools"] = tools.Select(t => new { type = "function", function = new { name = t.Name, description = t.Description, parameters = new { type = "object", properties = t.Parameters.ToDictionary(p => p.Key, p => new { type = p.Value.Type, description = p.Value.Description }), required = t.Required } } }).ToArray();
+        return payload;
+    }
+
+    private object BuildAnthropicPayload(IReadOnlyList<AgentMessage> messages)
+    {
+        string? system = messages.FirstOrDefault(m => m.Role == "system")?.Content;
+        var content = messages.Where(m => m.Role != "system").Select(m => new { role = m.Role == "assistant" ? "assistant" : "user", content = m.Content ?? string.Empty }).ToArray();
+        var payload = new Dictionary<string, object?> { ["model"] = Options.Model, ["max_tokens"] = Options.MaxTokens, ["messages"] = content };
+        if (!string.IsNullOrWhiteSpace(system)) payload["system"] = system;
+        return payload;
+    }
+
+    private object BuildGeminiPayload(IReadOnlyList<AgentMessage> messages)
+    {
+        var contents = messages.Where(m => m.Role != "system").Select(m => new { role = m.Role == "assistant" ? "model" : "user", parts = new[] { new { text = m.Content ?? string.Empty } } }).ToArray();
+        var system = messages.FirstOrDefault(m => m.Role == "system")?.Content;
+        var payload = new Dictionary<string, object?> { ["contents"] = contents, ["generationConfig"] = new { maxOutputTokens = Options.MaxTokens } };
+        if (!string.IsNullOrWhiteSpace(system)) payload["systemInstruction"] = new { parts = new[] { new { text = system } } };
+        return payload;
+    }
+
+    private AgentChatResponse ParseResponse(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            if (Options.ApiFormat == UniversalAI.UniversalApiFormat.AnthropicMessages)
+            {
+                string text = root.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.Array ? string.Join("", c.EnumerateArray().Where(x => x.TryGetProperty("text", out _)).Select(x => x.GetProperty("text").GetString())) : string.Empty;
+                return new AgentChatResponse { Content = text };
+            }
+            if (Options.ApiFormat == UniversalAI.UniversalApiFormat.GeminiGenerateContent)
+            {
+                string text = string.Empty;
+                if (root.TryGetProperty("candidates", out var candidates) && candidates.ValueKind == JsonValueKind.Array && candidates.GetArrayLength() > 0)
+                {
+                    var parts = candidates[0].GetProperty("content").GetProperty("parts");
+                    text = string.Join("", parts.EnumerateArray().Where(x => x.TryGetProperty("text", out _)).Select(x => x.GetProperty("text").GetString()));
+                }
+                return new AgentChatResponse { Content = text };
+            }
+            var choice = root.GetProperty("choices")[0];
+            var message = choice.GetProperty("message");
+            var result = new AgentChatResponse { Content = message.TryGetProperty("content", out var content) ? content.GetString() : string.Empty };
+            if (message.TryGetProperty("tool_calls", out var calls) && calls.ValueKind == JsonValueKind.Array)
+            {
+                result.ToolCalls = new List<AgentToolCall>();
+                foreach (var call in calls.EnumerateArray())
+                {
+                    var fn = call.GetProperty("function");
+                    result.ToolCalls.Add(new AgentToolCall { Id = call.GetProperty("id").GetString() ?? Guid.NewGuid().ToString("N"), Name = fn.GetProperty("name").GetString() ?? string.Empty, ArgumentsJson = fn.GetProperty("arguments").GetString() ?? "{}" });
+                }
+            }
+            return result;
+        }
+        catch (Exception ex)
+        {
+            return new AgentChatResponse { Error = "Resposta inválida do provedor: " + ex.Message, ErrorKind = AgentErrorKind.InvalidRequest };
+        }
+    }
+
+    private void ApplyCustomHeaders(HttpRequestMessage request)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(Options.HeadersJson ?? "{}");
+            if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                foreach (var p in doc.RootElement.EnumerateObject())
+                    if (p.Value.ValueKind == JsonValueKind.String) request.Headers.TryAddWithoutValidation(p.Name, p.Value.GetString());
+        }
+        catch (JsonException ex) { _logger.Warning("Cabeçalhos personalizados inválidos: " + ex.Message); }
+    }
+
+    private void EnsureConfigured()
+    {
+        if (string.IsNullOrWhiteSpace(Options.BaseUrl)) throw new InvalidOperationException("Endpoint do provedor não configurado.");
+        if (string.IsNullOrWhiteSpace(Options.Model)) throw new InvalidOperationException("Modelo não configurado.");
+        if (Options.ApiKeyLocation != UniversalAI.UniversalApiKeyLocation.None && string.IsNullOrWhiteSpace(Options.ApiKey)) throw new InvalidOperationException("API key não configurada.");
+    }
+
+    private static AgentErrorKind Classify(HttpStatusCode code) => code switch
+    {
+        HttpStatusCode.BadRequest => AgentErrorKind.InvalidRequest,
+        HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => AgentErrorKind.InvalidApiKey,
+        (HttpStatusCode)402 => AgentErrorKind.PaymentRequired,
+        HttpStatusCode.TooManyRequests => AgentErrorKind.RateLimited,
+        _ when (int)code >= 500 => AgentErrorKind.ProviderError,
+        _ => AgentErrorKind.Unknown
+    };
+}
+''', encoding="utf-8")
+
+          (root / "src/AURA.AI/AgentSession.cs").write_text(r'''using System.Text;
+using AURA.Core.Logging;
+using AURA.Memory;
+
+namespace AURA.AI;
+
+public sealed class AgentSession
+{
+    private readonly int _maxRounds;
+    private readonly AiClient _client;
+    private readonly ILogger _logger;
+    private readonly List<AgentTool> _tools;
+    private readonly List<AgentMessage> _messages = new();
+    private readonly string? _systemPrompt;
+    private readonly MemoryStore? _memory;
+
+    public AgentSession(AiClient client, IEnumerable<AgentTool> tools, string? systemPrompt = null, ILogger? logger = null, MemoryStore? memory = null, int maxRounds = 12)
+    {
+        _client = client ?? throw new ArgumentNullException(nameof(client));
+        _tools = (tools ?? Enumerable.Empty<AgentTool>()).ToList();
+        _systemPrompt = systemPrompt;
+        _logger = logger ?? new ConsoleLogger();
+        _memory = memory;
+        _maxRounds = Math.Max(1, maxRounds);
+    }
+
+    public event Action<AgentStep>? Step;
+    public IReadOnlyList<AgentMessage> Messages => _messages;
+
+    public async Task<string> RunAsync(string userText, HttpClient? httpClient = null, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(userText)) throw new ArgumentException("A instrução não pode ser vazia.", nameof(userText));
+        _messages.Add(new AgentMessage { Role = "user", Content = userText });
+        _memory?.Append(MemoryEntry.Question(userText));
+
+        for (int round = 0; round < _maxRounds; round++)
+        {
+            var response = await _client.ChatToolsAsync(_messages.ToArray(), _tools.Select(t => t.Definition).ToList(), httpClient, ct, BuildSystemPrompt()).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(response.Error)) throw new AgentLlmException(response.Error, response.ErrorKind);
+            if (response.ToolCalls is not { Count: > 0 })
+            {
+                string answer = response.Content ?? string.Empty;
+                _memory?.Append(MemoryEntry.Answer(answer));
+                return answer;
+            }
+
+            _messages.Add(new AgentMessage { Role = "assistant", Content = response.Content, ToolCalls = response.ToolCalls });
+            foreach (var call in response.ToolCalls)
+            {
+                ct.ThrowIfCancellationRequested();
+                AgentTool? tool = _tools.FirstOrDefault(t => string.Equals(t.Definition.Name, call.Name, StringComparison.OrdinalIgnoreCase));
+                string result;
+                bool success = true;
+                if (tool is null)
+                {
+                    result = "ERRO: ferramenta não encontrada: " + call.Name;
+                    success = false;
+                }
+                else
+                {
+                    try { result = await tool.ExecuteAsync(call.ArgumentsJson, ct).ConfigureAwait(false); }
+                    catch (Exception ex) { result = "ERRO: " + ex.Message; success = false; _logger.Error(ex.ToString()); }
+                }
+                _messages.Add(new AgentMessage { Role = "tool", ToolCallId = call.Id, Content = result });
+                Step?.Invoke(new AgentStep(call.Name, call.ArgumentsJson, result, success));
+            }
+        }
+        throw new AgentLlmException("O agente atingiu o limite de rodadas sem produzir uma resposta final.", AgentErrorKind.Unknown);
+    }
+
+    private string BuildSystemPrompt()
+    {
+        var sb = new StringBuilder();
+        if (!string.IsNullOrWhiteSpace(_systemPrompt)) sb.Append(_systemPrompt.Trim());
+        if (_tools.Count > 0)
+        {
+            sb.Append("\n\nFERRAMENTAS DISPONÍVEIS:\n");
+            foreach (var tool in _tools)
+                sb.Append("- ").Append(tool.Definition.Name).Append(": ").Append(tool.Definition.Description).Append('\n');
+        }
+        return sb.ToString();
+    }
+}
+''', encoding="utf-8")
+
+          # Service façade: no vendor-specific defaults.
+          (root / "src/AURA.AI/AiAssistantService.cs").write_text(r'''using AURA.Core.Logging;
+using AURA.Memory;
+
+namespace AURA.AI;
+
+public static class AiAssistantService
+{
+    public static async Task<string> AskAsync(string question, MemoryStore? memory = null, ILogger? logger = null, AiClientOptions? options = null, HttpClient? http = null)
+    {
+        if (string.IsNullOrWhiteSpace(question)) throw new ArgumentException("A pergunta não pode ser vazia.", nameof(question));
+        var client = new AiClient(options ?? throw new InvalidOperationException("A configuração do provedor não foi fornecida."), logger);
+        if (memory != null) memory.Append(MemoryEntry.Question(question));
+        string answer = await client.ChatAsync(question, http).ConfigureAwait(false);
+        memory?.Append(MemoryEntry.Answer(answer));
+        return answer;
+    }
+}
+''', encoding="utf-8")
+
+          (root / "src/AURA.AI/AiAssistant.cs").write_text(r'''using AURA.Core.Logging;
+using AURA.Memory;
+
+namespace AURA.AI;
+
+public sealed class AiAssistant
+{
+    private readonly AiClient _client;
+    private readonly MemoryStore _memory;
+    private readonly ILogger _logger;
+
+    public AiAssistant(AiClient client, MemoryStore memory, ILogger? logger = null)
+    {
+        _client = client ?? throw new ArgumentNullException(nameof(client));
+        _memory = memory ?? throw new ArgumentNullException(nameof(memory));
+        _logger = logger ?? new ConsoleLogger();
+    }
+
+    public async Task<string> AskAsync(string question, HttpClient? httpClient = null, CancellationToken ct = default)
+    {
+        _memory.Append(MemoryEntry.Question(question));
+        string answer = await _client.ChatAsync(question, httpClient, ct).ConfigureAwait(false);
+        _memory.Append(MemoryEntry.Answer(answer));
+        _logger.Info("IA: pergunta registrada e respondida.");
+        return answer;
+    }
+}
+''', encoding="utf-8")
+
+          # Remove the embedded vendor catalog from the AI project.
+          csproj = root / "src/AURA.AI/AURA.AI.csproj"
+          text = csproj.read_text(encoding="utf-8")
+          text = re.sub(r'\s*<!-- Catálogo de provedores/modelos.*?</ItemGroup>\s*', '\n', text, flags=re.S)
+          csproj.write_text(text, encoding="utf-8")
+
+          # CLI: generic environment configuration only; no provider/model default.
+          program = root / "src/AURA.CLI/Program.cs"
+          text = program.read_text(encoding="utf-8")
+          text = text.replace('Environment.GetEnvironmentVariable("OPENROUTER_API_KEY")', 'Environment.GetEnvironmentVariable("AURA_API_KEY")')
+          text = text.replace('Environment.GetEnvironmentVariable("AURA_OPENROUTER_KEY")', 'Environment.GetEnvironmentVariable("AURA_API_KEY")')
+          text = text.replace('"qwen/qwen-plus"', 'string.Empty')
+          text = text.replace('"gpt-5-mini"', 'string.Empty')
+          text = text.replace('"sk-or-..."', '"<api-key>"')
+          text = text.replace('"OPENROUTER_API_KEY"', '"AURA_API_KEY"')
+          program.write_text(text, encoding="utf-8")
+
+          # Mobile DI: start with an empty client; RuntimeConfig supplies the user's choice.
+          maui = root / "src/AURA.Mobile/MauiProgram.cs"
+          text = maui.read_text(encoding="utf-8")
+          text = re.sub(r'\s*builder\.Services\.AddSingleton\(sp => new AiClient\(new AiClientOptions \{.*?\}, sp\.GetRequiredService<ILogger>\(\)\)\);', '\n        builder.Services.AddSingleton(sp => new AiClient(new AiClientOptions(), sp.GetRequiredService<ILogger>()));', text, flags=re.S)
+          maui.write_text(text, encoding="utf-8")
+
+          # Module metadata must describe capability, not a vendor.
+          for path in [root / "modules/packages/ai/module.json"]:
+              if path.exists():
+                  data = path.read_text(encoding="utf-8").replace("Assistente inteligente: chat com a IA (OpenRouter) e agente de arquivos com ferramentas.", "Assistente inteligente: conexão configurável com um provedor de IA e agente de arquivos com ferramentas.")
+                  path.write_text(data, encoding="utf-8")
+          module_catalog = root / "src/AURA.Modules/ModuleCatalog.cs"
+          if module_catalog.exists():
+              data = module_catalog.read_text(encoding="utf-8").replace("OpenRouterClient", "AiClient")
+              module_catalog.write_text(data, encoding="utf-8")
+
+          print("Universal AI source reconstruction written.")
+
+      - name: Build solution
+        run: dotnet build AURA.sln --configuration Release --no-restore
+
+      - name: Verify vendor-neutral source
+        shell: bash
+        run: |
+          if grep -RniE 'OpenRouter|OPENROUTER|qwen/qwen-plus|gpt-5-mini|127\.0\.0\.1:1143[0-9]' src config modules tests --exclude-dir=bin --exclude-dir=obj; then
+            echo "Vendor-specific reference remains in source."
+            exit 1
+          fi
+
+      - name: Commit reconstructed source
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "refactor(ai): make provider runtime fully user-configurable"
+          git push origin HEAD:${GITHUB_REF_NAME}
