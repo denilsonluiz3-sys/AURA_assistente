@@ -98,7 +98,7 @@ public static class RuntimeConfig
             {
                 var fromPref = Preferences.Default.Get(ApiKeyPrefix + id, string.Empty)?.Trim();
                 if (!string.IsNullOrEmpty(fromPref))
-                    return fromPref;
+                    return ApiKeyValidator.Normalize(fromPref);
             }
             catch { /* ignore */ }
         }
@@ -108,8 +108,9 @@ public static class RuntimeConfig
             var fromSecure = ReadSecure(ApiKeyPrefix + id);
             if (!string.IsNullOrEmpty(fromSecure))
             {
-                try { Preferences.Default.Set(ApiKeyPrefix + id, fromSecure); } catch { /* ignore */ }
-                return fromSecure;
+                var norm = ApiKeyValidator.Normalize(fromSecure);
+                try { Preferences.Default.Set(ApiKeyPrefix + id, norm); } catch { /* ignore */ }
+                return norm;
             }
         }
 
@@ -117,13 +118,13 @@ public static class RuntimeConfig
         {
             var legacy = Preferences.Default.Get(LegacyApiKeyPref, string.Empty)?.Trim();
             if (!string.IsNullOrEmpty(legacy))
-                return legacy;
+                return ApiKeyValidator.Normalize(legacy);
         }
         catch { /* ignore */ }
 
         var legacySecure = ReadSecure(LegacyApiKeySecure);
         if (!string.IsNullOrEmpty(legacySecure))
-            return legacySecure;
+            return ApiKeyValidator.Normalize(legacySecure);
 
         return string.Empty;
     }
@@ -131,7 +132,7 @@ public static class RuntimeConfig
     public static void SetApiKeyForProvider(string? providerId, string? value)
     {
         var id = Normalize(providerId);
-        var v = (value ?? string.Empty).Trim();
+        var v = ApiKeyValidator.Normalize(value);
 
         if (string.IsNullOrEmpty(id))
         {
@@ -182,7 +183,6 @@ public static class RuntimeConfig
     public static string NormalizeChatBaseUrl(string? url, string? providerId = null)
         => EndpointValidator.Normalize(url);
 
-    /// <summary>Valida o endpoint de chat atual. null = OK.</summary>
     public static string? ValidateCurrentEndpoint()
     {
         var hint = ApiFormat switch
@@ -282,8 +282,14 @@ public static class RuntimeConfig
         if (string.IsNullOrWhiteSpace(client.Options.Model))
             return "Configure o modelo (⚙).";
 
-        if (RequiresApiKey && string.IsNullOrWhiteSpace(client.Options.ApiKey))
-            return "Configure a chave de API do provider (⚙). A key não foi encontrada no armazenamento.";
+        if (RequiresApiKey)
+        {
+            var keyResult = ApiKeyValidator.ValidateFormat(
+                client.Options.ApiKey, client.Options.Provider, required: true);
+            if (!keyResult.Success)
+                return keyResult.Message;
+            // Avisos de prefixo não bloqueiam a chamada
+        }
 
         return null;
     }
