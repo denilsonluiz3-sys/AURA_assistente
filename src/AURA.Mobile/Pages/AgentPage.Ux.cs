@@ -4,8 +4,7 @@ using AURA.Mobile.Diagnostics;
 namespace AURA.Mobile.Pages;
 
 /// <summary>
-/// UX: stop (■) no enviar, botão 🔊 nas respostas, status curto.
-/// Partial — sem reescrever o AgentPage.xaml.cs de 1200+ linhas.
+/// UX: stop (■) com CancellationToken real, 🔊 nas respostas, status curto.
 /// </summary>
 public partial class AgentPage
 {
@@ -42,7 +41,7 @@ public partial class AgentPage
         }
     }
 
-    /// <summary>▶ envia · ■ cancela (XAML: Clicked=OnRunOrStopClicked).</summary>
+    /// <summary>▶ envia · ■ cancela via AgentSession.CancelAmbientRun + CTS.</summary>
     private void OnRunOrStopClicked(object? sender, EventArgs e)
     {
         HookBubbleSpeakInjector();
@@ -53,12 +52,23 @@ public partial class AgentPage
             return;
         }
 
+        // Token ambiente: RunAsync (mesmo sem CT explícito no OnRunClicked) liga neste CTS
+        try
+        {
+            _runCts = AgentSession.BeginAmbientRun();
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("BeginAmbientRun", ex);
+            _runCts = new CancellationTokenSource();
+        }
+
         OnRunClicked(sender, e);
 
         // OnRunClicked desabilita o botão — reabilita como ■ para permitir stop
         MainThread.BeginInvokeOnMainThread(async () =>
         {
-            await Task.Delay(100);
+            await Task.Delay(80);
             if (_runInFlight)
                 SetRunButtonBusy(true);
         });
@@ -66,16 +76,16 @@ public partial class AgentPage
 
     private void RequestStopRun()
     {
+        try { AgentSession.CancelAmbientRun(); } catch { /* ignore */ }
         try { _runCts?.Cancel(); } catch { /* ignore */ }
         try { _ = _speech.StopAsync(); } catch { /* ignore */ }
 
-        MainThread.BeginInvokeOnMainThread(() =>
-        {
-            SetRunButtonBusy(false);
-            _runInFlight = false;
-        });
+        MainThread.BeginInvokeOnMainThread(() => SetRunButtonBusy(false));
 
-        _ = AppendBubbleAsync("⏹ Execução interrompida.", user: false, isTool: true);
+        // A bolha de interrupção também pode vir do retorno de RunAsync ("⏹ Execução interrompida.")
+        // Evita duplicar: só mostra se o fluxo ainda estiver marcado em voo.
+        if (_runInFlight)
+            _ = AppendBubbleAsync("⏹ Cancelando…", user: false, isTool: true);
     }
 
     private void SetRunButtonBusy(bool busy)
