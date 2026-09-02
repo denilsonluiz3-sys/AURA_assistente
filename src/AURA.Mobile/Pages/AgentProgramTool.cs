@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -16,10 +17,7 @@ public sealed class AgentListProgramsTool : AgentTool
 {
     private readonly CellProgramRegistry _registry;
 
-    public AgentListProgramsTool(CellProgramRegistry registry)
-    {
-        _registry = registry ?? throw new ArgumentNullException(nameof(registry));
-    }
+    public AgentListProgramsTool(CellProgramRegistry registry) => _registry = registry ?? throw new ArgumentNullException(nameof(registry));
 
     public override AgentToolDefinition Definition => new AgentToolDefinition
     {
@@ -31,14 +29,10 @@ public sealed class AgentListProgramsTool : AgentTool
     public override Task<string> ExecuteAsync(string argumentsJson, CancellationToken ct = default)
     {
         var programs = _registry.All.ToList();
-        if (programs.Count == 0)
-            return Task.FromResult("Nenhum programa registrado.");
-
+        if (programs.Count == 0) return Task.FromResult("Nenhum programa registrado.");
         var sb = new StringBuilder();
         sb.AppendLine($"Programas ({programs.Count}):");
-        foreach (var p in programs)
-            sb.AppendLine($"- {p.Name}: {string.Join(", ", p.RequiredCapabilities)}");
-
+        foreach (var p in programs) sb.AppendLine($"- {p.Name}: {string.Join(", ", p.RequiredCapabilities)}");
         return Task.FromResult(sb.ToString().TrimEnd());
     }
 }
@@ -58,14 +52,11 @@ public sealed class AgentRunProgramTool : AgentTool
     public override AgentToolDefinition Definition => new AgentToolDefinition
     {
         Name = "run_program",
-        Description = "Executa um programa (Cell Program) registrado no app pelo nome.",
+        Description = "Executa um Cell Program registrado. Programas parametrizados podem receber argumentos adicionais, por exemplo {\"name\":\"browser-open\",\"url\":\"https://example.com\"}.",
         Parameters =
         {
-            ["name"] = new AgentToolParameter
-            {
-                Type = "string",
-                Description = "Nome do programa a executar."
-            }
+            ["name"] = new AgentToolParameter { Type = "string", Description = "Nome do programa a executar." },
+            ["url"] = new AgentToolParameter { Type = "string", Description = "URL para programas de navegador." }
         },
         Required = { "name" }
     };
@@ -73,12 +64,19 @@ public sealed class AgentRunProgramTool : AgentTool
     public override async Task<string> ExecuteAsync(string argumentsJson, CancellationToken ct = default)
     {
         string name;
+        var arguments = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         using (JsonDocument doc = JsonDocument.Parse(argumentsJson))
+        {
             name = ReadString(doc.RootElement, "name") ?? string.Empty;
+            foreach (var property in doc.RootElement.EnumerateObject())
+            {
+                if (property.NameEquals("name")) continue;
+                if (property.Value.ValueKind == JsonValueKind.String)
+                    arguments[property.Name] = property.Value.GetString() ?? string.Empty;
+            }
+        }
 
-        if (string.IsNullOrWhiteSpace(name))
-            return "ERRO: nome do programa vazio.";
-
+        if (string.IsNullOrWhiteSpace(name)) return "ERRO: nome do programa vazio.";
         var program = _registry.Resolve(name);
         if (program == null)
         {
@@ -86,19 +84,12 @@ public sealed class AgentRunProgramTool : AgentTool
             return $"ERRO: programa '{name}' não encontrado. Disponíveis: {available}";
         }
 
-        // Registra a execução no Coordinator ANTES de rodar, para que uma bolha de
-        // capacidade ("Programa: <nome>") apareça no chat assim que ela começa,
-        // e não só depois que o resultado inteiro já estiver pronto.
         string? correlationId = _coordinator?.BeginManual("Programa: " + program.Name, "run_program");
-
         try
         {
-            // Usa o mesmo contexto real e o mesmo CellProgramRunner da tela Programas.
-            // Isso mantém as capabilities Android reais e passa pelo PolicyGuard.
             var services = Application.Current?.Handler?.MauiContext?.Services;
             var contextFactory = services?.GetService(typeof(IAuraCellContextFactory)) as IAuraCellContextFactory;
             var runner = services?.GetService(typeof(CellProgramRunner)) as CellProgramRunner;
-
             if (contextFactory == null)
             {
                 if (correlationId != null) _coordinator!.CompleteManual(correlationId, false, "contexto indisponível");
@@ -111,7 +102,7 @@ public sealed class AgentRunProgramTool : AgentTool
             }
 
             string cellId = correlationId ?? "prog-" + Guid.NewGuid().ToString("N")[..8];
-            IAuraCellContext context = contextFactory.Create(cellId, ct);
+            IAuraCellContext context = contextFactory.Create(cellId, ct, arguments);
             CellProgramResult result = await runner.RunAsync(program, context, ct).ConfigureAwait(false);
 
             var sb = new StringBuilder();
@@ -119,10 +110,7 @@ public sealed class AgentRunProgramTool : AgentTool
             sb.AppendLine(result.IsSuccess ? "sucesso" : "falha");
             if (result.Error != null) sb.AppendLine("Erro: " + result.Error);
             if (result.Data != null) sb.AppendLine("Dados: " + JsonSerializer.Serialize(result.Data));
-
-            if (correlationId != null)
-                _coordinator!.CompleteManual(correlationId, result.IsSuccess, result.IsSuccess ? "concluído" : (result.Error ?? "falhou"));
-
+            if (correlationId != null) _coordinator!.CompleteManual(correlationId, result.IsSuccess, result.IsSuccess ? "concluído" : (result.Error ?? "falhou"));
             return sb.ToString().TrimEnd();
         }
         catch (Exception ex)

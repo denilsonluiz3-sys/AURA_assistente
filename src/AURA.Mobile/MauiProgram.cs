@@ -36,7 +36,21 @@ public static class MauiProgram
         builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Microsoft.Maui.Controls.WebView, AURA.Mobile.Platforms.Android.WebView.AuraWebViewHandler>());
         builder.Services.AddSingleton<IAndroidCapabilityService>(sp => new Services.AndroidCapabilityService(Android.App.Application.Context));
         builder.Services.AddSingleton<IAuraCellContextFactory, AuraCellContextFactory>();
-        builder.Services.AddSingleton<CellProgramRegistry>(sp => { var registry = new CellProgramRegistry(); registry.Register(new DeviceDiagnosticProgram()); return registry; });
+        builder.Services.AddSingleton<CellProgramRegistry>(sp =>
+        {
+            var registry = new CellProgramRegistry();
+            registry.Register(new DeviceDiagnosticProgram());
+            registry.Register(new BrowserCellProgram());
+            registry.Register(new BrowserReadCellProgram());
+            registry.Register(new BrowserClickCellProgram());
+            registry.Register(new BrowserTypeCellProgram());
+            registry.Register(new BrowserScrollCellProgram());
+            registry.Register(new BrowserBackCellProgram());
+            registry.Register(new BrowserForwardCellProgram());
+            registry.Register(new BrowserWaitCellProgram());
+            registry.Register(new BrowserScreenshotCellProgram());
+            return registry;
+        });
         builder.Services.AddSingleton<ISpeechRecognitionService, AndroidSpeechRecognitionService>();
         builder.Services.AddSingleton<IEmbeddedPython, EmbeddedPythonService>();
 #endif
@@ -54,7 +68,6 @@ public static class MauiProgram
         builder.Services.AddSingleton<IUniversalAiClient>(sp =>
         {
             var client = new UniversalAiClient(new UniversalAiClientOptions());
-            // Sempre hidratar (incluindo API key). Apply é soft e não exige config completa.
             try { RuntimeConfig.Apply(client); }
             catch (Exception ex) { AuraLog.Exception("MauiProgram.RuntimeConfig.Apply", ex); }
             return client;
