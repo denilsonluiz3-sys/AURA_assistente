@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.Abstractions;
@@ -31,7 +32,22 @@ public sealed class BrowserReadCellProgram : BrowserActionCellProgram
     {
         string? selector = context.Arguments.TryGetValue("selector", out var value) ? value : null;
         string text = await context.Browser.ReadAsync(selector, ct).ConfigureAwait(false);
-        return CellProgramResult.Ok(new { Selector = selector, Text = text });
+        string domJson = await context.Browser.ReadDomAsync(selector, ct).ConfigureAwait(false);
+
+        try
+        {
+            using var document = JsonDocument.Parse(domJson);
+            return CellProgramResult.Ok(new
+            {
+                Selector = selector,
+                Text = text,
+                Dom = document.RootElement.Clone()
+            });
+        }
+        catch (JsonException)
+        {
+            return CellProgramResult.Ok(new { Selector = selector, Text = text, Dom = new { Ok = false, Error = "DOM inválido retornado pelo navegador." } });
+        }
     }
 }
 
