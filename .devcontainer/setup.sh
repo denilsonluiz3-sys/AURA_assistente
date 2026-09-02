@@ -7,20 +7,19 @@ export DOTNET_GCHeapHardLimit=1C0000000 DOTNET_GCHeapCount=2
 
 ANDROID_HOME=/usr/local/android
 SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+DOTNET_SDK_VERSION=10.0.400
 
 # No Codespaces o container pode vir Alpine (musl). O .NET Android usa libs
 # glibc (libZipSharp). Instalamos gcompat + libstdc++ + zlib e um SDK .NET
 # glibc dedicado para o build do Android rodar sobre o musl.
 if grep -qi 'alpine\|musl' /etc/os-release 2>/dev/null; then
   echo "Container musl/Alpine detectado; preparando compatibilidade glibc..."
-  # apk v3 buga com pacote unico; passar sempre >=2 pacotes.
   apk add --no-cache gcompat libstdc++ zlib icu-libs tzdata unzip curl 2>/dev/null || true
 
   if [ ! -x /opt/dotnet-glibc/dotnet ]; then
-    echo "Instalando .NET SDK glibc (linux-x64) em /opt/dotnet-glibc..."
-    # Tarball glibc direto (dotnet-install.sh pega a build musl no Alpine).
+    echo "Instalando .NET SDK glibc ${DOTNET_SDK_VERSION} em /opt/dotnet-glibc..."
     curl -fsSL -o /tmp/dotnet-sdk.tar.gz \
-      https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.302/dotnet-sdk-10.0.302-linux-x64.tar.gz
+      "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz"
     mkdir -p /opt/dotnet-glibc
     tar -xzf /tmp/dotnet-sdk.tar.gz -C /opt/dotnet-glibc
     rm -f /tmp/dotnet-sdk.tar.gz
@@ -47,6 +46,13 @@ if grep -qi 'alpine\|musl' /etc/os-release 2>/dev/null; then
   } > /etc/profile.d/aura-dotnet.sh
 fi
 
+echo "=== .NET SDK ==="
+dotnet --version
+if [ "$(dotnet --version)" != "$DOTNET_SDK_VERSION" ]; then
+  echo "ERRO: SDK .NET esperado $DOTNET_SDK_VERSION, encontrado $(dotnet --version)"
+  exit 1
+fi
+
 echo "=== .NET workload MAUI Android ==="
 dotnet workload install maui-android
 
@@ -62,7 +68,7 @@ fi
 
 echo "=== Android SDK (licenças + componentes) ==="
 yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
-"$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+"$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;35.0.0" "ndk;26.3.11579264"
 
 echo "=== Runtimes disponíveis ==="
 dotnet --version
