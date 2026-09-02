@@ -1,10 +1,8 @@
 namespace AURA.Mobile.Pages;
 
 /// <summary>
-/// Ecossistema AURA: visualização do núcleo operacional (chat, agentes,
-/// células, runtime, shell, python, git) com navegação direta para cada
-/// módulo real do app. Nada de HTML externo: tudo nativo, seguindo o
-/// design system do app.
+/// Ecossistema AURA: visualização do núcleo operacional com navegação direta
+/// para os módulos reais do app. O Workspace também expõe os editores locais.
 /// </summary>
 public partial class EcosystemPage : ContentPage
 {
@@ -14,9 +12,10 @@ public partial class EcosystemPage : ContentPage
     private readonly RunPage _run;
     private readonly TerminalPage _terminal;
     private readonly ExecutorsPage _executors;
+    private readonly WorkspacePage _workspace;
 
     public EcosystemPage(ChatPage chat, AgentPage agent, CellsPage cells,
-        RunPage run, TerminalPage terminal, ExecutorsPage executors)
+        RunPage run, TerminalPage terminal, ExecutorsPage executors, WorkspacePage workspace)
     {
         InitializeComponent();
         _chat = chat;
@@ -25,7 +24,7 @@ public partial class EcosystemPage : ContentPage
         _run = run;
         _terminal = terminal;
         _executors = executors;
-
+        _workspace = workspace;
         BindableLayout.SetItemsSource(ModulesHost, BuildModules());
     }
 
@@ -33,6 +32,7 @@ public partial class EcosystemPage : ContentPage
     {
         new EcosystemModule("Chat", "A porta de entrada humana", "💬", DesignSystem.AuraAccent, () => _chat),
         new EcosystemModule("Agente", "Orquestra decisões via LegalProcessEngine", "🧠", DesignSystem.AuraAccent2, () => _agent),
+        new EcosystemModule("Workspace", "Edita Word e PDF dentro do workspace", "📄", DesignSystem.AuraAccent, () => _workspace),
         new EcosystemModule("Células", "Autonomia isolada com propósito", "📊", DesignSystem.AuraAccent, () => _cells),
         new EcosystemModule("Runtime", "Executa comandos e programas", "⚡", DesignSystem.AuraAccent, () => _run),
         new EcosystemModule("Shell", "Comandos via /bin/sh no sandbox", "💻", DesignSystem.AuraAccent, () => _terminal),
@@ -42,39 +42,24 @@ public partial class EcosystemPage : ContentPage
 
     private async void OnModuleTapped(object sender, TappedEventArgs e)
     {
-        if ((sender as BindableObject)?.BindingContext is not EcosystemModule module)
-            return;
-
-        try
-        {
-            await NavigateSafeAsync(module.Label, module.OpenPage());
-        }
-        catch (Exception ex)
-        {
-            AuraLog.Exception("EcosystemPage " + module.Label, ex);
-        }
+        if ((sender as BindableObject)?.BindingContext is not EcosystemModule module) return;
+        try { await NavigateSafeAsync(module.Label, module.OpenPage()); }
+        catch (Exception ex) { AuraLog.Exception("EcosystemPage " + module.Label, ex); }
     }
 
     private async Task NavigateSafeAsync(string label, Page page)
     {
         for (int i = 0; i < Navigation.NavigationStack.Count; i++)
         {
-            if (!ReferenceEquals(Navigation.NavigationStack[i], page))
-                continue;
-            while (Navigation.NavigationStack.Count > i + 1)
-                await Navigation.PopAsync(false);
+            if (!ReferenceEquals(Navigation.NavigationStack[i], page)) continue;
+            while (Navigation.NavigationStack.Count > i + 1) await Navigation.PopAsync(false);
             return;
         }
-
         if (page.Parent != null)
         {
-            await DisplayAlert(
-                "AURA",
-                "\"" + label + "\" já está aberta em outra aba. Feche-a lá ou use a barra de seções.",
-                "OK");
+            await DisplayAlert("AURA", "\"" + label + "\" já está aberta em outra aba. Feche-a lá ou use a barra de seções.", "OK");
             return;
         }
-
         await Navigation.PushAsync(page);
     }
 }
