@@ -12,6 +12,7 @@ public interface IBrowserCapability
     bool IsAvailable { get; }
     Task<bool> OpenAsync(string url, CancellationToken ct = default);
     Task<string> ReadAsync(string? selector = null, CancellationToken ct = default);
+    Task<string> ReadDomAsync(string? selector = null, CancellationToken ct = default);
     Task<bool> ClickAsync(string selector, CancellationToken ct = default);
     Task<bool> TypeAsync(string selector, string text, CancellationToken ct = default);
     Task<bool> ScrollAsync(int pixels, CancellationToken ct = default);
