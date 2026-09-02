@@ -7,7 +7,7 @@ using AURA.Abstractions;
 
 namespace AURA.Agents.Programs;
 
-internal abstract class BrowserActionCellProgram : IAuraCellProgram
+public abstract class BrowserActionCellProgram : IAuraCellProgram
 {
     protected BrowserActionCellProgram(string name, string capability)
     {
@@ -21,7 +21,10 @@ internal abstract class BrowserActionCellProgram : IAuraCellProgram
     public abstract Task<CellProgramResult> ExecuteAsync(IAuraCellContext context, CancellationToken ct = default);
 
     protected static bool TryInt(IReadOnlyDictionary<string, string> args, string key, out int value)
-        => args.TryGetValue(key, out var raw) && int.TryParse(raw, out value);
+    {
+        value = 0;
+        return args.TryGetValue(key, out var raw) && int.TryParse(raw, out value);
+    }
 }
 
 public sealed class BrowserReadCellProgram : BrowserActionCellProgram
