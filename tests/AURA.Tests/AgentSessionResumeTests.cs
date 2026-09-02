@@ -1,5 +1,6 @@
 using AURA.AI;
 using AURA.AI.UniversalAI;
+using AURA.Core.Logging;
 using Xunit;
 
 namespace AURA.Tests;
@@ -15,8 +16,7 @@ public sealed class AgentSessionResumeTests
         {
             AgentSession.ClearSharedHistory();
             var store = new AgentRunStore(new FakeLogger(), root);
-            var client = new ToolLoopClient();
-            var first = new AgentSession(client, Array.Empty<AgentTool>(), logger: new FakeLogger(), runStore: store, maxRounds: 2);
+            var first = new AgentSession(new ToolLoopClient(), Array.Empty<AgentTool>(), logger: new FakeLogger(), runStore: store, maxRounds: 2);
 
             string paused = await first.RunAsync("execute uma tarefa longa");
 
@@ -64,5 +64,12 @@ public sealed class AgentSessionResumeTests
 
         public Task<AgentChatResponse> ChatToolsAsync(IReadOnlyList<AgentMessage> messages, IReadOnlyList<AgentToolDefinition> tools, HttpClient? httpClient = null, CancellationToken ct = default, string? systemPrompt = null)
             => Task.FromResult(new AgentChatResponse { Content = "concluído após retomada" });
+    }
+
+    private sealed class FakeLogger : ILogger
+    {
+        public void Info(string message) { }
+        public void Warning(string message) { }
+        public void Error(string message) { }
     }
 }
