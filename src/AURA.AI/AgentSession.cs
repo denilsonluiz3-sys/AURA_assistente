@@ -15,21 +15,16 @@ public sealed class AgentSession
     private readonly string? _systemPrompt;
     private readonly MemoryStore? _memory;
     private readonly int _maxRounds;
+    private readonly AgentRunStore _runStore;
+    private AgentRunState? _runState;
     private const int MaxHistoryMessages = 16;
 
-    /// <summary>
-    /// Histórico entre recriações de sessão (AgentPage zera _session a cada run).
-    /// </summary>
     private static readonly List<AgentMessage> SharedHistory = new();
     private static readonly object SharedGate = new();
-
-    /// <summary>
-    /// Token do run atual (UI stop sem precisar passar CT em todo o AgentPage legado).
-    /// </summary>
     private static CancellationTokenSource? AmbientCts;
     private static readonly object AmbientGate = new();
 
-    public AgentSession(IUniversalAiClient client, IEnumerable<AgentTool> tools, string? systemPrompt = null, ILogger? logger = null, MemoryStore? memory = null, int maxRounds = 12)
+    public AgentSession(IUniversalAiClient client, IEnumerable<AgentTool> tools, string? systemPrompt = null, ILogger? logger = null, MemoryStore? memory = null, int maxRounds = 12, AgentRunStore? runStore = null)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _tools = (tools ?? Array.Empty<AgentTool>()).ToList();
@@ -37,6 +32,7 @@ public sealed class AgentSession
         _logger = logger ?? new ConsoleLogger();
         _memory = memory;
         _maxRounds = Math.Max(1, maxRounds);
+        _runStore = runStore ?? new AgentRunStore(_logger);
 
         lock (SharedGate)
         {
@@ -47,37 +43,92 @@ public sealed class AgentSession
 
     public event Action<AgentStep>? Step;
     public IReadOnlyList<AgentMessage> Messages => _messages;
+    public string? RunId => _runState?.RunId;
 
     public static void ClearSharedHistory()
     {
         lock (SharedGate) SharedHistory.Clear();
     }
 
-    /// <summary>Inicia um token de cancelamento para o próximo RunAsync (chamado pela UI antes do run).</summary>
     public static CancellationTokenSource BeginAmbientRun()
     {
         lock (AmbientGate)
         {
-            try { AmbientCts?.Cancel(); } catch { /* ignore */ }
-            try { AmbientCts?.Dispose(); } catch { /* ignore */ }
+            try { AmbientCts?.Cancel(); } catch { }
+            try { AmbientCts?.Dispose(); } catch { }
             AmbientCts = new CancellationTokenSource();
             return AmbientCts;
         }
     }
 
-    /// <summary>Cancela o run em andamento (botão ■).</summary>
     public static void CancelAmbientRun()
     {
         lock (AmbientGate)
         {
-            try { AmbientCts?.Cancel(); } catch { /* ignore */ }
+            try { AmbientCts?.Cancel(); } catch { }
         }
     }
 
-    public async Task<string> RunAsync(string userText, HttpClient? httpClient = null, CancellationToken ct = default)
+    /// <summary>Executa uma nova instrução. O estado é salvo desde o primeiro checkpoint.</summary>
+    public Task<string> RunAsync(string userText, HttpClient? httpClient = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(userText)) throw new ArgumentException("A instrução não pode ser vazia.", nameof(userText));
 
+        var state = new AgentRunState
+        {
+            RunId = Guid.NewGuid().ToString("N"),
+            Status = AgentRunStatus.Running,
+            Goal = userText,
+            Round = 0,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+        _runState = state;
+        _messages.Add(new AgentMessage { Role = "user", Content = userText });
+        _memory?.Append(MemoryEntry.Question(userText));
+        Checkpoint();
+        return ExecuteLoopAsync(httpClient, ct);
+    }
+
+    /// <summary>Retoma o último run pausado, inclusive depois de reiniciar o processo.</summary>
+    public Task<string> ResumeLastAsync(HttpClient? httpClient = null, CancellationToken ct = default)
+    {
+        var state = _runStore.LoadLatestResumable();
+        if (state == null)
+            return Task.FromResult("Não há nenhuma execução pausada para retomar.");
+
+        _runState = state;
+        _messages.Clear();
+        _messages.AddRange(state.Messages ?? new List<AgentMessage>());
+        PersistShared();
+        state.Status = AgentRunStatus.Running;
+        state.LastError = null;
+        state.Round = 0;
+        Checkpoint();
+        return ExecuteLoopAsync(httpClient, ct);
+    }
+
+    /// <summary>Retoma um run específico persistido.</summary>
+    public Task<string> ResumeAsync(string runId, HttpClient? httpClient = null, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(runId)) return Task.FromResult("RunId obrigatório.");
+        var state = _runStore.Load(runId);
+        if (state == null) return Task.FromResult("Execução não encontrada: " + runId);
+        if (state.Status != AgentRunStatus.Paused) return Task.FromResult("A execução não está pausada: " + state.Status);
+
+        _runState = state;
+        _messages.Clear();
+        _messages.AddRange(state.Messages ?? new List<AgentMessage>());
+        PersistShared();
+        state.Status = AgentRunStatus.Running;
+        state.LastError = null;
+        state.Round = 0;
+        Checkpoint();
+        return ExecuteLoopAsync(httpClient, ct);
+    }
+
+    private async Task<string> ExecuteLoopAsync(HttpClient? httpClient, CancellationToken ct)
+    {
         CancellationToken ambient;
         lock (AmbientGate)
             ambient = AmbientCts?.Token ?? CancellationToken.None;
@@ -85,18 +136,18 @@ public sealed class AgentSession
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, ambient);
         var token = linked.Token;
 
-        token.ThrowIfCancellationRequested();
-
-        _messages.Add(new AgentMessage { Role = "user", Content = userText });
-        _memory?.Append(MemoryEntry.Question(userText));
-
         try
         {
             for (var round = 0; round < _maxRounds; round++)
             {
                 token.ThrowIfCancellationRequested();
-                TrimHistory();
+                if (_runState != null)
+                {
+                    _runState.Round = round;
+                    Checkpoint();
+                }
 
+                TrimHistory();
                 var response = await _client.ChatToolsAsync(
                     new List<AgentMessage>(_messages),
                     _tools.Select(t => t.Definition).ToList(),
@@ -107,7 +158,15 @@ public sealed class AgentSession
                 token.ThrowIfCancellationRequested();
 
                 if (!string.IsNullOrWhiteSpace(response.Error))
+                {
+                    if (_runState != null)
+                    {
+                        _runState.Status = AgentRunStatus.Failed;
+                        _runState.LastError = response.Error;
+                        Checkpoint();
+                    }
                     throw new AgentLlmException(response.Error, response.ErrorKind);
+                }
 
                 if (response.ToolCalls is { Count: > 0 })
                 {
@@ -146,9 +205,14 @@ public sealed class AgentSession
                         _messages.Add(new AgentMessage { Role = "tool", ToolCallId = call.Id, Content = result });
                         Step?.Invoke(new AgentStep(call.Name, call.ArgumentsJson, result,
                             !result.StartsWith("ERRO:", StringComparison.OrdinalIgnoreCase)));
+                        PersistShared();
+                        if (_runState != null)
+                        {
+                            _runState.Round = round + 1;
+                            Checkpoint();
+                        }
                     }
 
-                    PersistShared();
                     continue;
                 }
 
@@ -156,17 +220,43 @@ public sealed class AgentSession
                 _messages.Add(new AgentMessage { Role = "assistant", Content = answer });
                 _memory?.Append(MemoryEntry.Answer(answer));
                 PersistShared();
+                if (_runState != null)
+                {
+                    _runState.Status = AgentRunStatus.Completed;
+                    _runState.Round = round + 1;
+                    _runState.LastError = null;
+                    Checkpoint();
+                }
                 return answer;
             }
 
-            throw new AgentLlmException("O agente atingiu o limite de rodadas.", AgentErrorKind.Unknown);
+            // O limite continua sendo uma proteção contra loops, mas não destrói o trabalho.
+            if (_runState != null)
+            {
+                _runState.Status = AgentRunStatus.Paused;
+                _runState.LastError = "Limite de rodadas atingido; execução preservada para retomada.";
+                Checkpoint();
+            }
+            return "⏸ Execução pausada no limite de rodadas. Estado salvo; use a retomada para continuar.";
         }
         catch (OperationCanceledException)
         {
-            // Não grava resposta parcial como se fosse sucesso
-            _logger.Info("agent: run cancelado pelo usuário");
-            return "⏹ Execução interrompida.";
+            if (_runState != null)
+            {
+                _runState.Status = AgentRunStatus.Paused;
+                _runState.LastError = "Execução interrompida; checkpoint preservado para retomada.";
+                Checkpoint();
+            }
+            _logger.Info("agent: run pausado por cancelamento");
+            return "⏸ Execução interrompida e pausada. Estado salvo; use a retomada para continuar.";
         }
+    }
+
+    private void Checkpoint()
+    {
+        if (_runState == null) return;
+        _runState.Messages = new List<AgentMessage>(_messages);
+        _runStore.Save(_runState);
     }
 
     private void PersistShared()
