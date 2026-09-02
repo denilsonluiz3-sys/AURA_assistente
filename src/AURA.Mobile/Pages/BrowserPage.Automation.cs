@@ -66,60 +66,64 @@ namespace AURA.Mobile.Pages
                 string selectorJson = JsonSerializer.Serialize(selector ?? "body");
                 const int maxNodes = 250;
                 const int maxText = 500;
-                string script = $"""
-(function() {{
-  const root = document.querySelector({selectorJson});
-  if (!root) return JSON.stringify({{ok:false,error:'selector not found'}});
+                string script = """
+(function() {
+  const root = document.querySelector(__SELECTOR_JSON__);
+  if (!root) return JSON.stringify({ok:false,error:'selector not found'});
   let count = 0;
-  const maxNodes = {maxNodes};
-  const maxText = {maxText};
+  const maxNodes = __MAX_NODES__;
+  const maxText = __MAX_TEXT__;
   const ids = new WeakMap();
-  function text(v) {{ return (v || '').replace(/\\s+/g,' ').trim().slice(0,maxText); }}
-  function attrs(e) {{
-    const out = {{}};
-    for (const a of Array.from(e.attributes || [])) {{
+  function text(v) { return (v || '').replace(/\\s+/g,' ').trim().slice(0,maxText); }
+  function attrs(e) {
+    const out = {};
+    for (const a of Array.from(e.attributes || [])) {
       if (out && Object.keys(out).length >= 24) break;
       out[a.name] = (a.value || '').slice(0,500);
-    }}
+    }
     return out;
-  }}
-  function node(e) {{
+  }
+  function node(e) {
     if (!e || count >= maxNodes) return null;
     count++;
     const id = 'dom-' + count;
     ids.set(e,id);
     const tag = (e.tagName || '').toLowerCase();
     const role = e.getAttribute('role');
-    const item = {{
+    const item = {
       id:id, tag:tag, text:text(e.innerText || e.textContent),
       attributes:attrs(e)
-    }};
+    };
     if (role) item.role = role;
     if (e.id) item.htmlId = e.id;
     if (e.getAttribute('name')) item.name = e.getAttribute('name');
     if (e.getAttribute('aria-label')) item.label = e.getAttribute('aria-label');
-    if (tag === 'a') {{ item.href = e.href || e.getAttribute('href') || ''; item.kind='link'; }}
+    if (tag === 'a') { item.href = e.href || e.getAttribute('href') || ''; item.kind='link'; }
     if (tag === 'button' || e.getAttribute('role') === 'button') item.kind='button';
-    if (['input','textarea','select'].includes(tag)) {{
+    if (['input','textarea','select'].includes(tag)) {
       item.kind='input'; item.type=e.type || tag; item.value=(e.value || '').slice(0,500);
       item.placeholder=e.getAttribute('placeholder') || '';
       item.disabled=!!e.disabled;
-    }}
+    }
     const children=[];
-    for (const child of Array.from(e.children || [])) {{
+    for (const child of Array.from(e.children || [])) {
       if (count >= maxNodes) break;
       const n=node(child); if (n) children.push(n);
-    }}
+    }
     if (children.length) item.children=children;
     return item;
-  }}
+  }
   const rootNode=node(root);
-  const links=Array.from(root.querySelectorAll('a')).slice(0,100).map((e,i)=>({{id:ids.get(e)||('link-'+(i+1)),text:text(e.innerText),href:e.href||e.getAttribute('href')||'',label:e.getAttribute('aria-label')||''}}));
-  const buttons=Array.from(root.querySelectorAll('button,[role=button]')).slice(0,100).map((e,i)=>({{id:ids.get(e)||('button-'+(i+1)),text:text(e.innerText),label:e.getAttribute('aria-label')||'',disabled:!!e.disabled}}));
-  const inputs=Array.from(root.querySelectorAll('input,textarea,select')).slice(0,100).map((e,i)=>({{id:ids.get(e)||('input-'+(i+1)),tag:(e.tagName||'').toLowerCase(),type:e.type||'',name:e.getAttribute('name')||'',placeholder:e.getAttribute('placeholder')||'',value:(e.value||'').slice(0,500),label:e.getAttribute('aria-label')||'',disabled:!!e.disabled}}));
-  return JSON.stringify({{ok:true,url:location.href,title:document.title||'',selector:{selectorJson},nodeCount:count,truncated:count>=maxNodes,dom:rootNode,links:links,buttons:buttons,inputs:inputs}});
-}})()
+  const links=Array.from(root.querySelectorAll('a')).slice(0,100).map((e,i)=>({id:ids.get(e)||('link-'+(i+1)),text:text(e.innerText),href:e.href||e.getAttribute('href')||'',label:e.getAttribute('aria-label')||''}));
+  const buttons=Array.from(root.querySelectorAll('button,[role=button]')).slice(0,100).map((e,i)=>({id:ids.get(e)||('button-'+(i+1)),text:text(e.innerText),label:e.getAttribute('aria-label')||'',disabled:!!e.disabled}));
+  const inputs=Array.from(root.querySelectorAll('input,textarea,select')).slice(0,100).map((e,i)=>({id:ids.get(e)||('input-'+(i+1)),tag:(e.tagName||'').toLowerCase(),type:e.type||'',name:e.getAttribute('name')||'',placeholder:e.getAttribute('placeholder')||'',value:(e.value||'').slice(0,500),label:e.getAttribute('aria-label')||'',disabled:!!e.disabled}));
+  return JSON.stringify({ok:true,url:location.href,title:document.title||'',selector:__SELECTOR_JSON__,nodeCount:count,truncated:count>=maxNodes,dom:rootNode,links:links,buttons:buttons,inputs:inputs});
+})()
 """;
+                script = script
+                    .Replace("__SELECTOR_JSON__", selectorJson, StringComparison.Ordinal)
+                    .Replace("__MAX_NODES__", maxNodes.ToString(), StringComparison.Ordinal)
+                    .Replace("__MAX_TEXT__", maxText.ToString(), StringComparison.Ordinal);
                 return await view.EvaluateJavaScriptAsync(script);
             });
 
