@@ -21,6 +21,7 @@ using AURA.Mobile.Speech;
 using AURA.Mobile.Services;
 using AURA.Mobile.ViewModels;
 using CommunityToolkit.Maui;
+using MauiNativePdfView;
 
 namespace AURA.Mobile;
 
@@ -31,6 +32,7 @@ public static class MauiProgram
         AuraLog.Info("MauiProgram.CreateMauiApp BEGIN");
         var builder = MauiApp.CreateBuilder();
         builder.UseMauiApp<App>();
+        builder.UseMauiNativePdfView();
         if (OperatingSystem.IsAndroidVersionAtLeast(26)) builder.UseMauiCommunityToolkitMediaElement(isAndroidForegroundServiceEnabled: true);
 #if ANDROID
         builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Microsoft.Maui.Controls.WebView, AURA.Mobile.Platforms.Android.WebView.AuraWebViewHandler>());
@@ -100,6 +102,7 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new SolutionStore(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "aura")));
         builder.Services.AddSingleton(sp => new LocalPlaybook(sp.GetRequiredService<SolutionStore>(), sp.GetRequiredService<MemoryStore>()));
         builder.Services.AddSingleton<FileTool>(sp => new FileTool(AgentWorkspace.ActiveRoot));
+        builder.Services.AddSingleton<WorkspaceDocumentService>();
         builder.Services.AddSingleton<AuraOrchestrator>(sp => new AuraOrchestrator(sp.GetRequiredService<ILogger>(), sp.GetRequiredService<SolutionStore>(), sp.GetRequiredService<Runner>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetRequiredService<IToolExecutor>(), sp.GetRequiredService<AURA.Core.Abstractions.IWebSearch>(), sp.GetRequiredService<IUniversalAiClient>(), events: sp.GetRequiredService<EventBus>(), intentResolver: sp.GetRequiredService<IIntentResolver>(), policyGuard: sp.GetRequiredService<PolicyGuard>()));
         builder.Services.AddSingleton<IOrchestrator>(sp => sp.GetRequiredService<AuraOrchestrator>());
         builder.Services.AddSingleton<AURA.Abstractions.Process.IProcessOrchestrator>(sp => new AURA.Agents.LegalProcessEngine(sp.GetRequiredService<ILogger>(), sp.GetServices<AURA.Core.Abstractions.IAgent>(), sp.GetRequiredService<IOrchestrator>(), sp.GetRequiredService<EventBus>()));
@@ -128,6 +131,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<RunPage>();
         builder.Services.AddSingleton<ProgramsPage>();
         builder.Services.AddSingleton<ProgramsPageViewModel>();
+        builder.Services.AddSingleton<WorkspacePage>();
         AuraLog.Info("MauiProgram: services registered");
         var app = builder.Build();
         try { var bus = app.Services.GetRequiredService<EventBus>(); var memory = app.Services.GetRequiredService<MemoryStore>(); bus.Subscribe<CellStateChangedEvent>(evt => memory.Append(MemoryEntry.CellStateChange(evt.CellId, evt.To))); } catch (Exception ex) { AuraLog.Exception("MauiProgram.MemoryEventSink", ex); }

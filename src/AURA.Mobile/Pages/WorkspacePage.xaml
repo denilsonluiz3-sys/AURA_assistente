@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pdf="clr-namespace:MauiNativePdfView;assembly=MauiNativePdfView"
+             x:Class="AURA.Mobile.Pages.WorkspacePage"
+             Title="Workspace"
+             BackgroundColor="{DynamicResource AuraBackground}">
+    <Grid Padding="12" RowDefinitions="Auto,Auto,*" RowSpacing="10">
+        <HorizontalStackLayout Grid.Row="0" Spacing="8">
+            <Button Text="Importar" Clicked="OnImportClicked" />
+            <Button Text="Atualizar" Clicked="OnRefreshClicked" />
+            <Label x:Name="StatusLabel" VerticalOptions="Center" LineBreakMode="TailTruncation" />
+        </HorizontalStackLayout>
+
+        <Picker x:Name="DocumentPicker" Grid.Row="1" Title="Documento do Workspace" SelectedIndexChanged="OnDocumentSelected" />
+
+        <Grid Grid.Row="2">
+            <Grid x:Name="WordEditor" IsVisible="False" RowDefinitions="Auto,*" RowSpacing="8">
+                <HorizontalStackLayout Grid.Row="0" Spacing="8">
+                    <Label Text="Word (.docx)" FontAttributes="Bold" VerticalOptions="Center" />
+                    <Button Text="Salvar" Clicked="OnSaveWordClicked" />
+                </HorizontalStackLayout>
+                <Editor Grid.Row="1" x:Name="WordTextEditor" AutoSize="TextChanges" VerticalOptions="Fill" />
+            </Grid>
+
+            <Grid x:Name="PdfEditor" IsVisible="False" RowDefinitions="Auto,*" RowSpacing="8">
+                <HorizontalStackLayout Grid.Row="0" Spacing="8">
+                    <Label x:Name="PdfInfoLabel" Text="PDF" FontAttributes="Bold" VerticalOptions="Center" />
+                    <Button Text="Girar" Clicked="OnRotatePdfClicked" />
+                    <Button Text="Adicionar página" Clicked="OnAddPdfPageClicked" />
+                    <Button Text="Excluir página" Clicked="OnDeletePdfPageClicked" />
+                </HorizontalStackLayout>
+                <pdf:PdfView Grid.Row="1" x:Name="PdfViewer"
+                             EnableZoom="True"
+                             EnableSwipe="True"
+                             EnableLinkNavigation="True"
+                             EnableAnnotationRendering="True"
+                             BackgroundColor="Transparent" />
+            </Grid>
+        </Grid>
+    </Grid>
+</ContentPage>
