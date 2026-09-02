@@ -21,6 +21,7 @@ using AURA.Mobile.Speech;
 using AURA.Mobile.Services;
 using AURA.Mobile.ViewModels;
 using CommunityToolkit.Maui;
+using MauiNativePdfView;
 
 namespace AURA.Mobile;
 
@@ -31,6 +32,7 @@ public static class MauiProgram
         AuraLog.Info("MauiProgram.CreateMauiApp BEGIN");
         var builder = MauiApp.CreateBuilder();
         builder.UseMauiApp<App>();
+        builder.UseMauiNativePdfView();
         if (OperatingSystem.IsAndroidVersionAtLeast(26)) builder.UseMauiCommunityToolkitMediaElement(isAndroidForegroundServiceEnabled: true);
 #if ANDROID
         builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Microsoft.Maui.Controls.WebView, AURA.Mobile.Platforms.Android.WebView.AuraWebViewHandler>());
@@ -128,6 +130,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<RunPage>();
         builder.Services.AddSingleton<ProgramsPage>();
         builder.Services.AddSingleton<ProgramsPageViewModel>();
+        builder.Services.AddSingleton<WorkspacePage>();
         AuraLog.Info("MauiProgram: services registered");
         var app = builder.Build();
         try { var bus = app.Services.GetRequiredService<EventBus>(); var memory = app.Services.GetRequiredService<MemoryStore>(); bus.Subscribe<CellStateChangedEvent>(evt => memory.Append(MemoryEntry.CellStateChange(evt.CellId, evt.To))); } catch (Exception ex) { AuraLog.Exception("MauiProgram.MemoryEventSink", ex); }
