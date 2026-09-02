@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.Abstractions;
+using AURA.Mobile.Pages;
 
 namespace AURA.Mobile.Services;
 
@@ -19,13 +20,14 @@ public sealed class AuraCellContext : IAuraCellContext
     public AuraCellContext(
         string cellId,
         IAndroidCapabilityService android,
+        BrowserPage browserPage,
         CancellationToken ct = default,
         IReadOnlyDictionary<string, string>? arguments = null)
     {
         if (string.IsNullOrWhiteSpace(cellId)) throw new ArgumentException("CellId cannot be empty.", nameof(cellId));
         CellId = cellId;
         Device = new AndroidDeviceDiagnosticCapability(android ?? throw new ArgumentNullException(nameof(android)));
-        Browser = new AndroidBrowserCapability();
+        Browser = new AndroidBrowserCapability(browserPage ?? throw new ArgumentNullException(nameof(browserPage)));
         Arguments = new ReadOnlyDictionary<string, string>(
             arguments is null ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) : new Dictionary<string, string>(arguments, StringComparer.OrdinalIgnoreCase));
         CancellationToken = ct;
@@ -43,23 +45,18 @@ public sealed class AuraCellContext : IAuraCellContext
 
     private sealed class AndroidBrowserCapability : IBrowserCapability
     {
-        public bool IsAvailable => true;
-
-        public async Task<bool> OpenAsync(string url, CancellationToken ct = default)
-        {
-            ct.ThrowIfCancellationRequested();
-            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
-            if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) return false;
-            try
-            {
-                return await Microsoft.Maui.ApplicationModel.Browser.Default.OpenAsync(
-                    uri, Microsoft.Maui.ApplicationModel.BrowserLaunchMode.External).ConfigureAwait(false);
-            }
-            catch
-            {
-                return false;
-            }
-        }
+        private readonly BrowserPage _page;
+        public AndroidBrowserCapability(BrowserPage page) => _page = page;
+        public bool IsAvailable => _page.AutomationAvailable || true;
+        public Task<bool> OpenAsync(string url, CancellationToken ct = default) => _page.AutomationOpenAsync(url, ct);
+        public Task<string> ReadAsync(string? selector = null, CancellationToken ct = default) => _page.AutomationReadAsync(selector, ct);
+        public Task<bool> ClickAsync(string selector, CancellationToken ct = default) => _page.AutomationClickAsync(selector, ct);
+        public Task<bool> TypeAsync(string selector, string text, CancellationToken ct = default) => _page.AutomationTypeAsync(selector, text, ct);
+        public Task<bool> ScrollAsync(int pixels, CancellationToken ct = default) => _page.AutomationScrollAsync(pixels, ct);
+        public Task<bool> BackAsync(CancellationToken ct = default) => _page.AutomationBackAsync(ct);
+        public Task<bool> ForwardAsync(CancellationToken ct = default) => _page.AutomationForwardAsync(ct);
+        public Task<bool> WaitAsync(int milliseconds, CancellationToken ct = default) => _page.AutomationWaitAsync(milliseconds, ct);
+        public Task<string?> ScreenshotAsync(CancellationToken ct = default) => _page.AutomationScreenshotAsync(ct);
     }
 }
 #endif
