@@ -43,6 +43,25 @@ public sealed class BrowserCellProgramTests
     }
 
     [Fact]
+    public async Task BrowserReadIncludesStructuredDom()
+    {
+        var browser = new FakeBrowserCapability();
+        var context = new FakeContext(browser, new Dictionary<string, string>
+        {
+            ["selector"] = "body"
+        });
+
+        var result = await new BrowserReadCellProgram().ExecuteAsync(context);
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains("Dom", result.OutputJson);
+        Assert.Contains("links", result.OutputJson);
+        Assert.Contains("buttons", result.OutputJson);
+        Assert.Contains("inputs", result.OutputJson);
+        Assert.Contains("dom-1", result.OutputJson);
+    }
+
+    [Fact]
     public async Task SupportsReadClickTypeScrollBackForwardWaitAndScreenshot()
     {
         var browser = new FakeBrowserCapability();
@@ -83,6 +102,12 @@ public sealed class BrowserCellProgramTests
         {
             LastSelector = selector;
             return Task.FromResult("AURA page");
+        }
+
+        public Task<string> ReadDomAsync(string? selector = null, CancellationToken ct = default)
+        {
+            LastSelector = selector;
+            return Task.FromResult("{\"ok\":true,\"url\":\"https://example.com\",\"title\":\"AURA\",\"nodeCount\":1,\"truncated\":false,\"dom\":{\"id\":\"dom-1\",\"tag\":\"body\",\"text\":\"AURA page\",\"attributes\":{}},\"links\":[],\"buttons\":[],\"inputs\":[]}");
         }
 
         public Task<bool> ClickAsync(string selector, CancellationToken ct = default)
