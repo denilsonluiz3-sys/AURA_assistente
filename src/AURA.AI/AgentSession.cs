@@ -69,10 +69,13 @@ public sealed class AgentSession
         }
     }
 
-    /// <summary>Executa uma nova instrução. O estado é salvo desde o primeiro checkpoint.</summary>
+    /// <summary>Executa uma nova instrução ou, para comandos de continuidade, retoma o último checkpoint pausado.</summary>
     public Task<string> RunAsync(string userText, HttpClient? httpClient = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(userText)) throw new ArgumentException("A instrução não pode ser vazia.", nameof(userText));
+
+        if (IsResumeInstruction(userText))
+            return ResumeLastAsync(httpClient, ct);
 
         var state = new AgentRunState
         {
@@ -230,7 +233,6 @@ public sealed class AgentSession
                 return answer;
             }
 
-            // O limite continua sendo uma proteção contra loops, mas não destrói o trabalho.
             if (_runState != null)
             {
                 _runState.Status = AgentRunStatus.Paused;
@@ -250,6 +252,15 @@ public sealed class AgentSession
             _logger.Info("agent: run pausado por cancelamento");
             return "⏸ Execução interrompida e pausada. Estado salvo; use a retomada para continuar.";
         }
+    }
+
+    private static bool IsResumeInstruction(string text)
+    {
+        string normalized = text.Trim().ToLowerInvariant();
+        return normalized is "continue" or "continua" or "continuar" or "prosseguir"
+            || normalized.StartsWith("continue de onde parou", StringComparison.Ordinal)
+            || normalized.StartsWith("continuar de onde parou", StringComparison.Ordinal)
+            || normalized.StartsWith("retome de onde parou", StringComparison.Ordinal);
     }
 
     private void Checkpoint()
