@@ -50,6 +50,7 @@ public sealed class AuraCellContext : IAuraCellContext
         public bool IsAvailable => true;
         public Task<bool> OpenAsync(string url, CancellationToken ct = default) => _page.AutomationOpenAsync(url, ct);
         public Task<string> ReadAsync(string? selector = null, CancellationToken ct = default) => _page.AutomationReadAsync(selector, ct);
+        public Task<string> ReadDomAsync(string? selector = null, CancellationToken ct = default) => _page.AutomationReadDomAsync(selector, ct);
         public Task<bool> ClickAsync(string selector, CancellationToken ct = default) => _page.AutomationClickAsync(selector, ct);
         public Task<bool> TypeAsync(string selector, string text, CancellationToken ct = default) => _page.AutomationTypeAsync(selector, text, ct);
         public Task<bool> ScrollAsync(int pixels, CancellationToken ct = default) => _page.AutomationScrollAsync(pixels, ct);
