@@ -48,7 +48,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          yes | sdkmanager --licenses >/dev/null || true
+          yes | sdkmanager --licenses >/dev/null || test $? -eq 141
           sdkmanager --install \
             "platform-tools" \
             "platforms;android-36" \
