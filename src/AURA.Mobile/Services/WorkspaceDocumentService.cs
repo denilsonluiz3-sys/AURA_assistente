@@ -1,3 +1,4 @@
+using AURA.Mobile.Diagnostics;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using PdfSharpCore.Pdf;
@@ -81,9 +82,6 @@ public sealed class WorkspaceDocumentService
             body.Elements<Paragraph>().Last().Remove();
         main.Document.Save();
     }
-
-    public PdfDocument OpenPdfForEdit(string path) =>
-        PdfReader.Open(Resolve(path), PdfDocumentOpenMode.Modify);
 
     public void DeletePdfPage(string path, int zeroBasedPage)
     {
