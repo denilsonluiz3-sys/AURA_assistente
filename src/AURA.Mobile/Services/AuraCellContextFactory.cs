@@ -1,5 +1,5 @@
 #if ANDROID
-using System;
+using System.Collections.Generic;
 using System.Threading;
 using AURA.Abstractions;
 
@@ -11,10 +11,10 @@ public sealed class AuraCellContextFactory : IAuraCellContextFactory
 
     public AuraCellContextFactory(IAndroidCapabilityService android)
     {
-        _android = android ?? throw new ArgumentNullException(nameof(android));
+        _android = android ?? throw new System.ArgumentNullException(nameof(android));
     }
 
-    public IAuraCellContext Create(string cellId, CancellationToken ct = default)
-        => new AuraCellContext(cellId, _android, ct);
+    public IAuraCellContext Create(string cellId, CancellationToken ct = default, IReadOnlyDictionary<string, string>? arguments = null)
+        => new AuraCellContext(cellId, _android, ct, arguments);
 }
 #endif

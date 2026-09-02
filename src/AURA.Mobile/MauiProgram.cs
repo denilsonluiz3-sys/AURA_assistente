@@ -36,7 +36,7 @@ public static class MauiProgram
         builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Microsoft.Maui.Controls.WebView, AURA.Mobile.Platforms.Android.WebView.AuraWebViewHandler>());
         builder.Services.AddSingleton<IAndroidCapabilityService>(sp => new Services.AndroidCapabilityService(Android.App.Application.Context));
         builder.Services.AddSingleton<IAuraCellContextFactory, AuraCellContextFactory>();
-        builder.Services.AddSingleton<CellProgramRegistry>(sp => { var registry = new CellProgramRegistry(); registry.Register(new DeviceDiagnosticProgram()); return registry; });
+        builder.Services.AddSingleton<CellProgramRegistry>(sp => { var registry = new CellProgramRegistry(); registry.Register(new DeviceDiagnosticProgram()); registry.Register(new BrowserCellProgram()); return registry; });
         builder.Services.AddSingleton<ISpeechRecognitionService, AndroidSpeechRecognitionService>();
         builder.Services.AddSingleton<IEmbeddedPython, EmbeddedPythonService>();
 #endif
