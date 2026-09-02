@@ -47,7 +47,7 @@ public sealed class AuraCellContext : IAuraCellContext
     {
         private readonly BrowserPage _page;
         public AndroidBrowserCapability(BrowserPage page) => _page = page;
-        public bool IsAvailable => _page.AutomationAvailable || true;
+        public bool IsAvailable => true;
         public Task<bool> OpenAsync(string url, CancellationToken ct = default) => _page.AutomationOpenAsync(url, ct);
         public Task<string> ReadAsync(string? selector = null, CancellationToken ct = default) => _page.AutomationReadAsync(selector, ct);
         public Task<bool> ClickAsync(string selector, CancellationToken ct = default) => _page.AutomationClickAsync(selector, ct);
