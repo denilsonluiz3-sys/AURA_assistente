@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.Abstractions;
@@ -54,11 +55,12 @@ public sealed class BrowserCellProgramTests
         var result = await new BrowserReadCellProgram().ExecuteAsync(context);
 
         Assert.True(result.IsSuccess);
-        Assert.Contains("Dom", result.OutputJson);
-        Assert.Contains("links", result.OutputJson);
-        Assert.Contains("buttons", result.OutputJson);
-        Assert.Contains("inputs", result.OutputJson);
-        Assert.Contains("dom-1", result.OutputJson);
+        string json = JsonSerializer.Serialize(result.Data);
+        Assert.Contains("Dom", json);
+        Assert.Contains("links", json);
+        Assert.Contains("buttons", json);
+        Assert.Contains("inputs", json);
+        Assert.Contains("dom-1", json);
     }
 
     [Fact]
