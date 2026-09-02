@@ -42,16 +42,67 @@ public sealed class BrowserCellProgramTests
         Assert.False(result.IsSuccess);
     }
 
+    [Fact]
+    public async Task SupportsReadClickTypeScrollBackForwardWaitAndScreenshot()
+    {
+        var browser = new FakeBrowserCapability();
+        var context = new FakeContext(browser, new Dictionary<string, string>
+        {
+            ["selector"] = "#login",
+            ["text"] = "AURA",
+            ["pixels"] = "500",
+            ["milliseconds"] = "1"
+        });
+
+        Assert.True((await new BrowserReadCellProgram().ExecuteAsync(context)).IsSuccess);
+        Assert.True((await new BrowserClickCellProgram().ExecuteAsync(context)).IsSuccess);
+        Assert.True((await new BrowserTypeCellProgram().ExecuteAsync(context)).IsSuccess);
+        Assert.True((await new BrowserScrollCellProgram().ExecuteAsync(context)).IsSuccess);
+        Assert.True((await new BrowserBackCellProgram().ExecuteAsync(context)).IsSuccess);
+        Assert.True((await new BrowserForwardCellProgram().ExecuteAsync(context)).IsSuccess);
+        Assert.True((await new BrowserWaitCellProgram().ExecuteAsync(context)).IsSuccess);
+        Assert.True((await new BrowserScreenshotCellProgram().ExecuteAsync(context)).IsSuccess);
+        Assert.Equal("#login", browser.LastSelector);
+        Assert.Equal("AURA", browser.LastText);
+    }
+
     private sealed class FakeBrowserCapability : IBrowserCapability
     {
         public bool IsAvailable => true;
         public string? LastUrl { get; private set; }
+        public string? LastSelector { get; private set; }
+        public string? LastText { get; private set; }
 
         public Task<bool> OpenAsync(string url, CancellationToken ct = default)
         {
             LastUrl = url;
             return Task.FromResult(true);
         }
+
+        public Task<string> ReadAsync(string? selector = null, CancellationToken ct = default)
+        {
+            LastSelector = selector;
+            return Task.FromResult("AURA page");
+        }
+
+        public Task<bool> ClickAsync(string selector, CancellationToken ct = default)
+        {
+            LastSelector = selector;
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> TypeAsync(string selector, string text, CancellationToken ct = default)
+        {
+            LastSelector = selector;
+            LastText = text;
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> ScrollAsync(int pixels, CancellationToken ct = default) => Task.FromResult(true);
+        public Task<bool> BackAsync(CancellationToken ct = default) => Task.FromResult(true);
+        public Task<bool> ForwardAsync(CancellationToken ct = default) => Task.FromResult(true);
+        public Task<bool> WaitAsync(int milliseconds, CancellationToken ct = default) => Task.FromResult(true);
+        public Task<string?> ScreenshotAsync(CancellationToken ct = default) => Task.FromResult<string?>("/cache/aura-browser.png");
     }
 
     private sealed class FakeContext : IAuraCellContext
