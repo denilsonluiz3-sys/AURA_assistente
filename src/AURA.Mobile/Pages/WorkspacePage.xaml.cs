@@ -74,7 +74,13 @@ public partial class WorkspacePage : ContentPage
             StatusLabel.Text = "Word aberto";
             return;
         }
-        PdfViewer.Source = MauiNativePdfView.PdfSource.FromFile(path);
+
+        // MauiNativePdfView aceita string (file path / file://) via conversão implícita.
+        // Evita MauiNativePdfView.PdfSource, que não resolve no pacote 1.1.1 neste target.
+        string absolute = Path.GetFullPath(path);
+        PdfViewer.Source = absolute.StartsWith("file:", StringComparison.OrdinalIgnoreCase)
+            ? absolute
+            : "file://" + absolute;
         StatusLabel.Text = "PDF aberto";
     }
 
@@ -98,8 +104,9 @@ public partial class WorkspacePage : ContentPage
         if (!EnsurePdf(out string path)) return;
         try
         {
-            _documents.RotatePdfPage(path, PdfViewer.CurrentPage);
-            PdfViewer.Reload();
+            int page = GetCurrentPdfPage();
+            _documents.RotatePdfPage(path, page);
+            ReloadPdf(path);
             StatusLabel.Text = "Página girada e salva";
         }
         catch (Exception ex)
@@ -115,7 +122,7 @@ public partial class WorkspacePage : ContentPage
         try
         {
             _documents.AddBlankPdfPage(path);
-            PdfViewer.Reload();
+            ReloadPdf(path);
             StatusLabel.Text = "Página adicionada";
         }
         catch (Exception ex)
@@ -130,8 +137,9 @@ public partial class WorkspacePage : ContentPage
         if (!EnsurePdf(out string path)) return;
         try
         {
-            _documents.DeletePdfPage(path, PdfViewer.CurrentPage);
-            PdfViewer.Reload();
+            int page = GetCurrentPdfPage();
+            _documents.DeletePdfPage(path, page);
+            ReloadPdf(path);
             StatusLabel.Text = "Página excluída";
         }
         catch (Exception ex)
@@ -145,6 +153,32 @@ public partial class WorkspacePage : ContentPage
     {
         path = _currentPath ?? string.Empty;
         return path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ReloadPdf(string path)
+    {
+        string absolute = Path.GetFullPath(path);
+        PdfViewer.Source = null;
+        PdfViewer.Source = absolute.StartsWith("file:", StringComparison.OrdinalIgnoreCase)
+            ? absolute
+            : "file://" + absolute;
+    }
+
+    private int GetCurrentPdfPage()
+    {
+        // PdfView.CurrentPage pode não existir em todas as versões do pacote.
+        // Fallback seguro para a primeira página (0).
+        try
+        {
+            var prop = PdfViewer.GetType().GetProperty("CurrentPage");
+            if (prop?.GetValue(PdfViewer) is int page && page >= 0)
+                return page;
+        }
+        catch
+        {
+            // ignore
+        }
+        return 0;
     }
 
     private static string DisplayName(string path) => Path.GetRelativePath(AgentWorkspace.ActiveRoot, path);

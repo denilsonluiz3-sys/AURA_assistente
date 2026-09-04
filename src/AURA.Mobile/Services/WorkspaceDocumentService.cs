@@ -31,7 +31,9 @@ public sealed class WorkspaceDocumentService
             throw new InvalidOperationException("O Workspace aceita .docx e .pdf nesta versão.");
         Directory.CreateDirectory(WorkspaceRoot);
         string destination = GetSafePath(name);
-        await using Stream source = await file.OpenReadAsync(cancellationToken);
+
+        // FileResult.OpenReadAsync() no MAUI não aceita CancellationToken.
+        await using Stream source = await file.OpenReadAsync();
         await using FileStream target = new(destination, FileMode.Create, FileAccess.Write, FileShare.None);
         await source.CopyToAsync(target, cancellationToken);
         return destination;
