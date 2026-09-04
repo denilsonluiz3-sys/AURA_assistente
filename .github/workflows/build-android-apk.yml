@@ -56,7 +56,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          yes | sdkmanager --licenses >/dev/null
+          # sdkmanager fecha o pipe ao terminar; yes recebe SIGPIPE (exit 141).
+          # Com pipefail isso derrubava o step — toleramos o exit do yes.
+          set +o pipefail
+          yes 2>/dev/null | sdkmanager --licenses >/dev/null 2>&1 || true
+          set -o pipefail
           sdkmanager --install \
             "platform-tools" \
             "platforms;android-36" \
