@@ -9,6 +9,7 @@ workflows:
       vars:
         DOTNET_PATH: $CM_BUILD_DIR/dotnet
         DOTNET_BIN: $CM_BUILD_DIR/dotnet/dotnet
+        # Feature band 100+ (ex.: 10.0.110). global.json usa rollForward latestFeature.
         DOTNET_VERSION: "10.0.110"
         ANDROID_TFM: net10.0-android
         AURA_DISPLAY_VERSION: "2.4"
@@ -22,11 +23,15 @@ workflows:
           ./dotnet-install.sh --install-dir "$DOTNET_PATH" --version "$DOTNET_VERSION"
           export PATH="$DOTNET_PATH:$PATH"
           echo "dotnet=$($DOTNET_BIN --version)"
+          "$DOTNET_BIN" --list-sdks || true
 
       - name: Install MAUI Android workload
         script: |
           set -euo pipefail
           export PATH="$DOTNET_PATH:$PATH"
+          # Garante que o SDK instalado é usado (global.json com rollForward).
+          export DOTNET_ROOT="$DOTNET_PATH"
+          "$DOTNET_BIN" --info
           "$DOTNET_BIN" workload install maui-android --verbosity minimal
           echo "MAUI workload: OK"
 
@@ -34,12 +39,14 @@ workflows:
         script: |
           set -euo pipefail
           export PATH="$DOTNET_PATH:$PATH"
+          export DOTNET_ROOT="$DOTNET_PATH"
           "$DOTNET_BIN" restore src/AURA.Mobile/AURA.Mobile.csproj --verbosity minimal
 
       - name: Install Android SDK deps
         script: |
           set -euo pipefail
           export PATH="$DOTNET_PATH:$PATH"
+          export DOTNET_ROOT="$DOTNET_PATH"
           SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
           "$DOTNET_BIN" build src/AURA.Mobile/AURA.Mobile.csproj \
             -t:InstallAndroidDependencies \
@@ -53,6 +60,7 @@ workflows:
         script: |
           set -euo pipefail
           export PATH="$DOTNET_PATH:$PATH"
+          export DOTNET_ROOT="$DOTNET_PATH"
           "$DOTNET_BIN" build src/AURA.Mobile/AURA.Mobile.csproj \
             -f "$ANDROID_TFM" \
             -c Release \
@@ -64,6 +72,7 @@ workflows:
         script: |
           set -euo pipefail
           export PATH="$DOTNET_PATH:$PATH"
+          export DOTNET_ROOT="$DOTNET_PATH"
           OUT="$CM_BUILD_DIR/artifacts"
           mkdir -p "$OUT"
 
