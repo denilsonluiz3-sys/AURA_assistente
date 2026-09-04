@@ -8,7 +8,7 @@ file static class SectionIcons
         ["Início"] = "⌂", ["Ecossistema"] = "✦", ["Logs"] = "≡", ["Correções"] = "⚕", ["Chat"] = "◉",
         ["Agente"] = "◆", ["Memória"] = "⬟", ["Terminal"] = ">_", ["Executores"] = "▶",
         ["Módulos"] = "⊞", ["Navegador"] = "⊕", ["Células"] = "⬡", ["Rodar programa"] = "▷",
-        ["Diagnóstico"] = "◎", ["Programas"] = "▣",
+        ["Diagnóstico"] = "◎", ["Programas"] = "▣", ["Workspace"] = "📄", ["Espectro"] = "〰",
     };
 
     public static string Get(string label) =>
@@ -34,10 +34,10 @@ public sealed class SectionPage : ContentPage
 
         string subtitle = title switch
         {
-            "Sistema" => "Dispositivo · diagnóstico · ecossistema",
-            "Assistente" => "Chat · agentes · memória",
-            "Ferramentas" => "Terminal · executores · módulos · logs",
-            "Apps" => "Programas · células · automação",
+            "Sistema" => "Início · ecossistema · diagnóstico · logs",
+            "Assistente" => "Chat · agente · memória · navegador",
+            "Ferramentas" => "Terminal · executores · módulos · workspace",
+            "Apps" => "Programas · células · rodar programa",
             _ => "AURA · " + items.Length + " opção" + (items.Length != 1 ? "ões" : "")
         };
 
@@ -129,10 +129,6 @@ public sealed class SectionPage : ContentPage
         return card;
     }
 
-    /// <summary>
-    /// Páginas são singleton: se já têm Parent, não dá Push de novo.
-    /// Se já está nesta pilha, só volta até ela.
-    /// </summary>
     private async Task NavigateSafeAsync(string label, Page page)
     {
         for (int i = 0; i < Navigation.NavigationStack.Count; i++)

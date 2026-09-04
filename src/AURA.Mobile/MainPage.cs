@@ -11,32 +11,65 @@ namespace AURA.Mobile
         private bool _permissionsAsked;
         private CancellationTokenSource? _rebuildCts;
 
-        public MainPage(EventBus events, ModuleManager manager, HomePage home, DiagnosticoPage diagnostico, ChatPage chat, AgentPage agent, MemoryPage memory, ExecutorsPage executors, ModulesPage modules, LogsPage logs, FixesPage fixes, TerminalPage terminal, BrowserPage browser, CellsPage cells, RunPage run, ProgramsPage programs, EcosystemPage ecosystem, SpectrumPage spectrum)
+        public MainPage(
+            EventBus events,
+            ModuleManager manager,
+            HomePage home,
+            DiagnosticoPage diagnostico,
+            ChatPage chat,
+            AgentPage agent,
+            MemoryPage memory,
+            ExecutorsPage executors,
+            ModulesPage modules,
+            LogsPage logs,
+            FixesPage fixes,
+            TerminalPage terminal,
+            BrowserPage browser,
+            CellsPage cells,
+            RunPage run,
+            ProgramsPage programs,
+            EcosystemPage ecosystem,
+            SpectrumPage spectrum,
+            WorkspacePage workspace)
         {
             AuraLog.Info("MainPage.ctor BEGIN");
             _manager = manager;
             events.Subscribe<ModuleStateChangedEvent>(_ =>
                 MainThread.BeginInvokeOnMainThread(ScheduleRebuildTabs));
 
-            // Núcleo: Agente + Terminal + Navegador + Módulos (ativar funções).
-            // Demais páginas ficam no DI, fora das abas.
+            // Todas as páginas principais visíveis nas seções.
+            // ModuleId != null só aparece se o módulo correspondente estiver aplicado.
             _entries = new List<(string?, string, string, Page)>
             {
+                // Sistema
+                (null, "Sistema", "Início", home),
+                (null, "Sistema", "Ecossistema", ecosystem),
+                ("system", "Sistema", "Diagnóstico", diagnostico),
+                (null, "Sistema", "Logs", logs),
+                (null, "Sistema", "Correções", fixes),
+                (null, "Sistema", "Espectro", spectrum),
+
+                // Assistente
+                (null, "Assistente", "Chat", chat),
                 (null, "Assistente", "Agente", agent),
+                (null, "Assistente", "Memória", memory),
                 (null, "Assistente", "Navegador", browser),
 
+                // Ferramentas
                 (null, "Ferramentas", "Terminal", terminal),
+                (null, "Ferramentas", "Executores", executors),
                 (null, "Ferramentas", "Módulos", modules),
+                (null, "Ferramentas", "Workspace", workspace),
 
-                (null, "Sistema", "Início", home),
-                ("system", "Sistema", "Diagnóstico", diagnostico),
+                // Apps / automação
+                (null, "Apps", "Programas", programs),
+                (null, "Apps", "Células", cells),
+                (null, "Apps", "Rodar programa", run),
             };
-
-            _ = (chat, memory, executors, logs, fixes, cells, run, programs, ecosystem, spectrum);
 
             BarBackgroundColor = Color.FromArgb("#0c0c12");
             BarTextColor = Color.FromArgb("#e8e8f0");
-            AuraLog.Info("MainPage.ctor OK (Agente/Navegador/Terminal/Módulos)");
+            AuraLog.Info("MainPage.ctor OK (todas as seções expostas)");
         }
 
         protected override async void OnAppearing()

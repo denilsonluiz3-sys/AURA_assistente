@@ -183,11 +183,12 @@ public partial class HomePage : ContentPage
             return;
         }
 
+        // Fallback se MainPage ainda não for a raiz
         string section = label switch
         {
-            "Diagnóstico" or "Logs" or "Correções" or "Ecossistema" => "Sistema",
+            "Diagnóstico" or "Logs" or "Correções" or "Ecossistema" or "Início" or "Espectro" => "Sistema",
             "Chat" or "Agente" or "Memória" or "Navegador" => "Assistente",
-            "Terminal" or "Executores" or "Módulos" => "Ferramentas",
+            "Terminal" or "Executores" or "Módulos" or "Workspace" => "Ferramentas",
             "Programas" or "Células" or "Rodar programa" => "Apps",
             _ => "Sistema"
         };
@@ -201,12 +202,13 @@ public partial class HomePage : ContentPage
     private async void OnConfigClicked(object? sender, EventArgs e)
     {
         await PlayButtonFeedbackAsync(BtnConfig);
-        if (!TrySwitchToSection("Sistema")) await DisplayAlert("Config", "Seção Sistema não disponível no momento.", "OK");
+        await NavigateToLabelAsync("Ecossistema");
     }
 
     private async Task NavigateToSectionAndPageAsync(string sectionTitle, string pageLabel)
     {
-        if (!TrySwitchToSection(sectionTitle)) await DisplayAlert(pageLabel, $"Seção \"{sectionTitle}\" ainda não está ativa.", "OK");
+        if (!TrySwitchToSection(sectionTitle))
+            await DisplayAlert(pageLabel, $"Seção \"{sectionTitle}\" ainda não está ativa.", "OK");
     }
 
     private bool TrySwitchToSection(string sectionTitle)
