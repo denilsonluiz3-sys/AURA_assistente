@@ -1,34 +1,57 @@
-# Pacote AURA — visão e estado
+# Pacote de atualizações AURA — segurança do Agente
 
-## Visão (prioridade)
+Data: 2026-09-04  
+Branch: `fix/agent-safety-aura-sh-dedupe`
 
-**Agente útil + terminal padrão + config simples + continuar de onde parou + menos abas.**
+## Problemas atacados
 
-## Abas visíveis (MainPage)
+1. Execução automática de blocos `aura-sh` após qualquer resposta do modelo.
+2. Tool calls duplicadas no mesmo run.
+3. Tool calls com argumentos vazios (`write_file {}`).
 
-| Seção | Aba |
-|-------|-----|
-| Assistente | **Agente** |
-| Ferramentas | **Terminal** |
-| Sistema | Início, Diagnóstico (se módulo system) |
+## Mudanças
 
-Chat, Células, Programas, Executores, Módulos, Logs, Navegador separado, etc. **não** entram nas abas (código/DI preservados).
+### AgentSession.cs (aplicado neste branch)
+- Dedupe por assinatura `nome|argumentos` no mesmo run.
+- Validação: rejeita `{}` / vazio para write_file, edit_file, read_file, list_dir, run_shell.
 
-Web AI fica **dentro** do Agente (modo Web AI).
+### AgentPage.xaml.cs
+Substituir o método `DeliverAnswerAsync` por:
 
-## Já no núcleo
+```csharp
+private async Task DeliverAnswerAsync(string answer, string processId, string completeMessage)
+{
+    string text = string.IsNullOrWhiteSpace(answer) ? "(sem texto na resposta)" : answer.Trim();
+    _lastAssistantText = text;
 
-- Config: preset → key → modelo → **Conectar** (painel curto)
-- Key/endpoint validados
-- Shell padrão no `DefaultAgentSystemPrompt`
-- Continuidade: `AgentSession` SharedHistory
-- Stop: `BeginAmbientRun` / `CancelAmbientRun` + CT no HTTP
-- UX: ▶/■, 🔊 nas bolhas, status `AiStatusText`
+    await AppendBubbleAsync(text, user: false);
 
-## Validar no APK
+    // NÃO executar aura-sh automaticamente.
+    // Execução só em fluxos explícitos (ex.: Colar plano).
+    string? shell = LocalPlaybook.ExtractAuraShell(text);
+    if (!string.IsNullOrWhiteSpace(shell))
+    {
+        await AppendBubbleAsync(
+            "Bloco aura-sh detectado. Não executei automaticamente. Use Colar plano se quiser rodar.",
+            user: false, isTool: true);
+    }
 
-1. Só ver poucas abas (Agente + Terminal + Início…)
-2. ⚙ Conectar → key ok
-3. `ls` / continue na 2ª mensagem
-4. ■ cancela run
-5. 🔊 lê resposta
+    _processes.Complete(processId, completeMessage);
+    _voice?.SetLastUtterance(text);
+    await SpeakAsync(text);
+}
+```
+
+## Como validar
+
+1. Pedido textual simples → sem tool calls.
+2. Resposta com aura-sh → aviso, sem execução.
+3. Colar plano com aura-sh → executa.
+4. Tool duplicada → erro de duplicata.
+5. write_file {} → erro de argumentos.
+
+## Próximos pacotes
+
+- Modelos com/sem tools
+- Unificar caminhos workspace
+- Cleanup de checkpoints

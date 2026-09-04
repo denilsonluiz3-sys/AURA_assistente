@@ -69,7 +69,6 @@ public sealed class AgentSession
         }
     }
 
-    /// <summary>Executa uma nova instrução ou, para comandos de continuidade, retoma o último checkpoint pausado.</summary>
     public Task<string> RunAsync(string userText, HttpClient? httpClient = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(userText)) throw new ArgumentException("A instrução não pode ser vazia.", nameof(userText));
@@ -93,7 +92,6 @@ public sealed class AgentSession
         return ExecuteLoopAsync(httpClient, ct);
     }
 
-    /// <summary>Retoma o último run pausado, inclusive depois de reiniciar o processo.</summary>
     public Task<string> ResumeLastAsync(HttpClient? httpClient = null, CancellationToken ct = default)
     {
         var state = _runStore.LoadLatestResumable();
@@ -111,7 +109,6 @@ public sealed class AgentSession
         return ExecuteLoopAsync(httpClient, ct);
     }
 
-    /// <summary>Retoma um run específico persistido.</summary>
     public Task<string> ResumeAsync(string runId, HttpClient? httpClient = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(runId)) return Task.FromResult("RunId obrigatório.");
@@ -138,6 +135,8 @@ public sealed class AgentSession
 
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, ambient);
         var token = linked.Token;
+
+        var executedSignatures = new HashSet<string>(StringComparer.Ordinal);
 
         try
         {
@@ -184,24 +183,37 @@ public sealed class AgentSession
                     foreach (var call in response.ToolCalls)
                     {
                         token.ThrowIfCancellationRequested();
-                        var tool = _tools.FirstOrDefault(t =>
-                            string.Equals(t.Definition.Name, call.Name, StringComparison.OrdinalIgnoreCase));
+                        string signature = (call.Name ?? "") + "|" + (call.ArgumentsJson ?? "");
                         string result;
-                        if (tool == null)
-                            result = "ERRO: ferramenta não encontrada: " + call.Name;
+
+                        if (IsEmptyOrInvalidArguments(call.Name, call.ArgumentsJson))
+                        {
+                            result = "ERRO: argumentos inválidos ou vazios para " + call.Name + ". Informe path/conteúdo válidos.";
+                        }
+                        else if (!executedSignatures.Add(signature))
+                        {
+                            result = "ERRO: chamada duplicada ignorada (" + call.Name + "). Não repita a mesma ação com os mesmos argumentos.";
+                        }
                         else
                         {
-                            try
+                            var tool = _tools.FirstOrDefault(t =>
+                                string.Equals(t.Definition.Name, call.Name, StringComparison.OrdinalIgnoreCase));
+                            if (tool == null)
+                                result = "ERRO: ferramenta não encontrada: " + call.Name;
+                            else
                             {
-                                result = await tool.ExecuteAsync(call.ArgumentsJson, token).ConfigureAwait(false);
-                            }
-                            catch (OperationCanceledException)
-                            {
-                                throw;
-                            }
-                            catch (Exception ex)
-                            {
-                                result = "ERRO: " + ex.Message;
+                                try
+                                {
+                                    result = await tool.ExecuteAsync(call.ArgumentsJson, token).ConfigureAwait(false);
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    throw;
+                                }
+                                catch (Exception ex)
+                                {
+                                    result = "ERRO: " + ex.Message;
+                                }
                             }
                         }
 
@@ -239,7 +251,7 @@ public sealed class AgentSession
                 _runState.LastError = "Limite de rodadas atingido; execução preservada para retomada.";
                 Checkpoint();
             }
-            return "⏸ Execução pausada no limite de rodadas. Estado salvo; use a retomada para continuar.";
+            return "Execução pausada no limite de rodadas. Estado salvo; use a retomada para continuar.";
         }
         catch (OperationCanceledException)
         {
@@ -250,8 +262,21 @@ public sealed class AgentSession
                 Checkpoint();
             }
             _logger.Info("agent: run pausado por cancelamento");
-            return "⏸ Execução interrompida e pausada. Estado salvo; use a retomada para continuar.";
+            return "Execução interrompida e pausada. Estado salvo; use a retomada para continuar.";
         }
+    }
+
+    private static bool IsEmptyOrInvalidArguments(string? name, string? argumentsJson)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return true;
+        string n = name.Trim().ToLowerInvariant();
+        string args = (argumentsJson ?? "").Trim();
+        if (args.Length == 0 || args == "{}" || args == "null")
+        {
+            if (n is "write_file" or "edit_file" or "read_file" or "list_dir" or "run_shell" or "shell")
+                return true;
+        }
+        return false;
     }
 
     private static bool IsResumeInstruction(string text)
