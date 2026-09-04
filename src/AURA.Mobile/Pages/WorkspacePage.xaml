@@ -5,7 +5,9 @@
              x:Class="AURA.Mobile.Pages.WorkspacePage"
              Title="Workspace"
              BackgroundColor="{DynamicResource AuraBackground}">
-    <Grid Padding="12" RowDefinitions="Auto,Auto,*" RowSpacing="10">
+    <Grid Padding="12" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="10">
+
+        <!-- Ações locais (sem IA) -->
         <HorizontalStackLayout Grid.Row="0" Spacing="8">
             <Button Text="Importar" Clicked="OnImportClicked" />
             <Button Text="Atualizar" Clicked="OnRefreshClicked" />
@@ -14,6 +16,7 @@
 
         <Picker x:Name="DocumentPicker" Grid.Row="1" Title="Documento do Workspace" SelectedIndexChanged="OnDocumentSelected" />
 
+        <!-- Documento aberto -->
         <Grid Grid.Row="2">
             <Grid x:Name="WordEditor" IsVisible="False" RowDefinitions="Auto,*" RowSpacing="8">
                 <HorizontalStackLayout Grid.Row="0" Spacing="8">
@@ -37,6 +40,53 @@
                              EnableAnnotationRendering="True"
                              BackgroundColor="Transparent" />
             </Grid>
+
+            <Label x:Name="EmptyHint"
+                   Text="Importe ou selecione um documento. Ações locais não usam IA."
+                   VerticalOptions="Center"
+                   HorizontalOptions="Center"
+                   Opacity="0.7" />
         </Grid>
+
+        <!-- Pedido ao agente (IA opcional, com contexto do arquivo) -->
+        <Border Grid.Row="3"
+                StrokeThickness="1"
+                Padding="10"
+                Stroke="{DynamicResource AuraSurface2}">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
+                <Label Text="O que você quer fazer com este arquivo?"
+                       FontAttributes="Bold" />
+
+                <HorizontalStackLayout Grid.Row="1" Spacing="6">
+                    <Button Text="Resumir" FontSize="12" Padding="10,4" Clicked="OnChipResumir" />
+                    <Button Text="Corrigir" FontSize="12" Padding="10,4" Clicked="OnChipCorrigir" />
+                    <Button Text="Simplificar" FontSize="12" Padding="10,4" Clicked="OnChipSimplificar" />
+                    <Button Text="Explicar" FontSize="12" Padding="10,4" Clicked="OnChipExplicar" />
+                </HorizontalStackLayout>
+
+                <Editor Grid.Row="2"
+                        x:Name="IntentEditor"
+                        Placeholder="Escreva livremente, ex.: tire as partes repetidas e deixe mais curto"
+                        AutoSize="TextChanges"
+                        HeightRequest="72" />
+
+                <HorizontalStackLayout Grid.Row="3" Spacing="8">
+                    <Button x:Name="SendAgentButton"
+                            Text="Enviar ao agente"
+                            Clicked="OnSendToAgentClicked" />
+                    <Button x:Name="ApplyWordButton"
+                            Text="Aplicar no Word"
+                            IsVisible="False"
+                            Clicked="OnApplyAgentToWordClicked" />
+                </HorizontalStackLayout>
+
+                <Editor Grid.Row="4"
+                        x:Name="AgentResponseEditor"
+                        Placeholder="Resposta do agente aparece aqui"
+                        IsReadOnly="True"
+                        AutoSize="TextChanges"
+                        HeightRequest="100" />
+            </Grid>
+        </Border>
     </Grid>
 </ContentPage>
