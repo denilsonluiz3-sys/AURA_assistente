@@ -1,21 +1,27 @@
+using AURA.AI.UniversalAI;
+using AURA.Abstractions.Orchestration;
+using AURA.Abstractions.Process;
+using AURA.Agents;
+using AURA.Mobile.Speech;
+
 namespace AURA.Mobile.Pages;
 
 /// <summary>
 /// Redirect residual → Agente. Chat removido do menu (Fase 3).
-/// Stubs dos handlers do XAML só para compilar; sem motor paralelo.
+/// Stubs XAML; sem motor paralelo Intent/Orchestrator.
 /// </summary>
 public partial class ChatPage : ContentPage
 {
     private bool _redirecting;
 
     public ChatPage(
-        AURA.AI.UniversalAI.IUniversalAiClient client,
+        IUniversalAiClient client,
         AURA.Memory.MemoryStore memory,
-        AURA.Abstractions.Process.IProcessOrchestrator processEngine,
-        AURA.Abstractions.Orchestration.IOrchestrator orchestrator,
-        AURA.Abstractions.IIntentResolver intentResolver,
+        IProcessOrchestrator processEngine,
+        IOrchestrator orchestrator,
+        IIntentResolver intentResolver,
         ProcessRegistry processes,
-        Speech.VoiceAssistantService? voice = null)
+        VoiceAssistantService? voice = null)
     {
         InitializeComponent();
         _ = (client, memory, processEngine, orchestrator, intentResolver, processes, voice);
@@ -45,7 +51,6 @@ public partial class ChatPage : ContentPage
         }
     }
 
-    // Handlers exigidos pelo XAML — sem lógica (página só redireciona)
     private void OnSendClicked(object? sender, EventArgs e) { }
     private void OnProcessTapped(object? sender, TappedEventArgs e) { }
     private void OnProviderChanged(object? sender, EventArgs e) { }
