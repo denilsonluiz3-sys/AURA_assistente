@@ -2,7 +2,7 @@ namespace AURA.Mobile.Pages;
 
 /// <summary>
 /// Redirect residual → Agente. Chat removido do menu (Fase 3).
-/// Mantido no DI para não quebrar registro; sem motor paralelo.
+/// Stubs dos handlers do XAML só para compilar; sem motor paralelo.
 /// </summary>
 public partial class ChatPage : ContentPage
 {
@@ -18,7 +18,6 @@ public partial class ChatPage : ContentPage
         Speech.VoiceAssistantService? voice = null)
     {
         InitializeComponent();
-        // Parâmetros mantidos só para assinatura DI compatível
         _ = (client, memory, processEngine, orchestrator, intentResolver, processes, voice);
     }
 
@@ -45,4 +44,9 @@ public partial class ChatPage : ContentPage
             _redirecting = false;
         }
     }
+
+    // Handlers exigidos pelo XAML — sem lógica (página só redireciona)
+    private void OnSendClicked(object? sender, EventArgs e) { }
+    private void OnProcessTapped(object? sender, TappedEventArgs e) { }
+    private void OnProviderChanged(object? sender, EventArgs e) { }
 }
