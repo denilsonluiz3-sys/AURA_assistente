@@ -7,7 +7,6 @@
              BackgroundColor="{DynamicResource AuraBackground}">
 
     <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
-        <!-- Header de status (oculto no modo Web AI) -->
         <Border x:Name="StatusBarHost" Grid.Row="0" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="16,12">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                 <VerticalStackLayout Spacing="2">
@@ -24,7 +23,6 @@
             </Grid>
         </Border>
 
-        <!-- Chips de modo (sempre visíveis — úteis) -->
         <ScrollView x:Name="ModeChipsHost" Grid.Row="1" Orientation="Horizontal" HorizontalScrollBarVisibility="Never" HeightRequest="42">
             <HorizontalStackLayout Spacing="6" Padding="12,5,12,3">
                 <Button x:Name="ModeAgentBtn" Text="Agente" Clicked="OnModeAgentUiClicked" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="16" />
@@ -60,17 +58,21 @@
             </ScrollView>
         </Grid>
 
-        <!-- Web AI: barra de provedores + WebView (máxima área) -->
         <Grid x:Name="WebPane" Grid.Row="3" IsVisible="False" RowDefinitions="Auto,*">
-            <HorizontalStackLayout Spacing="6" Padding="8,4">
-                <Button Text="DeepSeek" Clicked="OnWebDeepSeekClicked" FontSize="11" Padding="10,4" HeightRequest="30" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="12" />
-                <Button Text="ChatGPT" Clicked="OnWebChatGptClicked" FontSize="11" Padding="10,4" HeightRequest="30" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="12" />
-                <Button Text="↻" Clicked="OnWebReloadClicked" FontSize="12" Padding="8,4" HeightRequest="30" WidthRequest="40" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" />
-            </HorizontalStackLayout>
+            <ScrollView Orientation="Horizontal" HorizontalScrollBarVisibility="Never" HeightRequest="38">
+                <HorizontalStackLayout Spacing="6" Padding="8,4">
+                    <Button x:Name="WebBtnDeepSeek" Text="DeepSeek" CommandParameter="deepseek" Clicked="OnWebProviderClicked" FontSize="11" Padding="10,4" HeightRequest="30" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="12" />
+                    <Button x:Name="WebBtnChatGpt" Text="ChatGPT" CommandParameter="chatgpt" Clicked="OnWebProviderClicked" FontSize="11" Padding="10,4" HeightRequest="30" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="12" />
+                    <Button x:Name="WebBtnClaude" Text="Claude" CommandParameter="claude" Clicked="OnWebProviderClicked" FontSize="11" Padding="10,4" HeightRequest="30" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="12" />
+                    <Button x:Name="WebBtnGemini" Text="Gemini" CommandParameter="gemini" Clicked="OnWebProviderClicked" FontSize="11" Padding="10,4" HeightRequest="30" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="12" />
+                    <Button x:Name="WebBtnPerplexity" Text="Perplexity" CommandParameter="perplexity" Clicked="OnWebProviderClicked" FontSize="11" Padding="10,4" HeightRequest="30" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="12" />
+                    <Button Text="+" Clicked="OnWebMoreClicked" FontSize="14" Padding="12,4" HeightRequest="30" WidthRequest="40" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="12" />
+                    <Button Text="↻" Clicked="OnWebReloadClicked" FontSize="12" Padding="8,4" HeightRequest="30" WidthRequest="40" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" />
+                </HorizontalStackLayout>
+            </ScrollView>
             <WebView x:Name="BridgeWebView" Grid.Row="1" />
         </Grid>
 
-        <!-- Input do agente (oculto no modo Web AI) -->
         <Border x:Name="InputBarHost" Grid.Row="4" ZIndex="50" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,8">
             <VerticalStackLayout Spacing="6">
                 <ScrollView x:Name="ConfigHost" IsVisible="False" MaximumHeightRequest="260" VerticalScrollBarVisibility="Default" BackgroundColor="{DynamicResource AuraSurface2}" />
