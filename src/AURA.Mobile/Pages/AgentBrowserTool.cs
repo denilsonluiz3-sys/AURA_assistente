@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.AI;
+using AURA.Mobile.Services;
 
 namespace AURA.Mobile.Pages;
 
@@ -11,7 +12,7 @@ public sealed class AgentBrowserTool : AgentTool
     public override AgentToolDefinition Definition => new AgentToolDefinition
     {
         Name = "open_browser",
-        Description = "Abre uma URL no navegador padrão do dispositivo.",
+        Description = "Abre uma URL no navegador in-app da AURA (Navegador). Fallback: navegador externo.",
         Parameters =
         {
             ["url"] = new AgentToolParameter
@@ -23,28 +24,39 @@ public sealed class AgentBrowserTool : AgentTool
         Required = { "url" }
     };
 
-    public override Task<string> ExecuteAsync(string argumentsJson, CancellationToken ct = default)
+    public override async Task<string> ExecuteAsync(string argumentsJson, CancellationToken ct = default)
     {
         string url;
         using (JsonDocument doc = JsonDocument.Parse(argumentsJson))
             url = ReadString(doc.RootElement, "url") ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(url))
-            return Task.FromResult("ERRO: URL vazia.");
+            return "ERRO: URL vazia.";
 
         if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
             !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            return Task.FromResult("ERRO: URL deve começar com http:// ou https://");
+            return "ERRO: URL deve começar com http:// ou https://";
 
         try
         {
-            _ = Microsoft.Maui.ApplicationModel.Browser.Default.OpenAsync(
-                new Uri(url), Microsoft.Maui.ApplicationModel.BrowserLaunchMode.External);
-            return Task.FromResult("OK: navegador aberto com " + url);
+            await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                await AuraBrowserBridge.OpenInAppBrowserAsync(url);
+            });
+            return "OK: navegador in-app com " + url;
         }
         catch (Exception ex)
         {
-            return Task.FromResult("ERRO: não foi possível abrir o navegador: " + ex.Message);
+            try
+            {
+                await Microsoft.Maui.ApplicationModel.Browser.Default.OpenAsync(
+                    new Uri(url), Microsoft.Maui.ApplicationModel.BrowserLaunchMode.External);
+                return "OK: navegador externo com " + url + " (in-app falhou: " + ex.Message + ")";
+            }
+            catch (Exception ex2)
+            {
+                return "ERRO: não foi possível abrir o navegador: " + ex2.Message;
+            }
         }
     }
 }

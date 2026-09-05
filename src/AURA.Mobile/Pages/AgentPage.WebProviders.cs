@@ -1,3 +1,5 @@
+using AURA.Mobile.Services;
+
 namespace AURA.Mobile.Pages;
 
 /// <summary>
@@ -76,6 +78,20 @@ public partial class AgentPage
         }
     }
 
+    private string? CurrentWebUrl()
+    {
+        try
+        {
+            if (BridgeWebView?.Source is UrlWebViewSource u && !string.IsNullOrWhiteSpace(u.Url))
+                return u.Url;
+        }
+        catch { /* ignore */ }
+
+        var all = WebProvidersPrimary.Concat(WebProvidersMore);
+        var hit = all.FirstOrDefault(p => p.Id == _activeWebProviderId);
+        return string.IsNullOrEmpty(hit.Url) ? null : hit.Url;
+    }
+
     private void OnWebProviderClicked(object? sender, EventArgs e)
     {
         if (sender is not Button btn || btn.CommandParameter is not string id)
@@ -92,10 +108,24 @@ public partial class AgentPage
     {
         try
         {
-            string[] labels = WebProvidersMore.Select(p => p.Label).ToArray();
+            string[] labels = WebProvidersMore.Select(p => p.Label)
+                .Append("↗ Abrir no Navegador")
+                .ToArray();
             string chosen = await DisplayActionSheetAsync("Mais sites", "Cancelar", null, labels);
             if (string.IsNullOrEmpty(chosen) || chosen == "Cancelar")
                 return;
+
+            if (chosen == "↗ Abrir no Navegador")
+            {
+                string? url = CurrentWebUrl();
+                if (string.IsNullOrWhiteSpace(url))
+                {
+                    await SafeAlertAsync("Navegador", "Nenhuma URL ativa na Web AI.");
+                    return;
+                }
+                await AuraBrowserBridge.OpenInAppBrowserAsync(url, this);
+                return;
+            }
 
             var hit = WebProvidersMore.FirstOrDefault(p => p.Label == chosen);
             if (string.IsNullOrEmpty(hit.Url))
