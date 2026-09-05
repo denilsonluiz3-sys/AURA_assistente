@@ -3,7 +3,8 @@ using AURA.AI.UniversalAI;
 namespace AURA.Mobile.Diagnostics;
 
 /// <summary>
-/// Presets de API (Fase 4). Claude + Gemini além dos já existentes na AiConfigView.
+/// Presets de API (Fase 4). Claude + Gemini além dos já na AiConfigView.
+/// Requer RuntimeConfig como partial class.
 /// </summary>
 public static partial class RuntimeConfig
 {
@@ -44,7 +45,6 @@ public static partial class RuntimeConfig
             UniversalApiFormat.OpenAiCompatible, false, "llama3.2"),
     };
 
-    /// <summary>Aplica preset por id (openrouter, deepseek, anthropic, gemini, …).</summary>
     public static bool ApplyNamedPreset(string id)
     {
         if (string.IsNullOrWhiteSpace(id))
