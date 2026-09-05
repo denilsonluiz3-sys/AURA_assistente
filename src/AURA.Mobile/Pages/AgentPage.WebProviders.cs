@@ -83,7 +83,7 @@ public partial class AgentPage
 
         var all = WebProvidersPrimary.Concat(WebProvidersMore);
         var hit = all.FirstOrDefault(p => p.Id == id);
-        if (hit.Url == null)
+        if (string.IsNullOrEmpty(hit.Url))
             return;
         OpenWebProvider(hit.Id, hit.Url);
     }
@@ -98,7 +98,7 @@ public partial class AgentPage
                 return;
 
             var hit = WebProvidersMore.FirstOrDefault(p => p.Label == chosen);
-            if (hit.Url == null)
+            if (string.IsNullOrEmpty(hit.Url))
                 return;
             OpenWebProvider(hit.Id, hit.Url);
         }
@@ -107,11 +107,4 @@ public partial class AgentPage
             AuraLog.Exception("WebProvider.More", ex);
         }
     }
-
-    // Mantém handlers legados usados por XAML antigo / menus
-    private void OnWebDeepSeekClicked(object sender, EventArgs e)
-        => OpenWebProvider("deepseek", "https://chat.deepseek.com");
-
-    private void OnWebChatGptClicked(object sender, EventArgs e)
-        => OpenWebProvider("chatgpt", "https://chatgpt.com");
 }
