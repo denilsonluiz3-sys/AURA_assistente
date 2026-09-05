@@ -26,16 +26,20 @@
 	<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" android:maxSdkVersion="35" />
 	<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:maxSdkVersion="35" />
 
-	<!-- Acesso à memória do dispositivo para a Aura ler, gravar e executar arquivos. -->
+	<!-- Acesso à memória: workspace em Download/AURA e leitura/escrita. -->
 	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
 
-	<!-- Android 13+ (API 33+): permissões de mídia em vez de armazenamento amplo. -->
+	<!-- Android 13+ (API 33+): permissões de mídia. -->
 	<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 	<uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
 	<uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 	<uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
 
-	<!-- Android 11+ (API 30+): acesso amplo a arquivos (All files access), solicitado via Settings. -->
+	<!-- Android 11+ : acesso amplo (All files access) — necessário para Download/AURA direto. -->
 	<uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
+
+	<!-- ADB: apps de terceiros NÃO recebem permissão de adbd.
+	     Shell remoto (adb shell) só via PC com USB debugging.
+	     In-app usamos /system/bin/sh|toybox|Termux. -->
 </manifest>
