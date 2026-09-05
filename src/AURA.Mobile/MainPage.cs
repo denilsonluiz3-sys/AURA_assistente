@@ -37,8 +37,10 @@ namespace AURA.Mobile
             events.Subscribe<ModuleStateChangedEvent>(_ =>
                 MainThread.BeginInvokeOnMainThread(ScheduleRebuildTabs));
 
-            // Todas as páginas principais visíveis nas seções.
-            // ModuleId != null só aparece se o módulo correspondente estiver aplicado.
+            // Chat removido do menu: Agente é o único ponto de interação inteligente.
+            // ChatPage permanece no DI para redirect residual (NavigateToProcessAsync "Chat").
+            _ = chat;
+
             _entries = new List<(string?, string, string, Page)>
             {
                 // Sistema
@@ -49,8 +51,7 @@ namespace AURA.Mobile
                 (null, "Sistema", "Correções", fixes),
                 (null, "Sistema", "Espectro", spectrum),
 
-                // Assistente
-                (null, "Assistente", "Chat", chat),
+                // Assistente — Agente único (sem Chat paralelo)
                 (null, "Assistente", "Agente", agent),
                 (null, "Assistente", "Memória", memory),
                 (null, "Assistente", "Navegador", browser),
@@ -69,7 +70,7 @@ namespace AURA.Mobile
 
             BarBackgroundColor = Color.FromArgb("#0c0c12");
             BarTextColor = Color.FromArgb("#e8e8f0");
-            AuraLog.Info("MainPage.ctor OK (todas as seções expostas)");
+            AuraLog.Info("MainPage.ctor OK (Agente único no Assistente)");
         }
 
         protected override async void OnAppearing()
@@ -121,6 +122,11 @@ namespace AURA.Mobile
 
         public async Task NavigateToProcessAsync(string target)
         {
+            // Rotas legadas "Chat" → Agente (um único ponto inteligente)
+            if (string.Equals(target, "Chat", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(target, "Assistente", StringComparison.OrdinalIgnoreCase))
+                target = "Agente";
+
             var entry = _entries.FirstOrDefault(e => string.Equals(e.Label, target, StringComparison.OrdinalIgnoreCase));
             if (entry.Page == null) return;
             var section = Children.OfType<NavigationPage>().FirstOrDefault(n => string.Equals(n.Title, entry.Section, StringComparison.OrdinalIgnoreCase));
