@@ -1,3 +1,5 @@
+using AURA.Mobile.Pages;
+
 namespace AURA.Mobile.Services;
 
 /// <summary>
@@ -44,14 +46,12 @@ public static class AuraBrowserBridge
                 return;
             }
 
-            // Fallback: push na navigation atual
             if (fromPage?.Navigation != null && browser != null && browser.Parent == null)
             {
                 await fromPage.Navigation.PushAsync(browser);
                 return;
             }
 
-            // Último recurso: browser externo
             await Microsoft.Maui.ApplicationModel.Browser.Default.OpenAsync(
                 new Uri(url), Microsoft.Maui.ApplicationModel.BrowserLaunchMode.External);
         }
