@@ -10,6 +10,7 @@ namespace AURA.Mobile
         private readonly List<(string? ModuleId, string Section, string Label, Page Page)> _entries;
         private bool _permissionsAsked;
         private CancellationTokenSource? _rebuildCts;
+        private Page? _advancedMenu;
 
         private static readonly HashSet<string> PrimaryTabs = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -44,6 +45,22 @@ namespace AURA.Mobile
             // Navegação principal curta: quatro destinos frequentes + Mais.
             // As antigas categorias Sistema/Assistente/Ferramentas/Apps duplicavam
             // os mesmos atalhos em várias telas.
+            var advancedItems = new (string Label, Page Page)[]
+            {
+                ("Logs", logs),
+                ("Correções", fixes),
+                ("Espectro", spectrum),
+                ("Terminal", terminal),
+                ("Executores", executors),
+                ("Módulos", modules),
+                ("Células", cells),
+                ("Programas", programs),
+                ("Rodar programa", run),
+                ("Ecossistema", ecosystem),
+            };
+            var advancedMenu = new SectionPage("Modo avançado", advancedItems);
+            _advancedMenu = advancedMenu;
+
             _entries = new List<(string?, string, string, Page)>
             {
                 (null, "Início", "Início", home),
@@ -51,19 +68,22 @@ namespace AURA.Mobile
                 ("system", "Diagnóstico", "Diagnóstico", diagnostico),
                 (null, "Workspace", "Workspace", workspace),
 
-                // Destinos menos frequentes ficam em um único menu.
+                // Recursos úteis para uso geral.
                 (null, "Mais", "Memória", memory),
                 (null, "Mais", "Navegador", browser),
-                (null, "Mais", "Logs", logs),
-                (null, "Mais", "Correções", fixes),
-                (null, "Mais", "Espectro", spectrum),
-                (null, "Mais", "Terminal", terminal),
-                (null, "Mais", "Executores", executors),
-                (null, "Mais", "Módulos", modules),
-                (null, "Mais", "Células", cells),
-                (null, "Mais", "Programas", programs),
-                (null, "Mais", "Rodar programa", run),
-                (null, "Mais", "Ecossistema", ecosystem),
+                (null, "Mais", "Modo avançado", advancedMenu),
+
+                // Ferramentas técnicas continuam disponíveis, mas fora do fluxo comum.
+                (null, "Avançado", "Logs", logs),
+                (null, "Avançado", "Correções", fixes),
+                (null, "Avançado", "Espectro", spectrum),
+                (null, "Avançado", "Terminal", terminal),
+                (null, "Avançado", "Executores", executors),
+                (null, "Avançado", "Módulos", modules),
+                (null, "Avançado", "Células", cells),
+                (null, "Avançado", "Programas", programs),
+                (null, "Avançado", "Rodar programa", run),
+                (null, "Avançado", "Ecossistema", ecosystem),
             };
 
             BarBackgroundColor = Color.FromArgb("#0c0c12");
@@ -152,6 +172,20 @@ namespace AURA.Mobile
                     .FirstOrDefault(n => string.Equals(n.Title, entry.Section, StringComparison.OrdinalIgnoreCase));
                 if (direct != null)
                     CurrentPage = direct;
+                return;
+            }
+
+            if (entry.Section.Equals("Avançado", StringComparison.OrdinalIgnoreCase) && _advancedMenu != null)
+            {
+                var moreForAdvanced = Children.OfType<NavigationPage>()
+                    .FirstOrDefault(n => string.Equals(n.Title, "Mais", StringComparison.OrdinalIgnoreCase));
+                if (moreForAdvanced == null) return;
+                CurrentPage = moreForAdvanced;
+
+                if (!moreForAdvanced.Navigation.NavigationStack.Contains(_advancedMenu))
+                    await moreForAdvanced.PushAsync(_advancedMenu, false);
+                if (entry.Page.Parent == null)
+                    await moreForAdvanced.PushAsync(entry.Page);
                 return;
             }
 

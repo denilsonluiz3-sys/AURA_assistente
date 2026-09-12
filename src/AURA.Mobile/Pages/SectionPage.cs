@@ -9,6 +9,7 @@ file static class SectionIcons
         ["Agente"] = "◆", ["Memória"] = "⬟", ["Terminal"] = ">_", ["Executores"] = "▶",
         ["Módulos"] = "⊞", ["Navegador"] = "⊕", ["Células"] = "⬡", ["Rodar programa"] = "▷",
         ["Diagnóstico"] = "◎", ["Programas"] = "▣", ["Workspace"] = "📄", ["Espectro"] = "〰",
+        ["Modo avançado"] = "⚙",
     };
 
     public static string Get(string label) =>
@@ -38,6 +39,7 @@ public sealed class SectionPage : ContentPage
             "Assistente" => "Agente · memória · navegador",
             "Ferramentas" => "Terminal · executores · módulos · workspace",
             "Apps" => "Programas · células · rodar programa",
+            "Modo avançado" => "Ferramentas técnicas para usuários avançados",
             _ => "AURA · " + items.Length + " opção" + (items.Length != 1 ? "ões" : "")
         };
 
