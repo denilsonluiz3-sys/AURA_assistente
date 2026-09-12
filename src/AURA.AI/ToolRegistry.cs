@@ -12,7 +12,7 @@ namespace AURA.AI
     public sealed class ToolRegistry
     {
         private readonly Dictionary<string, AgentTool> _byName =
-            new Dictionary<string, AgentTool>(StringComparer.Ordinal);
+            new Dictionary<string, AgentTool>(StringComparer.OrdinalIgnoreCase);
 
         public ToolRegistry()
         {

@@ -10,7 +10,7 @@ public sealed class AgentSession
 {
     private readonly IUniversalAiClient _client;
     private readonly ILogger _logger;
-    private readonly List<AgentTool> _tools;
+    private readonly ToolRegistry _toolRegistry;
     private readonly List<AgentMessage> _messages = new();
     private readonly string? _systemPrompt;
     private readonly MemoryStore? _memory;
@@ -27,7 +27,7 @@ public sealed class AgentSession
     public AgentSession(IUniversalAiClient client, IEnumerable<AgentTool> tools, string? systemPrompt = null, ILogger? logger = null, MemoryStore? memory = null, int maxRounds = 12, AgentRunStore? runStore = null)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
-        _tools = (tools ?? Array.Empty<AgentTool>()).ToList();
+        _toolRegistry = new ToolRegistry(tools ?? Array.Empty<AgentTool>());
         _systemPrompt = systemPrompt;
         _logger = logger ?? new ConsoleLogger();
         _memory = memory;
@@ -152,7 +152,7 @@ public sealed class AgentSession
                 TrimHistory();
                 var response = await _client.ChatToolsAsync(
                     new List<AgentMessage>(_messages),
-                    _tools.Select(t => t.Definition).ToList(),
+                    _toolRegistry.Definitions(),
                     httpClient,
                     token,
                     BuildSystemPrompt()).ConfigureAwait(false);
@@ -196,8 +196,7 @@ public sealed class AgentSession
                         }
                         else
                         {
-                            var tool = _tools.FirstOrDefault(t =>
-                                string.Equals(t.Definition.Name, call.Name, StringComparison.OrdinalIgnoreCase));
+                            var tool = _toolRegistry.Resolve(call.Name);
                             if (tool == null)
                                 result = "ERRO: ferramenta não encontrada: " + call.Name;
                             else
@@ -308,11 +307,11 @@ public sealed class AgentSession
     {
         var sb = new StringBuilder();
         sb.Append(DefaultAgentSystemPrompt.Merge(_systemPrompt));
-        if (_tools.Count > 0)
+        if (_toolRegistry.Count > 0)
         {
             sb.Append("\n\nFERRAMENTAS REGISTRADAS:\n");
-            foreach (var t in _tools)
-                sb.Append("- ").Append(t.Definition.Name).Append(": ").Append(t.Definition.Description).Append('\n');
+            foreach (var definition in _toolRegistry.Definitions())
+                sb.Append("- ").Append(definition.Name).Append(": ").Append(definition.Description).Append('\n');
         }
 
         if (_memory != null)
