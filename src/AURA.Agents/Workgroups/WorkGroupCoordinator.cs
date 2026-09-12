@@ -1,3 +1,5 @@
+using AURA.Agents.Specialists;
+
 namespace AURA.Agents.Workgroups;
 
 public interface IWorkGroupAgent
@@ -25,6 +27,8 @@ public sealed class WorkGroupCoordinator
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _reports = reports;
         _items = items;
+        if (_registry.Resolve("qa-ci") != null)
+            Register(new QaCiPlanningAgent());
     }
 
     public AgentReport? LastReport { get; private set; }
