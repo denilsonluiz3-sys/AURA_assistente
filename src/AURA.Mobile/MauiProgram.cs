@@ -75,7 +75,6 @@ public static class MauiProgram
             return client;
         });
         builder.Services.AddSingleton<AiDiagnosticsService>();
-        builder.Services.AddSingleton<AiAssistant>();
         builder.Services.AddSingleton<ISpeechService, HybridSpeechService>();
         builder.Services.AddSingleton<VoiceAssistantService>(sp => new VoiceAssistantService(sp.GetRequiredService<ISpeechService>(), sp.GetService<ISpeechRecognitionService>(), sp.GetService<IOrchestrator>(), sp.GetService<IIntentResolver>()));
         builder.Services.AddSingleton(sp => new AgentManager(sp.GetRequiredService<ILogger>()) { Events = sp.GetRequiredService<EventBus>() });
