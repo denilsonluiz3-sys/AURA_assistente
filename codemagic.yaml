@@ -9,8 +9,9 @@ workflows:
       vars:
         DOTNET_PATH: $CM_BUILD_DIR/dotnet
         DOTNET_BIN: $CM_BUILD_DIR/dotnet/dotnet
-        # Feature band 100+ (ex.: 10.0.110). global.json usa rollForward latestFeature.
-        DOTNET_VERSION: "10.0.110"
+        # Deve coincidir com global.json (SDK fixado e rollForward latestPatch).
+        DOTNET_VERSION: "10.0.100"
+        ANDROID_NDK_VERSION: "26.3.11579264"
         ANDROID_TFM: net10.0-android
         AURA_DISPLAY_VERSION: "2.4"
 
@@ -25,6 +26,14 @@ workflows:
           echo "dotnet=$($DOTNET_BIN --version)"
           "$DOTNET_BIN" --list-sdks || true
 
+      - name: Run .NET unit tests
+        script: |
+          set -euo pipefail
+          export PATH="$DOTNET_PATH:$PATH"
+          export DOTNET_ROOT="$DOTNET_PATH"
+          "$DOTNET_BIN" restore tests/AURA.Tests/AURA.Tests.csproj --verbosity minimal
+          "$DOTNET_BIN" test tests/AURA.Tests/AURA.Tests.csproj --no-restore --verbosity normal
+
       - name: Install MAUI Android workload
         script: |
           set -euo pipefail
@@ -34,6 +43,38 @@ workflows:
           "$DOTNET_BIN" --info
           "$DOTNET_BIN" workload install maui-android --verbosity minimal
           echo "MAUI workload: OK"
+
+      - name: Install native Android dependencies
+        script: |
+          set -euo pipefail
+          SDK_DIR="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Library/Android/sdk}}"
+          SDKMANAGER="$SDK_DIR/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager)"; fi
+          yes 2>/dev/null | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" --install "platform-tools" "platforms;android-36" "build-tools;35.0.0" "ndk;$ANDROID_NDK_VERSION"
+          test -d "$SDK_DIR/ndk/$ANDROID_NDK_VERSION"
+
+      - name: Build native offline AI runtime
+        script: |
+          set -euo pipefail
+          SDK_DIR="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Library/Android/sdk}}"
+          NDK_ROOT="$SDK_DIR/ndk/$ANDROID_NDK_VERSION"
+          git clone --depth 1 --branch v0.4.0 https://github.com/ggml-org/llama.cpp native/llama.cpp
+          cmake -S native/aura-llama -B native/aura-llama/build \
+            -DLLAMA_CPP_ROOT="$CM_BUILD_DIR/native/llama.cpp" \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK_ROOT/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=28 \
+            -DGGML_NATIVE=OFF \
+            -DGGML_OPENMP=OFF \
+            -DGGML_LLAMAFILE=OFF \
+            -DLLAMA_OPENSSL=OFF
+          cmake --build native/aura-llama/build --target aura_llama --parallel 2
+          mkdir -p src/AURA.Mobile/Platforms/Android/NativeLibs/arm64-v8a
+          NATIVE_LIB="$(find native/aura-llama/build -type f -name 'libaura_llama.so' | head -n 1)"
+          test -n "$NATIVE_LIB"
+          cp "$NATIVE_LIB" src/AURA.Mobile/Platforms/Android/NativeLibs/arm64-v8a/libaura_llama.so
+          ls -lh src/AURA.Mobile/Platforms/Android/NativeLibs/arm64-v8a/libaura_llama.so
 
       - name: Restore
         script: |
