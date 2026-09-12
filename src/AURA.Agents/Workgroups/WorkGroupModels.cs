@@ -84,7 +84,10 @@ public sealed class WorkGroupRegistry
             throw new ArgumentException("O grupo precisa de um Id.", nameof(group));
         if (string.IsNullOrWhiteSpace(group.Name))
             throw new ArgumentException("O grupo precisa de um nome.", nameof(group));
-        _groups[group.Id.Trim()] = group;
+        string id = group.Id.Trim();
+        if (_groups.ContainsKey(id))
+            throw new InvalidOperationException("Grupo já registrado: " + id);
+        _groups[id] = group;
     }
 
     public WorkGroupDefinition? Resolve(string id) =>

@@ -1,4 +1,5 @@
 using AURA.Agents.Specialists;
+using AURA.AI;
 
 namespace AURA.Agents.Workgroups;
 
@@ -38,9 +39,25 @@ public sealed class WorkGroupCoordinator
     public void Register(IWorkGroupAgent agent)
     {
         ArgumentNullException.ThrowIfNull(agent);
-        if (_registry.Resolve(agent.GroupId) == null)
+        WorkGroupDefinition? group = _registry.Resolve(agent.GroupId);
+        if (group == null)
             throw new InvalidOperationException("Grupo não registrado: " + agent.GroupId);
+        if (!group.Enabled)
+            throw new InvalidOperationException("Grupo desativado: " + agent.GroupId);
         _agents[agent.GroupId] = agent;
+    }
+
+    public AgentToolPolicy CreateToolPolicy(WorkItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        WorkGroupDefinition? group = _registry.Resolve(item.GroupId);
+        if (group == null)
+            throw new InvalidOperationException("Grupo não registrado: " + item.GroupId);
+        if (!group.Enabled)
+            throw new InvalidOperationException("Grupo desativado: " + item.GroupId);
+        if (!group.AllowedStages.Contains(item.Stage))
+            throw new InvalidOperationException("Estágio não autorizado para o grupo: " + item.Stage);
+        return new AgentToolPolicy(group.AllowedTools);
     }
 
     public async Task<AgentReport> AnalyzeAsync(
@@ -60,6 +77,7 @@ public sealed class WorkGroupCoordinator
             Stage = WorkGroupStage.Observe,
             Status = WorkItemStatus.InProgress
         };
+        _ = CreateToolPolicy(item);
         await SaveItemAsync(item, cancellationToken).ConfigureAwait(false);
 
         AgentReport report;
