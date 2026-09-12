@@ -25,7 +25,6 @@ public partial class AgentPage : ContentPage
     private readonly OpenRouterClient _client;
     private readonly MemoryStore _memory;
     private readonly ISpeechService _speech;
-    private readonly VoiceAssistantService? _voice;
     private readonly ShellExecutor _shell;
     private readonly GitExecutor? _git;
     private readonly PythonExecutor? _python;
@@ -56,7 +55,7 @@ public partial class AgentPage : ContentPage
     public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
         ShellExecutor shell, ProcessRegistry processes, AuraOrchestrator orchestrator,
         AgentExecutionCoordinator coordinator,
-        LocalPlaybook? playbook = null, VoiceAssistantService? voice = null,
+        LocalPlaybook? playbook = null,
         SolutionStore? solutions = null, GitExecutor? git = null, PythonExecutor? python = null,
         NodeExecutor? node = null, CellProgramRegistry? cellRegistry = null, SimulationRuntime? runtime = null,
         IAndroidCapabilityService? android = null, AgentRunStore? runStore = null)
@@ -79,7 +78,6 @@ public partial class AgentPage : ContentPage
         _playbook = playbook;
         _runStore = runStore;
         ProcessCards.BindingContext = _processes;
-        _voice = voice;
         LoadRecentsFromPrefs();
 
         _processes.Processes.CollectionChanged += OnProcessesChanged;
@@ -978,8 +976,6 @@ public partial class AgentPage : ContentPage
         }
 
         _processes.Complete(processId, completeMessage);
-        _voice?.SetLastUtterance(text);
-
         await SpeakAsync(text);
     }
 
