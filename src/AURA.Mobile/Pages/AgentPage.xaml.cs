@@ -1,4 +1,5 @@
 using AURA.AI;
+using CommunityToolkit.Maui.Views;
 using AURA.Agents;
 using AURA.Agents.Workgroups;
 using AURA.Agents.Programs;
@@ -20,6 +21,7 @@ namespace AURA.Mobile.Pages;
 
 public partial class AgentPage : ContentPage
 {
+    private int _videoRequestId;
     private const string UrlDeepSeek = "https://chat.deepseek.com";
     private const string UrlChatGpt = "https://chatgpt.com";
 
@@ -63,6 +65,7 @@ public partial class AgentPage : ContentPage
         IAndroidCapabilityService? android = null, AgentRunStore? runStore = null)
     {
         InitializeComponent();
+        App.ThemeChanged += OnThemeChanged;
         _client = client;
         _memory = memory;
         _solutions = solutions;
@@ -208,6 +211,7 @@ public partial class AgentPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        ApplyVideoBackground();
         RuntimeConfig.Apply(_client);
 
         if (ConfigHost.Content is not AiConfigView cfg)
@@ -227,6 +231,50 @@ public partial class AgentPage : ContentPage
 
         UpdateProcessCardsVisibility();
         EnsureSession();
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        Interlocked.Increment(ref _videoRequestId);
+        PauseVideoBackground();
+    }
+
+    private void OnThemeChanged()
+    {
+        MainThread.BeginInvokeOnMainThread(ApplyVideoBackground);
+    }
+
+    private async void ApplyVideoBackground()
+    {
+        if (BgVideo is null) return;
+        int requestId = Interlocked.Increment(ref _videoRequestId);
+        string resource = App.IsSolar ? "solar_bg.mp4" : "lunar_bg.mp4";
+        try
+        {
+            using Stream stream = await FileSystem.OpenAppPackageFileAsync(resource);
+            if (requestId != _videoRequestId) return;
+            BgVideo.Stop();
+            BgVideo.Source = null;
+            BgVideo.Source = MediaSource.FromResource(resource);
+            BgVideo.IsVisible = true;
+            await BgVideo.FadeTo(1, 180, Easing.Linear);
+            if (requestId != _videoRequestId) return;
+            BgVideo.Play();
+            AuraLog.Info($"Vídeo de fundo do Agente carregado: {resource}");
+        }
+        catch (Exception ex)
+        {
+            if (requestId != _videoRequestId) return;
+            BgVideo.Stop();
+            BgVideo.IsVisible = false;
+            AuraLog.Info($"Vídeo de fundo do Agente indisponível: {resource} ({ex.GetType().Name})");
+        }
+    }
+
+    private void PauseVideoBackground()
+    {
+        try { BgVideo?.Pause(); } catch { }
     }
 
     private async Task SafeAlertAsync(string title, string message, string cancel = "OK")
