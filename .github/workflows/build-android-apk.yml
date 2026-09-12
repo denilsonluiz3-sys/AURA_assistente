@@ -98,6 +98,28 @@ jobs:
           test -d "${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}/build-tools/35.0.0"
           test -d "${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}/ndk/26.3.11579264"
 
+      - name: Build native offline AI runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}/ndk/26.3.11579264"
+          git clone --depth 1 --branch v0.4.0 https://github.com/ggml-org/llama.cpp native/llama.cpp
+          cmake -S native/aura-llama -B native/aura-llama/build \
+            -DLLAMA_CPP_ROOT="$GITHUB_WORKSPACE/native/llama.cpp" \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK_ROOT/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=28 \
+            -DGGML_NATIVE=OFF \
+            -DGGML_OPENMP=OFF \
+            -DGGML_LLAMAFILE=OFF \
+            -DLLAMA_OPENSSL=OFF
+          cmake --build native/aura-llama/build --target aura_llama --parallel 2
+          mkdir -p src/AURA.Mobile/Platforms/Android/NativeLibs/arm64-v8a
+          NATIVE_LIB=$(find native/aura-llama/build -type f -name 'libaura_llama.so' | head -n 1)
+          test -n "$NATIVE_LIB"
+          cp "$NATIVE_LIB" src/AURA.Mobile/Platforms/Android/NativeLibs/arm64-v8a/libaura_llama.so
+          ls -lh src/AURA.Mobile/Platforms/Android/NativeLibs/arm64-v8a/libaura_llama.so
+
       - name: Install MAUI Android workload
         run: dotnet workload install maui-android
 

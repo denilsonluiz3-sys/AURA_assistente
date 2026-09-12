@@ -35,6 +35,7 @@
 
   <ItemGroup>
     <MauiFont Include="Resources\Fonts\*" />
+    <AndroidNativeLibrary Include="Platforms\Android\NativeLibs\**\*.so" Condition="Exists('Platforms\Android\NativeLibs')" />
   </ItemGroup>
 
   <ItemGroup>
