@@ -27,9 +27,9 @@
             <HorizontalStackLayout Spacing="6" Padding="4,5,4,3">
                 <Button x:Name="ModeAgentBtn" Text="Agente" Clicked="OnModeAgentUiClicked" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="16" />
                 <Button x:Name="ModeWebBtn" Text="Web AI" Clicked="OnModeWebUiClicked" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="16" />
-                <Button Text="📂 Workspace" Clicked="OnChipWorkspace" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
-                <Button Text="🩺 Diagnóstico" Clicked="OnChipDiagnostic" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
-                <Button Text="🧠 Memória" Clicked="OnChipMemory" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
+                <Button IsVisible="False" Text="📂 Workspace" Clicked="OnChipWorkspace" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
+                <Button IsVisible="False" Text="🩺 Diagnóstico" Clicked="OnChipDiagnostic" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
+                <Button IsVisible="False" Text="🧠 Memória" Clicked="OnChipMemory" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
                 <Button Text="▶ Continuar" Clicked="OnChipContinue" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
                 <Button Text="🛡 Shell" Clicked="OnChipShellSafe" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
             </HorizontalStackLayout>

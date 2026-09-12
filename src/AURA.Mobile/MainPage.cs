@@ -11,6 +11,11 @@ namespace AURA.Mobile
         private bool _permissionsAsked;
         private CancellationTokenSource? _rebuildCts;
 
+        private static readonly HashSet<string> PrimaryTabs = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Início", "Agente", "Diagnóstico", "Workspace"
+        };
+
         public MainPage(
             EventBus events,
             ModuleManager manager,
@@ -36,33 +41,29 @@ namespace AURA.Mobile
             events.Subscribe<ModuleStateChangedEvent>(_ =>
                 MainThread.BeginInvokeOnMainThread(ScheduleRebuildTabs));
 
-            // Agente é o único ponto de interação inteligente; o antigo ChatPage era apenas um redirect.
-
+            // Navegação principal curta: quatro destinos frequentes + Mais.
+            // As antigas categorias Sistema/Assistente/Ferramentas/Apps duplicavam
+            // os mesmos atalhos em várias telas.
             _entries = new List<(string?, string, string, Page)>
             {
-                // Sistema
-                (null, "Sistema", "Início", home),
-                (null, "Sistema", "Ecossistema", ecosystem),
-                ("system", "Sistema", "Diagnóstico", diagnostico),
-                (null, "Sistema", "Logs", logs),
-                (null, "Sistema", "Correções", fixes),
-                (null, "Sistema", "Espectro", spectrum),
+                (null, "Início", "Início", home),
+                (null, "Agente", "Agente", agent),
+                ("system", "Diagnóstico", "Diagnóstico", diagnostico),
+                (null, "Workspace", "Workspace", workspace),
 
-                // Assistente — Agente único (sem Chat paralelo)
-                (null, "Assistente", "Agente", agent),
-                (null, "Assistente", "Memória", memory),
-                (null, "Assistente", "Navegador", browser),
-
-                // Ferramentas
-                (null, "Ferramentas", "Terminal", terminal),
-                (null, "Ferramentas", "Executores", executors),
-                (null, "Ferramentas", "Módulos", modules),
-                (null, "Ferramentas", "Workspace", workspace),
-
-                // Apps / automação
-                (null, "Apps", "Programas", programs),
-                (null, "Apps", "Células", cells),
-                (null, "Apps", "Rodar programa", run),
+                // Destinos menos frequentes ficam em um único menu.
+                (null, "Mais", "Memória", memory),
+                (null, "Mais", "Navegador", browser),
+                (null, "Mais", "Logs", logs),
+                (null, "Mais", "Correções", fixes),
+                (null, "Mais", "Espectro", spectrum),
+                (null, "Mais", "Terminal", terminal),
+                (null, "Mais", "Executores", executors),
+                (null, "Mais", "Módulos", modules),
+                (null, "Mais", "Células", cells),
+                (null, "Mais", "Programas", programs),
+                (null, "Mais", "Rodar programa", run),
+                (null, "Mais", "Ecossistema", ecosystem),
             };
 
             BarBackgroundColor = Color.FromArgb("#0c0c12");
@@ -70,13 +71,11 @@ namespace AURA.Mobile
             SelectedTabColor = Color.FromArgb("#7a9eff");
             UnselectedTabColor = Color.FromArgb("#7a7f94");
 #if ANDROID
-            // Evita que as categorias longas sejam comprimidas e quebradas no topo.
-            // A barra inferior também fica mais acessível com uma mão.
             Microsoft.Maui.Controls.PlatformConfiguration.AndroidSpecific.TabbedPage.SetToolbarPlacement(
                 On<Microsoft.Maui.Controls.PlatformConfiguration.Android>(),
                 Microsoft.Maui.Controls.PlatformConfiguration.AndroidSpecific.ToolbarPlacement.Bottom);
 #endif
-            AuraLog.Info("MainPage.ctor OK (Agente único no Assistente)");
+            AuraLog.Info("MainPage.ctor OK (navegação principal consolidada)");
         }
 
         protected override async void OnAppearing()
@@ -117,41 +116,60 @@ namespace AURA.Mobile
         public void RebuildTabs()
         {
             Children.Clear();
-            foreach (IGrouping<string, (string ModuleId, string Section, string Label, Page Page)> group in _entries.GroupBy(e => e.Section))
+
+            foreach (var entry in _entries.Where(e => PrimaryTabs.Contains(e.Section)))
             {
-                var items = group.Where(e => e.ModuleId == null || _manager.IsApplied(e.ModuleId)).Select(e => (e.Label, e.Page)).ToArray();
-                if (items.Length == 0) continue;
-                Children.Add(MakeSection(group.Key, items));
+                if (entry.ModuleId != null && !_manager.IsApplied(entry.ModuleId))
+                    continue;
+                Children.Add(new NavigationPage(entry.Page) { Title = entry.Section });
             }
-            AuraLog.Info("MainPage.RebuildTabs: " + Children.Count + " seções ativas");
+
+            var moreItems = _entries
+                .Where(e => e.Section.Equals("Mais", StringComparison.OrdinalIgnoreCase))
+                .Where(e => e.ModuleId == null || _manager.IsApplied(e.ModuleId))
+                .Select(e => (e.Label, e.Page))
+                .ToArray();
+            if (moreItems.Length > 0)
+                Children.Add(new NavigationPage(new SectionPage("Mais", moreItems)) { Title = "Mais" });
+
+            AuraLog.Info("MainPage.RebuildTabs: " + Children.Count + " destinos principais");
         }
 
         public async Task NavigateToProcessAsync(string target)
         {
-            // Rotas legadas "Chat" → Agente (um único ponto inteligente)
+            // Rota legada "Chat" → Agente (um único ponto inteligente).
             if (string.Equals(target, "Chat", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(target, "Assistente", StringComparison.OrdinalIgnoreCase))
                 target = "Agente";
 
-            var entry = _entries.FirstOrDefault(e => string.Equals(e.Label, target, StringComparison.OrdinalIgnoreCase));
+            var entry = _entries.FirstOrDefault(e =>
+                string.Equals(e.Label, target, StringComparison.OrdinalIgnoreCase));
             if (entry.Page == null) return;
-            var section = Children.OfType<NavigationPage>().FirstOrDefault(n => string.Equals(n.Title, entry.Section, StringComparison.OrdinalIgnoreCase));
-            if (section == null) return;
-            CurrentPage = section;
-            var navigationStack = section.Navigation.NavigationStack;
-            for (int i = 0; i < navigationStack.Count; i++)
+
+            if (PrimaryTabs.Contains(entry.Section))
             {
-                if (!ReferenceEquals(navigationStack[i], entry.Page)) continue;
-                while (section.Navigation.NavigationStack.Count > i + 1) await section.PopAsync(false);
+                var direct = Children.OfType<NavigationPage>()
+                    .FirstOrDefault(n => string.Equals(n.Title, entry.Section, StringComparison.OrdinalIgnoreCase));
+                if (direct != null)
+                    CurrentPage = direct;
                 return;
             }
-            if (entry.Page.Parent == null) await section.PushAsync(entry.Page);
-        }
 
-        private static NavigationPage MakeSection(string title, params (string Label, Page Page)[] items)
-        {
-            var section = new SectionPage(title, items);
-            return new NavigationPage(section) { Title = title };
+            var more = Children.OfType<NavigationPage>()
+                .FirstOrDefault(n => string.Equals(n.Title, "Mais", StringComparison.OrdinalIgnoreCase));
+            if (more == null) return;
+            CurrentPage = more;
+
+            for (int i = 0; i < more.Navigation.NavigationStack.Count; i++)
+            {
+                if (!ReferenceEquals(more.Navigation.NavigationStack[i], entry.Page)) continue;
+                while (more.Navigation.NavigationStack.Count > i + 1)
+                    await more.PopAsync(false);
+                return;
+            }
+
+            if (entry.Page.Parent == null)
+                await more.PushAsync(entry.Page);
         }
     }
 }
