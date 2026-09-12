@@ -38,6 +38,7 @@ namespace AURA.Agents
         private readonly ToolResolver _toolResolver;
         private readonly WorkGroupRegistry _workGroups;
         private readonly AgentReportStore? _agentReports;
+        private readonly WorkGroupCoordinator _workCoordinator;
 
         public AuraOrchestrator(
             ILogger logger,
@@ -54,7 +55,8 @@ namespace AURA.Agents
             ToolResolver? toolResolver = null,
             bool enableFallback = false,
             WorkGroupRegistry? workGroups = null,
-            AgentReportStore? agentReports = null)
+            AgentReportStore? agentReports = null,
+            WorkGroupCoordinator? workCoordinator = null)
         {
             _logger = logger ?? new ConsoleLogger();
             _memory = memory ?? throw new ArgumentNullException(nameof(memory));
@@ -69,6 +71,7 @@ namespace AURA.Agents
             _toolResolver = toolResolver ?? CreateToolResolver();
             _workGroups = workGroups ?? WorkGroupRegistry.CreateDefault();
             _agentReports = agentReports;
+            _workCoordinator = workCoordinator ?? new WorkGroupCoordinator(_workGroups, _agentReports);
             EnableFallback = enableFallback;
             HttpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         }
@@ -95,14 +98,6 @@ namespace AURA.Agents
             _logger.Info("[ORQUESTRA] " + normalized);
 
             IntentResult intent = _intentResolver.Resolve(normalized);
-            WorkGroupDefinition workGroup = _workGroups.ResolveFor(userCommand + " " + intent.Intent);
-            Publish(
-                processId,
-                "Grupo de trabalho",
-                workGroup.Name,
-                "Observando",
-                "Solicitação encaminhada para análise especializada",
-                0.12);
             AuthorizationResult auth = _policyGuard.Authorize(intent.Intent, userCommand);
 
             if (auth.Decision == AuthorizationDecision.Blocked)
@@ -113,6 +108,23 @@ namespace AURA.Agents
                 Publish(processId, "Política", "PolicyGuard", "Aguardando", auth.Message, 0.15);
                 return "⚠️ " + auth.Message + " Responda explicitamente para confirmar a execução.";
             }
+
+            WorkGroupDefinition workGroup = _workGroups.ResolveFor(userCommand + " " + intent.Intent);
+            Publish(
+                processId,
+                "Grupo de trabalho",
+                workGroup.Name,
+                "Observando",
+                "Solicitação encaminhada para análise especializada",
+                0.12);
+            AgentReport observation = await _workCoordinator.AnalyzeAsync(userCommand, intent.Intent, ct).ConfigureAwait(false);
+            Publish(
+                processId,
+                "Grupo de trabalho",
+                workGroup.Name,
+                "Registrado",
+                observation.NextStep ?? "Observação registrada",
+                0.16);
 
             SolutionEntry? hit = _memory.FindBestMatch(userCommand);
             if (hit != null)
