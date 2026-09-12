@@ -47,6 +47,20 @@ public sealed class WorkGroupCoordinator
         _agents[agent.GroupId] = agent;
     }
 
+    public AgentToolPolicy CreateObservationPolicy(string objective)
+    {
+        if (string.IsNullOrWhiteSpace(objective))
+            throw new ArgumentException("Objetivo obrigatório.", nameof(objective));
+
+        return CreateToolPolicy(new WorkItem
+        {
+            GroupId = _registry.ResolveFor(objective.Trim()).Id,
+            Objective = objective.Trim(),
+            Stage = WorkGroupStage.Observe,
+            Status = WorkItemStatus.InProgress
+        });
+    }
+
     public AgentToolPolicy CreateToolPolicy(WorkItem item)
     {
         ArgumentNullException.ThrowIfNull(item);

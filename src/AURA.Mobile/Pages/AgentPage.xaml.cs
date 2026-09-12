@@ -1,5 +1,6 @@
 using AURA.AI;
 using AURA.Agents;
+using AURA.Agents.Workgroups;
 using AURA.Agents.Programs;
 using AURA.Abstractions.Execution;
 using AURA.Core.Events;
@@ -31,6 +32,7 @@ public partial class AgentPage : ContentPage
     private readonly NodeExecutor? _node;
     private readonly ProcessRegistry _processes;
     private readonly AgentExecutionCoordinator _coordinator;
+    private readonly WorkGroupCoordinator _workCoordinator;
     private readonly Dictionary<string, AgentCapabilityBubble> _capabilityBubbles = new(StringComparer.OrdinalIgnoreCase);
     private readonly AuraOrchestrator _orchestrator;
     private readonly LocalPlaybook? _playbook;
@@ -54,7 +56,7 @@ public partial class AgentPage : ContentPage
 
     public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
         ShellExecutor shell, ProcessRegistry processes, AuraOrchestrator orchestrator,
-        AgentExecutionCoordinator coordinator,
+        AgentExecutionCoordinator coordinator, WorkGroupCoordinator workCoordinator,
         LocalPlaybook? playbook = null,
         SolutionStore? solutions = null, GitExecutor? git = null, PythonExecutor? python = null,
         NodeExecutor? node = null, CellProgramRegistry? cellRegistry = null, SimulationRuntime? runtime = null,
@@ -72,6 +74,7 @@ public partial class AgentPage : ContentPage
         _android = android;
         _processes = processes;
         _coordinator = coordinator;
+        _workCoordinator = workCoordinator;
         _orchestrator = orchestrator;
         _cellRegistry = cellRegistry;
         _runtime = runtime;
@@ -565,7 +568,7 @@ public partial class AgentPage : ContentPage
         return p != null && !p.NeedsKey && !string.IsNullOrWhiteSpace(_client.Options.BaseUrl);
     }
 
-    private void EnsureSession()
+    private void EnsureSession(AgentToolPolicy? toolPolicy = null)
     {
         if (_session != null)
             return;
@@ -621,7 +624,13 @@ public partial class AgentPage : ContentPage
             "Não invente caminhos fora do workspace. Use o mínimo de rodadas de ferramenta. " +
             "NÃO use busca na web nem diga que pesquisou na internet para perguntas simples — responda direto com o modelo local quando possível.";
 
-        _session = new AgentSession(_client, tools, systemPrompt, memory: _memory, runStore: _runStore);
+        _session = new AgentSession(
+            _client,
+            tools,
+            systemPrompt,
+            memory: _memory,
+            runStore: _runStore,
+            toolPolicy: toolPolicy ?? _workCoordinator.CreateObservationPolicy("observação"));
         _session.Step += OnAgentStep;
 
         int memCount = 0;
@@ -917,7 +926,8 @@ public partial class AgentPage : ContentPage
                 }
 
                 _session = null;
-                EnsureSession();
+                AgentToolPolicy observationPolicy = _workCoordinator.CreateObservationPolicy(resolved);
+                EnsureSession(observationPolicy);
                 answerFromAgent = await _session!.RunAsync(resolved);
             }
 
