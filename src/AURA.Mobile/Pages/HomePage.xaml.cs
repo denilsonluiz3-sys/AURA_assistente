@@ -8,6 +8,7 @@ namespace AURA.Mobile.Pages;
 public partial class HomePage : ContentPage
 {
     private const string VideoBgPrefKey = "aura_video_bg";
+    private IDispatcherTimer? _clockTimer;
 
     public HomePage()
     {
@@ -18,6 +19,10 @@ public partial class HomePage : ContentPage
         var doubleTap = new TapGestureRecognizer { NumberOfTapsRequired = 2 };
         doubleTap.Tapped += OnThemeDoubleTapped;
         BtnTheme.GestureRecognizers.Add(doubleTap);
+        _clockTimer = Dispatcher.CreateTimer();
+        _clockTimer.Interval = TimeSpan.FromSeconds(1);
+        _clockTimer.Tick += OnClockTick;
+        UpdateDigitalClock();
         RunAndroidBridgeTest();
     }
 
@@ -40,6 +45,8 @@ public partial class HomePage : ContentPage
         base.OnAppearing();
         UpdateThemeIcon();
         VersionLabel.Text = AURA.Core.VersionInfo.FullName;
+        _clockTimer?.Start();
+        UpdateDigitalClock();
         ApplyVideoBackground();
         RefreshStatus();
     }
@@ -47,7 +54,18 @@ public partial class HomePage : ContentPage
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        _clockTimer?.Stop();
         PauseVideoBackground();
+    }
+
+    private void OnClockTick(object? sender, EventArgs e) => UpdateDigitalClock();
+
+    private void UpdateDigitalClock()
+    {
+        if (DigitalClockLabel is null || DigitalDateLabel is null) return;
+        DateTime now = DateTime.Now;
+        DigitalClockLabel.Text = now.ToString("HH:mm:ss");
+        DigitalDateLabel.Text = now.ToString("dd/MM/yyyy");
     }
 
     private void RefreshStatus()

@@ -19,12 +19,16 @@
 
         <ScrollView Grid.Row="0" Padding="0" VerticalOptions="Fill">
             <VerticalStackLayout Spacing="0" Padding="0,0,0,12">
-                <Grid ColumnDefinitions="*,Auto" Padding="20,24,20,12">
+                <Grid ColumnDefinitions="*,Auto,Auto" Padding="20,24,20,12">
                     <VerticalStackLayout Grid.Column="0" Spacing="2">
                         <Label Text="A U R A" FontSize="32" FontAttributes="Bold" TextColor="{DynamicResource AuraAccent}" />
                         <Label x:Name="VersionLabel" FontSize="12" TextColor="{DynamicResource AuraTextSecondary}" />
                     </VerticalStackLayout>
-                    <Button x:Name="BtnTheme" Grid.Column="1" Text="☾" FontSize="20" BackgroundColor="Transparent" TextColor="{DynamicResource AuraAccent}" WidthRequest="44" HeightRequest="44" Padding="0" Clicked="OnThemeToggleClicked" />
+                    <VerticalStackLayout Grid.Column="1" Spacing="0" HorizontalOptions="End" VerticalOptions="Center" Margin="8,0,4,0">
+                        <Label x:Name="DigitalClockLabel" Text="00:00:00" FontFamily="IBMPlexSans" FontSize="18" CharacterSpacing="1" HorizontalTextAlignment="End" TextColor="{DynamicResource AuraAccent}" />
+                        <Label x:Name="DigitalDateLabel" Text="00/00/0000" FontSize="9" HorizontalTextAlignment="End" TextColor="{DynamicResource AuraTextSecondary}" />
+                    </VerticalStackLayout>
+                    <Button x:Name="BtnTheme" Grid.Column="2" Text="☾" FontSize="20" BackgroundColor="Transparent" TextColor="{DynamicResource AuraAccent}" WidthRequest="44" HeightRequest="44" Padding="0" Clicked="OnThemeToggleClicked" />
                 </Grid>
 
                 <Border Margin="16,4,16,12" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,8">
