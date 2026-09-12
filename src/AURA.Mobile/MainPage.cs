@@ -16,7 +16,6 @@ namespace AURA.Mobile
             ModuleManager manager,
             HomePage home,
             DiagnosticoPage diagnostico,
-            ChatPage chat,
             AgentPage agent,
             MemoryPage memory,
             ExecutorsPage executors,
@@ -37,9 +36,7 @@ namespace AURA.Mobile
             events.Subscribe<ModuleStateChangedEvent>(_ =>
                 MainThread.BeginInvokeOnMainThread(ScheduleRebuildTabs));
 
-            // Chat removido do menu: Agente é o único ponto de interação inteligente.
-            // ChatPage permanece no DI para redirect residual (NavigateToProcessAsync "Chat").
-            _ = chat;
+            // Agente é o único ponto de interação inteligente; o antigo ChatPage era apenas um redirect.
 
             _entries = new List<(string?, string, string, Page)>
             {

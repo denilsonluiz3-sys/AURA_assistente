@@ -5,7 +5,6 @@ namespace AURA.Mobile.Pages;
 /// </summary>
 public partial class EcosystemPage : ContentPage
 {
-    private readonly ChatPage _chat;
     private readonly AgentPage _agent;
     private readonly MemoryPage _memory;
     private readonly CellsPage _cells;
@@ -21,7 +20,6 @@ public partial class EcosystemPage : ContentPage
     private readonly ModulesPage _modules;
 
     public EcosystemPage(
-        ChatPage chat,
         AgentPage agent,
         MemoryPage memory,
         CellsPage cells,
@@ -37,7 +35,6 @@ public partial class EcosystemPage : ContentPage
         ModulesPage modules)
     {
         InitializeComponent();
-        _chat = chat;
         _agent = agent;
         _memory = memory;
         _cells = cells;
@@ -56,8 +53,7 @@ public partial class EcosystemPage : ContentPage
 
     private List<EcosystemModule> BuildModules() => new()
     {
-        new EcosystemModule("Chat", "Conversa direta com a AURA", "💬", DesignSystem.AuraAccent, () => _chat),
-        new EcosystemModule("Agente", "Loop com tools e workspace", "🧠", DesignSystem.AuraAccent2, () => _agent),
+        new EcosystemModule("Agente", "Conversa, tools e workspace em um único fluxo", "🧠", DesignSystem.AuraAccent2, () => _agent),
         new EcosystemModule("Memória", "Histórico e memórias persistentes", "📒", DesignSystem.AuraAccent, () => _memory),
         new EcosystemModule("Workspace", "Word, PDF e pedido ao agente", "📄", DesignSystem.AuraAccent, () => _workspace),
         new EcosystemModule("Navegador", "WebView e automação de páginas", "🌐", DesignSystem.AuraAccent2, () => _browser),
