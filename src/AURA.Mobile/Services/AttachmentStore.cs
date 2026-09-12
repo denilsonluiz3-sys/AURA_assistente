@@ -21,6 +21,7 @@ public sealed record AuraAttachmentRef(
 public sealed class AttachmentStore
 {
     private const long MaxBytes = 50L * 1024L * 1024L;
+    private static readonly SemaphoreSlim RegistryGate = new(1, 1);
     private static readonly string[] AllowedExtensions =
     {
         ".txt", ".md", ".csv", ".json", ".xml", ".log", ".cs", ".js", ".py", ".sh",
@@ -47,37 +48,48 @@ public sealed class AttachmentStore
         string id = Guid.NewGuid().ToString("N");
         string storedName = id + extension.ToLowerInvariant();
         string destination = Path.Combine(attachmentRoot, storedName);
+        string temporary = destination + ".tmp";
+        bool committed = false;
 
-        await using (FileStream target = new(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        try
         {
-            await source.CopyToAsync(target, cancellationToken);
-            if (target.Length > MaxBytes)
+            await using (FileStream target = new(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
-                target.Close();
-                File.Delete(destination);
-                throw new InvalidOperationException("O anexo excede o limite de 50 MB.");
+                await source.CopyToAsync(target, cancellationToken);
+                if (target.Length > MaxBytes)
+                    throw new InvalidOperationException("O anexo excede o limite de 50 MB.");
             }
-        }
 
-        string hash;
-        await using (FileStream hashStream = File.OpenRead(destination))
+            string hash;
+            await using (FileStream hashStream = File.OpenRead(temporary))
+            {
+                byte[] digest = await SHA256.HashDataAsync(hashStream, cancellationToken);
+                hash = Convert.ToHexString(digest).ToLowerInvariant();
+            }
+
+            File.Move(temporary, destination, overwrite: false);
+            committed = true;
+            string relative = Path.GetRelativePath(root, destination).Replace(Path.DirectorySeparatorChar, '/');
+            var item = new AuraAttachmentRef(
+                id,
+                fileName,
+                string.IsNullOrWhiteSpace(file.ContentType) ? GuessMimeType(extension) : file.ContentType,
+                new FileInfo(destination).Length,
+                hash,
+                relative,
+                DateTimeOffset.UtcNow);
+
+            await AppendRegistryAsync(root, item, cancellationToken);
+            return item;
+        }
+        catch
         {
-            byte[] digest = await SHA256.HashDataAsync(hashStream, cancellationToken);
-            hash = Convert.ToHexString(digest).ToLowerInvariant();
+            TryDelete(temporary);
+            // Se já foi publicado, preserva o anexo para uma nova tentativa de registro.
+            if (!committed)
+                TryDelete(destination);
+            throw;
         }
-
-        string relative = Path.GetRelativePath(root, destination).Replace(Path.DirectorySeparatorChar, '/');
-        var item = new AuraAttachmentRef(
-            id,
-            fileName,
-            string.IsNullOrWhiteSpace(file.ContentType) ? GuessMimeType(extension) : file.ContentType,
-            new FileInfo(destination).Length,
-            hash,
-            relative,
-            DateTimeOffset.UtcNow);
-
-        await AppendRegistryAsync(root, item, cancellationToken);
-        return item;
     }
 
     public static string BuildAgentContext(IEnumerable<AuraAttachmentRef> attachments)
@@ -97,25 +109,51 @@ public sealed class AttachmentStore
 
     private static async Task AppendRegistryAsync(string root, AuraAttachmentRef item, CancellationToken cancellationToken)
     {
-        string registry = Path.Combine(root, "attachments", "registry.json");
-        List<AuraAttachmentRef> all = new();
+        await RegistryGate.WaitAsync(cancellationToken);
         try
         {
-            if (File.Exists(registry))
+            string registry = Path.Combine(root, "attachments", "registry.json");
+            string temporary = registry + ".tmp";
+            List<AuraAttachmentRef> all = new();
+            try
             {
-                await using FileStream input = File.OpenRead(registry);
-                all = await JsonSerializer.DeserializeAsync<List<AuraAttachmentRef>>(input, cancellationToken: cancellationToken) ?? new();
+                if (File.Exists(registry))
+                {
+                    await using FileStream input = File.OpenRead(registry);
+                    all = await JsonSerializer.DeserializeAsync<List<AuraAttachmentRef>>(input, cancellationToken: cancellationToken) ?? new();
+                }
+            }
+            catch (JsonException)
+            {
+                all = new();
+            }
+
+            all.RemoveAll(x => string.Equals(x.Id, item.Id, StringComparison.Ordinal));
+            all.Add(item);
+            try
+            {
+                await using (FileStream output = new(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
+                    await JsonSerializer.SerializeAsync(output, all, new JsonSerializerOptions { WriteIndented = true }, cancellationToken);
+                File.Move(temporary, registry, overwrite: true);
+            }
+            finally
+            {
+                TryDelete(temporary);
             }
         }
-        catch (JsonException)
+        finally
         {
-            all = new();
+            RegistryGate.Release();
         }
+    }
 
-        all.RemoveAll(x => string.Equals(x.Id, item.Id, StringComparison.Ordinal));
-        all.Add(item);
-        await using FileStream output = File.Create(registry);
-        await JsonSerializer.SerializeAsync(output, all, new JsonSerializerOptions { WriteIndented = true }, cancellationToken);
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch { /* limpeza best-effort após falha de cópia */ }
     }
 
     private static string GuessMimeType(string extension) => extension.ToLowerInvariant() switch
