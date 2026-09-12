@@ -1,29 +1,9 @@
 name: AURA Android APK
 
 # Caminho oficial do APK (Codemagic esgotou builds).
-# Disparo: manual ou push na main.
+# O APK só é produzido manualmente após a última atualização do lote.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - "src/AURA.Mobile/**"
-      - "src/AURA.*/**"
-      - "tests/**"
-      - ".github/workflows/build-android-apk.yml"
-      - "global.json"
-      - "NuGet.Config"
-      - "AURA.sln"
-  pull_request:
-    paths:
-      - "src/AURA.Mobile/**"
-      - "src/AURA.*/**"
-      - "tests/**"
-      - ".github/workflows/build-android-apk.yml"
-      - "global.json"
-      - "NuGet.Config"
-      - "AURA.sln"
 
 concurrency:
   group: aura-android-apk-${{ github.event.pull_request.number || github.ref }}
