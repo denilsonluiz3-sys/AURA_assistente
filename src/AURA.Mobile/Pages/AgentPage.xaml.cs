@@ -945,7 +945,8 @@ public partial class AgentPage : ContentPage
             if (!isRepeat && ShouldOrchestrate(resolved))
             {
                 _processes.Update(process.Id, "Planejando", "Orquestrador", 0.15);
-                string answer = await _orchestrator.ExecuteAsync(resolved);
+                AgentToolPolicy observationPolicy = _workCoordinator.CreateObservationPolicy(resolved);
+                string answer = await _orchestrator.ExecuteAsync(resolved, toolPolicy: observationPolicy);
                 _playbook?.RememberFromRun(resolved, _runShellCommands, answer);
                 await DeliverAnswerAsync(answer, process.Id, "OK");
                 return;

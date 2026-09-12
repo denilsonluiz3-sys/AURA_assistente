@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AURA.Abstractions.Execution;
 using AURA.Abstractions.Orchestration;
+using AURA.AI;
 using AURA.AI.UniversalAI;
 using AURA.Core.Abstractions;
 using AURA.Core.Events;
@@ -39,6 +40,7 @@ namespace AURA.Agents
         private readonly WorkGroupRegistry _workGroups;
         private readonly AgentReportStore? _agentReports;
         private readonly WorkGroupCoordinator _workCoordinator;
+        private readonly AgentToolPolicy? _toolPolicy;
 
         public AuraOrchestrator(
             ILogger logger,
@@ -57,7 +59,8 @@ namespace AURA.Agents
             WorkGroupRegistry? workGroups = null,
             AgentReportStore? agentReports = null,
             WorkItemStore? workItems = null,
-            WorkGroupCoordinator? workCoordinator = null)
+            WorkGroupCoordinator? workCoordinator = null,
+            AgentToolPolicy? toolPolicy = null)
         {
             _logger = logger ?? new ConsoleLogger();
             _memory = memory ?? throw new ArgumentNullException(nameof(memory));
@@ -73,6 +76,7 @@ namespace AURA.Agents
             _workGroups = workGroups ?? WorkGroupRegistry.CreateDefault();
             _agentReports = agentReports;
             _workCoordinator = workCoordinator ?? new WorkGroupCoordinator(_workGroups, _agentReports, workItems);
+            _toolPolicy = toolPolicy;
             EnableFallback = enableFallback;
             HttpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         }
@@ -86,7 +90,8 @@ namespace AURA.Agents
         public async Task<string> ExecuteAsync(
             string userCommand,
             CancellationToken ct = default,
-            bool confirmed = false)
+            bool confirmed = false,
+            AgentToolPolicy? toolPolicy = null)
         {
             if (string.IsNullOrWhiteSpace(userCommand))
                 return "Comando vazio.";
@@ -108,6 +113,14 @@ namespace AURA.Agents
             {
                 Publish(processId, "Política", "PolicyGuard", "Aguardando", auth.Message, 0.15);
                 return "⚠️ " + auth.Message + " Responda explicitamente para confirmar a execução.";
+            }
+
+            AgentToolPolicy? effectivePolicy = toolPolicy ?? _toolPolicy;
+            if (effectivePolicy != null && !effectivePolicy.Allows(MapIntentToTool(intent.Intent)))
+            {
+                string deniedTool = MapIntentToTool(intent.Intent);
+                Publish(processId, "Política", "AgentToolPolicy", "Bloqueado", "Ferramenta não autorizada: " + deniedTool, 0.15);
+                return "⛔ A política atual não permite executar esta ação nesta etapa: " + deniedTool;
             }
 
             WorkGroupDefinition workGroup = _workGroups.ResolveFor(userCommand + " " + intent.Intent);
@@ -188,6 +201,14 @@ namespace AURA.Agents
 
             return "Limite de passos. Seja mais específico.";
         }
+
+        private static string MapIntentToTool(string intent) => intent switch
+        {
+            "search" => "browser",
+            "execute" => "execute",
+            "conversar" => "conversar",
+            _ => intent
+        };
 
         private ToolResolver CreateToolResolver()
         {

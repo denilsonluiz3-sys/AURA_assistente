@@ -42,6 +42,18 @@ public sealed class AuraOrchestratorIntegrationTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_PolicyBlocksUnauthorizedIntentBeforeToolExecution()
+    {
+        using var fixture = new OrchestratorFixture();
+        var policy = new AgentToolPolicy(new[] { "read_file", "list_dir", "search_files" });
+
+        string result = await fixture.Orchestrator.ExecuteAsync("execute a tarefa", toolPolicy: policy);
+
+        Assert.StartsWith("⛔ A política atual não permite", result);
+        Assert.Equal(0, fixture.ExecutorCalls);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_NoMemoryHit_UsesConversationTool()
     {
         using var fixture = new OrchestratorFixture(new FakeUniversalAiClient());
@@ -58,6 +70,8 @@ public sealed class AuraOrchestratorIntegrationTests
 
         public SolutionStore Memory { get; }
         public AuraOrchestrator Orchestrator { get; }
+        public int ExecutorCalls => _shell.Calls;
+        private readonly FakeExecutor _shell;
 
         public OrchestratorFixture(IUniversalAiClient? aiClient = null)
         {
@@ -71,7 +85,7 @@ public sealed class AuraOrchestratorIntegrationTests
 
             Memory = new SolutionStore(logger, Path.Combine(_root, "memory"));
             var runner = new Runner(new ILauncher[] { });
-            var shell = new FakeExecutor();
+            _shell = new FakeExecutor();
             var webSearch = new FakeWebSearch();
 
             Orchestrator = new AuraOrchestrator(
@@ -79,7 +93,7 @@ public sealed class AuraOrchestratorIntegrationTests
                 Memory,
                 runner,
                 _runtime,
-                shell,
+                _shell,
                 webSearch,
                 aiClient: aiClient,
                 httpClient: null,
