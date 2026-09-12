@@ -39,6 +39,7 @@ public partial class AgentPage : ContentPage
     private readonly CellProgramRegistry? _cellRegistry;
     private readonly SimulationRuntime? _runtime;
     private readonly IAndroidCapabilityService? _android;
+    private readonly AgentRunStore? _runStore;
     private readonly SemaphoreSlim _bubbleGate = new(1, 1);
     private readonly List<string> _recentCommands = new();
     private readonly List<string> _runShellCommands = new();
@@ -58,7 +59,7 @@ public partial class AgentPage : ContentPage
         LocalPlaybook? playbook = null, VoiceAssistantService? voice = null,
         SolutionStore? solutions = null, GitExecutor? git = null, PythonExecutor? python = null,
         NodeExecutor? node = null, CellProgramRegistry? cellRegistry = null, SimulationRuntime? runtime = null,
-        IAndroidCapabilityService? android = null)
+        IAndroidCapabilityService? android = null, AgentRunStore? runStore = null)
     {
         InitializeComponent();
         _client = client;
@@ -76,6 +77,7 @@ public partial class AgentPage : ContentPage
         _cellRegistry = cellRegistry;
         _runtime = runtime;
         _playbook = playbook;
+        _runStore = runStore;
         ProcessCards.BindingContext = _processes;
         _voice = voice;
         LoadRecentsFromPrefs();
@@ -620,7 +622,7 @@ public partial class AgentPage : ContentPage
             "Não invente caminhos fora do workspace. Use o mínimo de rodadas de ferramenta. " +
             "NÃO use busca na web nem diga que pesquisou na internet para perguntas simples — responda direto com o modelo local quando possível.";
 
-        _session = new AgentSession(_client, tools, systemPrompt, memory: _memory);
+        _session = new AgentSession(_client, tools, systemPrompt, memory: _memory, runStore: _runStore);
         _session.Step += OnAgentStep;
 
         int memCount = 0;
