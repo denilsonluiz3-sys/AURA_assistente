@@ -27,6 +27,8 @@ public sealed class UniversalAiClient : IUniversalAiClient
         var http = httpClient ?? own!;
         using var request = new HttpRequestMessage(HttpMethod.Post, Options.BaseUrl);
         AddAuthentication(request);
+        if (Options.ApiFormat == UniversalApiFormat.AnthropicMessages)
+            request.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
         request.Content = new StringContent(BuildPayload(messages, tools, systemPrompt), Encoding.UTF8, "application/json");
         try
         {
@@ -73,6 +75,11 @@ public sealed class UniversalAiClient : IUniversalAiClient
             var item = new Dictionary<string, object?> { ["role"] = m.Role, ["content"] = m.Content };
             if (!string.IsNullOrWhiteSpace(m.ToolCallId)) item["tool_call_id"] = m.ToolCallId;
             if (m.ToolCalls is { Count: > 0 }) item["tool_calls"] = m.ToolCalls.Select(t => new { id = t.Id, type = "function", function = new { name = t.Name, arguments = t.ArgumentsJson } }).ToArray();
+            if (!string.IsNullOrWhiteSpace(m.ReasoningDetailsJson))
+            {
+                try { item["reasoning_details"] = ParseJsonValue(m.ReasoningDetailsJson); }
+                catch (JsonException) { /* reasoning opaco inválido não deve quebrar a mensagem */ }
+            }
             list.Add(item);
         }
         var toolObjects = tools.Select(t => new { type = "function", function = new { name = t.Name, description = t.Description, parameters = new { type = "object", properties = t.Parameters.ToDictionary(p => p.Key, p => new { type = p.Value.Type, description = p.Value.Description }), required = t.Required } } }).ToArray();
@@ -83,18 +90,118 @@ public sealed class UniversalAiClient : IUniversalAiClient
 
     private string BuildAnthropic(IReadOnlyList<AgentMessage> messages, IReadOnlyList<AgentToolDefinition> tools, string? systemPrompt)
     {
-        var list = messages.Where(m => m.Role != "system").Select(m => new { role = m.Role == "assistant" ? "assistant" : "user", content = m.Content ?? string.Empty }).ToArray();
+        var list = new List<object>();
+        foreach (var message in messages.Where(m => m.Role != "system"))
+        {
+            if (message.Role == "assistant" && message.ToolCalls is { Count: > 0 })
+            {
+                var blocks = new List<object>();
+                if (!string.IsNullOrWhiteSpace(message.Content))
+                    blocks.Add(new { type = "text", text = message.Content });
+                foreach (var call in message.ToolCalls)
+                    blocks.Add(new { type = "tool_use", id = call.Id, name = call.Name, input = ParseJsonValue(call.ArgumentsJson) });
+                list.Add(new { role = "assistant", content = blocks });
+            }
+            else if (message.Role == "tool")
+            {
+                list.Add(new
+                {
+                    role = "user",
+                    content = new[]
+                    {
+                        new { type = "tool_result", tool_use_id = message.ToolCallId ?? string.Empty, content = message.Content ?? string.Empty }
+                    }
+                });
+            }
+            else
+            {
+                list.Add(new { role = message.Role == "assistant" ? "assistant" : "user", content = message.Content ?? string.Empty });
+            }
+        }
+
         var payload = new Dictionary<string, object?> { ["model"] = Options.Model, ["messages"] = list, ["max_tokens"] = Options.MaxTokens };
         if (!string.IsNullOrWhiteSpace(systemPrompt)) payload["system"] = systemPrompt;
-        if (tools.Count > 0) payload["tools"] = tools.Select(t => new { name = t.Name, description = t.Description, input_schema = new { type = "object", properties = t.Parameters.ToDictionary(p => p.Key, p => new { type = p.Value.Type, description = p.Value.Description }), required = t.Required } }).ToArray();
+        if (tools.Count > 0)
+            payload["tools"] = tools.Select(t => new
+            {
+                name = t.Name,
+                description = t.Description,
+                input_schema = new
+                {
+                    type = "object",
+                    properties = t.Parameters.ToDictionary(p => p.Key, p => new { type = p.Value.Type, description = p.Value.Description }),
+                    required = t.Required
+                }
+            }).ToArray();
         return JsonSerializer.Serialize(payload);
     }
 
     private string BuildGemini(IReadOnlyList<AgentMessage> messages, IReadOnlyList<AgentToolDefinition> tools, string? systemPrompt)
     {
-        var contents = messages.Where(m => m.Role != "system").Select(m => new { role = m.Role == "assistant" ? "model" : "user", parts = new[] { new { text = m.Content ?? string.Empty } } }).ToArray();
-        var payload = new Dictionary<string, object?> { ["contents"] = contents, ["generationConfig"] = new { maxOutputTokens = Options.MaxTokens } };
+        var contents = new List<object>();
+        var toolNames = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var message in messages.Where(m => m.Role != "system"))
+        {
+            if (message.Role == "assistant" && message.ToolCalls is { Count: > 0 })
+            {
+                var parts = new List<object>();
+                if (!string.IsNullOrWhiteSpace(message.Content))
+                    parts.Add(new { text = message.Content });
+                foreach (var call in message.ToolCalls)
+                {
+                    toolNames[call.Id] = call.Name;
+                    parts.Add(new { functionCall = new { name = call.Name, args = ParseJsonValue(call.ArgumentsJson) } });
+                }
+                contents.Add(new { role = "model", parts });
+            }
+            else if (message.Role == "tool")
+            {
+                var name = message.ToolCallId != null && toolNames.TryGetValue(message.ToolCallId, out var knownName)
+                    ? knownName
+                    : message.ToolCallId ?? string.Empty;
+                contents.Add(new
+                {
+                    role = "user",
+                    parts = new[]
+                    {
+                        new { functionResponse = new { name, response = new { content = message.Content ?? string.Empty } } }
+                    }
+                });
+            }
+            else
+            {
+                contents.Add(new
+                {
+                    role = message.Role == "assistant" ? "model" : "user",
+                    parts = new[] { new { text = message.Content ?? string.Empty } }
+                });
+            }
+        }
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["contents"] = contents,
+            ["generationConfig"] = new { maxOutputTokens = Options.MaxTokens }
+        };
         if (!string.IsNullOrWhiteSpace(systemPrompt)) payload["systemInstruction"] = new { parts = new[] { new { text = systemPrompt } } };
+        if (tools.Count > 0)
+            payload["tools"] = new[]
+            {
+                new
+                {
+                    functionDeclarations = tools.Select(t => new
+                    {
+                        name = t.Name,
+                        description = t.Description,
+                        parameters = new
+                        {
+                            type = "OBJECT",
+                            properties = t.Parameters.ToDictionary(p => p.Key, p => new { type = p.Value.Type.ToUpperInvariant(), description = p.Value.Description }),
+                            required = t.Required
+                        }
+                    }).ToArray()
+                }
+            };
         return JsonSerializer.Serialize(payload);
     }
 
@@ -105,26 +212,89 @@ public sealed class UniversalAiClient : IUniversalAiClient
         if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array && choices.GetArrayLength() > 0)
         {
             var msg = choices[0].GetProperty("message");
-            var result = new AgentChatResponse { Content = msg.TryGetProperty("content", out var c) && c.ValueKind != JsonValueKind.Null ? c.GetString() : null };
+            var result = new AgentChatResponse
+            {
+                Content = msg.TryGetProperty("content", out var c) && c.ValueKind != JsonValueKind.Null ? c.GetString() : null,
+                ReasoningDetailsJson = msg.TryGetProperty("reasoning_details", out var reasoning) ? reasoning.GetRawText() : null
+            };
             if (msg.TryGetProperty("tool_calls", out var tc) && tc.ValueKind == JsonValueKind.Array)
             {
                 result.ToolCalls = new List<AgentToolCall>();
                 foreach (var item in tc.EnumerateArray())
                 {
                     var fn = item.GetProperty("function");
-                    result.ToolCalls.Add(new AgentToolCall { Id = item.GetProperty("id").GetString() ?? Guid.NewGuid().ToString("N"), Name = fn.GetProperty("name").GetString() ?? string.Empty, ArgumentsJson = fn.GetProperty("arguments").GetString() ?? "{}" });
+                    result.ToolCalls.Add(new AgentToolCall
+                    {
+                        Id = item.TryGetProperty("id", out var id) ? id.GetString() ?? Guid.NewGuid().ToString("N") : Guid.NewGuid().ToString("N"),
+                        Name = fn.GetProperty("name").GetString() ?? string.Empty,
+                        ArgumentsJson = fn.TryGetProperty("arguments", out var args) ? args.GetString() ?? "{}" : "{}"
+                    });
                 }
             }
             return result;
         }
+
         if (root.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
-            return new AgentChatResponse { Content = string.Join("\n", content.EnumerateArray().Where(x => x.TryGetProperty("text", out _)).Select(x => x.GetProperty("text").GetString())) };
+        {
+            var result = new AgentChatResponse();
+            var texts = new List<string>();
+            foreach (var block in content.EnumerateArray())
+            {
+                if (block.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String)
+                    texts.Add(text.GetString() ?? string.Empty);
+                if (block.TryGetProperty("type", out var type) && type.GetString() == "tool_use")
+                {
+                    result.ToolCalls ??= new List<AgentToolCall>();
+                    result.ToolCalls.Add(new AgentToolCall
+                    {
+                        Id = block.TryGetProperty("id", out var id) ? id.GetString() ?? Guid.NewGuid().ToString("N") : Guid.NewGuid().ToString("N"),
+                        Name = block.TryGetProperty("name", out var name) ? name.GetString() ?? string.Empty : string.Empty,
+                        ArgumentsJson = block.TryGetProperty("input", out var input) ? input.GetRawText() : "{}"
+                    });
+                }
+            }
+            result.Content = texts.Count == 0 ? null : string.Join("\n", texts);
+            return result;
+        }
+
         if (root.TryGetProperty("candidates", out var candidates) && candidates.ValueKind == JsonValueKind.Array && candidates.GetArrayLength() > 0)
         {
+            var result = new AgentChatResponse();
+            var texts = new List<string>();
             var parts = candidates[0].GetProperty("content").GetProperty("parts");
-            return new AgentChatResponse { Content = string.Join("\n", parts.EnumerateArray().Where(x => x.TryGetProperty("text", out _)).Select(x => x.GetProperty("text").GetString())) };
+            foreach (var part in parts.EnumerateArray())
+            {
+                if (part.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String)
+                    texts.Add(text.GetString() ?? string.Empty);
+                if (part.TryGetProperty("functionCall", out var functionCall))
+                {
+                    result.ToolCalls ??= new List<AgentToolCall>();
+                    result.ToolCalls.Add(new AgentToolCall
+                    {
+                        Id = "gemini_" + Guid.NewGuid().ToString("N"),
+                        Name = functionCall.TryGetProperty("name", out var name) ? name.GetString() ?? string.Empty : string.Empty,
+                        ArgumentsJson = functionCall.TryGetProperty("args", out var args) ? args.GetRawText() : "{}"
+                    });
+                }
+            }
+            result.Content = texts.Count == 0 ? null : string.Join("\n", texts);
+            return result;
         }
         return new AgentChatResponse { Error = "Resposta do provider sem conteúdo reconhecível.", ErrorKind = AgentErrorKind.Unknown };
+    }
+
+    private static JsonElement ParseJsonValue(string? json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(string.IsNullOrWhiteSpace(json) ? "{}" : json);
+            return document.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            using var document = JsonDocument.Parse("{}");
+            return document.RootElement.Clone();
+        }
     }
 
     private static AgentErrorKind Classify(System.Net.HttpStatusCode code) => (int)code switch { 400 => AgentErrorKind.InvalidRequest, 401 => AgentErrorKind.InvalidApiKey, 402 => AgentErrorKind.PaymentRequired, 429 => AgentErrorKind.RateLimited, >= 500 => AgentErrorKind.ProviderError, _ => AgentErrorKind.Unknown };
