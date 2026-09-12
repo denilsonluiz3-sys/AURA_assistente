@@ -7,7 +7,7 @@
              BackgroundColor="{DynamicResource AuraBackground}">
 
     <ScrollView>
-        <VerticalStackLayout Padding="20,24,20,32" Spacing="16">
+        <VerticalStackLayout Padding="12,14,12,24" Spacing="14">
 
             <VerticalStackLayout Spacing="4">
                 <Label Text="ECOSSISTEMA AURA"

@@ -5,7 +5,7 @@
              Title="Rodar programa"
              BackgroundColor="{DynamicResource AuraBackground}">
 
-    <Grid RowDefinitions="Auto,*,Auto" Padding="16" RowSpacing="10">
+    <Grid RowDefinitions="Auto,*,Auto" Padding="12,10,12,16" RowSpacing="10">
 
         <Label Text="Rodar programa em célula isolada"
                FontAttributes="Bold"
@@ -21,9 +21,7 @@
 
                 <Button Text="Escolher arquivo"
                         Clicked="OnPickClicked"
-                        BackgroundColor="{DynamicResource AuraSurface}"
-                        TextColor="{DynamicResource AuraTextPrimary}"
-                        CornerRadius="8" />
+                        Style="{StaticResource BtnGhost}" />
                 <Label x:Name="FileLabel"
                        FontSize="12"
                        FontFamily="monospace"
@@ -66,9 +64,7 @@
 
                 <Button Text="Rodar em célula"
                         Clicked="OnRunClicked"
-                        BackgroundColor="{DynamicResource AuraAccent}"
-                        TextColor="White"
-                        CornerRadius="8" />
+                        Style="{StaticResource BtnPrimary}" />
 
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                     <Label x:Name="ResultLabel"
@@ -79,10 +75,8 @@
                             x:Name="CopyButton"
                             Text="Copiar"
                             Clicked="OnCopyClicked"
-                            BackgroundColor="{DynamicResource AuraSurface}"
-                            TextColor="{DynamicResource AuraAccent}"
+                            Style="{StaticResource BtnGhost}"
                             Padding="12,4"
-                            CornerRadius="8"
                             FontSize="12" />
                 </Grid>
 

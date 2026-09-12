@@ -37,7 +37,10 @@ public sealed class SpectrumPage : ContentPage
         {
             Text = "▶ Iniciar",
             BackgroundColor = Color.FromArgb("#2a6df4"),
-            TextColor = Colors.White
+            TextColor = Colors.White,
+            CornerRadius = 12,
+            Padding = new Thickness(16, 8),
+            FontAttributes = FontAttributes.Bold
         };
         startBtn.Clicked += (_, _) => Start();
 
@@ -45,7 +48,9 @@ public sealed class SpectrumPage : ContentPage
         {
             Text = "■ Parar",
             BackgroundColor = Color.FromArgb("#3a2030"),
-            TextColor = Color.FromArgb("#f0c0c4")
+            TextColor = Color.FromArgb("#f0c0c4"),
+            CornerRadius = 12,
+            Padding = new Thickness(16, 8)
         };
         stopBtn.Clicked += (_, _) => Stop();
 
@@ -62,6 +67,16 @@ public sealed class SpectrumPage : ContentPage
             Drawable = _drawable,
             HeightRequest = 360,
             BackgroundColor = Color.FromArgb("#0c0c12")
+        };
+
+        var canvasCard = new Border
+        {
+            BackgroundColor = Color.FromArgb("#13131d"),
+            Stroke = Color.FromArgb("#242438"),
+            StrokeThickness = 1,
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 14 },
+            Padding = 8,
+            Content = _canvas
         };
 
         Content = new ScrollView
@@ -91,7 +106,7 @@ public sealed class SpectrumPage : ContentPage
                         Spacing = 8,
                         Children = { startBtn, stopBtn }
                     },
-                    _canvas,
+                    canvasCard,
                     _status
                 }
             }
