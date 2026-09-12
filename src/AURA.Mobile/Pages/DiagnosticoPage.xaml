@@ -19,7 +19,7 @@
             </VerticalStackLayout>
 
             <!-- Ação principal: Device Diagnostic via Cell Program -->
-            <Border Style="{DynamicResource AuraGlassCard}" Padding="16,14">
+            <Border Style="{StaticResource AuraCard}" Padding="16,14">
                 <VerticalStackLayout Spacing="10">
                     <Label Text="DIAGNÓSTICO COMPLETO"
                            FontSize="10"
@@ -31,7 +31,7 @@
                     <Button x:Name="BtnRunCellDiag"
                             Text="Executar diagnóstico"
                             Clicked="OnRunCellDiagnosticClicked"
-                            Style="{DynamicResource BtnGlass}"
+                            Style="{StaticResource BtnGhost}"
                             HorizontalOptions="Start" />
                     <Label x:Name="CellDiagStatus"
                            Text=""
@@ -47,13 +47,13 @@
                     <Button x:Name="BtnCellDetails"
                             Text="Ver detalhes"
                             Clicked="OnCellDetailsClicked"
-                            Style="{DynamicResource BtnGlass}"
+                            Style="{StaticResource BtnGhost}"
                             HorizontalOptions="Start"
                             IsVisible="False" />
                     <Button x:Name="BtnAnalyzeWithAi"
                             Text="Analisar diagnóstico com IA"
                             Clicked="OnAnalyzeWithAiClicked"
-                            Style="{DynamicResource BtnGlass}"
+                            Style="{StaticResource BtnGhost}"
                             HorizontalOptions="Start"
                             IsEnabled="False" />
                     <Label x:Name="AiDiagnosticStatus"
@@ -70,7 +70,7 @@
                    FontAttributes="Bold"
                    TextColor="{DynamicResource AuraTextSecondary}" />
             <Border x:Name="ConnectionCard"
-                    Style="{DynamicResource AuraGlassCard}"
+                    Style="{StaticResource AuraCard}"
                     Padding="16,12">
                 <HorizontalStackLayout Spacing="10">
                     <Label x:Name="ConnectionIcon"
@@ -92,7 +92,7 @@
             <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto"
                   ColumnSpacing="12" RowSpacing="12">
 
-                <Border Grid.Row="0" Grid.Column="0" Style="{DynamicResource AuraGlassCard}">
+                <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource AuraCard}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="CPU"
                                FontSize="10"
@@ -109,7 +109,7 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <Border Grid.Row="0" Grid.Column="1" Style="{DynamicResource AuraGlassCard}">
+                <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource AuraCard}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="RAM"
                                FontSize="10"
@@ -126,7 +126,7 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <Border Grid.Row="1" Grid.Column="0" Style="{DynamicResource AuraGlassCard}">
+                <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource AuraCard}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="ARMAZENAMENTO"
                                FontSize="10"
@@ -143,7 +143,7 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <Border Grid.Row="1" Grid.Column="1" Style="{DynamicResource AuraGlassCard}">
+                <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource AuraCard}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="SISTEMA"
                                FontSize="10"
@@ -160,7 +160,7 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <Border Grid.Row="2" Grid.Column="0" Style="{DynamicResource AuraGlassCard}">
+                <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource AuraCard}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="NÚCLEOS"
                                FontSize="10"
@@ -177,7 +177,7 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <Border Grid.Row="2" Grid.Column="1" Style="{DynamicResource AuraGlassCard}">
+                <Border Grid.Row="2" Grid.Column="1" Style="{StaticResource AuraCard}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="LATÊNCIA"
                                FontSize="10"
@@ -194,7 +194,7 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <Border Grid.Row="3" Grid.Column="0" Style="{DynamicResource AuraGlassCard}">
+                <Border Grid.Row="3" Grid.Column="0" Style="{StaticResource AuraCard}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="IP LOCAL"
                                FontSize="10"
@@ -211,7 +211,7 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <Border Grid.Row="3" Grid.Column="1" Style="{DynamicResource AuraGlassCard}">
+                <Border Grid.Row="3" Grid.Column="1" Style="{StaticResource AuraCard}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="VERSÃO AURA"
                                FontSize="10"
@@ -235,7 +235,7 @@
                    FontSize="12"
                    FontAttributes="Bold"
                    TextColor="{DynamicResource AuraTextSecondary}" />
-            <Border Style="{DynamicResource AuraGlassCard}" Padding="16,12">
+            <Border Style="{StaticResource AuraCard}" Padding="16,12">
                 <VerticalStackLayout Spacing="6">
                     <Label x:Name="AgentsLabel"
                            Text="…"
@@ -246,7 +246,7 @@
 
             <Button Text="↻  Atualizar visão geral"
                     Clicked="OnRefreshClicked"
-                    Style="{DynamicResource BtnGlass}"
+                    Style="{StaticResource BtnGhost}"
                     HorizontalOptions="Start" />
 
         </VerticalStackLayout>

@@ -5,14 +5,14 @@
              x:Class="AURA.Mobile.Pages.WorkspacePage"
              Title="Workspace"
              BackgroundColor="{DynamicResource AuraBackground}">
-    <Grid Padding="12" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="10">
+    <Grid Padding="12,10,12,16" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="10">
 
         <!-- Ações locais (sem IA) -->
-        <HorizontalStackLayout Grid.Row="0" Spacing="8">
-            <Button Text="Importar" Clicked="OnImportClicked" />
-            <Button Text="Atualizar" Clicked="OnRefreshClicked" />
-            <Label x:Name="StatusLabel" VerticalOptions="Center" LineBreakMode="TailTruncation" />
-        </HorizontalStackLayout>
+        <Grid Grid.Row="0" RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8" RowSpacing="4">
+            <Button Grid.Column="0" Text="Importar" Clicked="OnImportClicked" Style="{StaticResource BtnGhost}" />
+            <Button Grid.Column="1" Text="Atualizar" Clicked="OnRefreshClicked" Style="{StaticResource BtnGhost}" />
+            <Label Grid.Row="1" Grid.ColumnSpan="3" x:Name="StatusLabel" FontSize="11" TextColor="{DynamicResource AuraTextSecondary}" LineBreakMode="TailTruncation" />
+        </Grid>
 
         <Picker x:Name="DocumentPicker" Grid.Row="1" Title="Documento do Workspace" SelectedIndexChanged="OnDocumentSelected" />
 
@@ -21,7 +21,7 @@
             <Grid x:Name="WordEditor" IsVisible="False" RowDefinitions="Auto,*" RowSpacing="8">
                 <HorizontalStackLayout Grid.Row="0" Spacing="8">
                     <Label Text="Word (.docx)" FontAttributes="Bold" VerticalOptions="Center" />
-                    <Button Text="Salvar" Clicked="OnSaveWordClicked" />
+                    <Button Text="Salvar" Clicked="OnSaveWordClicked" Style="{StaticResource BtnPrimary}" />
                 </HorizontalStackLayout>
                 <Editor Grid.Row="1" x:Name="WordTextEditor" AutoSize="TextChanges" VerticalOptions="Fill" />
             </Grid>
@@ -29,9 +29,9 @@
             <Grid x:Name="PdfEditor" IsVisible="False" RowDefinitions="Auto,*" RowSpacing="8">
                 <HorizontalStackLayout Grid.Row="0" Spacing="8">
                     <Label x:Name="PdfInfoLabel" Text="PDF" FontAttributes="Bold" VerticalOptions="Center" />
-                    <Button Text="Girar" Clicked="OnRotatePdfClicked" />
-                    <Button Text="Adicionar página" Clicked="OnAddPdfPageClicked" />
-                    <Button Text="Excluir página" Clicked="OnDeletePdfPageClicked" />
+                    <Button Text="Girar" Clicked="OnRotatePdfClicked" Style="{StaticResource BtnGhost}" />
+                    <Button Text="Adicionar página" Clicked="OnAddPdfPageClicked" Style="{StaticResource BtnGhost}" />
+                    <Button Text="Excluir página" Clicked="OnDeletePdfPageClicked" Style="{StaticResource BtnDanger}" />
                 </HorizontalStackLayout>
                 <pdf:PdfView Grid.Row="1" x:Name="PdfViewer"
                              EnableZoom="True"
@@ -50,18 +50,17 @@
 
         <!-- Pedido ao agente (IA opcional, com contexto do arquivo) -->
         <Border Grid.Row="3"
-                StrokeThickness="1"
-                Padding="10"
-                Stroke="{DynamicResource AuraSurface2}">
+                Style="{StaticResource AuraCard}"
+                Padding="12">
             <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
                 <Label Text="O que você quer fazer com este arquivo?"
                        FontAttributes="Bold" />
 
                 <HorizontalStackLayout Grid.Row="1" Spacing="6">
-                    <Button Text="Resumir" FontSize="12" Padding="10,4" Clicked="OnChipResumir" />
-                    <Button Text="Corrigir" FontSize="12" Padding="10,4" Clicked="OnChipCorrigir" />
-                    <Button Text="Simplificar" FontSize="12" Padding="10,4" Clicked="OnChipSimplificar" />
-                    <Button Text="Explicar" FontSize="12" Padding="10,4" Clicked="OnChipExplicar" />
+                    <Button Text="Resumir" FontSize="12" Padding="10,4" Style="{StaticResource BtnGhost}" Clicked="OnChipResumir" />
+                    <Button Text="Corrigir" FontSize="12" Padding="10,4" Style="{StaticResource BtnGhost}" Clicked="OnChipCorrigir" />
+                    <Button Text="Simplificar" FontSize="12" Padding="10,4" Style="{StaticResource BtnGhost}" Clicked="OnChipSimplificar" />
+                    <Button Text="Explicar" FontSize="12" Padding="10,4" Style="{StaticResource BtnGhost}" Clicked="OnChipExplicar" />
                 </HorizontalStackLayout>
 
                 <Editor Grid.Row="2"
@@ -73,11 +72,13 @@
                 <HorizontalStackLayout Grid.Row="3" Spacing="8">
                     <Button x:Name="SendAgentButton"
                             Text="Enviar ao agente"
-                            Clicked="OnSendToAgentClicked" />
+                            Clicked="OnSendToAgentClicked"
+                            Style="{StaticResource BtnPrimary}" />
                     <Button x:Name="ApplyWordButton"
                             Text="Aplicar no Word"
                             IsVisible="False"
-                            Clicked="OnApplyAgentToWordClicked" />
+                            Clicked="OnApplyAgentToWordClicked"
+                            Style="{StaticResource BtnGhost}" />
                 </HorizontalStackLayout>
 
                 <Editor Grid.Row="4"

@@ -11,11 +11,12 @@
 
         <!-- ── Header ────────────────────────────────── -->
         <Border Grid.Row="0"
+                Margin="10,8,10,0"
                 BackgroundColor="{DynamicResource AuraSurface}"
                 Stroke="{DynamicResource AuraBorder}"
                 StrokeThickness="1"
-                Padding="16,14"
-                StrokeShape="RoundRectangle 0,0,0,0">
+                Padding="14,12"
+                StrokeShape="RoundRectangle 18">
             <HorizontalStackLayout Spacing="8">
                 <Label Text="⬟"
                        FontSize="16"
@@ -72,9 +73,10 @@
 
         <!-- ── Botões ─────────────────────────────────── -->
         <Grid Grid.Row="2"
+              Margin="10,4,10,10"
               ColumnDefinitions="*,*"
-              ColumnSpacing="12"
-              Padding="16,10">
+              ColumnSpacing="10"
+              Padding="6,8">
             <Button Text="↻  Atualizar"
                     Clicked="OnRefreshClicked"
                     Style="{StaticResource BtnGhost}" />
