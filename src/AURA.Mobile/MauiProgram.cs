@@ -22,7 +22,6 @@ using AURA.Mobile.Speech;
 using AURA.Mobile.Services;
 using AURA.Mobile.ViewModels;
 using CommunityToolkit.Maui;
-using MauiNativePdfView;
 
 namespace AURA.Mobile;
 
@@ -33,7 +32,6 @@ public static class MauiProgram
         AuraLog.Info("MauiProgram.CreateMauiApp BEGIN");
         var builder = MauiApp.CreateBuilder();
         builder.UseMauiApp<App>();
-        builder.UseMauiNativePdfView();
         if (OperatingSystem.IsAndroidVersionAtLeast(26)) builder.UseMauiCommunityToolkitMediaElement(isAndroidForegroundServiceEnabled: true);
 #if ANDROID
         builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Microsoft.Maui.Controls.WebView, AURA.Mobile.Platforms.Android.WebView.AuraWebViewHandler>());
@@ -104,6 +102,10 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new SolutionStore(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "aura")));
         builder.Services.AddSingleton(sp => new LocalPlaybook(sp.GetRequiredService<SolutionStore>(), sp.GetRequiredService<MemoryStore>()));
         builder.Services.AddSingleton<AttachmentStore>();
+        builder.Services.AddSingleton<LocalModelStore>(sp => new LocalModelStore(Path.Combine(FileSystem.AppDataDirectory, "models")));
+#if ANDROID
+        builder.Services.AddSingleton<ILocalModelEngine, AURA.Mobile.Platforms.Android.AI.AndroidNativeLocalModelEngine>();
+#endif
         builder.Services.AddSingleton<WorkGroupRegistry>(_ => WorkGroupRegistry.CreateDefault());
         builder.Services.AddSingleton<AgentReportStore>(_ => new AgentReportStore(Path.Combine(AgentWorkspace.EnsureCreated(), ".aura", "reports")));
         builder.Services.AddSingleton<WorkItemStore>(_ => new WorkItemStore(Path.Combine(AgentWorkspace.EnsureCreated(), ".aura", "work-items")));

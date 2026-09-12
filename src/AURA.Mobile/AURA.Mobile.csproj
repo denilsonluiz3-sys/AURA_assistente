@@ -26,7 +26,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.60" />
     <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="10.0.0" />
-    <PackageReference Include="Eightbot.MauiNativePdfView" Version="1.1.1" />
     <!-- CPython 3.11 embutido no APK (arm64) — aumenta o tamanho do APK -->
     <PackageReference Include="Python3Android" Version="311.22.1.21" />
   </ItemGroup>
