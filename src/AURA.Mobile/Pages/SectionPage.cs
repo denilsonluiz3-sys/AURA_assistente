@@ -35,7 +35,7 @@ public sealed class SectionPage : ContentPage
         string subtitle = title switch
         {
             "Sistema" => "Início · ecossistema · diagnóstico · logs",
-            "Assistente" => "Chat · agente · memória · navegador",
+            "Assistente" => "Agente · memória · navegador",
             "Ferramentas" => "Terminal · executores · módulos · workspace",
             "Apps" => "Programas · células · rodar programa",
             _ => "AURA · " + items.Length + " opção" + (items.Length != 1 ? "ões" : "")

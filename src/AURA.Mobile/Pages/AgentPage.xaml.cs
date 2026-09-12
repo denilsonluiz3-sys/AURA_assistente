@@ -217,11 +217,12 @@ public partial class AgentPage : ContentPage
         cfg.Load(_client);
         SetConfigVisible(_configVisible);
 
-        string activeRoot = AgentWorkspace.ActiveRoot;
-        WorkspaceLabel.Text = ProjectAccessService.StatusText + "\n" +
-            "Workspace: " + activeRoot +
-            $" ({AgentWorkspace.CountFiles(activeRoot)} arquivo(s))";
-        ModelLabel.Text = $"Modelo: {_client.Options.Model} · {_client.Options.BaseUrl}";
+        WorkspaceLabel.Text = ProjectAccessService.IsLinked
+            ? "Projeto vinculado · workspace ativo"
+            : "Workspace local · pronto para uso";
+        ModelLabel.Text = string.IsNullOrWhiteSpace(_client.Options.Model)
+            ? "Modelo: não configurado"
+            : $"Modelo: {_client.Options.Model}";
 
         UpdateProcessCardsVisibility();
         EnsureSession();

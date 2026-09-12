@@ -6,8 +6,8 @@
              Title="Agente"
              BackgroundColor="{DynamicResource AuraBackground}">
 
-    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
-        <Border x:Name="StatusBarHost" Grid.Row="0" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="16,12">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="0">
+        <Border x:Name="StatusBarHost" Grid.Row="0" Margin="10,8,10,0" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" StrokeShape="RoundRectangle 18" Padding="14,10">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                 <VerticalStackLayout Spacing="2">
                     <HorizontalStackLayout Spacing="6">
@@ -19,12 +19,12 @@
                 </VerticalStackLayout>
                 <Button Grid.Column="1" x:Name="AgentMenuButton" Text="⚡" Clicked="OnAgentMenuClicked" VerticalOptions="Center" Padding="10,6" FontSize="16" BackgroundColor="Transparent" TextColor="{DynamicResource AuraAccent}" />
                 <Button Grid.Column="2" x:Name="ConfigButton" Text="⚙" Clicked="OnConfigClicked" VerticalOptions="Center" Padding="10,6" FontSize="16" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
-                <Button Grid.Column="3" x:Name="ProjectButton" Text="📁 Projeto" Clicked="OnProjectClicked" VerticalOptions="Center" Padding="10,6" FontSize="12" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
+                <Button Grid.Column="3" x:Name="ProjectButton" Text="📁" Clicked="OnProjectClicked" SemanticProperties.Description="Abrir informações do projeto" VerticalOptions="Center" Padding="10,6" FontSize="18" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
             </Grid>
         </Border>
 
-        <ScrollView x:Name="ModeChipsHost" Grid.Row="1" Orientation="Horizontal" HorizontalScrollBarVisibility="Never" HeightRequest="42">
-            <HorizontalStackLayout Spacing="6" Padding="12,5,12,3">
+        <ScrollView x:Name="ModeChipsHost" Grid.Row="1" Margin="8,4,8,0" Orientation="Horizontal" HorizontalScrollBarVisibility="Never" HeightRequest="42">
+            <HorizontalStackLayout Spacing="6" Padding="4,5,4,3">
                 <Button x:Name="ModeAgentBtn" Text="Agente" Clicked="OnModeAgentUiClicked" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="16" />
                 <Button x:Name="ModeWebBtn" Text="Web AI" Clicked="OnModeWebUiClicked" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="16" />
                 <Button Text="📂 Workspace" Clicked="OnChipWorkspace" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
@@ -54,7 +54,7 @@
 
         <Grid x:Name="AgentPane" Grid.Row="3" IsVisible="True">
             <ScrollView x:Name="ConversationScroll">
-                <VerticalStackLayout x:Name="ConversationContainer" Spacing="6" Padding="14,12" />
+                <VerticalStackLayout x:Name="ConversationContainer" Spacing="8" Padding="16,14,16,20" />
             </ScrollView>
         </Grid>
 
@@ -73,19 +73,19 @@
             <WebView x:Name="BridgeWebView" Grid.Row="1" />
         </Grid>
 
-        <Border x:Name="InputBarHost" Grid.Row="4" ZIndex="50" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,8">
-            <VerticalStackLayout Spacing="6">
+        <Border x:Name="InputBarHost" Grid.Row="4" Margin="8,4,8,4" ZIndex="50" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" StrokeShape="RoundRectangle 20" Padding="10,6">
+            <VerticalStackLayout Spacing="4">
                 <ScrollView x:Name="ConfigHost" IsVisible="False" MaximumHeightRequest="260" VerticalScrollBarVisibility="Default" BackgroundColor="{DynamicResource AuraSurface2}" />
                 <Label x:Name="PendingAttachmentLabel" IsVisible="False" FontSize="11" TextColor="{DynamicResource AuraAccent}" LineBreakMode="TailTruncation" />
                 <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
                     <Border Grid.Column="0" BackgroundColor="{DynamicResource AuraSurface2}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,5" StrokeShape="RoundRectangle 12,12,12,12">
-                        <Editor x:Name="CommandEditor" MinimumHeightRequest="40" MaximumHeightRequest="110" Placeholder="Instrua o agente… (ex.: ls, diagnostique)" AutoSize="TextChanges" BackgroundColor="Transparent" />
+                        <Editor x:Name="CommandEditor" MinimumHeightRequest="34" MaximumHeightRequest="84" Placeholder="Instrua o agente… (ex.: ls, diagnostique)" AutoSize="TextChanges" BackgroundColor="Transparent" />
                     </Border>
-                    <Button Grid.Column="1" x:Name="AttachButton" Text="📎" Clicked="OnAttachmentClicked" SemanticProperties.Description="Importar arquivo para a AURA" FontSize="18" Padding="0" WidthRequest="44" HeightRequest="44" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="22" VerticalOptions="End" />
-                    <Button Grid.Column="2" x:Name="MicrophoneButton" Text="🎙" Clicked="OnMicrophoneClicked" SemanticProperties.Description="Ditado por voz" FontSize="18" Padding="0" WidthRequest="44" HeightRequest="44" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="22" VerticalOptions="End" />
-                    <Grid Grid.Column="3" WidthRequest="56" HeightRequest="56" VerticalOptions="End" ZIndex="51">
-                        <ActivityIndicator x:Name="BusyIndicator" IsRunning="False" IsVisible="False" InputTransparent="True" Color="White" WidthRequest="22" HeightRequest="22" HorizontalOptions="Center" VerticalOptions="Center" />
-                        <Button x:Name="RunButton" Text="▶" Clicked="OnRunOrStopClicked" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="28" FontSize="18" Padding="0" WidthRequest="56" HeightRequest="56" />
+                    <Button Grid.Column="1" x:Name="AttachButton" Text="📎" Clicked="OnAttachmentClicked" SemanticProperties.Description="Importar arquivo para a AURA" FontSize="16" Padding="0" WidthRequest="40" HeightRequest="40" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="20" VerticalOptions="End" />
+                    <Button Grid.Column="2" x:Name="MicrophoneButton" Text="🎙" Clicked="OnMicrophoneClicked" SemanticProperties.Description="Ditado por voz" FontSize="16" Padding="0" WidthRequest="40" HeightRequest="40" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="20" VerticalOptions="End" />
+                    <Grid Grid.Column="3" WidthRequest="46" HeightRequest="46" VerticalOptions="End" ZIndex="51">
+                        <ActivityIndicator x:Name="BusyIndicator" IsRunning="False" IsVisible="False" InputTransparent="True" Color="White" WidthRequest="18" HeightRequest="18" HorizontalOptions="Center" VerticalOptions="Center" />
+                        <Button x:Name="RunButton" Text="▶" Clicked="OnRunOrStopClicked" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="23" FontSize="16" Padding="0" WidthRequest="46" HeightRequest="46" />
                     </Grid>
                 </Grid>
             </VerticalStackLayout>
