@@ -29,6 +29,8 @@ public sealed class WorkGroupCoordinator
         _items = items;
         if (_registry.Resolve("qa-ci") != null)
             Register(new QaCiPlanningAgent());
+        if (_registry.Resolve("ia-offline") != null)
+            Register(new OfflineAiPlanningAgent());
     }
 
     public AgentReport? LastReport { get; private set; }

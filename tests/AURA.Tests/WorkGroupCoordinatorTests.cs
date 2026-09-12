@@ -8,11 +8,13 @@ public sealed class WorkGroupCoordinatorTests
     [Fact]
     public async Task AnalyzeAsyncCreatesPartialObservationWhenNoSpecialistIsRegistered()
     {
-        var coordinator = new WorkGroupCoordinator(WorkGroupRegistry.CreateDefault());
+        var registry = new WorkGroupRegistry();
+        registry.Register(new WorkGroupDefinition { Id = "conhecimento", Name = "Conhecimento", Mission = "Observação" });
+        var coordinator = new WorkGroupCoordinator(registry);
 
-        AgentReport report = await coordinator.AnalyzeAsync("validar runtime GGUF");
+        AgentReport report = await coordinator.AnalyzeAsync("registrar uma observação");
 
-        Assert.Equal("ia-offline", report.GroupId);
+        Assert.Equal("conhecimento", report.GroupId);
         Assert.Equal(AgentReportStatus.Partial, report.Status);
         Assert.Contains(report.Findings, finding => finding.Contains("roteada"));
         Assert.NotNull(coordinator.LastReport);
