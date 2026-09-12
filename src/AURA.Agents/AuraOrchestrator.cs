@@ -87,11 +87,17 @@ namespace AURA.Agents
         public WorkGroupRegistry WorkGroups => _workGroups;
         public AgentReportStore? AgentReports => _agentReports;
 
-        public async Task<string> ExecuteAsync(
+        public Task<string> ExecuteAsync(
             string userCommand,
             CancellationToken ct = default,
-            bool confirmed = false,
-            AgentToolPolicy? toolPolicy = null)
+            bool confirmed = false) =>
+            ExecuteAsync(userCommand, ct, confirmed, null);
+
+        public async Task<string> ExecuteAsync(
+            string userCommand,
+            CancellationToken ct,
+            bool confirmed,
+            AgentToolPolicy? toolPolicy)
         {
             if (string.IsNullOrWhiteSpace(userCommand))
                 return "Comando vazio.";
