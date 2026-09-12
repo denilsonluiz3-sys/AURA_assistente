@@ -18,6 +18,18 @@ public sealed class WorkGroupTests
         Assert.DoesNotContain(WorkGroupStage.Publish, offline.AllowedStages);
     }
 
+    [Theory]
+    [InlineData("validar o runtime GGUF", "ia-offline")]
+    [InlineData("revisar permissões do Android", "seguranca")]
+    [InlineData("criar lembrete local", "tarefas")]
+    [InlineData("executar testes do APK", "qa-ci")]
+    public void RegistryRoutesRequestToSpecializedGroup(string request, string expectedGroup)
+    {
+        var registry = WorkGroupRegistry.CreateDefault();
+
+        Assert.Equal(expectedGroup, registry.ResolveFor(request).Id);
+    }
+
     [Fact]
     public void RegistryRejectsInvalidDefinitions()
     {

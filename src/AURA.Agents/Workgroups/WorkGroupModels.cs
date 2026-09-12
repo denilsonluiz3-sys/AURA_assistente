@@ -94,6 +94,31 @@ public sealed class WorkGroupRegistry
         .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
+    public WorkGroupDefinition ResolveFor(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return Resolve("conhecimento") ?? throw new InvalidOperationException("Grupo conhecimento não registrado.");
+
+        string value = text.ToLowerInvariant();
+        string? id = value switch
+        {
+            _ when ContainsAny(value, "offline", "gguf", "llama", "modelo local", "ndk") => "ia-offline",
+            _ when ContainsAny(value, "tool call", "ferramenta", "memória", "prompt", "agente") => "ia-toolcalls",
+            _ when ContainsAny(value, "segurança", "permissão", "privacidade", "risco") => "seguranca",
+            _ when ContainsAny(value, "tela", "ux", "interface", "navegação", "acessibilidade") => "ux",
+            _ when ContainsAny(value, "tarefa", "lembrete", "notificação") => "tarefas",
+            _ when ContainsAny(value, "teste", "ci", "build", "apk", "workflow") => "qa-ci",
+            _ when ContainsAny(value, "arquitetura", "dependência", "contrato", "duplicidade") => "arquitetura",
+            _ when ContainsAny(value, "produto", "usuário", "prioridade", "utilidade") => "produto",
+            _ => "conhecimento"
+        };
+
+        return Resolve(id) ?? Resolve("conhecimento")!;
+    }
+
+    private static bool ContainsAny(string value, params string[] terms) =>
+        terms.Any(value.Contains);
+
     public static WorkGroupRegistry CreateDefault()
     {
         var registry = new WorkGroupRegistry();

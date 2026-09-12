@@ -13,6 +13,7 @@ using AURA.Core.Launchers;
 using AURA.Core.Logging;
 using AURA.Core.Runtime;
 using AURA.Memory;
+using AURA.Agents.Workgroups;
 
 namespace AURA.Agents
 {
@@ -35,6 +36,8 @@ namespace AURA.Agents
         private readonly IIntentResolver _intentResolver;
         private readonly PolicyGuard _policyGuard;
         private readonly ToolResolver _toolResolver;
+        private readonly WorkGroupRegistry _workGroups;
+        private readonly AgentReportStore? _agentReports;
 
         public AuraOrchestrator(
             ILogger logger,
@@ -49,7 +52,9 @@ namespace AURA.Agents
             IIntentResolver? intentResolver = null,
             PolicyGuard? policyGuard = null,
             ToolResolver? toolResolver = null,
-            bool enableFallback = false)
+            bool enableFallback = false,
+            WorkGroupRegistry? workGroups = null,
+            AgentReportStore? agentReports = null)
         {
             _logger = logger ?? new ConsoleLogger();
             _memory = memory ?? throw new ArgumentNullException(nameof(memory));
@@ -62,12 +67,17 @@ namespace AURA.Agents
             _intentResolver = intentResolver ?? new HeuristicIntentResolver();
             _policyGuard = policyGuard ?? new PolicyGuard();
             _toolResolver = toolResolver ?? CreateToolResolver();
+            _workGroups = workGroups ?? WorkGroupRegistry.CreateDefault();
+            _agentReports = agentReports;
             EnableFallback = enableFallback;
             HttpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         }
 
         private HttpClient HttpClient { get; }
         private bool EnableFallback { get; }
+
+        public WorkGroupRegistry WorkGroups => _workGroups;
+        public AgentReportStore? AgentReports => _agentReports;
 
         public async Task<string> ExecuteAsync(
             string userCommand,
@@ -85,6 +95,14 @@ namespace AURA.Agents
             _logger.Info("[ORQUESTRA] " + normalized);
 
             IntentResult intent = _intentResolver.Resolve(normalized);
+            WorkGroupDefinition workGroup = _workGroups.ResolveFor(userCommand + " " + intent.Intent);
+            Publish(
+                processId,
+                "Grupo de trabalho",
+                workGroup.Name,
+                "Observando",
+                "Solicitação encaminhada para análise especializada",
+                0.12);
             AuthorizationResult auth = _policyGuard.Authorize(intent.Intent, userCommand);
 
             if (auth.Decision == AuthorizationDecision.Blocked)
