@@ -962,7 +962,17 @@ public partial class AgentPage : ContentPage
         _lastAssistantText = text;
 
         await AppendBubbleAsync(text, user: false);
-        await TryExecuteAuraShellAsync(text);
+
+        // Respostas do modelo nunca executam comandos implicitamente.
+        // A execução de aura-sh continua disponível apenas em fluxos explícitos,
+        // como o plano colado pelo usuário e confirmado pela UI.
+        string? shell = LocalPlaybook.ExtractAuraShell(text);
+        if (!string.IsNullOrWhiteSpace(shell))
+        {
+            await AppendBubbleAsync(
+                "Bloco aura-sh detectado. Não executei automaticamente. Use Colar plano se quiser rodar.",
+                user: false, isTool: true);
+        }
 
         _processes.Complete(processId, completeMessage);
         _voice?.SetLastUtterance(text);
