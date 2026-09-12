@@ -72,8 +72,9 @@ namespace AURA.Mobile
 #if ANDROID
             // Evita que as categorias longas sejam comprimidas e quebradas no topo.
             // A barra inferior também fica mais acessível com uma mão.
-            On<Microsoft.Maui.Controls.PlatformConfiguration.Android>()
-                .SetToolbarPlacement(Microsoft.Maui.Controls.PlatformConfiguration.AndroidSpecific.ToolbarPlacement.Bottom);
+            Microsoft.Maui.Controls.PlatformConfiguration.AndroidSpecific.TabbedPage.SetToolbarPlacement(
+                On<Microsoft.Maui.Controls.PlatformConfiguration.Android>(),
+                Microsoft.Maui.Controls.PlatformConfiguration.AndroidSpecific.ToolbarPlacement.Bottom);
 #endif
             AuraLog.Info("MainPage.ctor OK (Agente único no Assistente)");
         }
