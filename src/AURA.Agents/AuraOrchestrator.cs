@@ -91,13 +91,13 @@ namespace AURA.Agents
             string userCommand,
             CancellationToken ct = default,
             bool confirmed = false) =>
-            ExecuteAsync(userCommand, ct, confirmed, null);
+            ExecuteAsync(userCommand, null, ct, confirmed);
 
         public async Task<string> ExecuteAsync(
             string userCommand,
-            CancellationToken ct,
-            bool confirmed,
-            AgentToolPolicy? toolPolicy)
+            AgentToolPolicy? toolPolicy,
+            CancellationToken ct = default,
+            bool confirmed = false)
         {
             if (string.IsNullOrWhiteSpace(userCommand))
                 return "Comando vazio.";
