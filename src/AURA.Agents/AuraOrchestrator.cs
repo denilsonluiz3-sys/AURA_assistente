@@ -56,6 +56,7 @@ namespace AURA.Agents
             bool enableFallback = false,
             WorkGroupRegistry? workGroups = null,
             AgentReportStore? agentReports = null,
+            WorkItemStore? workItems = null,
             WorkGroupCoordinator? workCoordinator = null)
         {
             _logger = logger ?? new ConsoleLogger();
@@ -71,7 +72,7 @@ namespace AURA.Agents
             _toolResolver = toolResolver ?? CreateToolResolver();
             _workGroups = workGroups ?? WorkGroupRegistry.CreateDefault();
             _agentReports = agentReports;
-            _workCoordinator = workCoordinator ?? new WorkGroupCoordinator(_workGroups, _agentReports);
+            _workCoordinator = workCoordinator ?? new WorkGroupCoordinator(_workGroups, _agentReports, workItems);
             EnableFallback = enableFallback;
             HttpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         }

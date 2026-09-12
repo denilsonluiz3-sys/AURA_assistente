@@ -14,12 +14,17 @@ public sealed class WorkGroupCoordinator
 {
     private readonly WorkGroupRegistry _registry;
     private readonly AgentReportStore? _reports;
+    private readonly WorkItemStore? _items;
     private readonly Dictionary<string, IWorkGroupAgent> _agents = new(StringComparer.OrdinalIgnoreCase);
 
-    public WorkGroupCoordinator(WorkGroupRegistry registry, AgentReportStore? reports = null)
+    public WorkGroupCoordinator(
+        WorkGroupRegistry registry,
+        AgentReportStore? reports = null,
+        WorkItemStore? items = null)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _reports = reports;
+        _items = items;
     }
 
     public AgentReport? LastReport { get; private set; }
@@ -49,6 +54,7 @@ public sealed class WorkGroupCoordinator
             Stage = WorkGroupStage.Observe,
             Status = WorkItemStatus.InProgress
         };
+        await SaveItemAsync(item, cancellationToken).ConfigureAwait(false);
 
         AgentReport report;
         if (_agents.TryGetValue(group.Id, out IWorkGroupAgent? agent))
@@ -70,9 +76,18 @@ public sealed class WorkGroupCoordinator
             };
         }
 
+        item.Status = report.Status == AgentReportStatus.Failed
+            ? WorkItemStatus.Blocked
+            : WorkItemStatus.Completed;
+        item.UpdatedAtUtc = DateTime.UtcNow;
+        await SaveItemAsync(item, cancellationToken).ConfigureAwait(false);
+
         LastReport = report;
         if (_reports != null)
             await _reports.SaveAsync(report, cancellationToken).ConfigureAwait(false);
         return report;
     }
+
+    private Task SaveItemAsync(WorkItem item, CancellationToken ct) =>
+        _items == null ? Task.CompletedTask : _items.SaveAsync(item, ct);
 }
