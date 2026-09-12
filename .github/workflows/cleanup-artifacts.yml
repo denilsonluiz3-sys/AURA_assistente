@@ -25,9 +25,11 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+            const artifactDays = 14;
             const runDays = 7;
             const cacheDays = 7;
             const now = Date.now();
+            const artifactCutoff = now - artifactDays * 24 * 60 * 60 * 1000;
             const runCutoff = now - runDays * 24 * 60 * 60 * 1000;
             const cacheCutoff = now - cacheDays * 24 * 60 * 60 * 1000;
             const currentRunId = context.runId;
@@ -46,10 +48,13 @@ jobs:
             }
 
             for (const artifact of artifacts) {
-              await github.rest.actions.deleteArtifact({
-                owner, repo, artifact_id: artifact.id
-              });
-              artifactsDeleted++;
+              const created = new Date(artifact.created_at).getTime();
+              if (created < artifactCutoff) {
+                await github.rest.actions.deleteArtifact({
+                  owner, repo, artifact_id: artifact.id
+                });
+                artifactsDeleted++;
+              }
             }
 
             const runs = [];
@@ -96,7 +101,7 @@ jobs:
               .addHeading('AURA Actions cleanup')
               .addTable([
                 [{data:'Resource',header:true},{data:'Policy',header:true},{data:'Deleted',header:true}],
-                ['Artifacts','all existing artifacts',String(artifactsDeleted)],
+                ['Artifacts','older than 14 days',String(artifactsDeleted)],
                 ['Workflow runs','older than 7 days',String(runsDeleted)],
                 ['Caches','unused for 7 days',String(cachesDeleted)]
               ])
