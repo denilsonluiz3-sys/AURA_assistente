@@ -1,6 +1,7 @@
 using AURA.AI;
 using AURA.AI.UniversalAI;
 using AURA.Agents;
+using AURA.Agents.Workgroups;
 using AURA.Agents.Programs;
 using AURA.Abstractions;
 using AURA.Abstractions.Execution;
@@ -104,7 +105,14 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new LocalPlaybook(sp.GetRequiredService<SolutionStore>(), sp.GetRequiredService<MemoryStore>()));
         builder.Services.AddSingleton<WorkspaceDocumentService>();
         builder.Services.AddSingleton<AttachmentStore>();
-        builder.Services.AddSingleton<AuraOrchestrator>(sp => new AuraOrchestrator(sp.GetRequiredService<ILogger>(), sp.GetRequiredService<SolutionStore>(), sp.GetRequiredService<Runner>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetRequiredService<IToolExecutor>(), sp.GetRequiredService<AURA.Core.Abstractions.IWebSearch>(), sp.GetRequiredService<IUniversalAiClient>(), events: sp.GetRequiredService<EventBus>(), intentResolver: sp.GetRequiredService<IIntentResolver>(), policyGuard: sp.GetRequiredService<PolicyGuard>()));
+        builder.Services.AddSingleton<WorkGroupRegistry>(_ => WorkGroupRegistry.CreateDefault());
+        builder.Services.AddSingleton<AgentReportStore>(_ => new AgentReportStore(Path.Combine(AgentWorkspace.EnsureCreated(), ".aura", "reports")));
+        builder.Services.AddSingleton<WorkItemStore>(_ => new WorkItemStore(Path.Combine(AgentWorkspace.EnsureCreated(), ".aura", "work-items")));
+        builder.Services.AddSingleton<WorkGroupCoordinator>(sp => new WorkGroupCoordinator(
+            sp.GetRequiredService<WorkGroupRegistry>(),
+            sp.GetRequiredService<AgentReportStore>(),
+            sp.GetRequiredService<WorkItemStore>()));
+        builder.Services.AddSingleton<AuraOrchestrator>(sp => new AuraOrchestrator(sp.GetRequiredService<ILogger>(), sp.GetRequiredService<SolutionStore>(), sp.GetRequiredService<Runner>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetRequiredService<IToolExecutor>(), sp.GetRequiredService<AURA.Core.Abstractions.IWebSearch>(), sp.GetRequiredService<IUniversalAiClient>(), events: sp.GetRequiredService<EventBus>(), intentResolver: sp.GetRequiredService<IIntentResolver>(), policyGuard: sp.GetRequiredService<PolicyGuard>(), workGroups: sp.GetRequiredService<WorkGroupRegistry>(), agentReports: sp.GetRequiredService<AgentReportStore>(), workItems: sp.GetRequiredService<WorkItemStore>(), workCoordinator: sp.GetRequiredService<WorkGroupCoordinator>()));
         builder.Services.AddSingleton<IOrchestrator>(sp => sp.GetRequiredService<AuraOrchestrator>());
         builder.Services.AddSingleton<AURA.Abstractions.Process.IProcessOrchestrator>(sp => new AURA.Agents.LegalProcessEngine(sp.GetRequiredService<ILogger>(), sp.GetServices<AURA.Core.Abstractions.IAgent>(), sp.GetRequiredService<IOrchestrator>(), sp.GetRequiredService<EventBus>()));
         builder.Services.AddSingleton<MainPage>();

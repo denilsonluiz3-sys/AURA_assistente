@@ -59,6 +59,9 @@ public sealed class QaCiPlanningAgent : IWorkGroupAgent
         });
     }
 
-    private static bool ContainsAny(string value, params string[] terms) =>
-        terms.Any(value.Contains);
+    private static bool ContainsAny(string value, params string[] terms)
+    {
+        string normalized = value.ToLowerInvariant();
+        return terms.Any(normalized.Contains);
+    }
 }

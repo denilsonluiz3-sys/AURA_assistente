@@ -63,28 +63,51 @@ public sealed class WorkGroupCoordinator
         await SaveItemAsync(item, cancellationToken).ConfigureAwait(false);
 
         AgentReport report;
-        if (_agents.TryGetValue(group.Id, out IWorkGroupAgent? agent))
+        try
         {
-            report = await agent.AnalyzeAsync(item, group, cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            report = new AgentReport
+            if (_agents.TryGetValue(group.Id, out IWorkGroupAgent? agent))
             {
-                WorkItemId = item.Id,
-                GroupId = group.Id,
-                Objective = item.Objective,
-                Status = AgentReportStatus.Partial,
-                Findings = new[] { "Solicitação roteada para o grupo especializado." },
-                Recommendation = "Conectar um agente especializado para aprofundar a observação.",
-                NextStep = "Executar análise específica do grupo.",
-                Confidence = 0.5
-            };
+                report = await agent.AnalyzeAsync(item, group, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                report = new AgentReport
+                {
+                    WorkItemId = item.Id,
+                    GroupId = group.Id,
+                    Objective = item.Objective,
+                    Status = AgentReportStatus.Partial,
+                    Findings = new[] { "Solicitação roteada para o grupo especializado." },
+                    Recommendation = "Conectar um agente especializado para aprofundar a observação.",
+                    NextStep = "Executar análise específica do grupo.",
+                    Confidence = 0.5
+                };
+            }
+
+            if (report.WorkItemId != item.Id || report.GroupId != group.Id)
+            {
+                report = FailureReport(item, group, "O agente retornou um relatório vinculado a outro trabalho ou grupo.");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            item.Status = WorkItemStatus.Pending;
+            item.UpdatedAtUtc = DateTime.UtcNow;
+            await SaveItemAsync(item, CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            report = FailureReport(item, group, "O agente não concluiu a análise: " + ex.GetType().Name);
         }
 
-        item.Status = report.Status == AgentReportStatus.Failed
-            ? WorkItemStatus.Blocked
-            : WorkItemStatus.Completed;
+        item.Status = report.Status switch
+        {
+            AgentReportStatus.Complete => WorkItemStatus.Completed,
+            AgentReportStatus.Partial => WorkItemStatus.InProgress,
+            AgentReportStatus.Blocked or AgentReportStatus.Failed => WorkItemStatus.Blocked,
+            _ => WorkItemStatus.Blocked
+        };
         item.UpdatedAtUtc = DateTime.UtcNow;
         await SaveItemAsync(item, cancellationToken).ConfigureAwait(false);
 
@@ -93,6 +116,19 @@ public sealed class WorkGroupCoordinator
             await _reports.SaveAsync(report, cancellationToken).ConfigureAwait(false);
         return report;
     }
+
+    private static AgentReport FailureReport(WorkItem item, WorkGroupDefinition group, string reason) =>
+        new()
+        {
+            WorkItemId = item.Id,
+            GroupId = group.Id,
+            Objective = item.Objective,
+            Status = AgentReportStatus.Failed,
+            Findings = new[] { reason },
+            Recommendation = "Revisar o erro antes de tentar novamente.",
+            NextStep = "Corrigir o agente ou o contexto do trabalho.",
+            Confidence = 1
+        };
 
     private Task SaveItemAsync(WorkItem item, CancellationToken ct) =>
         _items == null ? Task.CompletedTask : _items.SaveAsync(item, ct);
