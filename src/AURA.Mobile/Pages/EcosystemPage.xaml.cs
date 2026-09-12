@@ -12,7 +12,6 @@ public partial class EcosystemPage : ContentPage
     private readonly ProgramsPage _programs;
     private readonly TerminalPage _terminal;
     private readonly ExecutorsPage _executors;
-    private readonly WorkspacePage _workspace;
     private readonly LogsPage _logs;
     private readonly FixesPage _fixes;
     private readonly SpectrumPage _spectrum;
@@ -27,7 +26,6 @@ public partial class EcosystemPage : ContentPage
         ProgramsPage programs,
         TerminalPage terminal,
         ExecutorsPage executors,
-        WorkspacePage workspace,
         LogsPage logs,
         FixesPage fixes,
         SpectrumPage spectrum,
@@ -42,7 +40,6 @@ public partial class EcosystemPage : ContentPage
         _programs = programs;
         _terminal = terminal;
         _executors = executors;
-        _workspace = workspace;
         _logs = logs;
         _fixes = fixes;
         _spectrum = spectrum;
@@ -55,7 +52,6 @@ public partial class EcosystemPage : ContentPage
     {
         new EcosystemModule("Agente", "Conversa, tools e workspace em um único fluxo", "🧠", DesignSystem.AuraAccent2, () => _agent),
         new EcosystemModule("Memória", "Histórico e memórias persistentes", "📒", DesignSystem.AuraAccent, () => _memory),
-        new EcosystemModule("Workspace", "Word, PDF e pedido ao agente", "📄", DesignSystem.AuraAccent, () => _workspace),
         new EcosystemModule("Navegador", "WebView e automação de páginas", "🌐", DesignSystem.AuraAccent2, () => _browser),
         new EcosystemModule("Células", "Programas Cell isolados", "📊", DesignSystem.AuraAccent, () => _cells),
         new EcosystemModule("Programas", "Lista e executa programas", "▣", DesignSystem.AuraAccent, () => _programs),

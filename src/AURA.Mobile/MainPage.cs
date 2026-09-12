@@ -14,7 +14,7 @@ namespace AURA.Mobile
 
         private static readonly HashSet<string> PrimaryTabs = new(StringComparer.OrdinalIgnoreCase)
         {
-            "Início", "Agente", "Diagnóstico", "Workspace"
+            "Início", "Agente", "Diagnóstico"
         };
 
         public MainPage(
@@ -34,8 +34,7 @@ namespace AURA.Mobile
             RunPage run,
             ProgramsPage programs,
             EcosystemPage ecosystem,
-            SpectrumPage spectrum,
-            WorkspacePage workspace)
+            SpectrumPage spectrum)
         {
             AuraLog.Info("MainPage.ctor BEGIN");
             _manager = manager;
@@ -66,7 +65,7 @@ namespace AURA.Mobile
                 (null, "Início", "Início", home),
                 (null, "Agente", "Agente", agent),
                 ("system", "Diagnóstico", "Diagnóstico", diagnostico),
-                (null, "Workspace", "Workspace", workspace),
+                // O Workspace local agora é acessado pelo fluxo principal do Agente.
 
                 // Recursos úteis para uso geral.
                 (null, "Mais", "Memória", memory),
