@@ -44,6 +44,8 @@ public sealed class AgentSessionResumeTests
 
     private sealed class ToolLoopClient : IUniversalAiClient
     {
+        public UniversalAiClientOptions Options { get; } = new();
+
         public Task<string> ChatAsync(string question, HttpClient? httpClient = null, string? systemPrompt = null, CancellationToken ct = default)
             => Task.FromResult("unused");
 
@@ -59,6 +61,8 @@ public sealed class AgentSessionResumeTests
 
     private sealed class FinalAnswerClient : IUniversalAiClient
     {
+        public UniversalAiClientOptions Options { get; } = new();
+
         public Task<string> ChatAsync(string question, HttpClient? httpClient = null, string? systemPrompt = null, CancellationToken ct = default)
             => Task.FromResult("concluído após retomada");
 
