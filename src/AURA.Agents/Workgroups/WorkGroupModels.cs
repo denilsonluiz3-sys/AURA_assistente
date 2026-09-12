@@ -107,7 +107,7 @@ public sealed class WorkGroupRegistry
         {
             _ when ContainsAny(value, "offline", "gguf", "llama", "modelo local", "ndk") => "ia-offline",
             _ when ContainsAny(value, "tool call", "ferramenta", "memória", "prompt", "agente") => "ia-toolcalls",
-            _ when ContainsAny(value, "segurança", "permissão", "privacidade", "risco") => "seguranca",
+            _ when ContainsAny(value, "segurança", "permissão", "permissões", "privacidade", "risco") => "seguranca",
             _ when ContainsAny(value, "tela", "ux", "interface", "navegação", "acessibilidade") => "ux",
             _ when ContainsAny(value, "tarefa", "lembrete", "notificação") => "tarefas",
             _ when ContainsAny(value, "teste", "ci", "build", "apk", "workflow") => "qa-ci",

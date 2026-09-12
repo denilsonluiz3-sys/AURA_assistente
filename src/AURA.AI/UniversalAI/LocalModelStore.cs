@@ -156,8 +156,10 @@ public sealed class LocalModelStore
     private static string SanitizeId(string value)
     {
         if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("Id do modelo obrigatório.", nameof(value));
-        string id = new(value.Trim().Where(c => char.IsLetterOrDigit(c) || c is '-' or '_' or '.').ToArray());
-        if (id.Length is < 1 or > 80) throw new ArgumentException("Id do modelo inválido.", nameof(value));
+        string id = value.Trim();
+        if (id.Length is < 1 or > 80 || id is "." or ".." ||
+            id.Any(c => !(char.IsLetterOrDigit(c) || c is '-' or '_' or '.')))
+            throw new ArgumentException("Id do modelo inválido.", nameof(value));
         return id;
     }
 
