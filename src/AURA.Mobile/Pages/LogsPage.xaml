@@ -5,7 +5,7 @@
              Title="Logs + IA"
              BackgroundColor="{DynamicResource AuraBackground}">
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="20" RowSpacing="10">
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="12,10,12,16" RowSpacing="10">
 
         <Label Text="Logs do app + diagnóstico por IA"
                FontAttributes="Bold"
@@ -17,14 +17,20 @@
                FontSize="13"
                TextColor="{DynamicResource AuraTextSecondary}" />
 
-        <Editor x:Name="LogViewer"
-                Grid.Row="2"
-                TextColor="{DynamicResource AuraTextPrimary}"
+        <Border Grid.Row="2"
                 BackgroundColor="{DynamicResource AuraSurface}"
-                FontFamily="monospace"
-                FontSize="11"
-                IsReadOnly="True"
-                AutoSize="TextChanges" />
+                Stroke="{DynamicResource AuraBorder}"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 14"
+                Padding="8">
+            <Editor x:Name="LogViewer"
+                    TextColor="{DynamicResource AuraTextPrimary}"
+                    BackgroundColor="Transparent"
+                    FontFamily="monospace"
+                    FontSize="11"
+                    IsReadOnly="True"
+                    AutoSize="TextChanges" />
+        </Border>
 
         <ScrollView Grid.Row="3">
             <VerticalStackLayout Spacing="8">
@@ -35,33 +41,23 @@
                 <Button x:Name="AnalyzeButton"
                         Text="Analisar com IA"
                         Clicked="OnAnalyzeClicked"
-                        BackgroundColor="{DynamicResource AuraAccent}"
-                        TextColor="White"
-                        CornerRadius="8" />
+                        Style="{StaticResource BtnPrimary}" />
                 <Button x:Name="TestButton"
                         Text="Testar conexão"
                         Clicked="OnTestClicked"
-                        BackgroundColor="{DynamicResource AuraSurface}"
-                        TextColor="{DynamicResource AuraTextPrimary}"
-                        CornerRadius="8" />
+                        Style="{StaticResource BtnGhost}" />
                 <Button x:Name="CopyButton"
                         Text="Copiar log"
                         Clicked="OnCopyClicked"
-                        BackgroundColor="{DynamicResource AuraSurface}"
-                        TextColor="{DynamicResource AuraTextPrimary}"
-                        CornerRadius="8" />
+                        Style="{StaticResource BtnGhost}" />
                 <Button x:Name="ShareButton"
                         Text="Compartilhar log"
                         Clicked="OnShareClicked"
-                        BackgroundColor="{DynamicResource AuraSurface}"
-                        TextColor="{DynamicResource AuraTextPrimary}"
-                        CornerRadius="8" />
+                        Style="{StaticResource BtnGhost}" />
                 <Button x:Name="RefreshButton"
                         Text="Recarregar log"
                         Clicked="OnRefreshClicked"
-                        BackgroundColor="{DynamicResource AuraSurface}"
-                        TextColor="{DynamicResource AuraTextPrimary}"
-                        CornerRadius="8" />
+                        Style="{StaticResource BtnGhost}" />
             </VerticalStackLayout>
         </ScrollView>
 

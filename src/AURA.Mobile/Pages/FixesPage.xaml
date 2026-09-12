@@ -6,7 +6,7 @@
              Title="Correções"
              BackgroundColor="{DynamicResource AuraBackground}">
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="20" RowSpacing="10">
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="12,10,12,16" RowSpacing="10">
 
         <Label Text="Correções diretas (sem recompilar)"
                FontAttributes="Bold"
@@ -27,9 +27,10 @@
                 <CollectionView x:Name="FixesView">
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="diagnostics:FixProposal">
-                            <Frame BackgroundColor="{DynamicResource AuraSurface}"
-                                   BorderColor="Transparent"
-                                   CornerRadius="12"
+                            <Border BackgroundColor="{DynamicResource AuraSurface}"
+                                   Stroke="{DynamicResource AuraBorder}"
+                                   StrokeThickness="1"
+                                   StrokeShape="RoundRectangle 12"
                                    Padding="12"
                                    Margin="0,4">
                                 <VerticalStackLayout Spacing="4">
@@ -53,7 +54,7 @@
                                     <CheckBox IsChecked="{Binding Selected}"
                                               Color="{DynamicResource AuraAccent}" />
                                 </VerticalStackLayout>
-                            </Frame>
+                            </Border>
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
                 </CollectionView>
@@ -68,21 +69,15 @@
             <Button x:Name="AnalyzeButton"
                     Text="Analisar e propor correções"
                     Clicked="OnAnalyzeClicked"
-                    BackgroundColor="{DynamicResource AuraAccent}"
-                    TextColor="White"
-                    CornerRadius="8" />
+                    Style="{StaticResource BtnPrimary}" />
             <Button x:Name="ApplyButton"
                     Text="Aplicar selecionadas"
                     Clicked="OnApplyClicked"
-                    BackgroundColor="{DynamicResource AuraSurface}"
-                    TextColor="{DynamicResource AuraTextPrimary}"
-                    CornerRadius="8" />
+                    Style="{StaticResource BtnGhost}" />
             <Button x:Name="ResetButton"
                     Text="Restaurar padrão"
                     Clicked="OnResetClicked"
-                    BackgroundColor="{DynamicResource AuraSurface}"
-                    TextColor="{DynamicResource AuraTextPrimary}"
-                    CornerRadius="8" />
+                    Style="{StaticResource BtnGhost}" />
         </VerticalStackLayout>
 
     </Grid>

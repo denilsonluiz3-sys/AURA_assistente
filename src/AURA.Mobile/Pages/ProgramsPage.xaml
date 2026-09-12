@@ -4,7 +4,7 @@
              x:Class="AURA.Mobile.Pages.ProgramsPage"
              Title="Programas"
              BackgroundColor="{DynamicResource AuraBackground}">
-    <Grid RowDefinitions="Auto,*" Padding="16,12">
+    <Grid RowDefinitions="Auto,*" Padding="12,10,12,16">
         <VerticalStackLayout Spacing="4">
             <Label Text="Programas AURA"
                    FontSize="22"
@@ -28,9 +28,7 @@
             </CollectionView.EmptyView>
             <CollectionView.ItemTemplate>
                 <DataTemplate>
-                    <Border BackgroundColor="{DynamicResource AuraSurface}"
-                            Stroke="{DynamicResource AuraBorder}"
-                            StrokeThickness="1"
+                    <Border Style="{StaticResource AuraCard}"
                             Padding="14,12"
                             Margin="0,0,0,10">
                         <Border.StrokeShape>
@@ -75,9 +73,7 @@
                                     Text="{Binding ActionButtonText}"
                                     Command="{Binding ExecuteCommand}"
                                     IsEnabled="{Binding CanExecute}"
-                                    BackgroundColor="{DynamicResource AuraAccent}"
-                                    TextColor="White"
-                                    CornerRadius="8"
+                                    Style="{StaticResource BtnPrimary}"
                                     Padding="12,8"
                                     FontSize="13" />
                         </Grid>
