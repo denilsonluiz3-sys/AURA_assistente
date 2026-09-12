@@ -175,7 +175,8 @@ public sealed class UniversalAiProviderProtocolTests
                 return Task.FromResult(Json("{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":null,\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"decisão\"}],\"tool_calls\":[{\"id\":\"reasoning-call\",\"type\":\"function\",\"function\":{\"name\":\"echo_value\",\"arguments\":\"{\\\"value\\\":\\\"x\\\"}\"}}]}}]}"));
             }
 
-            var assistant = root.GetProperty("messages")[1];
+            var assistant = root.GetProperty("messages").EnumerateArray()
+                .Single(message => message.GetProperty("role").GetString() == "assistant");
             Assert.True(assistant.TryGetProperty("reasoning_details", out var details));
             Assert.Equal(JsonValueKind.Array, details.ValueKind);
             Assert.Equal("reasoning.text", details[0].GetProperty("type").GetString());
