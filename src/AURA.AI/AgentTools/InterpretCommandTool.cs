@@ -45,7 +45,11 @@ namespace AURA.AI
             }
 
             var result = Interpret(command);
-            string json = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true });
+            string json = JsonSerializer.Serialize(result, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
             return Task.FromResult(json);
         }
 

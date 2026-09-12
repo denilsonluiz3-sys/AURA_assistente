@@ -45,6 +45,7 @@ namespace AURA.Agents
         public ITool Resolve(string intent)
         {
             if (_tools.TryGetValue(intent, out ITool? tool)) return tool;
+            if (_tools.TryGetValue("conversar", out ITool? conversation)) return conversation;
             return new DelegateTool("unknown", (_, _, _) => Task.FromResult(
                 new ToolResult(false, "Não sei como executar essa solicitação localmente.")));
         }

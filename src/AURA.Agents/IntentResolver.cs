@@ -22,6 +22,15 @@ namespace AURA.Agents
         {
             string command = normalizedCommand ?? string.Empty;
 
+            if (ContainsAny(command, "diagnóstico", "diagnostico", "diagnosticar", "status do aparelho", "aparelho"))
+            {
+                var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["action"] = "device-diagnostic"
+                };
+                return new IntentResult("android", 0.95, parameters);
+            }
+
             if (ContainsAny(command, "pesquise", "busque", "procure", "search"))
                 return Result("search", 0.95, command, "pesquise", "busque", "procure", "search");
 

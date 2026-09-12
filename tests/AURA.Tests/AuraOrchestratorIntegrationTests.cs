@@ -3,7 +3,6 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.Agents;
-using AURA.AI;
 using AURA.AI.UniversalAI;
 using AURA.Abstractions.Execution;
 using AURA.Core;
@@ -42,13 +41,13 @@ public sealed class AuraOrchestratorIntegrationTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_NoMemoryHit_DelegatesToAgentSession()
+    public async Task ExecuteAsync_NoMemoryHit_UsesConversationTool()
     {
         using var fixture = new OrchestratorFixture(new FakeUniversalAiClient());
 
         string result = await fixture.Orchestrator.ExecuteAsync("comando totalmente novo que não existe na memória");
 
-        Assert.StartsWith("❌ Erro ao processar:", result);
+        Assert.Equal("Resultado web", result);
     }
 
     private sealed class OrchestratorFixture : IDisposable

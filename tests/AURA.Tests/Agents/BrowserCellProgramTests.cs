@@ -19,7 +19,7 @@ public sealed class BrowserCellProgramTests
         var result = await new BrowserCellProgram().ExecuteAsync(context);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("https://example.com", browser.LastUrl);
+        Assert.Equal("https://example.com/", browser.LastUrl);
     }
 
     [Fact]
