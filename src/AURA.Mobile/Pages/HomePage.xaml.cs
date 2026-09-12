@@ -9,6 +9,7 @@ public partial class HomePage : ContentPage
 {
     private const string VideoBgPrefKey = "aura_video_bg";
     private IDispatcherTimer? _clockTimer;
+    private int _videoRequestId;
 
     public HomePage()
     {
@@ -55,6 +56,7 @@ public partial class HomePage : ContentPage
     {
         base.OnDisappearing();
         _clockTimer?.Stop();
+        Interlocked.Increment(ref _videoRequestId);
         PauseVideoBackground();
     }
 
@@ -130,6 +132,7 @@ public partial class HomePage : ContentPage
     private async void ApplyVideoBackground()
     {
         if (BgVideo is null) return;
+        int requestId = Interlocked.Increment(ref _videoRequestId);
 
         if (!IsVideoBgEnabled)
         {
@@ -142,18 +145,22 @@ public partial class HomePage : ContentPage
         try
         {
             using Stream stream = await FileSystem.OpenAppPackageFileAsync(resource);
-            await stream.DisposeAsync();
+            if (requestId != _videoRequestId) return;
 
             await BgVideo.FadeTo(0, 100, Easing.Linear);
+            if (requestId != _videoRequestId) return;
             BgVideo.Stop();
+            BgVideo.Source = null;
             BgVideo.Source = MediaSource.FromResource(resource);
             BgVideo.IsVisible = true;
             await BgVideo.FadeTo(1, 250, Easing.Linear);
+            if (requestId != _videoRequestId) return;
             BgVideo.Play();
             AuraLog.Info($"Vídeo de fundo carregado: {resource}");
         }
         catch (Exception ex)
         {
+            if (requestId != _videoRequestId) return;
             BgVideo.Stop();
             BgVideo.IsVisible = false;
             AuraLog.Info($"Vídeo de fundo indisponível: {resource} ({ex.GetType().Name})");
