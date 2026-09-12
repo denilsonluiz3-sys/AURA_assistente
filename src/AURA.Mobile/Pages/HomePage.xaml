@@ -5,7 +5,7 @@
              x:Class="AURA.Mobile.Pages.HomePage"
              Title="Início"
              BackgroundColor="{DynamicResource AuraBackground}">
-    <Grid RowDefinitions="*,Auto" Padding="0">
+    <Grid RowDefinitions="*,0" Padding="0">
         <toolkit:MediaElement x:Name="BgVideo"
                               Grid.RowSpan="2"
                               Aspect="AspectFill"
@@ -51,7 +51,9 @@
             </VerticalStackLayout>
         </ScrollView>
 
-        <Border Grid.Row="1" Style="{StaticResource AuraGlassBar}" Margin="12,0,12,12">
+        <!-- A navegação global agora é fornecida pela barra inferior da MainPage.
+             Mantemos os handlers legados no code-behind para compatibilidade. -->
+        <Border Grid.Row="1" IsVisible="False" Style="{StaticResource AuraGlassBar}" Margin="12,0,12,12">
             <Grid ColumnDefinitions="*,*,*,*,*">
                 <VerticalStackLayout Grid.Column="0"><Button x:Name="BtnInicio" Text="⌂" FontSize="18" BackgroundColor="Transparent" TextColor="{DynamicResource AuraCyan}" HeightRequest="36" Clicked="OnInicioClicked" /><Label Text="Início" FontSize="9" TextColor="{DynamicResource AuraCyan}" HorizontalTextAlignment="Center" /></VerticalStackLayout>
                 <VerticalStackLayout Grid.Column="1"><Button x:Name="BtnDiagnostico" Text="◎" FontSize="18" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextPrimary}" HeightRequest="36" Clicked="OnDiagnosticoClicked" /><Label Text="Diagnóstico" FontSize="9" TextColor="{DynamicResource AuraTextSecondary}" HorizontalTextAlignment="Center" /></VerticalStackLayout>
