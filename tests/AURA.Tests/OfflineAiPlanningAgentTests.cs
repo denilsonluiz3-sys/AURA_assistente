@@ -16,6 +16,6 @@ public sealed class OfflineAiPlanningAgentTests
         Assert.Equal(AgentReportStatus.Complete, report.Status);
         Assert.Contains(report.Evidence, item => item.Reference == "model-import");
         Assert.Contains(report.Evidence, item => item.Reference == "tool-loop");
-        Assert.Contains(report.NextStep!, item => item.Contains("modelo GGUF"));
+        Assert.Contains("modelo GGUF", report.NextStep);
     }
 }
