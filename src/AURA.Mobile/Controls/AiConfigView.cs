@@ -1,5 +1,6 @@
 using AURA.AI.UniversalAI;
 using AURA.Mobile.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AURA.Mobile.Controls;
 
@@ -85,6 +86,19 @@ public sealed class AiConfigView : ContentView
         FontSize = 12,
         HeightRequest = 36
     };
+    private readonly Button _importLocalModelButton = new()
+    {
+        Text = "Importar modelo GGUF",
+        FontSize = 12,
+        HeightRequest = 36
+    };
+    private readonly Label _localModelStatus = new()
+    {
+        FontSize = 11,
+        LineBreakMode = LineBreakMode.WordWrap,
+        MaxLines = 3,
+        TextColor = Color.FromArgb("#8a9bb8")
+    };
     private readonly Button _connectButton = new()
     {
         Text = "Conectar",
@@ -125,6 +139,7 @@ public sealed class AiConfigView : ContentView
         };
         _advancedToggle.Clicked += OnAdvancedToggle;
         _loadModelsButton.Clicked += OnLoadModelsClicked;
+        _importLocalModelButton.Clicked += OnImportLocalModelClicked;
         _connectButton.Clicked += OnConnectClicked;
         Loaded += (_, _) => LoadExisting();
 
@@ -145,6 +160,8 @@ public sealed class AiConfigView : ContentView
                 _modelEntry,
                 _modelPicker,
                 _loadModelsButton,
+                _importLocalModelButton,
+                _localModelStatus,
                 _advancedToggle,
                 _baseUrlEntry,
                 _modelsUrlEntry,
@@ -180,6 +197,7 @@ public sealed class AiConfigView : ContentView
 
     private void LoadExisting()
     {
+        RefreshLocalModelStatus();
         var provider = RuntimeConfig.Provider?.Trim() ?? string.Empty;
         var idx = Array.FindIndex(Presets, p =>
             !string.IsNullOrEmpty(provider) &&
@@ -314,6 +332,63 @@ public sealed class AiConfigView : ContentView
         _baseUrlEntry.IsVisible = open;
         _modelsUrlEntry.IsVisible = open;
         _advancedToggle.Text = open ? "▾ Avançado" : "▸ Avançado";
+    }
+
+    private void RefreshLocalModelStatus()
+    {
+        try
+        {
+            var store = Handler?.MauiContext?.Services.GetService<LocalModelStore>();
+            var models = store?.List() ?? Array.Empty<LocalModelDescriptor>();
+            _localModelStatus.Text = models.Count == 0
+                ? "Offline: nenhum modelo GGUF importado."
+                : "Offline: " + string.Join(", ", models.Select(x => x.DisplayName));
+        }
+        catch (Exception ex)
+        {
+            _localModelStatus.Text = "Offline indisponível: " + ex.Message;
+        }
+    }
+
+    private async void OnImportLocalModelClicked(object? sender, EventArgs e)
+    {
+        try
+        {
+            var store = Handler?.MauiContext?.Services.GetService<LocalModelStore>();
+            if (store is null)
+            {
+                _localModelStatus.Text = "Offline indisponível neste dispositivo.";
+                return;
+            }
+
+            FileResult? file = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Selecionar modelo GGUF"
+            });
+            if (file is null) return;
+            if (!file.FileName.EndsWith(".gguf", StringComparison.OrdinalIgnoreCase))
+            {
+                _localModelStatus.Text = "Somente arquivos .gguf são aceitos.";
+                return;
+            }
+
+            string rawId = Path.GetFileNameWithoutExtension(file.FileName).ToLowerInvariant();
+            string id = string.Concat(rawId.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' or '.' ? c : '-'));
+            if (string.IsNullOrWhiteSpace(id)) id = "modelo-local";
+            await using Stream stream = await file.OpenReadAsync();
+            LocalModelDescriptor imported = await store.ImportAsync(stream, new LocalModelDescriptor
+            {
+                Id = id,
+                DisplayName = file.FileName,
+                FileName = file.FileName
+            });
+            _localModelStatus.Text = $"Offline: {imported.DisplayName} importado ({imported.SizeBytes / (1024 * 1024)} MB). Inferência ainda não ativada.";
+        }
+        catch (Exception ex)
+        {
+            _localModelStatus.Text = "Falha ao importar GGUF: " + ex.Message;
+            AuraLog.Exception("AiConfigView.ImportLocalModel", ex);
+        }
     }
 
     private async void OnLoadModelsClicked(object? sender, EventArgs e)
