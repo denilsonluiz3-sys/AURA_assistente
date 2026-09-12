@@ -103,6 +103,7 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new LocalPlaybook(sp.GetRequiredService<SolutionStore>(), sp.GetRequiredService<MemoryStore>()));
         builder.Services.AddSingleton<FileTool>(sp => new FileTool(AgentWorkspace.ActiveRoot));
         builder.Services.AddSingleton<WorkspaceDocumentService>();
+        builder.Services.AddSingleton<AttachmentStore>();
         builder.Services.AddSingleton<AuraOrchestrator>(sp => new AuraOrchestrator(sp.GetRequiredService<ILogger>(), sp.GetRequiredService<SolutionStore>(), sp.GetRequiredService<Runner>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetRequiredService<IToolExecutor>(), sp.GetRequiredService<AURA.Core.Abstractions.IWebSearch>(), sp.GetRequiredService<IUniversalAiClient>(), events: sp.GetRequiredService<EventBus>(), intentResolver: sp.GetRequiredService<IIntentResolver>(), policyGuard: sp.GetRequiredService<PolicyGuard>()));
         builder.Services.AddSingleton<IOrchestrator>(sp => sp.GetRequiredService<AuraOrchestrator>());
         builder.Services.AddSingleton<AURA.Abstractions.Process.IProcessOrchestrator>(sp => new AURA.Agents.LegalProcessEngine(sp.GetRequiredService<ILogger>(), sp.GetServices<AURA.Core.Abstractions.IAgent>(), sp.GetRequiredService<IOrchestrator>(), sp.GetRequiredService<EventBus>()));

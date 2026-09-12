@@ -76,11 +76,14 @@
         <Border x:Name="InputBarHost" Grid.Row="4" ZIndex="50" BackgroundColor="{DynamicResource AuraSurface}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,8">
             <VerticalStackLayout Spacing="6">
                 <ScrollView x:Name="ConfigHost" IsVisible="False" MaximumHeightRequest="260" VerticalScrollBarVisibility="Default" BackgroundColor="{DynamicResource AuraSurface2}" />
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <Label x:Name="PendingAttachmentLabel" IsVisible="False" FontSize="11" TextColor="{DynamicResource AuraAccent}" LineBreakMode="TailTruncation" />
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
                     <Border Grid.Column="0" BackgroundColor="{DynamicResource AuraSurface2}" Stroke="{DynamicResource AuraBorder}" StrokeThickness="1" Padding="12,5" StrokeShape="RoundRectangle 12,12,12,12">
                         <Editor x:Name="CommandEditor" MinimumHeightRequest="40" MaximumHeightRequest="110" Placeholder="Instrua o agente… (ex.: ls, diagnostique)" AutoSize="TextChanges" BackgroundColor="Transparent" />
                     </Border>
-                    <Grid Grid.Column="1" WidthRequest="56" HeightRequest="56" VerticalOptions="End" ZIndex="51">
+                    <Button Grid.Column="1" x:Name="AttachButton" Text="📎" Clicked="OnAttachmentClicked" SemanticProperties.Description="Importar arquivo para a AURA" FontSize="18" Padding="0" WidthRequest="44" HeightRequest="44" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="22" VerticalOptions="End" />
+                    <Button Grid.Column="2" x:Name="MicrophoneButton" Text="🎙" Clicked="OnMicrophoneClicked" SemanticProperties.Description="Ditado por voz" FontSize="18" Padding="0" WidthRequest="44" HeightRequest="44" BackgroundColor="{DynamicResource AuraSurface2}" TextColor="{DynamicResource AuraAccent}" CornerRadius="22" VerticalOptions="End" />
+                    <Grid Grid.Column="3" WidthRequest="56" HeightRequest="56" VerticalOptions="End" ZIndex="51">
                         <ActivityIndicator x:Name="BusyIndicator" IsRunning="False" IsVisible="False" InputTransparent="True" Color="White" WidthRequest="22" HeightRequest="22" HorizontalOptions="Center" VerticalOptions="Center" />
                         <Button x:Name="RunButton" Text="▶" Clicked="OnRunOrStopClicked" BackgroundColor="{DynamicResource AuraAccent}" TextColor="White" CornerRadius="28" FontSize="18" Padding="0" WidthRequest="56" HeightRequest="56" />
                     </Grid>

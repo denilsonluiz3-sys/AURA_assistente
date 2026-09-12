@@ -831,12 +831,13 @@ public partial class AgentPage : ContentPage
         try { CommandEditor.Unfocus(); } catch { /* ignore */ }
 
         string text = CommandEditor.Text?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(text))
+        if (string.IsNullOrWhiteSpace(text) && !HasPendingAttachments())
         {
-            await SafeAlertAsync("Agente", "Digite uma instrução antes de enviar.");
+            await SafeAlertAsync("Agente", "Digite uma instrução ou importe um arquivo antes de enviar.");
             return;
         }
 
+        text = PrepareCommandWithPendingAttachments(text);
         bool wasContinue = IsContinueCommand(text);
         string resolved = ExpandContinueCommand(text);
 
