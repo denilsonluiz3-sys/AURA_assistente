@@ -70,6 +70,14 @@ namespace AURA.AI
 
     public sealed class ReadFileTool : WorkspaceAgentTool
     {
+        private const int MaxCharacters = 40000;
+        private static readonly HashSet<string> TextExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".txt", ".md", ".log", ".csv", ".json", ".xml", ".yaml", ".yml", ".toml", ".ini", ".conf",
+            ".cs", ".csproj", ".sln", ".props", ".targets", ".xaml", ".java", ".kt", ".c", ".cpp", ".h",
+            ".js", ".ts", ".tsx", ".jsx", ".py", ".sh", ".sql", ".html", ".css"
+        };
+
         public ReadFileTool(string workspaceRoot) : base(workspaceRoot)
         {
         }
@@ -77,7 +85,7 @@ namespace AURA.AI
         public override AgentToolDefinition Definition => new AgentToolDefinition
         {
             Name = "read_file",
-            Description = "Lê o conteúdo textual de um arquivo do workspace (máx. 40.000 caracteres).",
+            Description = "Lê um arquivo textual útil do workspace (máx. 40.000 caracteres). Rejeita arquivos binários.",
             Parameters =
             {
                 ["path"] = new AgentToolParameter
@@ -89,7 +97,7 @@ namespace AURA.AI
             Required = { "path" }
         };
 
-        public override Task<string> ExecuteAsync(string argumentsJson, CancellationToken ct = default)
+        public override async Task<string> ExecuteAsync(string argumentsJson, CancellationToken ct = default)
         {
             string path;
             using (JsonDocument doc = JsonDocument.Parse(argumentsJson))
@@ -99,13 +107,30 @@ namespace AURA.AI
 
             string file = ResolvePath(path);
             if (!File.Exists(file))
+                return "ERRO: arquivo não existe: " + path;
+
+            string extension = Path.GetExtension(file);
+            if (!string.IsNullOrEmpty(extension) && !TextExtensions.Contains(extension))
+                return "ERRO: tipo não textual; o Agente não analisa este arquivo: " + path;
+
+            await using FileStream stream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            char[] buffer = new char[MaxCharacters + 1];
+            int count = 0;
+            while (count < buffer.Length)
             {
-                return Task.FromResult("ERRO: arquivo não existe: " + path);
+                int read = await reader.ReadAsync(buffer.AsMemory(count, buffer.Length - count), ct).ConfigureAwait(false);
+                if (read == 0) break;
+                count += read;
             }
 
-            ct.ThrowIfCancellationRequested();
-            string content = File.ReadAllText(file);
-            return Task.FromResult(Truncate(content));
+            string content = new(buffer, 0, Math.Min(count, MaxCharacters));
+            if (content.IndexOf('\0') >= 0)
+                return "ERRO: conteúdo binário detectado; o Agente não analisa este arquivo: " + path;
+
+            if (count > MaxCharacters)
+                content += "\n... (truncado: arquivo excede 40.000 caracteres)";
+            return content;
         }
     }
 

@@ -110,6 +110,14 @@ namespace AURA.Agents
             _logger.Info("[ORQUESTRA] " + normalized);
 
             IntentResult intent = _intentResolver.Resolve(normalized);
+            AgentToolPolicy? effectivePolicy = toolPolicy ?? _toolPolicy;
+            if (effectivePolicy != null && !effectivePolicy.Allows(MapIntentToTool(intent.Intent)))
+            {
+                string deniedTool = MapIntentToTool(intent.Intent);
+                Publish(processId, "Política", "AgentToolPolicy", "Bloqueado", "Ferramenta não autorizada: " + deniedTool, 0.15);
+                return "⛔ A política atual não permite executar esta ação nesta etapa: " + deniedTool;
+            }
+
             AuthorizationResult auth = _policyGuard.Authorize(intent.Intent, userCommand);
 
             if (auth.Decision == AuthorizationDecision.Blocked)
@@ -119,14 +127,6 @@ namespace AURA.Agents
             {
                 Publish(processId, "Política", "PolicyGuard", "Aguardando", auth.Message, 0.15);
                 return "⚠️ " + auth.Message + " Responda explicitamente para confirmar a execução.";
-            }
-
-            AgentToolPolicy? effectivePolicy = toolPolicy ?? _toolPolicy;
-            if (effectivePolicy != null && !effectivePolicy.Allows(MapIntentToTool(intent.Intent)))
-            {
-                string deniedTool = MapIntentToTool(intent.Intent);
-                Publish(processId, "Política", "AgentToolPolicy", "Bloqueado", "Ferramenta não autorizada: " + deniedTool, 0.15);
-                return "⛔ A política atual não permite executar esta ação nesta etapa: " + deniedTool;
             }
 
             WorkGroupDefinition workGroup = _workGroups.ResolveFor(userCommand + " " + intent.Intent);

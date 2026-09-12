@@ -24,7 +24,9 @@ public sealed class AttachmentStore
     private static readonly SemaphoreSlim RegistryGate = new(1, 1);
     private static readonly string[] AllowedExtensions =
     {
-        ".txt", ".md", ".csv", ".json", ".xml", ".log", ".cs", ".js", ".py", ".sh",
+        ".txt", ".md", ".csv", ".json", ".xml", ".log", ".yaml", ".yml", ".toml", ".ini", ".conf",
+        ".cs", ".csproj", ".sln", ".props", ".targets", ".xaml", ".java", ".kt", ".c", ".cpp", ".h",
+        ".js", ".ts", ".tsx", ".jsx", ".py", ".sh", ".sql", ".html", ".css",
 ".xlsx", ".png", ".jpg", ".jpeg", ".webp", ".gif",
         ".mp3", ".wav", ".m4a", ".mp4", ".mov"
     };

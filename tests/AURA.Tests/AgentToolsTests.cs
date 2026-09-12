@@ -43,6 +43,35 @@ public class AgentToolsTests
     }
 
     [Fact]
+    public async Task ReadFileRejectsBinaryExtension()
+    {
+        string root = CreateTempWorkspace();
+        try
+        {
+            await File.WriteAllBytesAsync(Path.Combine(root, "imagem.png"), new byte[] { 0x89, 0x50, 0x4E, 0x47 });
+            var reader = new ReadFileTool(root);
+            string result = await reader.ExecuteAsync(JsonSerializer.Serialize(new { path = "imagem.png" }));
+            Assert.Contains("tipo não textual", result);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public async Task ReadFileTruncatesLargeText()
+    {
+        string root = CreateTempWorkspace();
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "grande.log"), new string('x', 45000));
+            var reader = new ReadFileTool(root);
+            string result = await reader.ExecuteAsync(JsonSerializer.Serialize(new { path = "grande.log" }));
+            Assert.Equal(40000, result[..40000].Length);
+            Assert.Contains("truncado", result);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
     public async Task EditFileReplacesFirstOccurrence()
     {
         string root = CreateTempWorkspace();
