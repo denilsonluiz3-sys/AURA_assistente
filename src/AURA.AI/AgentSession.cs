@@ -16,6 +16,7 @@ public sealed class AgentSession
     private readonly MemoryStore? _memory;
     private readonly int _maxRounds;
     private readonly AgentRunStore _runStore;
+    private readonly AgentToolPolicy? _toolPolicy;
     private AgentRunState? _runState;
     private const int MaxHistoryMessages = 16;
 
@@ -24,10 +25,11 @@ public sealed class AgentSession
     private static CancellationTokenSource? AmbientCts;
     private static readonly object AmbientGate = new();
 
-    public AgentSession(IUniversalAiClient client, IEnumerable<AgentTool> tools, string? systemPrompt = null, ILogger? logger = null, MemoryStore? memory = null, int maxRounds = 12, AgentRunStore? runStore = null)
+    public AgentSession(IUniversalAiClient client, IEnumerable<AgentTool> tools, string? systemPrompt = null, ILogger? logger = null, MemoryStore? memory = null, int maxRounds = 12, AgentRunStore? runStore = null, AgentToolPolicy? toolPolicy = null)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _toolRegistry = new ToolRegistry(tools ?? Array.Empty<AgentTool>());
+        _toolPolicy = toolPolicy;
         _systemPrompt = systemPrompt;
         _logger = logger ?? new ConsoleLogger();
         _memory = memory;
@@ -152,7 +154,9 @@ public sealed class AgentSession
                 TrimHistory();
                 var response = await _client.ChatToolsAsync(
                     new List<AgentMessage>(_messages),
-                    _toolRegistry.Definitions(),
+                    _toolPolicy == null
+                        ? _toolRegistry.Definitions()
+                        : _toolPolicy.Filter(_toolRegistry.Definitions()),
                     httpClient,
                     token,
                     BuildSystemPrompt()).ConfigureAwait(false);
@@ -196,22 +200,29 @@ public sealed class AgentSession
                         }
                         else
                         {
-                            var tool = _toolRegistry.Resolve(call.Name);
-                            if (tool == null)
-                                result = "ERRO: ferramenta não encontrada: " + call.Name;
+                            if (_toolPolicy != null && !_toolPolicy.Allows(call.Name))
+                            {
+                                result = "ERRO: ferramenta não autorizada pela política da sessão: " + call.Name;
+                            }
                             else
                             {
-                                try
+                                var tool = _toolRegistry.Resolve(call.Name);
+                                if (tool == null)
+                                    result = "ERRO: ferramenta não encontrada: " + call.Name;
+                                else
                                 {
-                                    result = await tool.ExecuteAsync(call.ArgumentsJson, token).ConfigureAwait(false);
-                                }
-                                catch (OperationCanceledException)
-                                {
-                                    throw;
-                                }
-                                catch (Exception ex)
-                                {
-                                    result = "ERRO: " + ex.Message;
+                                    try
+                                    {
+                                        result = await tool.ExecuteAsync(call.ArgumentsJson, token).ConfigureAwait(false);
+                                    }
+                                    catch (OperationCanceledException)
+                                    {
+                                        throw;
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        result = "ERRO: " + ex.Message;
+                                    }
                                 }
                             }
                         }
