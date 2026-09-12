@@ -10,11 +10,12 @@
 
         <!-- ── Header ─────────────────────────────────────────── -->
         <Border Grid.Row="0"
+                Margin="10,8,10,0"
                 BackgroundColor="{DynamicResource AuraSurface}"
                 Stroke="{DynamicResource AuraBorder}"
                 StrokeThickness="1"
-                Padding="16,14"
-                StrokeShape="RoundRectangle 0,0,0,0">
+                Padding="14,12"
+                StrokeShape="RoundRectangle 18">
             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
                 <VerticalStackLayout Spacing="2">
                     <HorizontalStackLayout Spacing="8">
@@ -61,11 +62,8 @@
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="vm:ModuleRow">
                     <Border Margin="14,5"
-                            BackgroundColor="{DynamicResource AuraSurface}"
-                            Stroke="{DynamicResource AuraBorder}"
-                            StrokeThickness="1"
-                            Padding="14,12"
-                            StrokeShape="RoundRectangle 14,14,14,14">
+                            Style="{StaticResource AuraCard}"
+                            Padding="14,12">
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                             <VerticalStackLayout Spacing="4">
                                 <HorizontalStackLayout Spacing="8">

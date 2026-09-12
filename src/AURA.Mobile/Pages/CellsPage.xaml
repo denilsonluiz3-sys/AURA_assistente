@@ -6,7 +6,7 @@
              Title="Células"
              BackgroundColor="{DynamicResource AuraBackground}">
 
-    <Grid RowDefinitions="Auto,*,Auto" Padding="16" RowSpacing="10">
+    <Grid RowDefinitions="Auto,*,Auto" Padding="12,10,12,16" RowSpacing="10">
 
         <Label Text="Células (processos isolados com reciclagem em crash)"
                FontAttributes="Bold"
@@ -21,9 +21,7 @@
             </CollectionView.EmptyView>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="runtime:Cell">
-                    <Frame BackgroundColor="{DynamicResource AuraSurface}"
-                           BorderColor="Transparent"
-                           CornerRadius="12"
+                    <Border Style="{StaticResource AuraCard}"
                            Padding="12"
                            Margin="0,4">
                         <VerticalStackLayout Spacing="6">
@@ -49,60 +47,48 @@
                                 <Button Text="Iniciar"
                                         CommandParameter="{Binding .}"
                                         Clicked="OnStartClicked"
-                                        BackgroundColor="{DynamicResource AuraAccent}"
-                                        TextColor="White"
+                                        Style="{StaticResource BtnPrimary}"
                                         FontSize="13"
-                                        Padding="6,4"
-                                        CornerRadius="8" />
+                                        Padding="6,4" />
                                 <Button Grid.Column="1"
                                         Text="Parar"
                                         CommandParameter="{Binding .}"
                                         Clicked="OnStopClicked"
-                                        BackgroundColor="{DynamicResource AuraSurface}"
-                                        TextColor="{DynamicResource AuraTextPrimary}"
+                                        Style="{StaticResource BtnGhost}"
                                         FontSize="13"
-                                        Padding="6,4"
-                                        CornerRadius="8" />
+                                        Padding="6,4" />
                                 <Button Grid.Column="2"
                                         Text="Pausa"
                                         CommandParameter="{Binding .}"
                                         Clicked="OnPauseClicked"
-                                        BackgroundColor="{DynamicResource AuraSurface}"
-                                        TextColor="{DynamicResource AuraTextPrimary}"
+                                        Style="{StaticResource BtnGhost}"
                                         FontSize="13"
-                                        Padding="6,4"
-                                        CornerRadius="8" />
+                                        Padding="6,4" />
                             </Grid>
                             <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
                                 <Button Text="Retomar"
                                         CommandParameter="{Binding .}"
                                         Clicked="OnResumeClicked"
-                                        BackgroundColor="{DynamicResource AuraSurface}"
-                                        TextColor="{DynamicResource AuraTextPrimary}"
+                                        Style="{StaticResource BtnGhost}"
                                         FontSize="13"
-                                        Padding="6,4"
-                                        CornerRadius="8" />
+                                        Padding="6,4" />
                                 <Button Grid.Column="1"
                                         Text="Log"
                                         CommandParameter="{Binding .}"
                                         Clicked="OnLogClicked"
-                                        BackgroundColor="{DynamicResource AuraSurface}"
-                                        TextColor="{DynamicResource AuraTextPrimary}"
+                                        Style="{StaticResource BtnGhost}"
                                         FontSize="13"
-                                        Padding="6,4"
-                                        CornerRadius="8" />
+                                        Padding="6,4" />
                                 <Button Grid.Column="2"
                                         Text="Excluir"
                                         CommandParameter="{Binding .}"
                                         Clicked="OnDeleteClicked"
-                                        BackgroundColor="{DynamicResource AuraError}"
-                                        TextColor="White"
+                                        Style="{StaticResource BtnDanger}"
                                         FontSize="13"
-                                        Padding="6,4"
-                                        CornerRadius="8" />
+                                        Padding="6,4" />
                             </Grid>
                         </VerticalStackLayout>
-                    </Frame>
+                    </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
@@ -110,15 +96,11 @@
         <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="10">
             <Button Text="Atualizar"
                     Clicked="OnRefreshClicked"
-                    BackgroundColor="{DynamicResource AuraSurface}"
-                    TextColor="{DynamicResource AuraTextPrimary}"
-                    CornerRadius="8" />
+                    Style="{StaticResource BtnGhost}" />
             <Button Grid.Column="1"
                     Text="Nova célula"
                     Clicked="OnNewClicked"
-                    BackgroundColor="{DynamicResource AuraAccent}"
-                    TextColor="White"
-                    CornerRadius="8" />
+                    Style="{StaticResource BtnPrimary}" />
         </Grid>
 
     </Grid>

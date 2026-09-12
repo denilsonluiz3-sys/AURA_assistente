@@ -6,7 +6,7 @@
              Title="Executores"
              BackgroundColor="{DynamicResource AuraBackground}">
 
-    <Grid RowDefinitions="Auto,*,Auto,Auto" Padding="20" RowSpacing="12">
+    <Grid RowDefinitions="Auto,*,Auto,Auto" Padding="12,10,12,16" RowSpacing="10">
 
         <Label Text="Executores AURA"
                FontAttributes="Bold"
@@ -16,9 +16,7 @@
         <CollectionView x:Name="ExecutorsView" Grid.Row="1">
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="local:ExecutorStatus">
-                    <Frame BackgroundColor="{DynamicResource AuraSurface}"
-                           BorderColor="Transparent"
-                           CornerRadius="12"
+                    <Border Style="{StaticResource AuraCard}"
                            Padding="12"
                            Margin="0,4">
                         <VerticalStackLayout Spacing="4">
@@ -30,7 +28,7 @@
                                    FontSize="13"
                                    TextColor="{Binding StatusColor}" />
                         </VerticalStackLayout>
-                    </Frame>
+                    </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
@@ -51,10 +49,8 @@
                             x:Name="CopyButton"
                             Text="Copiar"
                             Clicked="OnCopyClicked"
-                            BackgroundColor="{DynamicResource AuraSurface2}"
-                            TextColor="{DynamicResource AuraAccent}"
+                            Style="{StaticResource BtnGhost}"
                             Padding="12,4"
-                            CornerRadius="8"
                             FontSize="12" />
                 </Grid>
                 <Picker x:Name="ExecutorPicker"
@@ -68,9 +64,7 @@
                 <Button x:Name="ExecButton"
                         Text="Executar"
                         Clicked="OnExecuteClicked"
-                        BackgroundColor="{DynamicResource AuraAccent}"
-                        TextColor="White"
-                        CornerRadius="8" />
+                        Style="{StaticResource BtnPrimary}" />
                 <Editor x:Name="ResultEditor"
                         IsReadOnly="True"
                         HeightRequest="150"
@@ -83,9 +77,7 @@
         <Button Grid.Row="3"
                 Text="Atualizar"
                 Clicked="OnRefreshClicked"
-                BackgroundColor="{DynamicResource AuraAccent}"
-                TextColor="White"
-                CornerRadius="8" />
+                Style="{StaticResource BtnGhost}" />
 
     </Grid>
 </ContentPage>

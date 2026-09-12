@@ -5,7 +5,7 @@
              Title="Navegador"
              BackgroundColor="{DynamicResource AuraBackground}">
 
-    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0" Padding="0,4,0,6">
 
         <!-- Barra de abas -->
         <Grid ColumnDefinitions="*,Auto,Auto"
@@ -22,13 +22,11 @@
                     x:Name="NewTabButton"
                     Text="＋"
                     Clicked="OnNewTabClicked"
-                    BackgroundColor="{DynamicResource AuraAccent}"
-                    TextColor="White"
+                    Style="{StaticResource BtnPrimary}"
                     FontSize="16"
                     Padding="12,0"
                     HeightRequest="36"
-                    Margin="0,5,8,5"
-                    CornerRadius="6" />
+                    Margin="0,5,8,5" />
             <Label Grid.Column="2"
                    x:Name="IsolatedLabel"
                    Text="🛡"
@@ -143,10 +141,8 @@
             <Button Grid.Column="4"
                     Text="Ir"
                     Clicked="OnGoClicked"
-                    BackgroundColor="{DynamicResource AuraAccent}"
-                    TextColor="White"
-                    Padding="14,2"
-                    CornerRadius="6" />
+                    Style="{StaticResource BtnPrimary}"
+                    Padding="14,2" />
             <Button Grid.Column="5"
                     x:Name="MenuButton"
                     Text="⋯"
