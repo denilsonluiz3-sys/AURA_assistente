@@ -318,7 +318,9 @@ public sealed class AgentSession
         {
             try
             {
-                sb.Append("\nMemória persistente disponível em ").Append(_memory.Path).Append(".\n");
+                // O caminho local não é necessário para o modelo e não deve ser
+                // enviado ao provider; as ferramentas já controlam os diretórios acessíveis.
+                sb.Append("\nMemória persistente disponível localmente.\n");
                 foreach (var e in _memory.Read(tail: 8).Where(x => x.Kind == MemoryKind.Turn))
                     sb.Append("- [").Append(e.Role ?? "?").Append("] ")
                         .Append((e.Text ?? string.Empty).Replace('\n', ' ').Take(180)
