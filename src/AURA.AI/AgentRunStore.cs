@@ -39,17 +39,41 @@ public sealed class AgentRunStore
         IncludeFields = true
     };
 
+    private const int DefaultMaxRetainedTerminalRuns = 20;
+    private static readonly TimeSpan DefaultRetention = TimeSpan.FromDays(14);
+
     private readonly ILogger _logger;
     private readonly string _directory;
+    private readonly TimeSpan _retention;
+    private readonly int _maxRetainedTerminalRuns;
     private readonly object _sync = new();
 
-    public AgentRunStore(ILogger? logger = null, string? directory = null)
+    public AgentRunStore(ILogger? logger = null, string? directory = null,
+        TimeSpan? retention = null, int maxRetainedTerminalRuns = DefaultMaxRetainedTerminalRuns)
     {
         _logger = logger ?? new ConsoleLogger();
         _directory = directory ?? SimulationRuntime.ExpandUserHome("~/AURA/runs");
+        _retention = retention is { } configuredRetention && configuredRetention >= TimeSpan.Zero
+            ? configuredRetention
+            : DefaultRetention;
+        _maxRetainedTerminalRuns = Math.Max(1, maxRetainedTerminalRuns);
+        Cleanup();
     }
 
     public string DirectoryPath => _directory;
+
+    /// <summary>
+    /// Remove checkpoints terminais antigos, arquivos temporários abandonados e
+    /// JSONs corrompidos que já ultrapassaram a retenção. Runs pausados ou em
+    /// execução nunca são removidos automaticamente.
+    /// </summary>
+    public int Cleanup()
+    {
+        lock (_sync)
+        {
+            return CleanupNoLock();
+        }
+    }
 
     public void Save(AgentRunState state)
     {
@@ -67,6 +91,7 @@ public sealed class AgentRunStore
                 string json = JsonSerializer.Serialize(state, Options);
                 File.WriteAllText(tmp, json);
                 File.Move(tmp, path, overwrite: true);
+                CleanupNoLock();
             }
             catch (Exception ex)
             {
@@ -117,6 +142,83 @@ public sealed class AgentRunStore
                 _logger.Warning("Não foi possível localizar runs retomáveis: " + ex.Message);
                 return null;
             }
+        }
+    }
+
+    private int CleanupNoLock()
+    {
+        if (!System.IO.Directory.Exists(_directory)) return 0;
+
+        int removed = 0;
+        DateTime cutoffUtc = DateTime.UtcNow - _retention;
+        var terminal = new List<(string Path, DateTime LastWriteUtc)>();
+
+        foreach (string path in System.IO.Directory.EnumerateFiles(_directory))
+        {
+            DateTime lastWriteUtc;
+            try { lastWriteUtc = File.GetLastWriteTimeUtc(path); }
+            catch { continue; }
+
+            if (path.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase))
+            {
+                if (lastWriteUtc < cutoffUtc)
+                    removed += TryDelete(path);
+                continue;
+            }
+
+            if (!path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            AgentRunState? state;
+            try
+            {
+                state = JsonSerializer.Deserialize<AgentRunState>(File.ReadAllText(path), Options);
+            }
+            catch
+            {
+                if (lastWriteUtc < cutoffUtc)
+                    removed += TryDelete(path);
+                else
+                    _logger.Warning("Checkpoint inválido preservado até a retenção: " + path);
+                continue;
+            }
+
+            if (state == null)
+            {
+                if (lastWriteUtc < cutoffUtc)
+                    removed += TryDelete(path);
+                continue;
+            }
+
+            if (IsTerminal(state.Status))
+            {
+                if (lastWriteUtc < cutoffUtc)
+                    removed += TryDelete(path);
+                else
+                    terminal.Add((path, lastWriteUtc));
+            }
+        }
+
+        foreach (var item in terminal.OrderBy(x => x.LastWriteUtc).Take(Math.Max(0, terminal.Count - _maxRetainedTerminalRuns)))
+            removed += TryDelete(item.Path);
+
+        return removed;
+    }
+
+    private static bool IsTerminal(string? status)
+        => status is AgentRunStatus.Completed or AgentRunStatus.Failed or AgentRunStatus.Cancelled;
+
+    private int TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning("Não foi possível limpar checkpoint '" + path + "': " + ex.Message);
+            return 0;
         }
     }
 
