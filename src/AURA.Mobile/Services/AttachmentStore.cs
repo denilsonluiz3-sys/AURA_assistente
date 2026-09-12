@@ -25,7 +25,7 @@ public sealed class AttachmentStore
     private static readonly string[] AllowedExtensions =
     {
         ".txt", ".md", ".csv", ".json", ".xml", ".log", ".cs", ".js", ".py", ".sh",
-        ".pdf", ".docx", ".xlsx", ".png", ".jpg", ".jpeg", ".webp", ".gif",
+".xlsx", ".png", ".jpg", ".jpeg", ".webp", ".gif",
         ".mp3", ".wav", ".m4a", ".mp4", ".mov"
     };
 
@@ -162,8 +162,6 @@ public sealed class AttachmentStore
         ".md" => "text/markdown",
         ".csv" => "text/csv",
         ".json" => "application/json",
-        ".pdf" => "application/pdf",
-        ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         ".png" => "image/png",
         ".jpg" or ".jpeg" => "image/jpeg",

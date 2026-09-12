@@ -103,7 +103,6 @@ public static class MauiProgram
         builder.Services.AddSingleton<AgentExecutionCoordinator>();
         builder.Services.AddSingleton(sp => new SolutionStore(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "aura")));
         builder.Services.AddSingleton(sp => new LocalPlaybook(sp.GetRequiredService<SolutionStore>(), sp.GetRequiredService<MemoryStore>()));
-        builder.Services.AddSingleton<WorkspaceDocumentService>();
         builder.Services.AddSingleton<AttachmentStore>();
         builder.Services.AddSingleton<WorkGroupRegistry>(_ => WorkGroupRegistry.CreateDefault());
         builder.Services.AddSingleton<AgentReportStore>(_ => new AgentReportStore(Path.Combine(AgentWorkspace.EnsureCreated(), ".aura", "reports")));
@@ -139,7 +138,6 @@ public static class MauiProgram
         builder.Services.AddSingleton<RunPage>();
         builder.Services.AddSingleton<ProgramsPage>();
         builder.Services.AddSingleton<ProgramsPageViewModel>();
-        builder.Services.AddSingleton<WorkspacePage>();
         AuraLog.Info("MauiProgram: services registered");
         var app = builder.Build();
         try { var bus = app.Services.GetRequiredService<EventBus>(); var memory = app.Services.GetRequiredService<MemoryStore>(); bus.Subscribe<CellStateChangedEvent>(evt => memory.Append(MemoryEntry.CellStateChange(evt.CellId, evt.To))); } catch (Exception ex) { AuraLog.Exception("MauiProgram.MemoryEventSink", ex); }
