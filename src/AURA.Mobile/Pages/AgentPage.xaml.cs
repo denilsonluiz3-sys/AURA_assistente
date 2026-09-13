@@ -221,9 +221,7 @@ public partial class AgentPage : ContentPage
         WorkspaceLabel.Text = ProjectAccessService.IsLinked
             ? "Projeto vinculado · workspace ativo"
             : "Workspace local · pronto para uso";
-        ModelLabel.Text = string.IsNullOrWhiteSpace(_client.Options.Model)
-            ? "Modelo: não configurado"
-            : $"Modelo: {_client.Options.Model}";
+        RefreshModelStatusLabel();
 
         UpdateProcessCardsVisibility();
         EnsureSession();
@@ -283,6 +281,8 @@ public partial class AgentPage : ContentPage
 
     private void ApplyModeUi()
     {
+        ModeChipsHost.IsVisible = true;
+        HookWebViewEvents();
         AgentPane.IsVisible = !_webMode;
         WebPane.IsVisible = _webMode;
 

@@ -1,4 +1,5 @@
 using AURA.AI;
+using AURA.AI.UniversalAI;
 using AURA.Mobile.Diagnostics;
 
 namespace AURA.Mobile.Pages;
@@ -110,7 +111,16 @@ public partial class AgentPage
 
     private void RefreshModelStatusLabel()
     {
-        try { ModelLabel.Text = AiStatusText.ForClient(_client); }
+        try
+        {
+            string cloud = AiStatusText.ForClient(_client);
+            var store = Handler?.MauiContext?.Services.GetService<LocalModelStore>();
+            int localCount = store?.List().Count ?? 0;
+            ModelLabel.Text = localCount > 0
+                ? $"{cloud} · offline: {localCount} GGUF importado(s)"
+                : cloud;
+            ModelLabel.IsVisible = !string.IsNullOrWhiteSpace(ModelLabel.Text);
+        }
         catch { /* ignore */ }
     }
 

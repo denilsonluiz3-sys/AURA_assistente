@@ -9,6 +9,23 @@ namespace AURA.Mobile.Pages;
 public partial class AgentPage
 {
     private string _activeWebProviderId = "deepseek";
+    private bool _webEventsHooked;
+
+    private void HookWebViewEvents()
+    {
+        if (_webEventsHooked || BridgeWebView == null)
+            return;
+        _webEventsHooked = true;
+        BridgeWebView.Navigated += OnWebNavigated;
+    }
+
+    private async void OnWebNavigated(object? sender, WebNavigatedEventArgs e)
+    {
+        if (e.Result == WebNavigationResult.Success)
+            return;
+
+        await SafeAlertAsync("Web AI", "Não foi possível carregar este provedor. Verifique a conexão ou escolha outro site.");
+    }
 
     private static readonly (string Id, string Label, string Url)[] WebProvidersPrimary =
     {
