@@ -767,7 +767,7 @@ public partial class AgentPage : ContentPage
             return;
         }
         ConversationContainer.Children.Clear();
-        _session = null;
+        ResetConversationContinuity();
         EnsureSession();
     }
 
@@ -894,11 +894,12 @@ public partial class AgentPage : ContentPage
 
             if (!isRepeat && ShouldOrchestrate(resolved))
             {
-                _processes.Update(process.Id, "Planejando", "Orquestrador", 0.15);
+                _processes.Update(process.Id, "Planejando", "Orquestrador · observação", 0.15);
                 AgentToolPolicy observationPolicy = _workCoordinator.CreateObservationPolicy(resolved);
                 string answer = await _orchestrator.ExecuteAsync(resolved, toolPolicy: observationPolicy);
                 _playbook?.RememberFromRun(resolved, _runShellCommands, answer);
-                await DeliverAnswerAsync(answer, process.Id, "OK");
+                await DeliverAnswerAsync(answer, process.Id, "Relatório entregue");
+                await AppendWorkGroupReportAsync(_workCoordinator.LastReport);
                 return;
             }
 
@@ -974,6 +975,35 @@ public partial class AgentPage : ContentPage
             try { _runCts?.Dispose(); } catch { /* ignore */ }
             _runCts = null;
         }
+    }
+
+    private async Task AppendWorkGroupReportAsync(AgentReport? report)
+    {
+        if (report == null)
+            return;
+
+        string confidence = Math.Clamp(report.Confidence, 0, 1).ToString("P0");
+        string status = report.Status switch
+        {
+            AgentReportStatus.Complete => "concluída",
+            AgentReportStatus.Partial => "parcial",
+            AgentReportStatus.Blocked => "bloqueada",
+            AgentReportStatus.Failed => "falhou",
+            _ => report.Status.ToString()
+        };
+
+        var lines = new List<string>
+        {
+            $"🧭 Observação · {report.GroupId} · {status} · confiança {confidence}"
+        };
+        if (report.Findings.Count > 0)
+            lines.Add("Evidências: " + string.Join(" | ", report.Findings.Take(3)));
+        if (report.Risks.Count > 0)
+            lines.Add("Riscos: " + string.Join(" | ", report.Risks.Take(3)));
+        if (!string.IsNullOrWhiteSpace(report.NextStep))
+            lines.Add("Próxima etapa: " + report.NextStep);
+
+        await AppendBubbleAsync(string.Join(Environment.NewLine, lines), user: false, isTool: true);
     }
 
     private async Task DeliverAnswerAsync(string answer, string processId, string completeMessage)
