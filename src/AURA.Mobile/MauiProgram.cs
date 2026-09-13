@@ -118,21 +118,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<AURA.Abstractions.Process.IProcessOrchestrator>(sp => new AURA.Agents.LegalProcessEngine(sp.GetRequiredService<ILogger>(), sp.GetServices<AURA.Core.Abstractions.IAgent>(), sp.GetRequiredService<IOrchestrator>(), sp.GetRequiredService<EventBus>()));
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<HomePage>();
-        builder.Services.AddSingleton<EcosystemPage>();
-        builder.Services.AddSingleton<DiagnosticoPage>(sp => new DiagnosticoPage(sp.GetRequiredService<SystemAnalyzer>(), sp.GetRequiredService<NetworkManager>(), sp.GetRequiredService<AgentManager>(), sp.GetRequiredService<AiDiagnosticsService>(),
-#if ANDROID
-            sp.GetService<CellProgramRegistry>(), sp.GetService<CellProgramRunner>(), sp.GetService<IAuraCellContextFactory>(), sp.GetService<ILogger>()
-#else
-            null, null, null, sp.GetService<ILogger>()
-#endif
-        ));
         builder.Services.AddSingleton<AgentPage>(sp => new AgentPage(sp.GetRequiredService<IUniversalAiClient>(), sp.GetRequiredService<MemoryStore>(), sp.GetRequiredService<ISpeechService>(), sp.GetRequiredService<ShellExecutor>(), sp.GetRequiredService<ProcessRegistry>(), sp.GetRequiredService<AuraOrchestrator>(), sp.GetRequiredService<AgentExecutionCoordinator>(), sp.GetRequiredService<WorkGroupCoordinator>(), sp.GetService<LocalPlaybook>(), sp.GetRequiredService<SolutionStore>(), sp.GetService<GitExecutor>(), sp.GetService<PythonExecutor>(), sp.GetService<NodeExecutor>(), sp.GetService<CellProgramRegistry>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetService<IAndroidCapabilityService>(), sp.GetRequiredService<AgentRunStore>()));
-        builder.Services.AddSingleton<MemoryPage>();
-        builder.Services.AddSingleton<ExecutorsPage>();
-        builder.Services.AddSingleton<SpectrumPage>(sp => new SpectrumPage(sp.GetService<IAndroidCapabilityService>()));
         builder.Services.AddSingleton<ModulesPage>();
-        builder.Services.AddSingleton<LogsPage>();
-        builder.Services.AddSingleton<FixesPage>();
         builder.Services.AddSingleton<TerminalPage>();
         builder.Services.AddSingleton<BrowserPage>();
         builder.Services.AddSingleton<ImageSearchPage>();
