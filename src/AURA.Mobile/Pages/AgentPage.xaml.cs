@@ -428,7 +428,6 @@ public partial class AgentPage : ContentPage
                 "🤖 Voltar ao agente",
                 "▶ Rodar programa",
                 "🌐 Contexto para Web AI",
-                "📋 Colar plano",
                 "⚙ Configurar IA",
                 "➕ Adicionar atalho"
             );
@@ -440,7 +439,6 @@ public partial class AgentPage : ContentPage
                 case "🤖 Voltar ao agente": OnModeAgentUiClicked(sender, e); break;
                 case "▶ Rodar programa": await OnRunProgramSubmenuAsync(); break;
                 case "🌐 Contexto para Web AI": OnCopyContextClicked(sender, e); break;
-                case "📋 Colar plano": OnPastePlanClicked(sender, e); break;
                 case "⚙ Configurar IA": SetConfigVisible(true); break;
                 case "➕ Adicionar atalho": _ = OnAddShortcutAsync(); break;
             }
