@@ -40,18 +40,29 @@ public sealed class AiConfigView : ContentView
         new("custom", "Personalizado", "", "", UniversalApiFormat.OpenAiCompatible, true, "")
     };
 
-    private readonly Picker _presetPicker = new() { Title = "Provedor" };
+    private readonly Picker _presetPicker = new()
+    {
+        Title = "Provedor",
+        TextColor = Color.FromArgb("#EAF7FF"),
+        BackgroundColor = Color.FromArgb("#243A52")
+    };
     private readonly Entry _apiKeyEntry = new()
     {
         Placeholder = "API key (DeepSeek: sk-… · OpenRouter: sk-or-…)",
         IsPassword = true,
         ClearButtonVisibility = ClearButtonVisibility.WhileEditing,
-        FontSize = 13
+        FontSize = 13,
+        TextColor = Color.FromArgb("#EAF7FF"),
+        PlaceholderColor = Color.FromArgb("#9AAEC4"),
+        BackgroundColor = Color.FromArgb("#182B43")
     };
     private readonly Entry _modelEntry = new()
     {
         Placeholder = "Modelo (OpenRouter: openrouter/free · DeepSeek: deepseek-v4-flash)",
-        FontSize = 13
+        FontSize = 13,
+        TextColor = Color.FromArgb("#EAF7FF"),
+        PlaceholderColor = Color.FromArgb("#9AAEC4"),
+        BackgroundColor = Color.FromArgb("#182B43")
     };
     private readonly Picker _modelPicker = new()
     {
@@ -84,20 +95,26 @@ public sealed class AiConfigView : ContentView
     {
         Text = "Só free / listar",
         FontSize = 12,
-        HeightRequest = 36
+        HeightRequest = 36,
+        BackgroundColor = Color.FromArgb("#2B4863"),
+        TextColor = Color.FromArgb("#EAF7FF")
     };
     private const string RecommendedModelPageUrl = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/blob/62a8d092b0a1047016f3edbd0fde387598727aa5/qwen2.5-1.5b-instruct-q4_k_m.gguf";
     private readonly Button _downloadRecommendedModelButton = new()
     {
         Text = "Baixar modelo recomendado",
         FontSize = 12,
-        HeightRequest = 36
+        HeightRequest = 36,
+        BackgroundColor = Color.FromArgb("#2B4863"),
+        TextColor = Color.FromArgb("#EAF7FF")
     };
     private readonly Button _importLocalModelButton = new()
     {
         Text = "Importar modelo GGUF",
         FontSize = 12,
-        HeightRequest = 36
+        HeightRequest = 36,
+        BackgroundColor = Color.FromArgb("#2B4863"),
+        TextColor = Color.FromArgb("#EAF7FF")
     };
     private readonly Label _localModelStatus = new()
     {
@@ -112,7 +129,9 @@ public sealed class AiConfigView : ContentView
         FontSize = 14,
         FontAttributes = FontAttributes.Bold,
         HorizontalOptions = LayoutOptions.Fill,
-        HeightRequest = 40
+        HeightRequest = 40,
+        BackgroundColor = Color.FromArgb("#128DD4"),
+        TextColor = Colors.White
     };
     private readonly Label _status = new()
     {
@@ -365,7 +384,7 @@ public sealed class AiConfigView : ContentView
             var models = store?.List() ?? Array.Empty<LocalModelDescriptor>();
             _localModelStatus.Text = models.Count == 0
                 ? "Offline: nenhum modelo GGUF importado."
-                : "Offline: " + string.Join(", ", models.Select(x => x.DisplayName));
+                : "Offline: " + string.Join(", ", models.Select(x => x.DisplayName)) + " (runtime ainda não conectado)";
         }
         catch (Exception ex)
         {
@@ -625,6 +644,7 @@ public sealed class AiConfigView : ContentView
             }
 
             SetStatus("Conectando…", true);
+            bool connectionVerified = false;
 
             RuntimeConfig.Provider = provider;
             RuntimeConfig.BaseUrlOverride = baseUrl;
@@ -653,14 +673,16 @@ public sealed class AiConfigView : ContentView
                 }
                 else
                 {
+                    connectionVerified = true;
                     SetStatus(Short(live.Message, 120), true);
                 }
             }
             else
             {
                 var probe = await EndpointValidator.ProbeAsync(baseUrl, key, timeoutSeconds: 12);
+                connectionVerified = probe.Success;
                 SetStatus(probe.Success
-                    ? "Conectado · " + Short(probe.Message, 80)
+                    ? "Endpoint acessível · " + Short(probe.Message, 80)
                     : probe.Message, probe.Success);
             }
 

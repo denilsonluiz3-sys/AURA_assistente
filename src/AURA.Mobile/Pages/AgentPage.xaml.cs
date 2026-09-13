@@ -466,12 +466,7 @@ public partial class AgentPage : ContentPage
         {
             string action = await DisplayActionSheetAsync(
                 "⚡ AURA Agent", "Fechar", null,
-                "📂 Workspace",
-                "🔍 Diagnóstico",
-                "🧠 Memória",
                 "▶ Continuar",
-                "🖥️ Shell",
-                "📋 Células",
                 "▶ Rodar programa",
                 "🌐 Contexto para Web AI",
                 "📋 Colar plano",

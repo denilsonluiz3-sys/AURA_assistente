@@ -27,7 +27,7 @@ namespace AURA.AI
             string full = Path.GetFullPath(Path.Combine(WorkspaceRoot, raw.Replace('\\', '/')));
             if (!IsInsideWorkspace(full))
             {
-                throw new InvalidOperationException("Caminho fora do workspace: " + raw);
+                throw new InvalidOperationException("Caminho fora do workspace: " + raw + ". Use o botão de importação da AURA para adicionar o arquivo ao workspace.");
             }
 
             return full;
