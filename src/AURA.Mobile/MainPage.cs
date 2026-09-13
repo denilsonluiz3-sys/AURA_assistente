@@ -21,20 +21,13 @@ namespace AURA.Mobile
             EventBus events,
             ModuleManager manager,
             HomePage home,
-            DiagnosticoPage diagnostico,
             AgentPage agent,
-            MemoryPage memory,
-            ExecutorsPage executors,
             ModulesPage modules,
-            LogsPage logs,
-            FixesPage fixes,
             TerminalPage terminal,
             BrowserPage browser,
             CellsPage cells,
             RunPage run,
-            ProgramsPage programs,
-            EcosystemPage ecosystem,
-            SpectrumPage spectrum)
+            ProgramsPage programs)
         {
             AuraLog.Info("MainPage.ctor BEGIN");
             _manager = manager;
@@ -46,16 +39,11 @@ namespace AURA.Mobile
             // os mesmos atalhos em várias telas.
             var advancedItems = new (string Label, Page Page)[]
             {
-                ("Logs", logs),
-                ("Correções", fixes),
-                ("Espectro", spectrum),
                 ("Terminal", terminal),
-                ("Executores", executors),
                 ("Módulos", modules),
                 ("Células", cells),
                 ("Programas", programs),
                 ("Rodar programa", run),
-                ("Ecossistema", ecosystem),
             };
             var advancedMenu = new SectionPage("Modo avançado", advancedItems);
             _advancedMenu = advancedMenu;
@@ -65,23 +53,16 @@ namespace AURA.Mobile
                 // O Agente é a tela inicial e o único destino primário.
                 (null, "Agente", "Agente", agent),
 
-                // Recursos secundários ficam fora da barra principal.
-                ("system", "Mais", "Diagnóstico", diagnostico),
-                (null, "Mais", "Memória", memory),
+                // Recursos que ainda acrescentam uma função própria.
                 (null, "Mais", "Navegador", browser),
                 (null, "Mais", "Modo avançado", advancedMenu),
 
-                // Ferramentas técnicas continuam disponíveis, mas fora do fluxo comum.
-                (null, "Avançado", "Logs", logs),
-                (null, "Avançado", "Correções", fixes),
-                (null, "Avançado", "Espectro", spectrum),
+                // Ferramentas técnicas continuam disponíveis em Modo avançado.
                 (null, "Avançado", "Terminal", terminal),
-                (null, "Avançado", "Executores", executors),
                 (null, "Avançado", "Módulos", modules),
                 (null, "Avançado", "Células", cells),
                 (null, "Avançado", "Programas", programs),
                 (null, "Avançado", "Rodar programa", run),
-                (null, "Avançado", "Ecossistema", ecosystem),
             };
 
             BarBackgroundColor = Color.FromArgb("#0c0c12");
