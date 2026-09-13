@@ -14,7 +14,7 @@ namespace AURA.Mobile
 
         private static readonly HashSet<string> PrimaryTabs = new(StringComparer.OrdinalIgnoreCase)
         {
-            "Início", "Agente", "Diagnóstico"
+            "Agente"
         };
 
         public MainPage(
@@ -41,7 +41,7 @@ namespace AURA.Mobile
             events.Subscribe<ModuleStateChangedEvent>(_ =>
                 MainThread.BeginInvokeOnMainThread(ScheduleRebuildTabs));
 
-            // Navegação principal curta: quatro destinos frequentes + Mais.
+            // Navegação principal: Agente como início; recursos secundários em Mais.
             // As antigas categorias Sistema/Assistente/Ferramentas/Apps duplicavam
             // os mesmos atalhos em várias telas.
             var advancedItems = new (string Label, Page Page)[]
@@ -62,12 +62,11 @@ namespace AURA.Mobile
 
             _entries = new List<(string?, string, string, Page)>
             {
-                (null, "Início", "Início", home),
+                // O Agente é a tela inicial e o único destino primário.
                 (null, "Agente", "Agente", agent),
-                ("system", "Diagnóstico", "Diagnóstico", diagnostico),
-                // O Workspace local agora é acessado pelo fluxo principal do Agente.
 
-                // Recursos úteis para uso geral.
+                // Recursos secundários ficam fora da barra principal.
+                ("system", "Mais", "Diagnóstico", diagnostico),
                 (null, "Mais", "Memória", memory),
                 (null, "Mais", "Navegador", browser),
                 (null, "Mais", "Modo avançado", advancedMenu),
@@ -151,7 +150,10 @@ namespace AURA.Mobile
             if (moreItems.Length > 0)
                 Children.Add(new NavigationPage(new SectionPage("Mais", moreItems)) { Title = "Mais" });
 
-            AuraLog.Info("MainPage.RebuildTabs: " + Children.Count + " destinos principais");
+            // O retorno à raiz deve sempre abrir o Agente, não a antiga tela Sistema.
+            if (Children.Count > 0)
+                CurrentPage = Children[0];
+            AuraLog.Info("MainPage.RebuildTabs: " + Children.Count + " destinos principais (Agente como início)");
         }
 
         public async Task NavigateToProcessAsync(string target)

@@ -424,6 +424,8 @@ public partial class AgentPage : ContentPage
             string action = await DisplayActionSheetAsync(
                 "⚡ AURA Agent", "Fechar", null,
                 "▶ Continuar",
+                "🌐 Abrir Web AI",
+                "🤖 Voltar ao agente",
                 "▶ Rodar programa",
                 "🌐 Contexto para Web AI",
                 "📋 Colar plano",
@@ -433,12 +435,9 @@ public partial class AgentPage : ContentPage
 
             switch (action)
             {
-                case "📂 Workspace": OnChipWorkspace(sender, e); break;
-                case "🔍 Diagnóstico": OnChipDiagnostic(sender, e); break;
-                case "🧠 Memória": OnChipMemory(sender, e); break;
                 case "▶ Continuar": OnChipContinue(sender, e); break;
-                case "🖥️ Shell": OnChipShellSafe(sender, e); break;
-                case "📋 Células": await OnCellsSubmenuAsync(); break;
+                case "🌐 Abrir Web AI": OnModeWebUiClicked(sender, e); break;
+                case "🤖 Voltar ao agente": OnModeAgentUiClicked(sender, e); break;
                 case "▶ Rodar programa": await OnRunProgramSubmenuAsync(); break;
                 case "🌐 Contexto para Web AI": OnCopyContextClicked(sender, e); break;
                 case "📋 Colar plano": OnPastePlanClicked(sender, e); break;

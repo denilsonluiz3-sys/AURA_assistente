@@ -22,15 +22,15 @@
                Aspect="AspectFill"
                Opacity="0.92"
                InputTransparent="True" />
-        <Border x:Name="StatusBarHost" Grid.Row="0" Margin="10,8,10,0" BackgroundColor="#55162B43" Stroke="#5079C9E8" StrokeThickness="1" StrokeShape="RoundRectangle 18" Padding="14,10">
+        <Border x:Name="StatusBarHost" Grid.Row="0" Margin="6,5,6,0" BackgroundColor="#55162B43" Stroke="#5079C9E8" StrokeThickness="1" StrokeShape="RoundRectangle 18" Padding="8,6">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                 <VerticalStackLayout Spacing="2">
                     <HorizontalStackLayout Spacing="6">
                         <Label Text="◆" FontSize="14" TextColor="{DynamicResource AuraAccent}" />
                         <Label Text="AGENTE" FontSize="11" FontAttributes="Bold" TextColor="{DynamicResource AuraAccent}" />
                     </HorizontalStackLayout>
-                    <Label x:Name="WorkspaceLabel" FontSize="11" TextColor="{DynamicResource AuraTextSecondary}" LineBreakMode="TailTruncation" />
-                    <Label x:Name="ModelLabel" FontSize="10" TextColor="{DynamicResource AuraTextMuted}" LineBreakMode="TailTruncation" />
+                    <Label x:Name="WorkspaceLabel" IsVisible="False" FontSize="9" TextColor="{DynamicResource AuraTextSecondary}" LineBreakMode="TailTruncation" />
+                    <Label x:Name="ModelLabel" IsVisible="False" FontSize="9" TextColor="{DynamicResource AuraTextMuted}" LineBreakMode="TailTruncation" />
                 </VerticalStackLayout>
                 <Button Grid.Column="1" x:Name="AgentMenuButton" Text="⚡" Clicked="OnAgentMenuClicked" VerticalOptions="Center" Padding="10,6" FontSize="16" BackgroundColor="#30203952" TextColor="#D9F5FF" />
                 <Button Grid.Column="2" x:Name="ConfigButton" Text="⚙" Clicked="OnConfigClicked" VerticalOptions="Center" Padding="10,6" FontSize="16" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
@@ -38,7 +38,7 @@
             </Grid>
         </Border>
 
-        <ScrollView x:Name="ModeChipsHost" Grid.Row="1" Margin="8,4,8,0" Orientation="Horizontal" HorizontalScrollBarVisibility="Never" HeightRequest="42">
+        <ScrollView x:Name="ModeChipsHost" IsVisible="False" Grid.Row="1" Margin="8,4,8,0" Orientation="Horizontal" HorizontalScrollBarVisibility="Never" HeightRequest="42">
             <HorizontalStackLayout Spacing="6" Padding="4,5,4,3">
                 <Button x:Name="ModeAgentBtn" Text="Agente" Clicked="OnModeAgentUiClicked" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="#128DD4" TextColor="White" CornerRadius="16" />
                 <Button x:Name="ModeWebBtn" Text="Web AI" Clicked="OnModeWebUiClicked" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="#40203952" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="16" />
