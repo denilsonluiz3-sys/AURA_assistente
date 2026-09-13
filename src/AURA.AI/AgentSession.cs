@@ -239,8 +239,9 @@ public sealed class AgentSession
                         }
 
                         bool toolFailed = result.StartsWith("ERRO:", StringComparison.OrdinalIgnoreCase);
+                        bool countsAgainstFailureBudget = toolFailed && _toolRegistry.Resolve(call.Name ?? string.Empty) != null;
                         bool stopAfterTool = false;
-                        if (toolFailed)
+                        if (countsAgainstFailureBudget)
                         {
                             string toolName = string.IsNullOrWhiteSpace(call.Name) ? "desconhecida" : call.Name.Trim();
                             toolFailureCounts[toolName] = toolFailureCounts.TryGetValue(toolName, out int count) ? count + 1 : 1;
@@ -260,7 +261,7 @@ public sealed class AgentSession
                                     + "Corrija o caminho ou forneça mais contexto e use Continuar.";
                             }
                         }
-                        else
+                        else if (!toolFailed)
                         {
                             consecutiveToolFailures = 0;
                         }
