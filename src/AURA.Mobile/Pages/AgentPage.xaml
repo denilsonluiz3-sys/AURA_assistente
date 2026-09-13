@@ -2,7 +2,6 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pages="clr-namespace:AURA.Mobile.Pages"
-             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:Class="AURA.Mobile.Pages.AgentPage"
              Title="Agente"
              BackgroundColor="#031426">
@@ -17,15 +16,12 @@
     </ContentPage.Resources>
 
     <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="0">
-        <toolkit:MediaElement x:Name="BgVideo"
-                              Grid.RowSpan="5"
-                              Aspect="AspectFill"
-                              ShouldAutoPlay="False"
-                              ShouldLoopPlayback="True"
-                              ShouldMute="True"
-                              Volume="0"
-                              InputTransparent="True"
-                              IsVisible="False" />
+        <Image x:Name="AgentBackground"
+               Grid.RowSpan="5"
+               Source="agent_background.jpg"
+               Aspect="AspectFill"
+               Opacity="0.92"
+               InputTransparent="True" />
         <Border x:Name="StatusBarHost" Grid.Row="0" Margin="10,8,10,0" BackgroundColor="#55162B43" Stroke="#5079C9E8" StrokeThickness="1" StrokeShape="RoundRectangle 18" Padding="14,10">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                 <VerticalStackLayout Spacing="2">
