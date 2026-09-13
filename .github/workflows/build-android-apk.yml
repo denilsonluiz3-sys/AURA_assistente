@@ -142,7 +142,7 @@ jobs:
             echo "KEYSTORE_PRESENT=1" >> "$GITHUB_ENV"
           else
             echo "KEYSTORE_PRESENT=0" >> "$GITHUB_ENV"
-            echo "::warning::Secrets de keystore ausentes — APK será gerado sem assinatura de release"
+            echo "::warning::Secrets de keystore ausentes — APK será assinado com a chave debug apenas para validação manual"
           fi
 
       - name: Publish APK
@@ -159,6 +159,10 @@ jobs:
               -p:AndroidSigningKeyPass=${{ secrets.AURA_KEYSTORE_PASS }} \
               -p:AndroidSigningStorePass=${{ secrets.AURA_KEYSTORE_PASS }} \
               -p:AndroidUseDebugSigning=false"
+          else
+            # Um APK sem assinatura é rejeitado pelo instalador Android como inválido.
+            # Sem o keystore de release, gere um APK debug-assinado apenas para testes.
+            SIGN_ARGS="-p:AndroidUseDebugSigning=true"
           fi
 
           dotnet publish src/AURA.Mobile/AURA.Mobile.csproj \
@@ -196,6 +200,9 @@ jobs:
           "$AAPT" dump badging "$APK" | tee "$OUT/apk-badging.txt"
           grep -Fq "package: name='com.aura.genesis'" "$OUT/apk-badging.txt"
           grep -Fq "versionName='2.4'" "$OUT/apk-badging.txt"
+          APKSIGNER="$SDK_ROOT/build-tools/35.0.0/apksigner"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose "$APK"
 
       - name: Upload APK
         if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
