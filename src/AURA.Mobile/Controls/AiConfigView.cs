@@ -86,6 +86,13 @@ public sealed class AiConfigView : ContentView
         FontSize = 12,
         HeightRequest = 36
     };
+    private const string RecommendedModelPageUrl = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/blob/62a8d092b0a1047016f3edbd0fde387598727aa5/qwen2.5-1.5b-instruct-q4_k_m.gguf";
+    private readonly Button _downloadRecommendedModelButton = new()
+    {
+        Text = "Baixar modelo recomendado",
+        FontSize = 12,
+        HeightRequest = 36
+    };
     private readonly Button _importLocalModelButton = new()
     {
         Text = "Importar modelo GGUF",
@@ -139,6 +146,7 @@ public sealed class AiConfigView : ContentView
         };
         _advancedToggle.Clicked += OnAdvancedToggle;
         _loadModelsButton.Clicked += OnLoadModelsClicked;
+        _downloadRecommendedModelButton.Clicked += OnDownloadRecommendedModelClicked;
         _importLocalModelButton.Clicked += OnImportLocalModelClicked;
         _connectButton.Clicked += OnConnectClicked;
         Loaded += (_, _) => LoadExisting();
@@ -160,6 +168,7 @@ public sealed class AiConfigView : ContentView
                 _modelEntry,
                 _modelPicker,
                 _loadModelsButton,
+                _downloadRecommendedModelButton,
                 _importLocalModelButton,
                 _localModelStatus,
                 _advancedToggle,
@@ -332,6 +341,20 @@ public sealed class AiConfigView : ContentView
         _baseUrlEntry.IsVisible = open;
         _modelsUrlEntry.IsVisible = open;
         _advancedToggle.Text = open ? "▾ Avançado" : "▸ Avançado";
+    }
+
+    private async void OnDownloadRecommendedModelClicked(object? sender, EventArgs e)
+    {
+        try
+        {
+            await Launcher.Default.OpenAsync(RecommendedModelPageUrl);
+            _localModelStatus.Text = "Download aberto. Depois, use Importar modelo GGUF para configurar a AURA.";
+        }
+        catch (Exception ex)
+        {
+            _localModelStatus.Text = "Não foi possível abrir o download: " + ex.Message;
+            AuraLog.Exception("AiConfigView.OpenRecommendedModel", ex);
+        }
     }
 
     private void RefreshLocalModelStatus()
