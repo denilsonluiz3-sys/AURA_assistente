@@ -871,6 +871,7 @@ public partial class AgentPage : ContentPage
 
             await AppendBubbleAsync(wasContinue ? resolved : text, user: true);
             CommandEditor.Text = string.Empty;
+            ClearPendingAttachments();
 
             var process = _processes.Begin(Shorten(resolved, 40), "Assistente", "Entendendo solicitação");
             processId = process.Id;
@@ -929,6 +930,13 @@ public partial class AgentPage : ContentPage
                 answerFromAgent = await _session!.RunAsync(resolved);
             }
 
+            if (AgentSession.IsAmbientRunCancellationRequested())
+            {
+                _processes.Update(process.Id, "Pausado", "Checkpoint salvo · pronto para continuar", 0.65);
+                await AppendBubbleAsync("⏸ Execução pausada. O checkpoint foi salvo; use ‘Continuar’ quando quiser retomar.", user: false, isTool: true);
+                return;
+            }
+
             _playbook?.RememberFromRun(resolved, _runShellCommands, answerFromAgent);
             await DeliverAnswerAsync(answerFromAgent, process.Id, "Resultado entregue");
             _lastUserQuery = text;
@@ -962,6 +970,9 @@ public partial class AgentPage : ContentPage
             BusyIndicator.IsRunning = false;
             BusyIndicator.IsVisible = false;
             _runInFlight = false;
+            try { SetRunButtonBusy(false); } catch { /* UX partial pode não estar inicializado */ }
+            try { _runCts?.Dispose(); } catch { /* ignore */ }
+            _runCts = null;
         }
     }
 

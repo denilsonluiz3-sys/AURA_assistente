@@ -13,13 +13,19 @@ public partial class AgentPage
 
     private bool HasPendingAttachments() => _pendingAttachments.Count > 0;
 
+    private void ClearPendingAttachments()
+    {
+        _pendingAttachments.Clear();
+        PendingAttachmentLabel.Text = string.Empty;
+        PendingAttachmentLabel.IsVisible = false;
+    }
+
     private string PrepareCommandWithPendingAttachments(string text)
     {
         if (_pendingAttachments.Count == 0) return text;
         string context = AttachmentStore.BuildAgentContext(_pendingAttachments);
-        _pendingAttachments.Clear();
-        PendingAttachmentLabel.Text = string.Empty;
-        PendingAttachmentLabel.IsVisible = false;
+        // O anexo só é removido da fila depois que a mensagem foi aceita pelo fluxo
+        // do agente. Se houver falha antes disso, ele continua pronto para reenvio.
         return string.IsNullOrWhiteSpace(text) ? context : text + Environment.NewLine + Environment.NewLine + context;
     }
 

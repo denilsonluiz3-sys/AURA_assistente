@@ -71,6 +71,13 @@ public sealed class AgentSession
         }
     }
 
+    /// <summary>Indica se a execução ambiente atual foi cancelada pela UI.</summary>
+    public static bool IsAmbientRunCancellationRequested()
+    {
+        lock (AmbientGate)
+            return AmbientCts?.IsCancellationRequested == true;
+    }
+
     public Task<string> RunAsync(string userText, HttpClient? httpClient = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(userText)) throw new ArgumentException("A instrução não pode ser vazia.", nameof(userText));
