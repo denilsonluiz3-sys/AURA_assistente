@@ -19,6 +19,8 @@ public sealed class AgentSession
     private readonly AgentToolPolicy? _toolPolicy;
     private AgentRunState? _runState;
     private const int MaxHistoryMessages = 16;
+    private const int MaxFailuresPerTool = 2;
+    private const int MaxConsecutiveToolFailures = 3;
 
     private static readonly List<AgentMessage> SharedHistory = new();
     private static readonly object SharedGate = new();
@@ -146,6 +148,8 @@ public sealed class AgentSession
         var token = linked.Token;
 
         var executedSignatures = new HashSet<string>(StringComparer.Ordinal);
+        var toolFailureCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        int consecutiveToolFailures = 0;
 
         try
         {
@@ -234,14 +238,57 @@ public sealed class AgentSession
                             }
                         }
 
+                        bool toolFailed = result.StartsWith("ERRO:", StringComparison.OrdinalIgnoreCase);
+                        bool stopAfterTool = false;
+                        if (toolFailed)
+                        {
+                            string toolName = string.IsNullOrWhiteSpace(call.Name) ? "desconhecida" : call.Name.Trim();
+                            toolFailureCounts[toolName] = toolFailureCounts.TryGetValue(toolName, out int count) ? count + 1 : 1;
+                            consecutiveToolFailures++;
+
+                            if (string.Equals(toolName, "read_file", StringComparison.OrdinalIgnoreCase)
+                                && result.Contains("arquivo não existe", StringComparison.OrdinalIgnoreCase))
+                            {
+                                result += " Use list_dir ou search_files para confirmar o caminho antes de tentar ler novamente.";
+                            }
+
+                            stopAfterTool = toolFailureCounts[toolName] >= MaxFailuresPerTool
+                                || consecutiveToolFailures >= MaxConsecutiveToolFailures;
+                            if (stopAfterTool)
+                            {
+                                result += " Execução interrompida para evitar tentativas repetidas. "
+                                    + "Corrija o caminho ou forneça mais contexto e use Continuar.";
+                            }
+                        }
+                        else
+                        {
+                            consecutiveToolFailures = 0;
+                        }
+
                         _messages.Add(new AgentMessage { Role = "tool", ToolCallId = call.Id, Content = result });
-                        Step?.Invoke(new AgentStep(call.Name, call.ArgumentsJson, result,
-                            !result.StartsWith("ERRO:", StringComparison.OrdinalIgnoreCase)));
+                        Step?.Invoke(new AgentStep(call.Name, call.ArgumentsJson, result, !toolFailed));
                         PersistShared();
                         if (_runState != null)
                         {
                             _runState.Round = round + 1;
+                            if (stopAfterTool)
+                            {
+                                _runState.Status = AgentRunStatus.Paused;
+                                _runState.LastError = "Execução interrompida após falhas repetidas de ferramenta.";
+                            }
                             Checkpoint();
+                        }
+
+                        if (stopAfterTool)
+                        {
+                            string stopped = "Parei após falhas repetidas da ferramenta "
+                                + (call.Name ?? "desconhecida") + ". "
+                                + "Não vou continuar tentando caminhos sem evidência. "
+                                + "Use list_dir/search_files ou corrija o caminho e depois escolha Continuar.";
+                            _messages.Add(new AgentMessage { Role = "assistant", Content = stopped });
+                            _memory?.Append(MemoryEntry.Answer(stopped));
+                            PersistShared();
+                            return stopped;
                         }
                     }
 
