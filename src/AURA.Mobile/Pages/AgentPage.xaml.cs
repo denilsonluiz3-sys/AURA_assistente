@@ -391,6 +391,7 @@ public partial class AgentPage : ContentPage
                 "⚡ AURA Agent", "Fechar", null,
                 "▶ Continuar",
                 "🌐 Abrir Web AI",
+                "🌐 Abrir navegador",
                 "🤖 Voltar ao agente",
                 "▶ Rodar programa",
                 "🌐 Contexto para Web AI",
@@ -402,6 +403,10 @@ public partial class AgentPage : ContentPage
             {
                 case "▶ Continuar": OnChipContinue(sender, e); break;
                 case "🌐 Abrir Web AI": OnModeWebUiClicked(sender, e); break;
+                case "🌐 Abrir navegador":
+                    if (Application.Current?.MainPage is MainPage main)
+                        await main.NavigateToProcessAsync("Navegador");
+                    break;
                 case "🤖 Voltar ao agente": OnModeAgentUiClicked(sender, e); break;
                 case "▶ Rodar programa": await OnRunProgramSubmenuAsync(); break;
                 case "🌐 Contexto para Web AI": OnCopyContextClicked(sender, e); break;

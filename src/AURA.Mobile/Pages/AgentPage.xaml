@@ -15,8 +15,8 @@
         </Style>
     </ContentPage.Resources>
 
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" RowSpacing="0">
-        <Border x:Name="StatusBarHost" Grid.Row="1" Margin="6,5,6,0" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 18" Padding="8,6">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="0">
+        <Border x:Name="StatusBarHost" Grid.Row="0" Margin="6,2,6,0" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 18" Padding="8,3">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                 <VerticalStackLayout Spacing="2">
                     <HorizontalStackLayout Spacing="6">
@@ -35,7 +35,7 @@
             </Grid>
         </Border>
 
-        <ScrollView x:Name="ModeChipsHost" IsVisible="False" Grid.Row="2" Margin="8,4,8,0" Orientation="Horizontal" HorizontalScrollBarVisibility="Never" HeightRequest="42">
+        <ScrollView x:Name="ModeChipsHost" IsVisible="False" Grid.Row="1" Margin="8,1,8,0" Orientation="Horizontal" HorizontalScrollBarVisibility="Never" HeightRequest="42">
             <HorizontalStackLayout Spacing="6" Padding="4,5,4,3">
                 <Button x:Name="ModeAgentBtn" Text="Agente" Clicked="OnModeAgentUiClicked" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="#128DD4" TextColor="White" CornerRadius="16" />
                 <Button x:Name="ModeWebBtn" Text="Web AI" Clicked="OnModeWebUiClicked" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="#171B22" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="16" />
@@ -48,7 +48,7 @@
             </HorizontalStackLayout>
         </ScrollView>
 
-        <Border x:Name="ProcessCardsHost" Grid.Row="3" IsVisible="True" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 14" Padding="10,8">
+        <Border x:Name="ProcessCardsHost" Grid.Row="2" IsVisible="True" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 14" Padding="10,8">
             <VerticalStackLayout Spacing="3">
                 <Grid ColumnDefinitions="*,Auto">
                     <Label Text="Estado do Agente" FontSize="11" TextColor="{DynamicResource AuraTextSecondary}" />
@@ -78,13 +78,13 @@
             </VerticalStackLayout>
         </Border>
 
-        <Grid x:Name="AgentPane" Grid.Row="4" IsVisible="True">
+        <Grid x:Name="AgentPane" Grid.Row="3" IsVisible="True">
             <ScrollView x:Name="ConversationScroll">
                 <VerticalStackLayout x:Name="ConversationContainer" Spacing="8" Padding="16,14,16,20" />
             </ScrollView>
         </Grid>
 
-        <Grid x:Name="WebPane" Grid.Row="4" IsVisible="False" RowDefinitions="Auto,*">
+        <Grid x:Name="WebPane" Grid.Row="3" IsVisible="False" RowDefinitions="Auto,*">
             <ScrollView Orientation="Horizontal" HorizontalScrollBarVisibility="Never" HeightRequest="38">
                 <HorizontalStackLayout Spacing="6" Padding="8,4">
                     <Button x:Name="WebBtnDeepSeek" Text="DeepSeek" CommandParameter="deepseek" Clicked="OnWebProviderClicked" FontSize="11" Padding="10,4" HeightRequest="30" BackgroundColor="#128DD4" TextColor="White" CornerRadius="12" />
@@ -99,7 +99,7 @@
             <WebView x:Name="BridgeWebView" Grid.Row="1" />
         </Grid>
 
-        <Border x:Name="InputBarHost" Grid.Row="5" Margin="8,4,8,4" ZIndex="50" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 20" Padding="10,6">
+        <Border x:Name="InputBarHost" Grid.Row="4" Margin="8,4,8,4" ZIndex="50" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 20" Padding="10,6">
             <VerticalStackLayout Spacing="4">
                 <Label x:Name="PendingAttachmentLabel" IsVisible="False" FontSize="11" TextColor="{DynamicResource AuraAccent}" LineBreakMode="TailTruncation" />
                 <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
@@ -117,7 +117,7 @@
         </Border>
 
         <Border x:Name="ConfigOverlay"
-                Grid.RowSpan="6"
+                Grid.RowSpan="5"
                 IsVisible="False"
                 ZIndex="100"
                 BackgroundColor="#CC05070B"

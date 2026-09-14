@@ -5,7 +5,7 @@
              Title="Navegador"
              BackgroundColor="{DynamicResource AuraBackground}">
 
-    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0" Padding="0,4,0,6">
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0" Padding="0,1,0,2">
 
         <!-- Barra de abas -->
         <Grid ColumnDefinitions="*,Auto,Auto"
@@ -16,7 +16,7 @@
                         Grid.Column="0">
                 <HorizontalStackLayout x:Name="TabBar"
                                        Spacing="6"
-                                       Padding="8,6" />
+                                       Padding="6,2" />
             </ScrollView>
             <Button Grid.Column="1"
                     x:Name="NewTabButton"
@@ -25,8 +25,8 @@
                     Style="{StaticResource BtnPrimary}"
                     FontSize="16"
                     Padding="12,0"
-                    HeightRequest="36"
-                    Margin="0,5,8,5" />
+                    HeightRequest="30"
+                    Margin="0,2,5,2" />
             <Label Grid.Column="2"
                    x:Name="IsolatedLabel"
                    Text="🛡"
@@ -97,18 +97,18 @@
 
         <!-- Navegação + endereço + menu (barra inferior) -->
         <Grid Grid.Row="2"
-              Padding="8,4"
+              Padding="5,2"
               ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto"
-              ColumnSpacing="6"
+              ColumnSpacing="3"
               BackgroundColor="{DynamicResource AuraSurface}">
             <Button x:Name="BackButton"
                     Text="‹"
                     Clicked="OnBackClicked"
                     BackgroundColor="{DynamicResource AuraSurface}"
                     TextColor="{DynamicResource AuraTextPrimary}"
-                    Padding="12,2"
+                    Padding="8,0"
                     CornerRadius="6"
-                    FontSize="18"
+                    FontSize="16"
                     IsEnabled="False" />
             <Button Grid.Column="1"
                     x:Name="ForwardButton"
@@ -116,9 +116,9 @@
                     Clicked="OnForwardClicked"
                     BackgroundColor="{DynamicResource AuraSurface}"
                     TextColor="{DynamicResource AuraTextPrimary}"
-                    Padding="12,2"
+                    Padding="8,0"
                     CornerRadius="6"
-                    FontSize="18"
+                    FontSize="16"
                     IsEnabled="False" />
             <Button Grid.Column="2"
                     x:Name="ReloadButton"
@@ -126,9 +126,9 @@
                     Clicked="OnReloadClicked"
                     BackgroundColor="{DynamicResource AuraSurface}"
                     TextColor="{DynamicResource AuraTextPrimary}"
-                    Padding="12,2"
+                    Padding="8,0"
                     CornerRadius="6"
-                    FontSize="18" />
+                    FontSize="16" />
             <Entry Grid.Column="3"
                    x:Name="UrlEntry"
                    Placeholder="URL ou pesquisa"
@@ -149,7 +149,7 @@
                     Clicked="OnMenuClicked"
                     BackgroundColor="{DynamicResource AuraSurface}"
                     TextColor="{DynamicResource AuraAccent}"
-                    Padding="12,2"
+                    Padding="8,0"
                     CornerRadius="6"
                     FontSize="16" />
         </Grid>
