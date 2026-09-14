@@ -95,7 +95,7 @@ public partial class AgentPage
     {
         url = string.Empty;
         if (string.IsNullOrWhiteSpace(text)) return false;
-        var match = System.Text.RegularExpressions.Regex.Match(text, @"https?://[^\s<>\"']+", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var match = System.Text.RegularExpressions.Regex.Match(text, @"https?://[^\s<>""']+", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         if (!match.Success || !Uri.TryCreate(match.Value.TrimEnd('.', ',', ';', ')', ']'), UriKind.Absolute, out var parsed)) return false;
         if (parsed.Scheme is not ("http" or "https") || string.IsNullOrWhiteSpace(parsed.Host)) return false;
         url = parsed.AbsoluteUri;
