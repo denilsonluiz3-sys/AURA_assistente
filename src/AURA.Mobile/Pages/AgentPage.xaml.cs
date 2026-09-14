@@ -618,13 +618,15 @@ public partial class AgentPage : ContentPage
             "Não invente caminhos fora do workspace. Use o mínimo de rodadas de ferramenta. " +
             "NÃO use busca na web nem diga que pesquisou na internet para perguntas simples — responda direto com o modelo local quando possível.";
 
+        AgentToolPolicy effectivePolicy = toolPolicy ?? _workCoordinator.CreateObservationPolicy("observação");
+        effectivePolicy.PermissionPrompt = AskPermissionAsync;
         _session = new AgentSession(
             CreateExecutionClient(),
             tools,
             systemPrompt,
             memory: _memory,
             runStore: _runStore,
-            toolPolicy: toolPolicy ?? _workCoordinator.CreateObservationPolicy("observação"));
+            toolPolicy: effectivePolicy);
         _session.Step += OnAgentStep;
 
         // A recriação da sessão não deve duplicar a mensagem de boas-vindas no chat.
@@ -637,6 +639,27 @@ public partial class AgentPage : ContentPage
             ? $"Pronto. Memória ({memCount}). Atalhos: ls · diagnóstico · memória X · continue. Chips na barra."
             : "Pronto. Atalhos: ls · diagnóstico · memória X · continue. 📋 Contexto → Web AI → ▶ Colar plano.";
         _ = AppendBubbleAsync(welcome, user: false);
+    }
+
+    private async Task<PermissionDecision> AskPermissionAsync(string toolName, CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
+            return PermissionDecision.Deny;
+
+        string action = await MainThread.InvokeOnMainThreadAsync(() =>
+            DisplayActionSheetAsync(
+                "Permissão necessária",
+                "Cancelar",
+                null,
+                "Permitir uma vez",
+                "Permitir sempre"));
+
+        return action switch
+        {
+            "Permitir uma vez" => PermissionDecision.AllowOnce,
+            "Permitir sempre" => PermissionDecision.AllowAlways,
+            _ => PermissionDecision.Deny
+        };
     }
 
     private async void OnProjectClicked(object sender, EventArgs e)

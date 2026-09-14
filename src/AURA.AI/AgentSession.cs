@@ -210,9 +210,9 @@ public sealed class AgentSession
                         }
                         else
                         {
-                            if (_toolPolicy != null && !_toolPolicy.Allows(call.Name))
+                            if (_toolPolicy != null && !await _toolPolicy.AuthorizeAsync(call.Name, token).ConfigureAwait(false))
                             {
-                                result = "ERRO: ferramenta não autorizada pela política da sessão: " + call.Name;
+                                result = "PERMISSÃO NEGADA: a ferramenta " + call.Name + " não foi autorizada.";
                             }
                             else
                             {
