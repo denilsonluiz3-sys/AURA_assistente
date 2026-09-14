@@ -90,7 +90,7 @@ public sealed class AndroidNativeLocalModelEngine : ILocalModelEngine, ILocalMod
     {
         string text = messages.LastOrDefault(x => string.Equals(x.Role, "user", StringComparison.OrdinalIgnoreCase))?.Content ?? string.Empty;
         string[] markers = { "arquivo", "pasta", "diretório", "memória", "pesquis", "internet", "web", "execute", "executar", "crie", "salve", "apague", "edite", "diagnóstico", "bateria", "localização", "câmera", "microfone", "clipboard", "célula", "sensor", "bluetooth" };
-        return markers.Any(text.Contains, StringComparison.OrdinalIgnoreCase);
+        return markers.Any(marker => text.Contains(marker, StringComparison.OrdinalIgnoreCase));
     }
 
     private string GenerateCore(
