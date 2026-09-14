@@ -646,9 +646,21 @@ public partial class AgentPage : ContentPage
         if (cancellationToken.IsCancellationRequested)
             return PermissionDecision.Deny;
 
+        string permission = toolName switch
+        {
+            "write_file" => "criar ou alterar arquivo",
+            "edit_file" => "editar arquivo",
+            "run_shell" => "executar comando no Android",
+            "run_executor" => "executar ferramenta externa",
+            "run_program" => "executar programa",
+            "android" => "usar uma capacidade do Android",
+            "memory_save" => "salvar memória persistente",
+            "conversar" => "conversar com o agente",
+            _ => toolName
+        };
         string action = await MainThread.InvokeOnMainThreadAsync(() =>
             DisplayActionSheetAsync(
-                "Permissão necessária",
+                "Permissão necessária: " + permission,
                 "Negar",
                 "Negar sempre",
                 "Permitir uma vez",
