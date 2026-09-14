@@ -52,11 +52,15 @@ public sealed class AgentRunProgramTool : AgentTool
     public override AgentToolDefinition Definition => new AgentToolDefinition
     {
         Name = "run_program",
-        Description = "Executa um Cell Program registrado. Programas parametrizados podem receber argumentos adicionais, por exemplo {\"name\":\"browser-open\",\"url\":\"https://example.com\"}.",
+        Description = "Executa um Cell Program pela AURA. Envie os argumentos no mesmo objeto: browser-open usa url; browser-read/click/type usam selector; browser-type também usa text; browser-scroll usa pixels; browser-wait usa milliseconds. Não execute programas sem os argumentos exigidos.",
         Parameters =
         {
-            ["name"] = new AgentToolParameter { Type = "string", Description = "Nome do programa a executar." },
-            ["url"] = new AgentToolParameter { Type = "string", Description = "URL para programas de navegador." }
+            ["name"] = new AgentToolParameter { Type = "string", Description = "Nome registrado do programa." },
+            ["url"] = new AgentToolParameter { Type = "string", Description = "URL http/https para browser-open." },
+            ["selector"] = new AgentToolParameter { Type = "string", Description = "Seletor CSS para browser-read, browser-click ou browser-type." },
+            ["text"] = new AgentToolParameter { Type = "string", Description = "Texto para browser-type." },
+            ["pixels"] = new AgentToolParameter { Type = "integer", Description = "Pixels para browser-scroll." },
+            ["milliseconds"] = new AgentToolParameter { Type = "integer", Description = "Milissegundos para browser-wait." }
         },
         Required = { "name" }
     };
@@ -73,6 +77,9 @@ public sealed class AgentRunProgramTool : AgentTool
                 if (property.NameEquals("name")) continue;
                 if (property.Value.ValueKind == JsonValueKind.String)
                     arguments[property.Name] = property.Value.GetString() ?? string.Empty;
+                else if (property.Value.ValueKind == JsonValueKind.Number
+                         && property.Value.TryGetInt32(out int number))
+                    arguments[property.Name] = number.ToString(System.Globalization.CultureInfo.InvariantCulture);
             }
         }
 
