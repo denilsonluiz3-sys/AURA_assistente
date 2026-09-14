@@ -178,7 +178,7 @@ public sealed class AiConfigView : ContentView
             {
                 new Label
                 {
-                    Text = "Conectar IA",
+                    Text = "Configurar IA",
                     FontSize = 14,
                     FontAttributes = FontAttributes.Bold
                 },

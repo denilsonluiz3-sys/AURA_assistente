@@ -101,7 +101,6 @@
 
         <Border x:Name="InputBarHost" Grid.Row="5" Margin="8,4,8,4" ZIndex="50" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 20" Padding="10,6">
             <VerticalStackLayout Spacing="4">
-                <ScrollView x:Name="ConfigHost" IsVisible="False" MaximumHeightRequest="260" VerticalScrollBarVisibility="Default" BackgroundColor="#40203952" />
                 <Label x:Name="PendingAttachmentLabel" IsVisible="False" FontSize="11" TextColor="{DynamicResource AuraAccent}" LineBreakMode="TailTruncation" />
                 <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
                     <Border Grid.Column="0" BackgroundColor="#40203952" Stroke="#5079C9E8" StrokeThickness="1" Padding="12,5" StrokeShape="RoundRectangle 12,12,12,12">
@@ -115,6 +114,42 @@
                     </Grid>
                 </Grid>
             </VerticalStackLayout>
+        </Border>
+
+        <Border x:Name="ConfigOverlay"
+                Grid.RowSpan="6"
+                IsVisible="False"
+                ZIndex="100"
+                BackgroundColor="#CC05070B"
+                Padding="14,38,14,24">
+            <Border BackgroundColor="#121923"
+                    Stroke="#34465A"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 22"
+                    Padding="14,16">
+                <Grid RowDefinitions="Auto,Auto,*" RowSpacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="Configurar IA"
+                               FontSize="20"
+                               FontAttributes="Bold"
+                               TextColor="{DynamicResource AuraTextPrimary}" />
+                        <Button Grid.Column="1"
+                                Text="×"
+                                Clicked="OnConfigClicked"
+                                BackgroundColor="Transparent"
+                                TextColor="{DynamicResource AuraTextSecondary}"
+                                FontSize="24"
+                                Padding="8,0" />
+                    </Grid>
+                    <Label Grid.Row="1"
+                           Text="A configuração fica fora do caminho da conversa."
+                           FontSize="12"
+                           TextColor="{DynamicResource AuraTextSecondary}" />
+                    <ScrollView Grid.Row="2"
+                                x:Name="ConfigHost"
+                                VerticalScrollBarVisibility="Default" />
+                </Grid>
+            </Border>
         </Border>
     </Grid>
 </ContentPage>

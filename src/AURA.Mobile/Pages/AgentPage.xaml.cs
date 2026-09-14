@@ -378,7 +378,8 @@ public partial class AgentPage : ContentPage
     private void SetConfigVisible(bool visible)
     {
         _configVisible = visible;
-        ConfigHost.IsVisible = visible;
+        ConfigOverlay.IsVisible = visible;
+        ConfigHost.IsVisible = true;
         ConfigButton.Text = visible ? "×" : "⚙";
     }
 
