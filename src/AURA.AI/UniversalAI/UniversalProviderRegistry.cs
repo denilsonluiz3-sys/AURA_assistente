@@ -6,7 +6,7 @@ namespace AURA.AI.UniversalAI;
 /// </summary>
 public static class UniversalProviderRegistry
 {
-    public static IReadOnlyList<UniversalProvider> BuiltIns { get; } = Array.Empty<UniversalProvider>();
+    public static IReadOnlyList<UniversalProvider> BuiltIns { get; } = new[] { OfflineProvider.Definition };
 
     public static UniversalProvider Custom(
         string providerId,
@@ -25,3 +25,4 @@ public static class UniversalProviderRegistry
         return new UniversalProvider(providerId.Trim(), string.IsNullOrWhiteSpace(name) ? providerId.Trim() : name.Trim(), baseValue, models, format, authHeader ?? string.Empty, authScheme ?? string.Empty, requiresApiKey);
     }
 }
+
