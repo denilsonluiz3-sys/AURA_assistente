@@ -9,7 +9,7 @@ namespace AURA.Core.Launchers
     /// </summary>
     public sealed class CellCommand
     {
-        public CellCommand(string fileName, string arguments = null)
+        public CellCommand(string fileName, string? arguments = null)
         {
             FileName = fileName ?? throw new ArgumentNullException(nameof(fileName));
             Arguments = arguments ?? string.Empty;

@@ -36,7 +36,7 @@ namespace AURA.Core.Runtime
         private readonly ILogger _logger;
         private readonly ICellBackend _backend;
         private readonly string _cellsRoot;
-        private readonly CellStore _store;
+        private readonly CellStore? _store;
         private readonly bool _persist;
         private readonly object _logLock = new object();
         private readonly ConcurrentDictionary<string, StreamWriter> _logWriters =
@@ -120,8 +120,8 @@ namespace AURA.Core.Runtime
             return string.Join(", ", parts);
         }
 
-        public Cell CreateCell(string id, string appPath, string args = null,
-            string templatePath = null, string workingDirectory = null, ResourceLimits? limits = null)
+        public Cell CreateCell(string id, string appPath, string? args = null,
+            string? templatePath = null, string? workingDirectory = null, ResourceLimits? limits = null)
         {
             if (string.IsNullOrWhiteSpace(id))
             {

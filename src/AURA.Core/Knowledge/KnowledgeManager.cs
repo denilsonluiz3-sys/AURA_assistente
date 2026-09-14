@@ -25,7 +25,7 @@ namespace AURA.Core.Knowledge
         public string Name => "knowledge";
         public string Description => "Conhecimento offline/online (cache + DuckDuckGo) com aprendizado local";
 
-        public KnowledgeManager(string cachePath = null, ILogger logger = null)
+        public KnowledgeManager(string? cachePath = null, ILogger? logger = null)
         {
             _cachePath = cachePath ?? "knowledge";
             _logger = logger ?? new ConsoleLogger();

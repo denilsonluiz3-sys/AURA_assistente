@@ -22,7 +22,7 @@ namespace AURA.Core.Runtime
         private readonly string _path;
         private readonly object _sync = new object();
 
-        public CellStore(ILogger logger, string path = null)
+        public CellStore(ILogger logger, string? path = null)
         {
             _logger = logger ?? new ConsoleLogger();
             _path = path ?? SimulationRuntime.ExpandUserHome("~/AURA/cells.json");

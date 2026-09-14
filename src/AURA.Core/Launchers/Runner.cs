@@ -58,8 +58,8 @@ namespace AURA.Core.Launchers
             SimulationRuntime runtime,
             string id,
             string filePath,
-            string arguments = null,
-            string templatePath = null,
+            string? arguments = null,
+            string? templatePath = null,
             ResourceLimits? limits = null)
         {
             if (runtime == null)

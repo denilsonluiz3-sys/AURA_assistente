@@ -26,11 +26,11 @@ namespace AURA.Core.Runtime
         private readonly object _sync = new object();
         private readonly List<string> _pluginPaths = new List<string>();
 
-        private PluginLoadContext _context;
+        private PluginLoadContext? _context;
         private List<ILauncher> _launchers = new List<ILauncher>();
         private List<IPlugin> _plugins = new List<IPlugin>();
 
-        public PluginWatcher(ILogger logger, string pluginsRoot = null)
+        public PluginWatcher(ILogger logger, string? pluginsRoot = null)
         {
             _logger = logger ?? new ConsoleLogger();
             _pluginsRoot = string.IsNullOrWhiteSpace(pluginsRoot)
