@@ -649,8 +649,8 @@ public partial class AgentPage : ContentPage
         string action = await MainThread.InvokeOnMainThreadAsync(() =>
             DisplayActionSheetAsync(
                 "Permissão necessária",
-                "Cancelar",
-                null,
+                "Negar",
+                "Negar sempre",
                 "Permitir uma vez",
                 "Permitir sempre"));
 
@@ -658,6 +658,7 @@ public partial class AgentPage : ContentPage
         {
             "Permitir uma vez" => PermissionDecision.AllowOnce,
             "Permitir sempre" => PermissionDecision.AllowAlways,
+            "Negar sempre" => PermissionDecision.DenyAlways,
             _ => PermissionDecision.Deny
         };
     }
