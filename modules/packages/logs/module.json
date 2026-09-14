@@ -1,0 +1,8 @@
+{
+  "id": "logs",
+  "name": "Logs e Correções",
+  "version": "1.0.0",
+  "description": "Visualiza o log de execução da AURA e aplica correções de sistema.",
+  "features": ["Log de execução", "Correções de sistema"],
+  "pages": ["LogsPage", "FixesPage"]
+}

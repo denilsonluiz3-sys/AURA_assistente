@@ -114,15 +114,11 @@ public static class MauiProgram
         builder.Services.AddSingleton<IOrchestrator>(sp => sp.GetRequiredService<AuraOrchestrator>());
         builder.Services.AddSingleton<AURA.Abstractions.Process.IProcessOrchestrator>(sp => new AURA.Agents.LegalProcessEngine(sp.GetRequiredService<ILogger>(), sp.GetServices<AURA.Core.Abstractions.IAgent>(), sp.GetRequiredService<IOrchestrator>(), sp.GetRequiredService<EventBus>()));
         builder.Services.AddSingleton<MainPage>();
-        builder.Services.AddSingleton<HomePage>();
         builder.Services.AddSingleton<AgentPage>(sp => new AgentPage(sp.GetRequiredService<IUniversalAiClient>(), sp.GetRequiredService<MemoryStore>(), sp.GetRequiredService<ISpeechService>(), sp.GetRequiredService<ShellExecutor>(), sp.GetRequiredService<ProcessRegistry>(), sp.GetRequiredService<AuraOrchestrator>(), sp.GetRequiredService<AgentExecutionCoordinator>(), sp.GetRequiredService<WorkGroupCoordinator>(), sp.GetRequiredService<WorkGroupRegistry>(), sp.GetService<LocalPlaybook>(), sp.GetRequiredService<SolutionStore>(), sp.GetService<GitExecutor>(), sp.GetService<PythonExecutor>(), sp.GetService<NodeExecutor>(), sp.GetService<CellProgramRegistry>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetService<IAndroidCapabilityService>(), sp.GetRequiredService<AgentRunStore>(), sp.GetRequiredService<LocalModelStore>(), sp.GetService<ILocalModelEngine>()));
         builder.Services.AddSingleton<TerminalPage>();
         builder.Services.AddSingleton<BrowserPage>();
         builder.Services.AddSingleton<ImageSearchPage>();
         builder.Services.AddSingleton<CellsPage>();
-        builder.Services.AddSingleton<RunPage>();
-        builder.Services.AddSingleton<ProgramsPage>();
-        builder.Services.AddSingleton<ProgramsPageViewModel>();
         AuraLog.Info("MauiProgram: services registered");
         var app = builder.Build();
         try { var bus = app.Services.GetRequiredService<EventBus>(); var memory = app.Services.GetRequiredService<MemoryStore>(); bus.Subscribe<CellStateChangedEvent>(evt => memory.Append(MemoryEntry.CellStateChange(evt.CellId, evt.To))); } catch (Exception ex) { AuraLog.Exception("MauiProgram.MemoryEventSink", ex); }

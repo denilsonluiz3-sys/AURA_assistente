@@ -1,0 +1,8 @@
+{
+  "id": "ai",
+  "name": "IA",
+  "version": "1.0.0",
+  "description": "Assistente inteligente: conversa, agente de arquivos e ferramentas em um único fluxo.",
+  "features": ["Agente", "Workspace e ferramentas"],
+  "pages": ["AgentPage"]
+}

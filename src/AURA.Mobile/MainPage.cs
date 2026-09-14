@@ -6,7 +6,6 @@ namespace AURA.Mobile
     {
         private readonly List<(string Section, string Label, Page Page)> _entries;
         private bool _permissionsAsked;
-        private CancellationTokenSource? _rebuildCts;
         private Page? _advancedMenu;
 
         private static readonly HashSet<string> PrimaryTabs = new(StringComparer.OrdinalIgnoreCase)
@@ -15,13 +14,10 @@ namespace AURA.Mobile
         };
 
         public MainPage(
-            HomePage home,
             AgentPage agent,
             TerminalPage terminal,
             BrowserPage browser,
-            CellsPage cells,
-            RunPage run,
-            ProgramsPage programs)
+            CellsPage cells)
         {
             AuraLog.Info("MainPage.ctor BEGIN");
             // Navegação principal: Agente como início; recursos secundários em Mais.
@@ -31,8 +27,6 @@ namespace AURA.Mobile
             {
                 ("Terminal", terminal),
                 ("Células", cells),
-                ("Programas", programs),
-                ("Rodar programa", run),
             };
             var advancedMenu = new SectionPage("Modo avançado", advancedItems);
             _advancedMenu = advancedMenu;
@@ -49,8 +43,6 @@ namespace AURA.Mobile
                 // Ferramentas técnicas continuam disponíveis em Modo avançado.
                 ("Avançado", "Terminal", terminal),
                 ("Avançado", "Células", cells),
-                ("Avançado", "Programas", programs),
-                ("Avançado", "Rodar programa", run),
             };
 
             BarBackgroundColor = Color.FromArgb("#0c0c12");
@@ -81,23 +73,6 @@ namespace AURA.Mobile
                 }
             }
             catch (Exception ex) { AuraLog.Info("Permissões de armazenamento: " + ex.Message); }
-        }
-
-        private void ScheduleRebuildTabs()
-        {
-            try { _rebuildCts?.Cancel(); } catch { /* ignore */ }
-            _rebuildCts = new CancellationTokenSource();
-            var token = _rebuildCts.Token;
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await Task.Delay(250, token);
-                    if (token.IsCancellationRequested) return;
-                    MainThread.BeginInvokeOnMainThread(RebuildTabs);
-                }
-                catch (TaskCanceledException) { /* coalesced */ }
-            });
         }
 
         public void RebuildTabs()

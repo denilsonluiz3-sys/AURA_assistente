@@ -4,12 +4,8 @@ file static class SectionIcons
 {
     private static readonly Dictionary<string, string> Map = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["Sistema"] = "⚙", ["Assistente"] = "◈", ["Ferramentas"] = "⬡", ["Apps"] = "▣",
-        ["Início"] = "⌂", ["Ecossistema"] = "✦", ["Logs"] = "≡", ["Correções"] = "⚕", ["Chat"] = "◉",
-        ["Agente"] = "◆", ["Memória"] = "⬟", ["Terminal"] = ">_", ["Executores"] = "▶",
-        ["Módulos"] = "⊞", ["Navegador"] = "⊕", ["Células"] = "⬡", ["Rodar programa"] = "▷",
-        ["Diagnóstico"] = "◎", ["Programas"] = "▣", ["Workspace"] = "📄", ["Espectro"] = "〰",
-        ["Modo avançado"] = "⚙",
+        ["Agente"] = "◆", ["Navegador"] = "⊕", ["Terminal"] = ">_",
+        ["Células"] = "⬡", ["Modo avançado"] = "⚙",
     };
 
     public static string Get(string label) =>
@@ -33,15 +29,9 @@ public sealed class SectionPage : ContentPage
         Title = title;
         BackgroundColor = Bg;
 
-        string subtitle = title switch
-        {
-            "Sistema" => "Início · ecossistema · diagnóstico · logs",
-            "Assistente" => "Agente · memória · navegador",
-            "Ferramentas" => "Terminal · executores · módulos · workspace",
-            "Apps" => "Programas · células · rodar programa",
-            "Modo avançado" => "Ferramentas técnicas para usuários avançados",
-            _ => "AURA · " + items.Length + " opção" + (items.Length != 1 ? "ões" : "")
-        };
+        string subtitle = title.Equals("Modo avançado", StringComparison.OrdinalIgnoreCase)
+            ? "Ferramentas técnicas disponíveis no aplicativo"
+            : "AURA · " + items.Length + " opção" + (items.Length != 1 ? "ões" : "");
 
         var header = new VerticalStackLayout
         {

@@ -44,7 +44,23 @@ namespace AURA.Core.Configuration
             Save(path, config);
         }
 
+        public ModulesConfiguration LoadModules(string path)
+        {
+            ModulesConfiguration config = Load<ModulesConfiguration>(path);
 
+            if (config == null)
+            {
+                config = new ModulesConfiguration();
+                SaveModules(path, config);
+            }
+
+            return config;
+        }
+
+        public void SaveModules(string path, ModulesConfiguration config)
+        {
+            Save(path, config);
+        }
 
         private T Load<T>(string path) where T : class
         {

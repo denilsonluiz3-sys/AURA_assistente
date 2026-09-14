@@ -1,0 +1,8 @@
+{
+  "id": "terminal",
+  "name": "Terminal",
+  "version": "1.0.0",
+  "description": "Console interativo para comandos com histórico de saída.",
+  "features": ["Console de comandos", "Log de saída"],
+  "pages": ["TerminalPage"]
+}

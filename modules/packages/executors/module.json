@@ -1,0 +1,8 @@
+{
+  "id": "executors",
+  "name": "Executores",
+  "version": "1.0.0",
+  "description": "Executa comandos Shell, Git, Python e Node com saída capturada.",
+  "features": ["Shell", "Git", "Python", "Node"],
+  "pages": ["ExecutorsPage"]
+}
