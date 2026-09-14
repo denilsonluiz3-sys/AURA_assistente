@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Linq;
 using AURA.Core.Logging;
 
 namespace AURA.Core.Runtime
@@ -45,7 +46,7 @@ namespace AURA.Core.Runtime
 
                     var document = new CellStoreDocument
                     {
-                        Cells = new System.Collections.Generic.List<Cell>(runtime.Cells),
+                        Cells = new System.Collections.Generic.List<Cell>(runtime.Cells.Where(c => !c.IsTransient)),
                         SavedAtUtc = DateTime.UtcNow
                     };
 
@@ -103,3 +104,4 @@ namespace AURA.Core.Runtime
         }
     }
 }
+

@@ -2,60 +2,36 @@ using Android.Content;
 using Android.Provider;
 using AndroidApp = Android.App.Application;
 
-namespace AURA.Mobile.Platforms.Android
+namespace AURA.Mobile.Platforms.Android;
+
+/// <summary>Abre configurações ou um provedor VPN externo; a AURA não implementa túnel nem armazena credenciais.</summary>
+public static class VpnHelper
 {
-    /// <summary>
-    /// Integração com VPN do sistema no Android. Não embute túnel (seria um SDK
-    /// nativo inviável aqui); abre as configurações de VPN do sistema e um provedor externo
-    /// compatível com .onion, quando disponível.
-    /// </summary>
-    public static class VpnHelper
+    public static void OpenExternalVpnSettings()
     {
-        private const string OrbotPackage = "org.torproject.android";
+        var intent = new Intent(Settings.ActionVpnSettings);
+        intent.AddFlags(ActivityFlags.NewTask);
+        AndroidApp.Context.StartActivity(intent);
+    }
 
-        public static void OpenVpnSettings()
+    public static bool IsExternalProviderInstalled(string packageName)
+    {
+        if (string.IsNullOrWhiteSpace(packageName)) return false;
+        try { AndroidApp.Context.PackageManager.GetPackageInfo(packageName, 0); return true; }
+        catch (Java.Lang.Exception) { return false; }
+    }
+
+    public static bool OpenExternalProvider(string packageName)
+    {
+        if (string.IsNullOrWhiteSpace(packageName)) return false;
+        try
         {
-            var intent = new Intent(Settings.ActionVpnSettings);
-            intent.AddFlags(ActivityFlags.NewTask);
-            AndroidApp.Context.StartActivity(intent);
+            var launch = AndroidApp.Context.PackageManager.GetLaunchIntentForPackage(packageName);
+            if (launch is null) return false;
+            launch.AddFlags(ActivityFlags.NewTask);
+            AndroidApp.Context.StartActivity(launch);
+            return true;
         }
-
-        public static bool IsOrbotInstalled()
-        {
-            try
-            {
-                AndroidApp.Context.PackageManager.GetPackageInfo(OrbotPackage, 0);
-                return true;
-            }
-            catch (Java.Lang.Exception)
-            {
-                return false;
-            }
-        }
-
-        public static bool OpenOrbot()
-        {
-            try
-            {
-                Intent launch = AndroidApp.Context
-                    .PackageManager.GetLaunchIntentForPackage(OrbotPackage);
-                if (launch == null)
-                {
-                    return false;
-                }
-
-                launch.AddFlags(ActivityFlags.NewTask);
-                AndroidApp.Context.StartActivity(launch);
-                return true;
-            }
-            catch (Java.Lang.Exception)
-            {
-                return false;
-            }
-        }
-
-        public const string OrbotPlayStoreUrl =
-            "https://play.google.com/store/apps/details?id=org.torproject.android";
+        catch (Java.Lang.Exception) { return false; }
     }
 }
-

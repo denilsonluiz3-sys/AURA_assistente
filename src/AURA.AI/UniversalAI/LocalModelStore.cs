@@ -22,6 +22,8 @@ public sealed class LocalModelDescriptor
 public sealed class LocalModelStore
 {
     private const long MaxModelBytes = 8L * 1024L * 1024L * 1024L;
+    public const string RequiredModelId = "qwen2.5-1.5b-instruct-q4_k_m";
+    public const string RequiredFileName = RequiredModelId + ".gguf";
     private readonly string _root;
     private readonly string _manifestPath;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -53,6 +55,9 @@ public sealed class LocalModelStore
 
         string id = SanitizeId(descriptor.Id);
         string fileName = SanitizeFileName(descriptor.FileName);
+        if (!string.Equals(id, RequiredModelId, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(fileName, RequiredFileName, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException($"O provider AURA Offline aceita somente {RequiredFileName}.");
         if (!fileName.EndsWith(".gguf", StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Somente modelos GGUF são aceitos nesta fase.");
 
@@ -103,9 +108,14 @@ public sealed class LocalModelStore
     public string GetModelPath(string id)
     {
         string safeId = SanitizeId(id);
-        string path = Path.Combine(_root, safeId + ".gguf");
+        if (!string.Equals(safeId, RequiredModelId, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException($"O provider AURA Offline requer {RequiredModelId}.");
+        string path = Path.Combine(_root, RequiredModelId + ".gguf");
+        var descriptor = ReadManifest().FirstOrDefault(x => string.Equals(x.Id, RequiredModelId, StringComparison.OrdinalIgnoreCase));
+        if (descriptor is null || !string.Equals(descriptor.FileName, RequiredFileName, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("O modelo Qwen local não foi importado com metadados válidos.");
         if (!File.Exists(path))
-            throw new FileNotFoundException("Modelo local não encontrado.", path);
+            throw new FileNotFoundException("Modelo local não encontrado. Importe o arquivo Qwen GGUF.", path);
         return path;
     }
 
@@ -171,3 +181,4 @@ public sealed class LocalModelStore
         return name;
     }
 }
+
