@@ -119,7 +119,7 @@ jobs:
           cmake --build native/aura-llama/build --target aura_llama --parallel 2
           mkdir -p src/AURA.Mobile/Platforms/Android/NativeLibs/arm64-v8a
           NATIVE_DIR="src/AURA.Mobile/Platforms/Android/NativeLibs/arm64-v8a"
-          find native/aura-llama/build -type f -path '*/bin/*.so' -exec cp -f {} "$NATIVE_DIR/" \;
+          find native/aura-llama/build -type f -name '*.so' -exec cp -f {} "$NATIVE_DIR/" \;
           test -f "$NATIVE_DIR/libaura_llama.so"
           ls -lh "$NATIVE_DIR"/*.so
 
