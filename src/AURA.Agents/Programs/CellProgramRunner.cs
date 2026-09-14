@@ -1,1 +1,53 @@
-dXNpbmcgU3lzdGVtOwp1c2luZyBTeXN0ZW0uVGhyZWFkaW5nOwp1c2luZyBTeXN0ZW0uVGhyZWFkaW5nLlRhc2tzOwp1c2luZyBBVVJBLkFic3RyYWN0aW9uczsKdXNpbmcgQVVSQS5Db3JlLkxvZ2dpbmc7CgpuYW1lc3BhY2UgQVVSQS5BZ2VudHMuUHJvZ3JhbXM7CgpwdWJsaWMgc2VhbGVkIGNsYXNzIENlbGxQcm9ncmFtUnVubmVyCnsKICAgIHByaXZhdGUgcmVhZG9ubHkgSUxvZ2dlciBfbG9nZ2VyOwogICAgcHJpdmF0ZSByZWFkb25seSBQb2xpY3lHdWFyZCBfcG9saWN5R3VhcmQ7CgogICAgcHVibGljIENlbGxQcm9ncmFtUnVubmVyKElMb2dnZXIgbG9nZ2VyLCBQb2xpY3lHdWFyZD8gcG9saWN5R3VhcmQgPSBudWxsKQogICAgewogICAgICAgIF9sb2dnZXIgPSBsb2dnZXIgPz8gdGhyb3cgbmV3IEFyZ3VtZW50TnVsbEV4Y2VwdGlvbihuYW1lb2YobG9nZ2VyKSk7CiAgICAgICAgX3BvbGljeUd1YXJkID0gcG9saWN5R3VhcmQgPz8gbmV3IFBvbGljeUd1YXJkKCk7CiAgICB9CgogICAgcHVibGljIGFzeW5jIFRhc2s8Q2VsbFByb2dyYW1SZXN1bHQ+IFJ1bkFzeW5jKAogICAgICAgIElBdXJhQ2VsbFByb2dyYW0gcHJvZ3JhbSwKICAgICAgICBJQXVyYUNlbGxDb250ZXh0IGNvbnRleHQsCiAgICAgICAgQ2FuY2VsbGF0aW9uVG9rZW4gY3QgPSBkZWZhdWx0KQogICAgewogICAgICAgIGlmIChwcm9ncmFtIGlzIG51bGwpIHRocm93IG5ldyBBcmd1bWVudE51bGxFeGNlcHRpb24obmFtZW9mKHByb2dyYW0pKTsKICAgICAgICBpZiAoY29udGV4dCBpcyBudWxsKSB0aHJvdyBuZXcgQXJndW1lbnROdWxsRXhjZXB0aW9uKG5hbWVvZihjb250ZXh0KSk7CgogICAgICAgIHN0cmluZyBjYXBhYmlsaXRpZXMgPSBzdHJpbmcuSm9pbigiLCAiLCBwcm9ncmFtLlJlcXVpcmVkQ2FwYWJpbGl0aWVzKTsKICAgICAgICB2YXIgYXV0aG9yaXphdGlvbiA9IF9wb2xpY3lHdWFyZC5BdXRob3JpemUoY2FwYWJpbGl0aWVzLCBwcm9ncmFtLk5hbWUpOwogICAgICAgIGlmIChhdXRob3JpemF0aW9uLkRlY2lzaW9uID09IEF1dGhvcml6YXRpb25EZWNpc2lvbi5CbG9ja2VkKQogICAgICAgICAgICByZXR1cm4gQ2VsbFByb2dyYW1SZXN1bHQuRmFpbChhdXRob3JpemF0aW9uLk1lc3NhZ2UpOwogICAgICAgIGlmIChhdXRob3JpemF0aW9uLkRlY2lzaW9uID09IEF1dGhvcml6YXRpb25EZWNpc2lvbi5SZXF1aXJlc0NvbmZpcm1hdGlvbikKICAgICAgICAgICAgcmV0dXJuIENlbGxQcm9ncmFtUmVzdWx0LkZhaWwoYXV0aG9yaXphdGlvbi5NZXNzYWdlKTsKCiAgICAgICAgdHJ5CiAgICAgICAgewogICAgICAgICAgICBjdC5UaHJvd0lmQ2FuY2VsbGF0aW9uUmVxdWVzdGVkKCk7CiAgICAgICAgICAgIF9sb2dnZXIuSW5mbygkIkV4ZWN1dGFuZG8gcHJvZ3JhbWEgJ3twcm9ncmFtLk5hbWV9JyAocHJvZ3JhbWEge2NvbnRleHQuQ2VsbElkfSkiKTsKICAgICAgICAgICAgcmV0dXJuIGF3YWl0IHByb2dyYW0uRXhlY3V0ZUFzeW5jKGNvbnRleHQsIGV4ZWN1dGlvblRva2VuKS5Db25maWd1cmVBd2FpdChmYWxzZSk7CiAgICAgICAgfQogICAgICAgIGNhdGNoIChPcGVyYXRpb25DYW5jZWxlZEV4Y2VwdGlvbikKICAgICAgICB7CiAgICAgICAgICAgIF9sb2dnZXIuV2FybmluZygkIlByb2dyYW1hICd7cHJvZ3JhbS5OYW1lfScgY2FuY2VsYWRvIik7CiAgICAgICAgICAgIHRocm93OwogICAgICAgIH0KICAgICAgICBjYXRjaCAoRXhjZXB0aW9uIGV4KQogICAgICAgIHsKICAgICAgICAgICAgX2xvZ2dlci5FcnJvcigkIkZhbGhhIG5vIHByb2dyYW1hICd7cHJvZ3JhbS5OYW1lfSc6IHtleC5NZXNzYWdlfSIpOwogICAgICAgICAgICByZXR1cm4gQ2VsbFByb2dyYW1SZXN1bHQuRmFpbChleC5NZXNzYWdlKTsKICAgICAgICB9CiAgICB9Cn0KCg==
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using AURA.Abstractions;
+using AURA.Core.Logging;
+
+namespace AURA.Agents.Programs;
+
+public sealed class CellProgramRunner
+{
+    private readonly ILogger _logger;
+    private readonly PolicyGuard _policyGuard;
+
+    public CellProgramRunner(ILogger logger, PolicyGuard? policyGuard = null)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _policyGuard = policyGuard ?? new PolicyGuard();
+    }
+
+    public async Task<CellProgramResult> RunAsync(
+        IAuraCellProgram program,
+        IAuraCellContext context,
+        CancellationToken ct = default)
+    {
+        if (program is null) throw new ArgumentNullException(nameof(program));
+        if (context is null) throw new ArgumentNullException(nameof(context));
+
+        string capabilities = string.Join(", ", program.RequiredCapabilities);
+        var authorization = _policyGuard.Authorize(capabilities, program.Name);
+        if (authorization.Decision == AuthorizationDecision.Blocked)
+            return CellProgramResult.Fail(authorization.Message);
+        if (authorization.Decision == AuthorizationDecision.RequiresConfirmation)
+            return CellProgramResult.Fail(authorization.Message);
+
+        try
+        {
+            ct.ThrowIfCancellationRequested();
+            _logger.Info($"Executando programa '{program.Name}' (programa {context.CellId})");
+            return await program.ExecuteAsync(context, executionToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.Warning($"Programa '{program.Name}' cancelado");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Falha no programa '{program.Name}': {ex.Message}");
+            return CellProgramResult.Fail(ex.Message);
+        }
+    }
+}
+
