@@ -42,6 +42,8 @@ public partial class AgentPage : ContentPage
     private readonly SimulationRuntime? _runtime;
     private readonly IAndroidCapabilityService? _android;
     private readonly AgentRunStore? _runStore;
+    private readonly LocalModelStore? _localModels;
+    private readonly ILocalModelEngine? _localEngine;
     private readonly SemaphoreSlim _bubbleGate = new(1, 1);
     private readonly List<string> _recentCommands = new();
     private readonly List<string> _runShellCommands = new();
@@ -61,7 +63,8 @@ public partial class AgentPage : ContentPage
         LocalPlaybook? playbook = null,
         SolutionStore? solutions = null, GitExecutor? git = null, PythonExecutor? python = null,
         NodeExecutor? node = null, CellProgramRegistry? cellRegistry = null, SimulationRuntime? runtime = null,
-        IAndroidCapabilityService? android = null, AgentRunStore? runStore = null)
+        IAndroidCapabilityService? android = null, AgentRunStore? runStore = null,
+        LocalModelStore? localModels = null, ILocalModelEngine? localEngine = null)
     {
         InitializeComponent();
         _client = client;
@@ -80,6 +83,8 @@ public partial class AgentPage : ContentPage
         _orchestrator = orchestrator;
         _cellRegistry = cellRegistry;
         _runtime = runtime;
+        _localModels = localModels;
+        _localEngine = localEngine;
         _playbook = playbook;
         _runStore = runStore;
         ProcessCards.BindingContext = _processes;
@@ -517,12 +522,37 @@ public partial class AgentPage : ContentPage
 
     private bool HasLocalLlmWithoutKey()
     {
+        if (_localModels != null && _localEngine != null)
+        {
+            try
+            {
+                if (_localModels.List().Count > 0)
+                    return true;
+            }
+            catch (Exception ex) { AuraLog.Exception("LocalModel.Check", ex); }
+        }
+
         if (string.Equals(_client.Options.Provider, "ollama", StringComparison.OrdinalIgnoreCase))
             return !string.IsNullOrWhiteSpace(_client.Options.BaseUrl);
 
         ProviderInfo? p = ProviderCatalog.Find(RuntimeConfig.Provider)
             ?? ProviderCatalog.Find(_client.Options.Provider);
         return p != null && !p.NeedsKey && !string.IsNullOrWhiteSpace(_client.Options.BaseUrl);
+    }
+
+    private IUniversalAiClient CreateExecutionClient()
+    {
+        if (_localModels != null && _localEngine != null)
+        {
+            LocalModelDescriptor? model = _localModels.List().FirstOrDefault();
+            if (model != null)
+            {
+                AuraLog.Info($"AgentPage: usando runtime local {model.Id}");
+                return new LocalAiClient(new StoredModelAiRuntime(_localModels, _localEngine, model.Id));
+            }
+        }
+
+        return _client;
     }
 
     private void EnsureSession(AgentToolPolicy? toolPolicy = null)
@@ -582,7 +612,7 @@ public partial class AgentPage : ContentPage
             "NÃO use busca na web nem diga que pesquisou na internet para perguntas simples — responda direto com o modelo local quando possível.";
 
         _session = new AgentSession(
-            _client,
+            CreateExecutionClient(),
             tools,
             systemPrompt,
             memory: _memory,
@@ -896,12 +926,17 @@ public partial class AgentPage : ContentPage
             }
             else
             {
-                string? readyError = RuntimeConfig.EnsureReadyForRequest(_client);
-                if (readyError != null)
+                bool usingImportedLocalModel = _localModels != null && _localEngine != null
+                    && _localModels.List().Count > 0;
+                if (!usingImportedLocalModel)
                 {
-                    _processes.Fail(process.Id, readyError);
-                    await AppendBubbleAsync(readyError, user: false, isError: true);
-                    return;
+                    string? readyError = RuntimeConfig.EnsureReadyForRequest(_client);
+                    if (readyError != null)
+                    {
+                        _processes.Fail(process.Id, readyError);
+                        await AppendBubbleAsync(readyError, user: false, isError: true);
+                        return;
+                    }
                 }
 
                 _session = null;

@@ -125,7 +125,7 @@ public sealed class WorkGroupRegistry
     public static WorkGroupRegistry CreateDefault()
     {
         var registry = new WorkGroupRegistry();
-        string[] readOnly = { "read_file", "list_dir", "search_files" };
+        string[] readOnly = { "read_file", "list_dir", "search_files", "web_fetch", "open_browser" };
         registry.Register(new WorkGroupDefinition { Id = "produto", Name = "Produto e utilidade", Mission = "Avaliar valor para o usuário comum e priorizar funções.", AllowedTools = readOnly });
         registry.Register(new WorkGroupDefinition { Id = "arquitetura", Name = "Arquitetura", Mission = "Analisar estrutura, dependências, contratos e duplicidades.", AllowedTools = readOnly });
         registry.Register(new WorkGroupDefinition { Id = "ia-toolcalls", Name = "IA e tool calls", Mission = "Avaliar contexto, memória, tool calls e respostas do Agente.", AllowedTools = readOnly });
