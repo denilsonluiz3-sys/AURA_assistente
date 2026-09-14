@@ -33,7 +33,7 @@ public sealed class AndroidNativeLocalModelEngine : ILocalModelEngine, ILocalMod
     private void SetState(LocalModelRuntimeState state)
     {
         lock (_sync) _state = state;
-        StateChanged?.Invoke(this, state);
+        StateChanged?.Invoke(state);
     }
 
     public AndroidNativeLocalModelEngine(LocalModelInferenceOptions? options = null)
