@@ -4,7 +4,7 @@
              xmlns:pages="clr-namespace:AURA.Mobile.Pages"
              x:Class="AURA.Mobile.Pages.AgentPage"
              Title="Agente"
-             BackgroundColor="#031426">
+             BackgroundColor="#05070B">
     <ContentPage.Resources>
         <Style x:Key="AgentGlassButton" TargetType="Button">
             <Setter Property="BackgroundColor" Value="#40203952" />
@@ -16,14 +16,8 @@
     </ContentPage.Resources>
 
     <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" RowSpacing="0">
-        <Image x:Name="AgentBackground"
-               Grid.RowSpan="6"
-               Source="agent_background.jpg"
-               Aspect="AspectFill"
-               Opacity="0.92"
-               InputTransparent="True" />
-        <Label x:Name="PageTitleLabel" Grid.Row="0" Text="Agente" FontSize="30" FontAttributes="Bold" TextColor="#F2F5FB" Margin="12,8,12,10" />
-        <Border x:Name="StatusBarHost" Grid.Row="1" Margin="6,5,6,0" BackgroundColor="#55162B43" Stroke="#5079C9E8" StrokeThickness="1" StrokeShape="RoundRectangle 18" Padding="8,6">
+        <Label x:Name="PageTitleLabel" Grid.Row="0" Text="Agente" FontSize="26" FontAttributes="Bold" TextColor="#F2F5FB" Margin="14,14,14,10" />
+        <Border x:Name="StatusBarHost" Grid.Row="1" Margin="6,5,6,0" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 18" Padding="8,6">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                 <VerticalStackLayout Spacing="2">
                     <HorizontalStackLayout Spacing="6">
@@ -39,10 +33,11 @@
             </Grid>
         </Border>
 
-        <ScrollView x:Name="ModeChipsHost" IsVisible="False" Grid.Row="2" Margin="8,4,8,0" Orientation="Horizontal" HorizontalScrollBarVisibility="Never" HeightRequest="42">
+        <ScrollView x:Name="ModeChipsHost" IsVisible="True" Grid.Row="2" Margin="8,4,8,0" Orientation="Horizontal" HorizontalScrollBarVisibility="Never" HeightRequest="42">
             <HorizontalStackLayout Spacing="6" Padding="4,5,4,3">
                 <Button x:Name="ModeAgentBtn" Text="Agente" Clicked="OnModeAgentUiClicked" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="#128DD4" TextColor="White" CornerRadius="16" />
-                <Button x:Name="ModeWebBtn" Text="Web AI" Clicked="OnModeWebUiClicked" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="#40203952" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="16" />
+                <Button x:Name="ModeWebBtn" Text="Web AI" Clicked="OnModeWebUiClicked" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="#171B22" TextColor="{DynamicResource AuraTextPrimary}" CornerRadius="16" />
+                <Button x:Name="AgentsButton" Text="◈ Agentes" Clicked="OnAgentsClicked" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="#171B22" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
                 <Button IsVisible="False" Text="📂 Workspace" Clicked="OnChipWorkspace" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="#40203952" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
                 <Button IsVisible="False" Text="🩺 Diagnóstico" Clicked="OnChipDiagnostic" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="#40203952" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
                 <Button IsVisible="False" Text="🧠 Memória" Clicked="OnChipMemory" FontSize="10" Padding="11,5" HeightRequest="32" BackgroundColor="#40203952" TextColor="{DynamicResource AuraAccent}" CornerRadius="16" />
@@ -51,7 +46,7 @@
             </HorizontalStackLayout>
         </ScrollView>
 
-        <Border x:Name="ProcessCardsHost" Grid.Row="3" IsVisible="False" BackgroundColor="#55162B43" Stroke="#5079C9E8" StrokeThickness="1" Padding="8,5">
+        <Border x:Name="ProcessCardsHost" Grid.Row="3" IsVisible="False" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" Padding="8,5">
             <CollectionView x:Name="ProcessCards" ItemsSource="{Binding Processes}" ItemsLayout="HorizontalList" HeightRequest="58" SelectionMode="None">
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
@@ -89,7 +84,7 @@
             <WebView x:Name="BridgeWebView" Grid.Row="1" />
         </Grid>
 
-        <Border x:Name="InputBarHost" Grid.Row="5" Margin="8,4,8,4" ZIndex="50" BackgroundColor="#55162B43" Stroke="#5079C9E8" StrokeThickness="1" StrokeShape="RoundRectangle 20" Padding="10,6">
+        <Border x:Name="InputBarHost" Grid.Row="5" Margin="8,4,8,4" ZIndex="50" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 20" Padding="10,6">
             <VerticalStackLayout Spacing="4">
                 <ScrollView x:Name="ConfigHost" IsVisible="False" MaximumHeightRequest="260" VerticalScrollBarVisibility="Default" BackgroundColor="#40203952" />
                 <Label x:Name="PendingAttachmentLabel" IsVisible="False" FontSize="11" TextColor="{DynamicResource AuraAccent}" LineBreakMode="TailTruncation" />

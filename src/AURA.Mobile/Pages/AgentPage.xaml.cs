@@ -33,6 +33,7 @@ public partial class AgentPage : ContentPage
     private readonly ProcessRegistry _processes;
     private readonly AgentExecutionCoordinator _coordinator;
     private readonly WorkGroupCoordinator _workCoordinator;
+    private readonly WorkGroupRegistry _workGroups;
     private readonly Dictionary<string, AgentCapabilityBubble> _capabilityBubbles = new(StringComparer.OrdinalIgnoreCase);
     private readonly AuraOrchestrator _orchestrator;
     private readonly LocalPlaybook? _playbook;
@@ -56,7 +57,7 @@ public partial class AgentPage : ContentPage
 
     public AgentPage(OpenRouterClient client, MemoryStore memory, ISpeechService speech,
         ShellExecutor shell, ProcessRegistry processes, AuraOrchestrator orchestrator,
-        AgentExecutionCoordinator coordinator, WorkGroupCoordinator workCoordinator,
+        AgentExecutionCoordinator coordinator, WorkGroupCoordinator workCoordinator, WorkGroupRegistry workGroups,
         LocalPlaybook? playbook = null,
         SolutionStore? solutions = null, GitExecutor? git = null, PythonExecutor? python = null,
         NodeExecutor? node = null, CellProgramRegistry? cellRegistry = null, SimulationRuntime? runtime = null,
@@ -75,6 +76,7 @@ public partial class AgentPage : ContentPage
         _processes = processes;
         _coordinator = coordinator;
         _workCoordinator = workCoordinator;
+        _workGroups = workGroups;
         _orchestrator = orchestrator;
         _cellRegistry = cellRegistry;
         _runtime = runtime;
@@ -405,6 +407,35 @@ public partial class AgentPage : ContentPage
         catch (Exception ex)
         {
             await SafeAlertAsync("Colar plano", ex.Message);
+        }
+    }
+
+    private async void OnAgentsClicked(object? sender, EventArgs e)
+    {
+        try
+        {
+            var groups = _workGroups.List();
+            if (groups.Count == 0)
+            {
+                await SafeAlertAsync("Agentes", "Nenhum agente especializado está disponível.");
+                return;
+            }
+
+            string[] options = groups.Select(g => $"{g.Name} — {g.Mission}").ToArray();
+            string selected = await DisplayActionSheetAsync("◈ Agentes especializados", "Fechar", null, options);
+            if (string.IsNullOrWhiteSpace(selected) || selected == "Fechar")
+                return;
+
+            var group = groups.FirstOrDefault(g => selected.StartsWith(g.Name, StringComparison.Ordinal));
+            if (group == null)
+                return;
+
+            CommandEditor.Text = $"Analise o objetivo a seguir como agente de {group.Name}: ";
+            MainThread.BeginInvokeOnMainThread(() => CommandEditor.Focus());
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("AgentsPicker", ex);
         }
     }
 
