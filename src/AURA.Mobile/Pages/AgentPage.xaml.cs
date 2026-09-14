@@ -845,25 +845,6 @@ public partial class AgentPage : ContentPage
         bool wasContinue = IsContinueCommand(text);
         string resolved = ExpandContinueCommand(text);
 
-        // URLs explícitas são navegação do usuário: encaminhe diretamente para a WebView,
-        // sem deixar o LLM tentar resolver a solicitação com open_browser/web_fetch.
-        if (!wasContinue && TryExtractHttpUrl(resolved, out string webUrl))
-        {
-            try
-            {
-                _runInFlight = true;
-                await AppendBubbleAsync(text, user: true);
-                CommandEditor.Text = string.Empty;
-                ClearPendingAttachments();
-                OpenWebUrlFromAgent(webUrl);
-            }
-            finally
-            {
-                _runInFlight = false;
-            }
-            return;
-        }
-
         _runInFlight = true;
         string? processId = null;
         _runShellCommands.Clear();
