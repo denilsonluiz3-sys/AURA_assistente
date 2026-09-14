@@ -1,8 +1,10 @@
 name: AURA Android APK
 
 # Caminho oficial do APK (Codemagic esgotou builds).
-# O APK só é produzido manualmente após a última atualização do lote.
+# O APK é validado automaticamente a cada atualização da branch main.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
