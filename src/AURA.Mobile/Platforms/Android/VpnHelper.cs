@@ -7,6 +7,14 @@ namespace AURA.Mobile.Platforms.Android;
 /// <summary>Abre configurações ou um provedor VPN externo; a AURA não implementa túnel nem armazena credenciais.</summary>
 public static class VpnHelper
 {
+    public const string OrbotPackageName = "org.torproject.android";
+    public const string OrbotPlayStoreUrl = "https://play.google.com/store/apps/details?id=org.torproject.android";
+
+    // Compatibility entry points used by the existing BrowserPage flow.
+    public static void OpenVpnSettings() => OpenExternalVpnSettings();
+    public static bool IsOrbotInstalled() => IsExternalProviderInstalled(OrbotPackageName);
+    public static bool OpenOrbot() => OpenExternalProvider(OrbotPackageName);
+
     public static void OpenExternalVpnSettings()
     {
         var intent = new Intent(Settings.ActionVpnSettings);
