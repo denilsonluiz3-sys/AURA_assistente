@@ -203,8 +203,9 @@ public partial class AgentPage : ContentPage
 
     private void UpdateProcessCardsVisibility()
     {
-        // A interface aprovada mantém o estado do Agente visível mesmo em repouso.
-        ProcessCardsHost.IsVisible = true;
+        // O estado detalhado só ocupa espaço enquanto há uma execução ativa.
+        // Em repouso, a conversa deve usar toda a área disponível.
+        ProcessCardsHost.IsVisible = _processes.Processes.Count > 0;
     }
 
     protected override void OnAppearing()
