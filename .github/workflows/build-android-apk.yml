@@ -205,7 +205,9 @@ jobs:
           fi
           if [ -z "$SIGNED_APK" ]; then echo "ERRO: nenhum APK assinado encontrado"; exit 1; fi
           FINAL_APK="$OUT/com.aura.genesis-Signed.apk"
-          cp -f "$SIGNED_APK" "$FINAL_APK"
+          if [ "$SIGNED_APK" != "$FINAL_APK" ]; then
+            cp -f "$SIGNED_APK" "$FINAL_APK"
+          fi
           find "$OUT" -type f -name '*.apk' ! -path "$FINAL_APK" -delete
           APK="$FINAL_APK"
           AAPT="$SDK_ROOT/build-tools/35.0.0/aapt"
@@ -246,3 +248,4 @@ jobs:
                 });
               }
             }
+
