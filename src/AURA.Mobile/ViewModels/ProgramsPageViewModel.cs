@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -53,6 +54,10 @@ namespace AURA.Mobile.ViewModels
         private ProgramState _state = ProgramState.Available;
         private string? _lastResult;
         private bool _isRunning;
+        private string _urlInput = string.Empty;
+        private string _selectorInput = string.Empty;
+        private string _textInput = string.Empty;
+        private string _numberInput = string.Empty;
 
         public ProgramCardViewModel(
             IAuraCellProgram program,
@@ -71,8 +76,36 @@ namespace AURA.Mobile.ViewModels
 
         public string Description => _program.Name switch
         {
-            "device-diagnostic" => "Diagnóstico completo do dispositivo Android (bateria, rede, sensores, propriedades).",
+            "device-diagnostic" => "Lê bateria, rede, sensores e propriedades reais do Android.",
+            "browser-open" => "Abre uma URL no navegador interno da AURA.",
+            "browser-read" => "Lê o texto e a árvore DOM da página atualmente aberta.",
+            "browser-click" => "Clica em um elemento usando um seletor CSS.",
+            "browser-type" => "Preenche um campo usando seletor CSS e texto.",
+            "browser-scroll" => "Rola a página atual pelo número de pixels informado.",
+            "browser-wait" => "Aguarda a página por um intervalo definido.",
+            "browser-back" => "Volta uma página no histórico do navegador.",
+            "browser-forward" => "Avança uma página no histórico do navegador.",
+            "browser-screenshot" => "Salva uma captura da página atual no workspace.",
             _ => "Programa interno controlado pela AURA."
+        };
+
+        public bool NeedsUrl => _program.Name == "browser-open";
+        public bool NeedsSelector => _program.Name is "browser-read" or "browser-click" or "browser-type";
+        public bool NeedsText => _program.Name == "browser-type";
+        public bool NeedsNumber => _program.Name is "browser-scroll" or "browser-wait";
+        public string UrlInput { get => _urlInput; set { _urlInput = value ?? string.Empty; OnChanged(); } }
+        public string SelectorInput { get => _selectorInput; set { _selectorInput = value ?? string.Empty; OnChanged(); } }
+        public string TextInput { get => _textInput; set { _textInput = value ?? string.Empty; OnChanged(); } }
+        public string NumberInput { get => _numberInput; set { _numberInput = value ?? string.Empty; OnChanged(); } }
+        public string ArgumentHint => _program.Name switch
+        {
+            "browser-open" => "URL https://…",
+            "browser-read" => "Seletor CSS opcional (vazio = página inteira)",
+            "browser-click" => "Seletor CSS, ex.: button[type=submit]",
+            "browser-type" => "Seletor CSS + texto abaixo",
+            "browser-scroll" => "Pixels, ex.: 600 ou -400",
+            "browser-wait" => "Milissegundos, ex.: 1000",
+            _ => "Nenhum parâmetro necessário"
         };
 
         public string CapabilitiesText =>
@@ -151,9 +184,47 @@ namespace AURA.Mobile.ViewModels
 
         public ICommand ExecuteCommand { get; }
 
+        private Dictionary<string, string>? BuildArguments(out string? validationError)
+        {
+            validationError = null;
+            var args = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (NeedsUrl)
+            {
+                if (!Uri.TryCreate(UrlInput.Trim(), UriKind.Absolute, out var uri)
+                    || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+                { validationError = "Informe uma URL http:// ou https:// válida."; return null; }
+                args["url"] = uri.ToString();
+            }
+            if (_program.Name is "browser-click" or "browser-type")
+            {
+                if (string.IsNullOrWhiteSpace(SelectorInput)) { validationError = "Informe o seletor CSS do elemento."; return null; }
+                args["selector"] = SelectorInput.Trim();
+            }
+            else if (_program.Name == "browser-read" && !string.IsNullOrWhiteSpace(SelectorInput))
+                args["selector"] = SelectorInput.Trim();
+            if (NeedsText)
+            {
+                if (string.IsNullOrWhiteSpace(TextInput)) { validationError = "Informe o texto a preencher."; return null; }
+                args["text"] = TextInput;
+            }
+            if (NeedsNumber)
+            {
+                if (!int.TryParse(NumberInput, out var number)) { validationError = "Informe um número inteiro válido."; return null; }
+                args[_program.Name == "browser-scroll" ? "pixels" : "milliseconds"] = number.ToString();
+            }
+            return args;
+        }
+
         private async Task ExecuteAsync()
         {
             if (_isRunning || !CanExecute) return;
+            var arguments = BuildArguments(out var validationError);
+            if (arguments == null)
+            {
+                State = ProgramState.Error;
+                LastResult = validationError;
+                return;
+            }
 
             _isRunning = true;
             State = ProgramState.Executing;
@@ -163,7 +234,7 @@ namespace AURA.Mobile.ViewModels
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(45));
             try
             {
-                var context = _contextFactory.Create($"program-ui-{Guid.NewGuid():N}", cts.Token);
+                var context = _contextFactory.Create($"program-ui-{Guid.NewGuid():N}", cts.Token, arguments);
                 var result = await _runner.RunAsync(_program, context, cts.Token);
 
                 if (result.IsSuccess)
