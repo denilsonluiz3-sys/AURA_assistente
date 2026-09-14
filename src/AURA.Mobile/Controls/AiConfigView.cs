@@ -37,6 +37,8 @@ public sealed class AiConfigView : ContentView
             "http://127.0.0.1:11434/v1/chat/completions",
             "http://127.0.0.1:11434/v1/models",
             UniversalApiFormat.OpenAiCompatible, false, "llama3.2"),
+        new("offline", "AURA Offline (GGUF)", "", "",
+            UniversalApiFormat.OpenAiCompatible, false, "qwen2.5-1.5b-instruct-q4_k_m.gguf"),
         new("custom", "Personalizado", "", "", UniversalApiFormat.OpenAiCompatible, true, "")
     };
 
@@ -539,6 +541,28 @@ public sealed class AiConfigView : ContentView
         try
         {
             var preset = SelectedPreset() ?? Presets[^1];
+            if (preset.Id == "offline")
+            {
+                var store = Handler?.MauiContext?.Services.GetService<LocalModelStore>();
+                var requested = "qwen2.5-1.5b-instruct-q4_k_m.gguf";
+                var local = store?.List().FirstOrDefault(x =>
+                    x.DisplayName.Equals(requested, StringComparison.OrdinalIgnoreCase) ||
+                    x.Id.Equals(requested, StringComparison.OrdinalIgnoreCase));
+                if (local == null)
+                {
+                    SetStatus("Importe o arquivo qwen2.5-1.5b-instruct-q4_k_m.gguf antes de conectar.", false);
+                    return;
+                }
+                RuntimeConfig.Provider = "offline";
+                RuntimeConfig.BaseUrlOverride = "";
+                RuntimeConfig.ModelsUrlOverride = "";
+                RuntimeConfig.RequiresApiKey = false;
+                RuntimeConfig.Model = local.Id;
+                RuntimeConfig.Apply((Handler?.MauiContext?.Services.GetService(typeof(IUniversalAiClient)) as IUniversalAiClient));
+                _modelEntry.Text = requested;
+                SetStatus("Conectado ao modelo local " + requested, true);
+                return;
+            }
             var provider = preset.Id == "custom"
                 ? (string.IsNullOrWhiteSpace(RuntimeConfig.Provider) ? "custom" : RuntimeConfig.Provider.Trim())
                 : preset.Id;
