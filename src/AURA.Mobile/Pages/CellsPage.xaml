@@ -93,14 +93,10 @@
             </CollectionView.ItemTemplate>
         </CollectionView>
 
-        <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="10">
+        <Grid Grid.Row="2" ColumnDefinitions="*">
             <Button Text="Atualizar"
                     Clicked="OnRefreshClicked"
                     Style="{StaticResource BtnGhost}" />
-            <Button Grid.Column="1"
-                    Text="Nova célula"
-                    Clicked="OnNewClicked"
-                    Style="{StaticResource BtnPrimary}" />
         </Grid>
 
     </Grid>

@@ -8,18 +8,14 @@ namespace AURA.Mobile.Pages;
 public partial class CellsPage : ContentPage
 {
     private readonly SimulationRuntime _runtime;
-    private readonly Runner _runner;
-    private readonly RunPage _runPage;
     private readonly EventBus _events;
     private bool _loaded;
     private bool _subscribed;
 
-    public CellsPage(SimulationRuntime runtime, Runner runner, RunPage runPage, EventBus events)
+    public CellsPage(SimulationRuntime runtime, EventBus events)
     {
         InitializeComponent();
         _runtime = runtime;
-        _runner = runner;
-        _runPage = runPage;
         _events = events;
     }
 
@@ -167,11 +163,6 @@ public partial class CellsPage : ContentPage
 
         _runtime.DeleteCell(cell.Id);
         Refresh();
-    }
-
-    private async void OnNewClicked(object sender, EventArgs e)
-    {
-        await Navigation.PushAsync(_runPage);
     }
 
     private void OnRefreshClicked(object sender, EventArgs e)
