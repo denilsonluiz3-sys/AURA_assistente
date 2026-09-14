@@ -19,7 +19,6 @@ using AURA.Network;
 using AURA.SystemInfo;
 using AURA.Mobile.Speech;
 using AURA.Mobile.Services;
-using AURA.Mobile.ViewModels;
 using CommunityToolkit.Maui;
 
 namespace AURA.Mobile;
