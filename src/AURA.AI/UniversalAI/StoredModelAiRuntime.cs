@@ -4,6 +4,21 @@ namespace AURA.AI.UniversalAI;
 /// Ponte mínima para o motor nativo do modelo. A implementação Android poderá
 /// usar llama.cpp ou outro backend sem contaminar o AgentSession.
 /// </summary>
+public enum LocalModelRuntimeState
+{
+    Unloaded,
+    Loading,
+    Loaded,
+    Generating,
+    Error
+}
+
+public interface ILocalModelEngineStatus
+{
+    LocalModelRuntimeState State { get; }
+    event Action<LocalModelRuntimeState>? StateChanged;
+}
+
 public interface ILocalModelEngine
 {
     Task<string> GenerateAsync(

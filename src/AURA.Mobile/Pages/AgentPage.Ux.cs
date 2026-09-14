@@ -12,12 +12,19 @@ public partial class AgentPage
 {
     private CancellationTokenSource? _runCts;
     private bool _uxHooked;
+    private bool _modelStatusHooked;
 
     protected override void OnHandlerChanged()
     {
         base.OnHandlerChanged();
         if (Handler == null)
             return;
+
+        if (!_modelStatusHooked && _localEngine is ILocalModelEngineStatus modelStatus)
+        {
+            _modelStatusHooked = true;
+            modelStatus.StateChanged += OnLocalModelStateChanged;
+        }
 
         HookBubbleSpeakInjector();
         try { RefreshModelStatusLabel(); } catch { /* ignore */ }
@@ -107,6 +114,27 @@ public partial class AgentPage
             }
         }
         catch { /* ignore */ }
+    }
+
+    private void OnLocalModelStateChanged(LocalModelRuntimeState state)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            try
+            {
+                string suffix = state switch
+                {
+                    LocalModelRuntimeState.Loading => "offline: carregando modelo…",
+                    LocalModelRuntimeState.Loaded => "offline: modelo carregado",
+                    LocalModelRuntimeState.Generating => "offline: gerando…",
+                    LocalModelRuntimeState.Error => "offline: erro no runtime",
+                    _ => "offline: descarregado"
+                };
+                ModelLabel.Text = suffix;
+                ModelLabel.IsVisible = true;
+            }
+            catch { /* ignore visual status failures */ }
+        });
     }
 
     private void RefreshModelStatusLabel()

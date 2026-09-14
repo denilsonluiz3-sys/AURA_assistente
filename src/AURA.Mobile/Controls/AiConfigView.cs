@@ -384,9 +384,13 @@ public sealed class AiConfigView : ContentView
         {
             var store = Handler?.MauiContext?.Services.GetService<LocalModelStore>();
             var models = store?.List() ?? Array.Empty<LocalModelDescriptor>();
+            bool offline = _presetPicker.SelectedIndex >= 0 &&
+                           string.Equals(Presets[_presetPicker.SelectedIndex].Id, "offline", StringComparison.OrdinalIgnoreCase);
+            _connectButton.IsEnabled = !offline || models.Count > 0;
+            _connectButton.Text = offline && models.Count == 0 ? "Importe o modelo primeiro" : offline ? "Ativar IA offline" : "Conectar";
             _localModelStatus.Text = models.Count == 0
-                ? "Offline: nenhum modelo GGUF importado."
-                : "Offline: " + string.Join(", ", models.Select(x => x.DisplayName)) + " (runtime ainda não conectado)";
+                ? "Offline: nenhum modelo GGUF importado. O arquivo ainda não foi carregado pela AURA."
+                : "Offline: " + string.Join(", ", models.Select(x => x.DisplayName)) + " — pronto; será carregado somente ao iniciar a primeira execução.";
         }
         catch (Exception ex)
         {
