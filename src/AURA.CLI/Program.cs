@@ -12,7 +12,6 @@ using AURA.Core.Launchers;
 using AURA.Core.Logging;
 using AURA.Core.Runtime;
 using AURA.Memory;
-using AURA.Modules;
 using AURA.Modules.Executors;
 using AURA.Network;
 using AURA.SystemInfo;
@@ -141,9 +140,6 @@ namespace AURA.CLI
                         break;
                     case "internet":
                         PrintNetwork();
-                        break;
-                    case "modulos":
-                        PrintModules();
                         break;
                     case "config":
                         PrintConfig();
@@ -835,28 +831,6 @@ namespace AURA.CLI
             Console.WriteLine("  FirstRunCompleted  : " + _bootstrap.Settings.FirstRunCompleted);
             Console.WriteLine("  Theme              : " + _bootstrap.Settings.Theme);
             Console.WriteLine();
-            Console.WriteLine("Módulos (" + _bootstrap.ModulesPath + "):");
-            foreach (ModuleInfo m in ModuleCatalog.GetAll())
-            {
-                string state = m.IsCore
-                    ? "núcleo"
-                    : _bootstrap.Modules.Modules.IsEnabled(m.Id) ? "aplicado" : "não aplicado";
-                Console.WriteLine("  " + m.DisplayName.PadRight(24) + ": " + state);
-            }
-        }
-
-        private static void PrintModules()
-        {
-            foreach (ModuleInfo module in ModuleCatalog.GetAll())
-            {
-                string kind = module.IsCore
-                    ? "núcleo"
-                    : string.IsNullOrWhiteSpace(module.PackageUrl) ? "planejado" : "baixável";
-                Console.WriteLine(module.Icon + " " + module.DisplayName +
-                    " [" + module.Status + ", " + kind + "] - " + module.ShortDescription);
-            }
-        }
-
         private static void PrintHelp()
         {
             Console.WriteLine("Comandos:");
@@ -876,8 +850,7 @@ namespace AURA.CLI
             Console.WriteLine("  aichave <sk-or-...>      Salva a chave da IA em ~/.aura/ai_key.txt");
             Console.WriteLine("  exec <shell|git|python|node> <cmd> [args]   Executa via executor");
             Console.WriteLine("  run aichat --cell chat  Inicia assistente como célula");
-            Console.WriteLine("  modulos                 Lista módulos disponíveis");
-            Console.WriteLine("  config                  Mostra configuração (settings + módulos)");
+            Console.WriteLine("  config                  Mostra configuração (settings)");
             Console.WriteLine("  launchers               Lista resolutores de extensão");
             Console.WriteLine("  plugins                 Lista plugins carregados");
             Console.WriteLine("  ajuda                   Mostra esta ajuda");
