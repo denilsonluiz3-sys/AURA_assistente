@@ -271,6 +271,7 @@ public sealed class AiConfigView : ContentView
         ApplyProviderUi(Presets[idx]);
 
         SeedFallbackModels(Presets[idx].Id);
+        ApplyProviderUi(Presets[idx]);
         RefreshStatusLine();
     }
 
@@ -289,6 +290,7 @@ public sealed class AiConfigView : ContentView
             SetAdvanced(true);
 
         SeedFallbackModels(p.Id);
+        ApplyProviderUi(p);
         _status.Text = string.Empty;
     }
 
@@ -355,6 +357,30 @@ public sealed class AiConfigView : ContentView
     {
         var mapped = ids.Select(id => new UniversalModel(id, id, "")).ToList();
         ApplyModelList(mapped);
+    }
+
+    private void ApplyProviderUi(Preset preset)
+    {
+        bool offline = string.Equals(preset.Id, "offline", StringComparison.OrdinalIgnoreCase);
+        _modelPicker.IsVisible = !offline && _models.Count > 0;
+        _loadModelsButton.IsVisible = !offline;
+        _connectButton.IsVisible = !offline;
+        _advancedToggle.IsVisible = !offline;
+        _baseUrlEntry.IsVisible = !offline && _advancedOpen;
+        _modelsUrlEntry.IsVisible = !offline && _advancedOpen;
+
+        if (offline)
+        {
+            _models.Clear();
+            _displayToId.Clear();
+            _modelPicker.ItemsSource = null;
+            _status.Text = string.Empty;
+            _modelEntry.IsEnabled = false;
+        }
+        else
+        {
+            _modelEntry.IsEnabled = true;
+        }
     }
 
     private void OnAdvancedToggle(object? sender, EventArgs e)
