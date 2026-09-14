@@ -32,16 +32,16 @@ public sealed class StoredModelAiRuntimeTests
             var store = new LocalModelStore(root);
             await store.ImportAsync(
                 new MemoryStream(new byte[] { 1, 2, 3 }),
-                new LocalModelDescriptor { Id = "model-a", FileName = "model-a.gguf" });
+                new LocalModelDescriptor { Id = LocalModelStore.RequiredModelId, FileName = LocalModelStore.RequiredFileName });
             var engine = new FakeEngine();
-            var runtime = new StoredModelAiRuntime(store, engine, "model-a");
+            var runtime = new StoredModelAiRuntime(store, engine, LocalModelStore.RequiredModelId);
 
             string answer = await runtime.CompleteAsync(
                 new[] { new AgentMessage { Role = "user", Content = "olá" } },
                 new[] { new AgentToolDefinition { Name = "read_file" } });
 
             Assert.Equal("resposta do motor local", answer);
-            Assert.Equal(store.GetModelPath("model-a"), engine.ModelPath);
+            Assert.Equal(store.GetModelPath(LocalModelStore.RequiredModelId), engine.ModelPath);
             Assert.Single(engine.Tools!);
         }
         finally
