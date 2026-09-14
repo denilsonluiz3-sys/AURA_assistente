@@ -48,6 +48,35 @@ public partial class AgentPage
         ("stackoverflow", "Stack Overflow", "https://stackoverflow.com"),
     };
 
+    private static bool TryExtractHttpUrl(string text, out string url)
+    {
+        url = string.Empty;
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        var match = System.Text.RegularExpressions.Regex.Match(
+            text,
+            @"https?://[^\s<>""']+", 
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!match.Success || !Uri.TryCreate(match.Value.TrimEnd('.', ',', ';', ')', ']'), UriKind.Absolute, out var parsed))
+            return false;
+
+        if (parsed.Scheme is not ("http" or "https") || string.IsNullOrWhiteSpace(parsed.Host))
+            return false;
+
+        url = parsed.AbsoluteUri;
+        return true;
+    }
+
+    private void OpenWebUrlFromAgent(string url)
+    {
+        _webMode = true;
+        StatusBarHost.IsVisible = false;
+        InputBarHost.IsVisible = false;
+        ApplyModeUi();
+        OpenWebProvider("custom", url);
+    }
+
     private void OpenWebProvider(string id, string url)
     {
         if (string.IsNullOrWhiteSpace(url))
