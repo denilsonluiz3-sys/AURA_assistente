@@ -8,7 +8,7 @@ namespace AURA.Mobile.Platforms.Android.AI;
 public sealed class LocalModelInferenceOptions
 {
     public int ContextSize { get; init; } = 4096;
-    public int MaxTokens { get; init; } = 512;
+    public int MaxTokens { get; init; } = 256;
     public int Threads { get; init; } = 4;
 }
 

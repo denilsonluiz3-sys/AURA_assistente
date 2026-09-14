@@ -4,8 +4,8 @@ using System.Text.Json;
 namespace AURA.AI.UniversalAI;
 
 /// <summary>
-/// Constrói um prompt estável para runtimes locais que recebem texto bruto.
-/// O motor nativo continua responsável pelo template específico do modelo.
+/// Constrói o prompt ChatML do modelo Qwen Instruct local. O runtime nativo
+/// recebe texto já formatado e preserva os marcadores de fim de turno.
 /// </summary>
 public static class LocalChatPromptBuilder
 {
@@ -14,6 +14,7 @@ public static class LocalChatPromptBuilder
         IReadOnlyList<AgentToolDefinition> tools)
     {
         var builder = new StringBuilder();
+        builder.AppendLine("<|im_start|>system");
         builder.AppendLine("AURA LOCAL CHAT");
         builder.AppendLine("Responda em português quando possível.");
 
@@ -38,10 +39,15 @@ public static class LocalChatPromptBuilder
             builder.AppendLine("Não invente ferramentas e não execute ações fora das ferramentas disponíveis.");
         }
 
+        builder.AppendLine("<|im_end|>");
+
+        // Qwen Instruct GGUF expects its ChatML turn markers. Keeping the
+        // model template here avoids an open-ended completion caused by the
+        // generic [ROLE] prompt and makes the end-of-turn token observable.
         foreach (var message in messages)
         {
-            string role = string.IsNullOrWhiteSpace(message.Role) ? "user" : message.Role.Trim().ToUpperInvariant();
-            builder.Append('[').Append(role).AppendLine("]");
+            string role = string.IsNullOrWhiteSpace(message.Role) ? "user" : message.Role.Trim().ToLowerInvariant();
+            builder.Append("<|im_start|>").Append(role).Append('\n');
             if (!string.IsNullOrWhiteSpace(message.Content))
                 builder.AppendLine(message.Content.Trim());
 
@@ -50,9 +56,11 @@ public static class LocalChatPromptBuilder
                 foreach (var call in message.ToolCalls)
                     builder.Append("tool_call ").Append(call.Name).Append(": ").AppendLine(call.ArgumentsJson);
             }
+
+            builder.AppendLine("<|im_end|>");
         }
 
-        builder.AppendLine("[ASSISTANT]");
+        builder.AppendLine("<|im_start|>assistant");
         return builder.ToString();
     }
 }
