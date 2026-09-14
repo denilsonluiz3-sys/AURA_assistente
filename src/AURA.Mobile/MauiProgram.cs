@@ -14,7 +14,6 @@ using AURA.Core.Runtime;
 using AURA.Memory;
 using AURA.Mobile.Diagnostics;
 using AURA.Mobile.Pages;
-using AURA.Modules;
 using AURA.Modules.Executors;
 using AURA.Network;
 using AURA.SystemInfo;
@@ -63,8 +62,6 @@ public static class MauiProgram
         builder.Services.AddSingleton<CellProgramRunner>();
         string configDir = Path.Combine(FileSystem.AppDataDirectory, "config");
         builder.Services.AddSingleton(sp => new ConfigLoader(sp.GetRequiredService<ILogger>()).LoadSettings(Path.Combine(configDir, "settings.json")));
-        builder.Services.AddSingleton(sp => new ConfigLoader(sp.GetRequiredService<ILogger>()).LoadModules(Path.Combine(configDir, "modules.json")));
-        builder.Services.AddSingleton(sp => new ModuleManager(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "modules"), Path.Combine(configDir, "modules.json"), sp.GetRequiredService<EventBus>(), localPackageProvider: ReadEmbeddedModulePackageAsync));
         builder.Services.AddSingleton(sp => new MemoryStore(sp.GetRequiredService<ILogger>(), Path.Combine(FileSystem.AppDataDirectory, "memory.json")));
         builder.Services.AddSingleton(sp => new AgentRunStore(
             sp.GetRequiredService<ILogger>(),
@@ -119,7 +116,6 @@ public static class MauiProgram
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<HomePage>();
         builder.Services.AddSingleton<AgentPage>(sp => new AgentPage(sp.GetRequiredService<IUniversalAiClient>(), sp.GetRequiredService<MemoryStore>(), sp.GetRequiredService<ISpeechService>(), sp.GetRequiredService<ShellExecutor>(), sp.GetRequiredService<ProcessRegistry>(), sp.GetRequiredService<AuraOrchestrator>(), sp.GetRequiredService<AgentExecutionCoordinator>(), sp.GetRequiredService<WorkGroupCoordinator>(), sp.GetRequiredService<WorkGroupRegistry>(), sp.GetService<LocalPlaybook>(), sp.GetRequiredService<SolutionStore>(), sp.GetService<GitExecutor>(), sp.GetService<PythonExecutor>(), sp.GetService<NodeExecutor>(), sp.GetService<CellProgramRegistry>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetService<IAndroidCapabilityService>(), sp.GetRequiredService<AgentRunStore>(), sp.GetRequiredService<LocalModelStore>(), sp.GetService<ILocalModelEngine>()));
-        builder.Services.AddSingleton<ModulesPage>();
         builder.Services.AddSingleton<TerminalPage>();
         builder.Services.AddSingleton<BrowserPage>();
         builder.Services.AddSingleton<ImageSearchPage>();
@@ -133,16 +129,5 @@ public static class MauiProgram
         try { PythonExecutor.Embedded = app.Services.GetService<IEmbeddedPython>(); if (PythonExecutor.Embedded is not null) AuraLog.Info("MauiProgram: Python embutido ligado ao PythonExecutor"); } catch (Exception ex) { AuraLog.Exception("MauiProgram.EmbeddedPython", ex); }
         AuraLog.Info("MauiProgram.CreateMauiApp OK");
         return app;
-    }
-
-    private static async Task<string?> ReadEmbeddedModulePackageAsync(string id)
-    {
-        if (string.IsNullOrWhiteSpace(id)) return null;
-        foreach (string path in new[] { $"modulepkgs/{id}/module.json", $"modulepkgs\\{id}\\module.json" })
-        {
-            try { using Stream stream = await FileSystem.OpenAppPackageFileAsync(path); using var reader = new StreamReader(stream); string json = await reader.ReadToEndAsync(); if (!string.IsNullOrWhiteSpace(json)) return json; }
-            catch (Exception ex) { AuraLog.Info($"Asset '{path}' indisponível ({ex.GetType().Name})."); }
-        }
-        AuraLog.Warning($"Nenhum pacote embarcado encontrado para o módulo '{id}'."); return null;
     }
 }

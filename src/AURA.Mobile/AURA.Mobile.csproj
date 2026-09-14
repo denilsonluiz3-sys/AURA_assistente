@@ -40,7 +40,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <MauiAsset Include="..\..\modules\packages\**\module.json" LogicalName="modulepkgs/%(RecursiveDir)module.json" />
   </ItemGroup>
 
   <ItemGroup>

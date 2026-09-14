@@ -1,13 +1,10 @@
-using AURA.Core.Events;
 using AURA.Mobile.Pages;
-using AURA.Modules;
 
 namespace AURA.Mobile
 {
     public class MainPage : TabbedPage
     {
-        private readonly ModuleManager _manager;
-        private readonly List<(string? ModuleId, string Section, string Label, Page Page)> _entries;
+        private readonly List<(string Section, string Label, Page Page)> _entries;
         private bool _permissionsAsked;
         private CancellationTokenSource? _rebuildCts;
         private Page? _advancedMenu;
@@ -18,11 +15,8 @@ namespace AURA.Mobile
         };
 
         public MainPage(
-            EventBus events,
-            ModuleManager manager,
             HomePage home,
             AgentPage agent,
-            ModulesPage modules,
             TerminalPage terminal,
             BrowserPage browser,
             CellsPage cells,
@@ -30,17 +24,12 @@ namespace AURA.Mobile
             ProgramsPage programs)
         {
             AuraLog.Info("MainPage.ctor BEGIN");
-            _manager = manager;
-            events.Subscribe<ModuleStateChangedEvent>(_ =>
-                MainThread.BeginInvokeOnMainThread(ScheduleRebuildTabs));
-
             // Navegação principal: Agente como início; recursos secundários em Mais.
             // As antigas categorias Sistema/Assistente/Ferramentas/Apps duplicavam
             // os mesmos atalhos em várias telas.
             var advancedItems = new (string Label, Page Page)[]
             {
                 ("Terminal", terminal),
-                ("Módulos", modules),
                 ("Células", cells),
                 ("Programas", programs),
                 ("Rodar programa", run),
@@ -51,18 +40,17 @@ namespace AURA.Mobile
             _entries = new List<(string?, string, string, Page)>
             {
                 // O Agente é a tela inicial e o único destino primário.
-                (null, "Agente", "Agente", agent),
+                ("Agente", "Agente", agent),
 
                 // Recursos que ainda acrescentam uma função própria.
-                (null, "Mais", "Navegador", browser),
-                (null, "Mais", "Modo avançado", advancedMenu),
+                ("Mais", "Navegador", browser),
+                ("Mais", "Modo avançado", advancedMenu),
 
                 // Ferramentas técnicas continuam disponíveis em Modo avançado.
-                (null, "Avançado", "Terminal", terminal),
-                (null, "Avançado", "Módulos", modules),
-                (null, "Avançado", "Células", cells),
-                (null, "Avançado", "Programas", programs),
-                (null, "Avançado", "Rodar programa", run),
+                ("Avançado", "Terminal", terminal),
+                ("Avançado", "Células", cells),
+                ("Avançado", "Programas", programs),
+                ("Avançado", "Rodar programa", run),
             };
 
             BarBackgroundColor = Color.FromArgb("#0c0c12");
@@ -118,14 +106,11 @@ namespace AURA.Mobile
 
             foreach (var entry in _entries.Where(e => PrimaryTabs.Contains(e.Section)))
             {
-                if (entry.ModuleId != null && !_manager.IsApplied(entry.ModuleId))
-                    continue;
                 Children.Add(new NavigationPage(entry.Page) { Title = entry.Section });
             }
 
             var moreItems = _entries
                 .Where(e => e.Section.Equals("Mais", StringComparison.OrdinalIgnoreCase))
-                .Where(e => e.ModuleId == null || _manager.IsApplied(e.ModuleId))
                 .Select(e => (e.Label, e.Page))
                 .ToArray();
             if (moreItems.Length > 0)
