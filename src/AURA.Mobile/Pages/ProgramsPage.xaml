@@ -10,7 +10,7 @@
                    FontSize="22"
                    FontAttributes="Bold"
                    TextColor="{DynamicResource AuraTextPrimary}" />
-            <Label Text="Ações reais do dispositivo, navegador e workspace. Preencha os parâmetros antes de executar."
+            <Label Text="Catálogo de programas internos. Execução via PolicyGuard → CellProgramRunner."
                    FontSize="13"
                    TextColor="{DynamicResource AuraTextSecondary}" />
         </VerticalStackLayout>
@@ -34,7 +34,7 @@
                         <Border.StrokeShape>
                             <RoundRectangle CornerRadius="14" />
                         </Border.StrokeShape>
-                        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto"
                               ColumnDefinitions="*,Auto"
                               RowSpacing="6">
                             <Label Grid.Row="0"
@@ -63,47 +63,12 @@
                                    LineBreakMode="TailTruncation" />
                             <Label Grid.Row="3"
                                    Grid.ColumnSpan="2"
-                                   Text="{Binding ArgumentHint}"
-                                   FontSize="11"
-                                   TextColor="{DynamicResource AuraTextSecondary}" />
-                            <Entry Grid.Row="4"
-                                   Grid.ColumnSpan="2"
-                                   Placeholder="URL https://…"
-                                   Text="{Binding UrlInput, Mode=TwoWay}"
-                                   IsVisible="{Binding NeedsUrl}"
-                                   Keyboard="Url"
-                                   ClearButtonVisibility="WhileEditing"
-                                   FontSize="13" />
-                            <Entry Grid.Row="5"
-                                   Grid.ColumnSpan="2"
-                                   Placeholder="Seletor CSS"
-                                   Text="{Binding SelectorInput, Mode=TwoWay}"
-                                   IsVisible="{Binding NeedsSelector}"
-                                   ClearButtonVisibility="WhileEditing"
-                                   FontSize="13" />
-                            <Entry Grid.Row="6"
-                                   Grid.ColumnSpan="2"
-                                   Placeholder="Texto a preencher"
-                                   Text="{Binding TextInput, Mode=TwoWay}"
-                                   IsVisible="{Binding NeedsText}"
-                                   ClearButtonVisibility="WhileEditing"
-                                   FontSize="13" />
-                            <Entry Grid.Row="7"
-                                   Grid.ColumnSpan="2"
-                                   Placeholder="Número"
-                                   Text="{Binding NumberInput, Mode=TwoWay}"
-                                   IsVisible="{Binding NeedsNumber}"
-                                   Keyboard="Numeric"
-                                   ClearButtonVisibility="WhileEditing"
-                                   FontSize="13" />
-                            <Label Grid.Row="8"
-                                   Grid.ColumnSpan="2"
                                    Text="{Binding ResultSummary}"
                                    FontSize="12"
                                    TextColor="{DynamicResource AuraTextPrimary}"
                                    IsVisible="{Binding HasResult}"
                                    LineBreakMode="WordWrap" />
-                            <Button Grid.Row="9"
+                            <Button Grid.Row="4"
                                     Grid.ColumnSpan="2"
                                     Text="{Binding ActionButtonText}"
                                     Command="{Binding ExecuteCommand}"

@@ -36,8 +36,6 @@ public sealed class BrowserReadCellProgram : BrowserActionCellProgram
         string? selector = context.Arguments.TryGetValue("selector", out var value) ? value : null;
         string text = await context.Browser.ReadAsync(selector, ct).ConfigureAwait(false);
         string domJson = await context.Browser.ReadDomAsync(selector, ct).ConfigureAwait(false);
-        if (domJson.Contains("browser unavailable", StringComparison.OrdinalIgnoreCase))
-            return CellProgramResult.Fail("Abra uma página no navegador antes de usar browser-read.");
 
         try
         {
