@@ -213,8 +213,8 @@ jobs:
           AAPT="$SDK_ROOT/build-tools/35.0.0/aapt"
           test -x "$AAPT"
           "$AAPT" dump badging "$APK" | tee "$RUNNER_TEMP/apk-badging.txt"
-          grep -Fq "package: name='com.aura.genesis'" "$OUT/apk-badging.txt"
-          grep -Fq "versionName='2.4'" "$OUT/apk-badging.txt"
+          grep -Fq "package: name='com.aura.genesis'" "$RUNNER_TEMP/apk-badging.txt"
+          grep -Fq "versionName='2.4'" "$RUNNER_TEMP/apk-badging.txt"
           "$APKSIGNER" verify --verbose "$APK"
 
       - name: Upload APK
