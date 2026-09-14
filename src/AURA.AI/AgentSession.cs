@@ -59,7 +59,6 @@ public sealed class AgentSession
         lock (AmbientGate)
         {
             try { AmbientCts?.Cancel(); } catch { }
-            try { AmbientCts?.Dispose(); } catch { }
             AmbientCts = new CancellationTokenSource();
             return AmbientCts;
         }

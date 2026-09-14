@@ -627,6 +627,10 @@ public partial class AgentPage : ContentPage
             toolPolicy: toolPolicy ?? _workCoordinator.CreateObservationPolicy("observação"));
         _session.Step += OnAgentStep;
 
+        // A recriação da sessão não deve duplicar a mensagem de boas-vindas no chat.
+        if (ConversationContainer.Children.Count > 0)
+            return;
+
         int memCount = 0;
         try { memCount = _memory.Read(tail: 64).Count; } catch { /* ignore */ }
         string welcome = memCount > 0
