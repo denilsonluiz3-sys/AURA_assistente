@@ -32,9 +32,12 @@ public sealed class CellProgramRunner
         if (authorization.Decision == AuthorizationDecision.RequiresConfirmation)
             return CellProgramResult.Fail(authorization.Message);
 
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, context.CancellationToken);
+        CancellationToken executionToken = linkedCts.Token;
+
         try
         {
-            ct.ThrowIfCancellationRequested();
+            executionToken.ThrowIfCancellationRequested();
             _logger.Info($"Executando programa '{program.Name}' (programa {context.CellId})");
             return await program.ExecuteAsync(context, executionToken).ConfigureAwait(false);
         }
