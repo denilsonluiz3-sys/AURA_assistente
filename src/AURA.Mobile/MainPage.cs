@@ -31,7 +31,7 @@ namespace AURA.Mobile
             var advancedMenu = new SectionPage("Modo avançado", advancedItems);
             _advancedMenu = advancedMenu;
 
-            _entries = new List<(string?, string, string, Page)>
+            _entries = new List<(string Section, string Label, Page Page)>
             {
                 // O Agente é a tela inicial e o único destino primário.
                 ("Agente", "Agente", agent),
