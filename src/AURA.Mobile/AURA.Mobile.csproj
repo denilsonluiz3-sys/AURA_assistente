@@ -32,10 +32,10 @@
 
   <ItemGroup>
     <MauiFont Include="Resources\Fonts\*" />
-    <!-- Native offline runtime: declare the ABI explicitly so MAUI packages the .so inside lib/arm64-v8a. -->
-    <AndroidNativeLibrary Include="Platforms\Android\NativeLibs\arm64-v8a\libaura_llama.so"
+    <!-- Package the bridge and every llama/ggml shared dependency for arm64-v8a. -->
+    <AndroidNativeLibrary Include="Platforms\Android\NativeLibs\arm64-v8a\*.so"
                           Abi="arm64-v8a"
-                          Condition="Exists('Platforms\Android\NativeLibs\arm64-v8a\libaura_llama.so')" />
+                          Condition="Exists('Platforms\Android\NativeLibs\arm64-v8a')" />
   </ItemGroup>
 
   <ItemGroup>

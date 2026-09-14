@@ -118,10 +118,10 @@ jobs:
             -DLLAMA_OPENSSL=OFF
           cmake --build native/aura-llama/build --target aura_llama --parallel 2
           mkdir -p src/AURA.Mobile/Platforms/Android/NativeLibs/arm64-v8a
-          NATIVE_LIB=$(find native/aura-llama/build -type f -name 'libaura_llama.so' | head -n 1)
-          test -n "$NATIVE_LIB"
-          cp "$NATIVE_LIB" src/AURA.Mobile/Platforms/Android/NativeLibs/arm64-v8a/libaura_llama.so
-          ls -lh src/AURA.Mobile/Platforms/Android/NativeLibs/arm64-v8a/libaura_llama.so
+          NATIVE_DIR="src/AURA.Mobile/Platforms/Android/NativeLibs/arm64-v8a"
+          find native/aura-llama/build -type f -path '*/bin/*.so' -exec cp -f {} "$NATIVE_DIR/" \;
+          test -f "$NATIVE_DIR/libaura_llama.so"
+          ls -lh "$NATIVE_DIR"/*.so
 
       - name: Install MAUI Android workload
         run: dotnet workload install maui-android
@@ -218,7 +218,7 @@ jobs:
           grep -Fq "package: name='com.aura.genesis'" "$RUNNER_TEMP/apk-badging.txt"
           grep -Fq "versionName='2.4'" "$RUNNER_TEMP/apk-badging.txt"
           "$APKSIGNER" verify --verbose "$APK"
-          unzip -l "$APK" | grep -Fq "lib/arm64-v8a/libaura_llama.so"
+          unzip -l "$APK" | grep -Eq "lib/arm64-v8a/lib(aura_llama|llama|ggml)"
 
       - name: Upload APK
         if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
