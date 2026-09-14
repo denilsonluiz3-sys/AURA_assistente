@@ -31,6 +31,7 @@ public sealed class AndroidNativeLocalModelEngine : ILocalModelEngine, ILocalMod
     public event Action<LocalModelRuntimeState>? StateChanged;
     public event Action<LocalModelProgress>? ProgressChanged;
     private readonly NativeProgressCallback _nativeProgressCallback;
+    private int _nativeCancelRequested;
 
     private void SetState(LocalModelRuntimeState state)
     {
@@ -58,10 +59,12 @@ public sealed class AndroidNativeLocalModelEngine : ILocalModelEngine, ILocalMod
 
         return Task.Run(async () =>
         {
+            Interlocked.Exchange(ref _nativeCancelRequested, 0);
+            using var cancellation = ct.Register(() => Interlocked.Exchange(ref _nativeCancelRequested, 1));
             await _inferenceGate.WaitAsync(ct).ConfigureAwait(false);
             try { return GenerateCore(modelPath, messages, tools, ct); }
             finally { _inferenceGate.Release(); }
-        }, ct);
+        }, CancellationToken.None);
     }
 
     public void Unload()
@@ -83,6 +86,13 @@ public sealed class AndroidNativeLocalModelEngine : ILocalModelEngine, ILocalMod
         _inferenceGate.Dispose();
     }
 
+    private static bool NeedsTools(IReadOnlyList<AgentMessage> messages)
+    {
+        string text = messages.LastOrDefault(x => string.Equals(x.Role, "user", StringComparison.OrdinalIgnoreCase))?.Content ?? string.Empty;
+        string[] markers = { "arquivo", "pasta", "diretório", "memória", "pesquis", "internet", "web", "execute", "executar", "crie", "salve", "apague", "edite", "diagnóstico", "bateria", "localização", "câmera", "microfone", "clipboard", "célula", "sensor", "bluetooth" };
+        return markers.Any(text.Contains, StringComparison.OrdinalIgnoreCase);
+    }
+
     private string GenerateCore(
         string modelPath,
         IReadOnlyList<AgentMessage> messages,
@@ -90,7 +100,10 @@ public sealed class AndroidNativeLocalModelEngine : ILocalModelEngine, ILocalMod
         CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        string prompt = LocalChatPromptBuilder.Build(messages, tools);
+        IReadOnlyList<AgentToolDefinition> effectiveTools = NeedsTools(messages)
+            ? tools
+            : Array.Empty<AgentToolDefinition>();
+        string prompt = LocalChatPromptBuilder.Build(messages, effectiveTools);
         IntPtr output = IntPtr.Zero;
 
         try
@@ -115,6 +128,7 @@ public sealed class AndroidNativeLocalModelEngine : ILocalModelEngine, ILocalMod
             ct.ThrowIfCancellationRequested();
             SetState(LocalModelRuntimeState.Generating);
             output = aura_llama_generate(context, prompt, _options.MaxTokens, _nativeProgressCallback);
+            ct.ThrowIfCancellationRequested();
             if (output == IntPtr.Zero)
                 throw new LocalModelEngineException("O runtime local não retornou uma resposta.");
 
@@ -146,12 +160,15 @@ public sealed class AndroidNativeLocalModelEngine : ILocalModelEngine, ILocalMod
     }
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void NativeProgressCallback(int phase, int current, int total);
+    private delegate int NativeProgressCallback(int phase, int current, int total);
 
-    private void OnNativeProgress(int phase, int current, int total)
+    private int OnNativeProgress(int phase, int current, int total)
     {
+        if (Volatile.Read(ref _nativeCancelRequested) != 0)
+            return 0;
         ProgressChanged?.Invoke(new LocalModelProgress(
             phase == 0 ? "processando prompt" : "gerando resposta", current, total));
+        return 1;
     }
 
     [DllImport(LibraryName, EntryPoint = "aura_llama_open", CallingConvention = CallingConvention.Cdecl)]

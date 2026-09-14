@@ -264,8 +264,11 @@ public sealed class AiConfigView : ContentView
         else if (string.IsNullOrWhiteSpace(model))
             model = Presets[idx].ModelHint;
 
+        if (Presets[idx].Id == "offline")
+            model = LocalModelStore.RequiredFileName;
         _modelEntry.Text = model;
         _apiKeyEntry.IsVisible = Presets[idx].RequiresKey || Presets[idx].Id == "custom";
+        ApplyProviderUi(Presets[idx]);
 
         SeedFallbackModels(Presets[idx].Id);
         RefreshStatusLine();
@@ -279,7 +282,8 @@ public sealed class AiConfigView : ContentView
 
         ApplyPresetFields(p, keepExistingUrls: false);
         _apiKeyEntry.IsVisible = p.RequiresKey || p.Id == "custom";
-        _modelEntry.Text = p.ModelHint;
+        _modelEntry.Text = p.Id == "offline" ? LocalModelStore.RequiredFileName : p.ModelHint;
+        ApplyProviderUi(p);
 
         if (p.Id == "custom")
             SetAdvanced(true);
