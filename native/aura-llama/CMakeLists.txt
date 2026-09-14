@@ -12,7 +12,9 @@ target_compile_features(aura_llama PRIVATE cxx_std_17)
 target_include_directories(aura_llama PRIVATE "${LLAMA_CPP_ROOT}/include")
 target_link_libraries(aura_llama PRIVATE llama)
 
+# The C# Android bridge calls these extern "C" functions by name.
+# Keep the bridge exports visible in the shared library.
 set_target_properties(aura_llama PROPERTIES
-    CXX_VISIBILITY_PRESET hidden
-    VISIBILITY_INLINES_HIDDEN YES
+    CXX_VISIBILITY_PRESET default
+    VISIBILITY_INLINES_HIDDEN NO
 )
