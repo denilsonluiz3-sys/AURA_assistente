@@ -10,7 +10,7 @@ namespace AURA.Mobile
 
         private static readonly HashSet<string> PrimaryTabs = new(StringComparer.OrdinalIgnoreCase)
         {
-            "Agente"
+            "Agente", "Navegador"
         };
 
         public MainPage(
@@ -37,7 +37,7 @@ namespace AURA.Mobile
                 ("Agente", "Agente", agent),
 
                 // Recursos que ainda acrescentam uma função própria.
-                ("Mais", "Navegador", browser),
+                ("Navegador", "Navegador", browser),
                 ("Mais", "Modo avançado", advancedMenu),
 
                 // Ferramentas técnicas continuam disponíveis em Modo avançado.
