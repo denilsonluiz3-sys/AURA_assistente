@@ -25,7 +25,8 @@ public sealed class LocalChatPromptBuilderTests
             new[] { new AgentMessage { Role = "user", Content = "Crie uma tarefa" } },
             new[] { tool });
 
-        Assert.Contains("[USER]", prompt);
+        Assert.Contains("<|im_start|>user", prompt);
+        Assert.Contains("<|im_end|>", prompt);
         Assert.Contains("create_task", prompt);
         Assert.Contains("tool_call", prompt);
         Assert.Contains("Crie uma tarefa", prompt);
