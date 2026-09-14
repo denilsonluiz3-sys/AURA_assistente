@@ -19,13 +19,10 @@ namespace AURA.Core.Bootstrap
 
         public EventBus Events { get; private set; }
 
-        public AuraConfiguration Settings { get; private set; }
-
-        public ModulesConfiguration Modules { get; private set; }
+        public AuraConfiguration Settings { get; private set; } = new AuraConfiguration();
 
         public string SettingsPath { get; private set; }
 
-        public string ModulesPath { get; private set; }
 
         public AuraBootstrap()
             : this(new ConsoleLogger())
@@ -40,7 +37,6 @@ namespace AURA.Core.Bootstrap
 
             string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
             SettingsPath = System.IO.Path.Combine(baseDirectory, "config", "settings.json");
-            ModulesPath = System.IO.Path.Combine(baseDirectory, "config", "modules.json");
         }
 
         /// <summary>
@@ -58,18 +54,12 @@ namespace AURA.Core.Bootstrap
             Services.RegisterInstance(configLoader);
 
             Settings = configLoader.LoadSettings(SettingsPath);
-            Modules = configLoader.LoadModules(ModulesPath);
             Logger.Info("Configuração......OK");
 
             Logger.Info("Bootstrap.........OK");
             Logger.Info("Sistema iniciado.");
         }
 
-        public void SaveModules()
-        {
-            var configLoader = Services.Resolve<ConfigLoader>();
-            configLoader.SaveModules(ModulesPath, Modules);
-        }
 
         public void SaveSettings()
         {

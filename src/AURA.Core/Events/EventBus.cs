@@ -11,13 +11,13 @@ namespace AURA.Core.Events
         private readonly Dictionary<Type, List<Delegate>> _handlers = new Dictionary<Type, List<Delegate>>();
         private readonly object _sync = new object();
 
-        public void Subscribe<TEvent>(Action<TEvent> handler) where TEvent : IEvent
+        public void Subscribe<TEvent>(Action<TEvent>? handler) where TEvent : IEvent
         {
             if (handler == null) throw new ArgumentNullException("handler");
 
             lock (_sync)
             {
-                List<Delegate> list;
+                List<Delegate>? list;
                 Type type = typeof(TEvent);
 
                 if (!_handlers.TryGetValue(type, out list))
@@ -34,7 +34,7 @@ namespace AURA.Core.Events
         {
             lock (_sync)
             {
-                List<Delegate> list;
+                List<Delegate>? list;
                 if (_handlers.TryGetValue(typeof(TEvent), out list))
                 {
                     list.Remove(handler);
@@ -44,13 +44,13 @@ namespace AURA.Core.Events
 
         public void Publish<TEvent>(TEvent @event) where TEvent : IEvent
         {
-            if (@event == null) throw new ArgumentNullException("event");
+            if (@event is null) throw new ArgumentNullException("event");
 
             List<Delegate> snapshot;
 
             lock (_sync)
             {
-                List<Delegate> list;
+                List<Delegate>? list;
                 if (!_handlers.TryGetValue(typeof(TEvent), out list))
                 {
                     return;
