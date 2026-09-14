@@ -93,7 +93,7 @@ public partial class AgentPage : ContentPage
         // stdout/stderr em tempo real e identidade por CorrelationId — para que várias
         // execuções concorrentes (ex.: Memória + Shell + Programa) não misturem saída.
         //
-        // ProcessExecutorBase.* cobre Shell/Git/Python/Node (e o aura-sh do TryExecuteAuraShellAsync),
+        // ProcessExecutorBase.* cobre Shell/Git/Python/Node.
         // porque todos herdam de ProcessExecutorBase e já emitem esses eventos estáticos.
         ProcessExecutorBase.ProcessStarted += OnCapabilityProcessStarted;
         ProcessExecutorBase.OutputReceived += OnCapabilityProcessOutput;
@@ -264,23 +264,6 @@ public partial class AgentPage : ContentPage
         }
     }
 
-    private void OnModeAgentClicked(object sender, EventArgs e)
-    {
-        _webMode = false;
-        ApplyModeUi();
-    }
-
-    private void OnModeWebClicked(object sender, EventArgs e)
-    {
-        _webMode = true;
-        ApplyModeUi();
-        if (!_webLoaded)
-        {
-            BridgeWebView.Source = UrlDeepSeek;
-            _webLoaded = true;
-        }
-    }
-
     private void ApplyModeUi()
     {
         ModeChipsHost.IsVisible = true;
@@ -301,18 +284,6 @@ public partial class AgentPage : ContentPage
         ModeWebBtn.TextColor = _webMode
             ? Colors.White
             : (Color)Application.Current!.Resources["AuraTextPrimary"];
-    }
-
-    private void OnWebDeepSeekClicked(object sender, EventArgs e)
-    {
-        BridgeWebView.Source = UrlDeepSeek;
-        _webLoaded = true;
-    }
-
-    private void OnWebChatGptClicked(object sender, EventArgs e)
-    {
-        BridgeWebView.Source = UrlChatGpt;
-        _webLoaded = true;
     }
 
     private void OnWebReloadClicked(object sender, EventArgs e)
@@ -371,43 +342,6 @@ public partial class AgentPage : ContentPage
         sb.AppendLine("2) UM bloco ```aura-sh\ncomandos\n```");
         sb.AppendLine("Não invente caminhos fora do workspace.");
         return sb.ToString().TrimEnd();
-    }
-
-    private async void OnPastePlanClicked(object sender, EventArgs e)
-    {
-        try
-        {
-            string? clip = await Clipboard.Default.GetTextAsync();
-            if (string.IsNullOrWhiteSpace(clip))
-            {
-                await SafeAlertAsync("Colar plano", "Clipboard vazio. Copie a resposta da Web AI e tente de novo.");
-                return;
-            }
-
-            string text = clip.Trim();
-            string? shell = LocalPlaybook.ExtractAuraShell(text);
-
-            _webMode = false;
-            ApplyModeUi();
-
-            if (!string.IsNullOrWhiteSpace(shell))
-            {
-                await AppendBubbleAsync("▶ Plano da web (aura-sh) — executando…", user: false, isTool: true);
-                await AppendBubbleAsync(text, user: false);
-                await TryExecuteAuraShellAsync(text);
-                _playbook?.RememberFromRun(_lastUserGoal ?? "plano web", null, text);
-                return;
-            }
-
-            CommandEditor.Text = text;
-            await AppendBubbleAsync(
-                "📋 Texto da web colado no editor (sem ```aura-sh). Revise e toque ▶ se quiser que o agente trate.",
-                user: false, isTool: true);
-        }
-        catch (Exception ex)
-        {
-            await SafeAlertAsync("Colar plano", ex.Message);
-        }
     }
 
     private async void OnAgentsClicked(object? sender, EventArgs e)
@@ -859,174 +793,6 @@ public partial class AgentPage : ContentPage
         return "continue de onde parou; não reinicie. Objetivo anterior: " + _lastUserGoal;
     }
 
-    private void OnEditorCompleted(object? sender, EventArgs e) => OnRunClicked(sender ?? RunButton, e);
-
-    private async void OnRunClicked(object? sender, EventArgs e)
-    {
-        if (_runInFlight)
-            return;
-
-        try { CommandEditor.Unfocus(); } catch { /* ignore */ }
-
-        string text = CommandEditor.Text?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(text) && !HasPendingAttachments())
-        {
-            await SafeAlertAsync("Agente", "Digite uma instrução ou importe um arquivo antes de enviar.");
-            return;
-        }
-
-        text = PrepareCommandWithPendingAttachments(text);
-        bool wasContinue = IsContinueCommand(text);
-        string resolved = ExpandContinueCommand(text);
-
-        // URLs explícitas são navegação do usuário: encaminhe diretamente para a WebView,
-        // sem deixar o LLM tentar resolver a solicitação com open_browser/web_fetch.
-        if (!wasContinue && TryExtractHttpUrl(resolved, out string webUrl))
-        {
-            try
-            {
-                _runInFlight = true;
-                await AppendBubbleAsync(text, user: true);
-                CommandEditor.Text = string.Empty;
-                ClearPendingAttachments();
-                OpenWebUrlFromAgent(webUrl);
-            }
-            finally
-            {
-                _runInFlight = false;
-            }
-            return;
-        }
-
-        _runInFlight = true;
-        string? processId = null;
-        _runShellCommands.Clear();
-        if (!wasContinue)
-            _lastUserGoal = text;
-
-        if (_webMode)
-        {
-            _webMode = false;
-            ApplyModeUi();
-        }
-
-        try
-        {
-            RememberCommand(wasContinue ? resolved : text);
-            RuntimeConfig.Apply(_client);
-
-            RunButton.IsEnabled = false;
-            BusyIndicator.IsRunning = true;
-            BusyIndicator.IsVisible = true;
-
-            await AppendBubbleAsync(wasContinue ? resolved : text, user: true);
-            CommandEditor.Text = string.Empty;
-            ClearPendingAttachments();
-
-            var process = _processes.Begin(Shorten(resolved, 40), "Assistente", "Entendendo solicitação");
-            processId = process.Id;
-            _activeProcessId = process.Id;
-
-            string playbookQuery = wasContinue ? resolved : text;
-            bool isRepeat = !wasContinue && _lastUserQuery != null
-                && string.Equals(text, _lastUserQuery, StringComparison.OrdinalIgnoreCase);
-
-            if (isRepeat)
-                _lastUserQuery = text;
-
-            string? local = isRepeat ? null : _playbook?.TryResolveWithoutLlm(playbookQuery);
-            if (!string.IsNullOrWhiteSpace(local))
-            {
-                _processes.Update(process.Id, "Playbook", "Ação local", 0.5);
-                await DeliverAnswerAsync(local, process.Id, "Memória procedural");
-                return;
-            }
-
-            if (!isRepeat && ShouldOrchestrate(resolved))
-            {
-                _processes.Update(process.Id, "Planejando", "Orquestrador · observação", 0.15);
-                AgentToolPolicy observationPolicy = _workCoordinator.CreateObservationPolicy(resolved);
-                string answer = await _orchestrator.ExecuteAsync(resolved, toolPolicy: observationPolicy);
-                _playbook?.RememberFromRun(resolved, _runShellCommands, answer);
-                await DeliverAnswerAsync(answer, process.Id, "Relatório entregue");
-                await AppendWorkGroupReportAsync(_workCoordinator.LastReport);
-                return;
-            }
-
-            _processes.Update(process.Id, "Executando", "Processando", 0.1);
-            string answerFromAgent;
-
-            bool hasCloudKey = !string.IsNullOrWhiteSpace(RuntimeConfig.ApiKey)
-                || !string.IsNullOrWhiteSpace(_client.Options.ApiKey);
-            bool hasLocalLlm = HasLocalLlmWithoutKey();
-
-            if (!hasCloudKey && !hasLocalLlm)
-            {
-                await AppendBubbleAsync("Sem LLM local/chave — tentando web…", user: false, isTool: true);
-                answerFromAgent = await WebSearchAnswer.SearchWithRefinementAsync(resolved);
-            }
-            else
-            {
-                string? readyError = RuntimeConfig.EnsureReadyForRequest(_client);
-                if (readyError != null)
-                {
-                    _processes.Fail(process.Id, readyError);
-                    await AppendBubbleAsync(readyError, user: false, isError: true);
-                    return;
-                }
-
-                _session = null;
-                AgentToolPolicy observationPolicy = _workCoordinator.CreateObservationPolicy(resolved);
-                EnsureSession(observationPolicy);
-                answerFromAgent = await _session!.RunAsync(resolved);
-            }
-
-            if (AgentSession.IsAmbientRunCancellationRequested())
-            {
-                _processes.Update(process.Id, "Pausado", "Checkpoint salvo · pronto para continuar", 0.65);
-                await AppendBubbleAsync("⏸ Execução pausada. O checkpoint foi salvo; use ‘Continuar’ quando quiser retomar.", user: false, isTool: true);
-                return;
-            }
-
-            _playbook?.RememberFromRun(resolved, _runShellCommands, answerFromAgent);
-            await DeliverAnswerAsync(answerFromAgent, process.Id, "Resultado entregue");
-            _lastUserQuery = text;
-
-            if (ProjectAccessService.IsLinked && !ProjectAccessService.IsDirect)
-            {
-                int synced = await ProjectAccessService.SyncBackAsync();
-                await AppendBubbleAsync($"↥ Sync: {synced} arquivo(s).", user: false, isTool: true);
-            }
-        }
-        catch (AgentLlmException ex)
-        {
-            string userMsg = FriendlyLlmError(ex);
-            if (!string.IsNullOrEmpty(processId))
-                _processes.Fail(processId, userMsg);
-            await AppendBubbleAsync("Erro: " + userMsg, user: false, isError: true);
-            AuraLog.Exception("AgentPage.OnRunClicked", ex);
-        }
-        catch (Exception ex)
-        {
-            string userMsg = FriendlyLlmError(ex);
-            if (!string.IsNullOrEmpty(processId))
-                _processes.Fail(processId, userMsg);
-            await AppendBubbleAsync("Erro: " + userMsg, user: false, isError: true);
-            AuraLog.Exception("AgentPage.OnRunClicked", ex);
-        }
-        finally
-        {
-            if (_activeProcessId == processId) _activeProcessId = null;
-            RunButton.IsEnabled = true;
-            BusyIndicator.IsRunning = false;
-            BusyIndicator.IsVisible = false;
-            _runInFlight = false;
-            try { SetRunButtonBusy(false); } catch { /* UX partial pode não estar inicializado */ }
-            try { _runCts?.Dispose(); } catch { /* ignore */ }
-            _runCts = null;
-        }
-    }
-
     private async Task AppendWorkGroupReportAsync(AgentReport? report)
     {
         if (report == null)
@@ -1076,34 +842,6 @@ public partial class AgentPage : ContentPage
 
         _processes.Complete(processId, completeMessage);
         await SpeakAsync(text);
-    }
-
-    private async Task TryExecuteAuraShellAsync(string answer)
-    {
-        string? script = LocalPlaybook.ExtractAuraShell(answer);
-        if (string.IsNullOrWhiteSpace(script))
-            return;
-
-        // A partir daqui, a execução em si (stdout/stderr, status, exit code) aparece
-        // como bolha de capacidade inline própria — ShellExecutor herda de
-        // ProcessExecutorBase, cujos eventos estáticos já alimentam
-        // OnCapabilityProcessStarted/Output/Completed. Não duplicamos a saída aqui.
-        await AppendBubbleAsync("▶ Executando aura-sh…", user: false, isTool: true);
-        try
-        {
-            var req = new ExecutionRequest
-            {
-                Command = script,
-                WorkingDirectory = AgentWorkspace.ActiveRoot,
-                Timeout = TimeSpan.FromSeconds(60)
-            };
-            await _shell.ExecuteAsync(req);
-        }
-        catch (Exception ex)
-        {
-            await AppendBubbleAsync("Shell: " + ex.Message, user: false, isError: true);
-            AuraLog.Exception("AgentPage.aura-sh", ex);
-        }
     }
 
     private static string FriendlyLlmError(Exception ex)
