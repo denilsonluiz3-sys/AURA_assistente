@@ -29,6 +29,8 @@ public sealed class AndroidNativeLocalModelEngine : ILocalModelEngine, ILocalMod
 
     public LocalModelRuntimeState State { get { lock (_sync) return _state; } }
     public event Action<LocalModelRuntimeState>? StateChanged;
+    public event Action<LocalModelProgress>? ProgressChanged;
+    private readonly NativeProgressCallback _nativeProgressCallback;
 
     private void SetState(LocalModelRuntimeState state)
     {
@@ -39,6 +41,7 @@ public sealed class AndroidNativeLocalModelEngine : ILocalModelEngine, ILocalMod
     public AndroidNativeLocalModelEngine(LocalModelInferenceOptions? options = null)
     {
         _options = options ?? new LocalModelInferenceOptions();
+        _nativeProgressCallback = OnNativeProgress;
         if (_options.ContextSize < 512) throw new ArgumentOutOfRangeException(nameof(options));
         if (_options.MaxTokens < 1) throw new ArgumentOutOfRangeException(nameof(options));
         if (_options.Threads < 1) throw new ArgumentOutOfRangeException(nameof(options));
@@ -111,7 +114,7 @@ public sealed class AndroidNativeLocalModelEngine : ILocalModelEngine, ILocalMod
 
             ct.ThrowIfCancellationRequested();
             SetState(LocalModelRuntimeState.Generating);
-            output = aura_llama_generate(context, prompt, _options.MaxTokens);
+            output = aura_llama_generate(context, prompt, _options.MaxTokens, _nativeProgressCallback);
             if (output == IntPtr.Zero)
                 throw new LocalModelEngineException("O runtime local não retornou uma resposta.");
 
@@ -142,6 +145,15 @@ public sealed class AndroidNativeLocalModelEngine : ILocalModelEngine, ILocalMod
         }
     }
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void NativeProgressCallback(int phase, int current, int total);
+
+    private void OnNativeProgress(int phase, int current, int total)
+    {
+        ProgressChanged?.Invoke(new LocalModelProgress(
+            phase == 0 ? "processando prompt" : "gerando resposta", current, total));
+    }
+
     [DllImport(LibraryName, EntryPoint = "aura_llama_open", CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr aura_llama_open(
         [MarshalAs(UnmanagedType.LPUTF8Str)] string modelPath,
@@ -152,7 +164,8 @@ public sealed class AndroidNativeLocalModelEngine : ILocalModelEngine, ILocalMod
     private static extern IntPtr aura_llama_generate(
         IntPtr context,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string prompt,
-        int maxTokens);
+        int maxTokens,
+        NativeProgressCallback progress);
 
     [DllImport(LibraryName, EntryPoint = "aura_llama_free_text", CallingConvention = CallingConvention.Cdecl)]
     private static extern void aura_llama_free_text(IntPtr output);

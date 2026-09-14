@@ -13,10 +13,13 @@ public enum LocalModelRuntimeState
     Error
 }
 
+public readonly record struct LocalModelProgress(string Phase, int Current, int Total);
+
 public interface ILocalModelEngineStatus
 {
     LocalModelRuntimeState State { get; }
     event Action<LocalModelRuntimeState>? StateChanged;
+    event Action<LocalModelProgress>? ProgressChanged;
 }
 
 public interface ILocalModelEngine

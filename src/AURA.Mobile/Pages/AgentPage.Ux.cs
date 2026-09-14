@@ -24,6 +24,7 @@ public partial class AgentPage
         {
             _modelStatusHooked = true;
             modelStatus.StateChanged += OnLocalModelStateChanged;
+            modelStatus.ProgressChanged += OnLocalModelProgressChanged;
         }
 
         HookBubbleSpeakInjector();
@@ -114,6 +115,22 @@ public partial class AgentPage
             }
         }
         catch { /* ignore */ }
+    }
+
+    private void OnLocalModelProgressChanged(LocalModelProgress progress)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            try
+            {
+                string suffix = progress.Total > 0
+                    ? $"offline: {progress.Phase} {progress.Current}/{progress.Total}"
+                    : "offline: " + progress.Phase;
+                ModelLabel.Text = suffix;
+                ModelLabel.IsVisible = true;
+            }
+            catch { /* ignore visual status failures */ }
+        });
     }
 
     private void OnLocalModelStateChanged(LocalModelRuntimeState state)

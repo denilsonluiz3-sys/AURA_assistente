@@ -62,7 +62,9 @@ void * aura_llama_open(const char * model_path, int context_size, int threads) {
     return result;
 }
 
-char * aura_llama_generate(void * handle, const char * prompt, int max_tokens) {
+using aura_progress_callback = void (*)(int phase, int current, int total);
+
+char * aura_llama_generate(void * handle, const char * prompt, int max_tokens, aura_progress_callback progress) {
     if (!handle || !prompt || max_tokens < 1) return nullptr;
 
     auto * state = static_cast<AuraLlamaContext *>(handle);
@@ -72,6 +74,7 @@ char * aura_llama_generate(void * handle, const char * prompt, int max_tokens) {
         state->vocab, prompt, std::strlen(prompt), nullptr, 0, true, true);
     if (prompt_size <= 0 || prompt_size + max_tokens > state->context_size) return nullptr;
 
+    if (progress) progress(0, 0, prompt_size);
     std::vector<llama_token> prompt_tokens(static_cast<size_t>(prompt_size));
     if (llama_tokenize(
             state->vocab, prompt, std::strlen(prompt), prompt_tokens.data(), prompt_size, true, true) < 0)
@@ -92,6 +95,9 @@ char * aura_llama_generate(void * handle, const char * prompt, int max_tokens) {
             return nullptr;
         }
         position += batch.n_tokens;
+        if (progress) progress(position < prompt_size ? 0 : 1,
+                               position < prompt_size ? position : position - prompt_size,
+                               position < prompt_size ? prompt_size : max_tokens);
 
         llama_token token = llama_sampler_sample(sampler, state->context, -1);
         if (llama_vocab_is_eog(state->vocab, token)) break;
