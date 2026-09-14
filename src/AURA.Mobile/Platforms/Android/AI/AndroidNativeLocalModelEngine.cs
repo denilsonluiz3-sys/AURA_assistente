@@ -100,10 +100,20 @@ public sealed class AndroidNativeLocalModelEngine : ILocalModelEngine, ILocalMod
         CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        IReadOnlyList<AgentToolDefinition> effectiveTools = NeedsTools(messages)
+        bool needsTools = NeedsTools(messages);
+        IReadOnlyList<AgentToolDefinition> effectiveTools = needsTools
             ? tools
             : Array.Empty<AgentToolDefinition>();
-        string prompt = LocalChatPromptBuilder.Build(messages, effectiveTools);
+
+        // A simple offline conversation must not replay the entire AgentSession
+        // history. On-device context is expensive; keep only the current user
+        // turn unless the request actually needs tools or previous tool output.
+        IReadOnlyList<AgentMessage> effectiveMessages = needsTools
+            ? messages
+            : messages.Where(x => string.Equals(x.Role, "user", StringComparison.OrdinalIgnoreCase))
+                .TakeLast(1)
+                .ToArray();
+        string prompt = LocalChatPromptBuilder.Build(effectiveMessages, effectiveTools);
         IntPtr output = IntPtr.Zero;
 
         try
