@@ -60,7 +60,7 @@ public sealed class StoredModelAiRuntimeTests
             var engine = new FakeEngine();
             var runtime = new StoredModelAiRuntime(store, engine, "missing");
 
-            await Assert.ThrowsAsync<FileNotFoundException>(() => runtime.CompleteAsync(
+            await Assert.ThrowsAsync<InvalidDataException>(() => runtime.CompleteAsync(
                 Array.Empty<AgentMessage>(), Array.Empty<AgentToolDefinition>()));
             Assert.Null(engine.ModelPath);
         }

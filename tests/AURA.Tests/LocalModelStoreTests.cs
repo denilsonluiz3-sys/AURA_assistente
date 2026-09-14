@@ -18,15 +18,15 @@ public sealed class LocalModelStoreTests
                 new MemoryStream(content),
                 new LocalModelDescriptor
                 {
-                    Id = "qwen-mini",
+                    Id = LocalModelStore.RequiredModelId,
                     DisplayName = "Qwen Mini",
-                    FileName = "qwen-mini.gguf"
+                    FileName = LocalModelStore.RequiredFileName
                 });
 
-            Assert.Equal("qwen-mini", descriptor.Id);
+            Assert.Equal(LocalModelStore.RequiredModelId, descriptor.Id);
             Assert.Equal(content.Length, descriptor.SizeBytes);
             Assert.False(string.IsNullOrWhiteSpace(descriptor.Sha256));
-            Assert.True(File.Exists(store.GetModelPath("qwen-mini")));
+            Assert.True(File.Exists(store.GetModelPath(LocalModelStore.RequiredModelId)));
             Assert.Single(store.List());
         }
         finally
@@ -44,11 +44,11 @@ public sealed class LocalModelStoreTests
             var store = new LocalModelStore(root);
             await Assert.ThrowsAsync<InvalidDataException>(() => store.ImportAsync(
                 new MemoryStream(new byte[] { 1 }),
-                new LocalModelDescriptor { Id = "model", FileName = "model.bin" }));
+                new LocalModelDescriptor { Id = LocalModelStore.RequiredModelId, FileName = "model.bin" }));
 
             await Assert.ThrowsAsync<ArgumentException>(() => store.ImportAsync(
                 new MemoryStream(new byte[] { 1 }),
-                new LocalModelDescriptor { Id = "../escape", FileName = "model.gguf" }));
+                new LocalModelDescriptor { Id = "../escape", FileName = LocalModelStore.RequiredFileName }));
         }
         finally
         {
@@ -63,11 +63,11 @@ public sealed class LocalModelStoreTests
         try
         {
             var store = new LocalModelStore(root);
-            await store.ImportAsync(new MemoryStream(new byte[] { 1 }), new LocalModelDescriptor { Id = "one", FileName = "one.gguf" });
-            await store.ImportAsync(new MemoryStream(new byte[] { 2, 3 }), new LocalModelDescriptor { Id = "one", FileName = "one.gguf" });
+            await store.ImportAsync(new MemoryStream(new byte[] { 1 }), new LocalModelDescriptor { Id = LocalModelStore.RequiredModelId, FileName = LocalModelStore.RequiredFileName });
+            await store.ImportAsync(new MemoryStream(new byte[] { 2, 3 }), new LocalModelDescriptor { Id = LocalModelStore.RequiredModelId, FileName = LocalModelStore.RequiredFileName });
 
             Assert.Single(store.List());
-            Assert.Equal(2, new FileInfo(store.GetModelPath("one")).Length);
+            Assert.Equal(2, new FileInfo(store.GetModelPath(LocalModelStore.RequiredModelId)).Length);
         }
         finally
         {
