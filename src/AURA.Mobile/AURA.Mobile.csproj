@@ -32,7 +32,10 @@
 
   <ItemGroup>
     <MauiFont Include="Resources\Fonts\*" />
-    <AndroidNativeLibrary Include="Platforms\Android\NativeLibs\**\*.so" Condition="Exists('Platforms\Android\NativeLibs')" />
+    <!-- Native offline runtime: declare the ABI explicitly so MAUI packages the .so inside lib/arm64-v8a. -->
+    <AndroidNativeLibrary Include="Platforms\Android\NativeLibs\arm64-v8a\libaura_llama.so"
+                          Abi="arm64-v8a"
+                          Condition="Exists('Platforms\Android\NativeLibs\arm64-v8a\libaura_llama.so')" />
   </ItemGroup>
 
   <ItemGroup>
