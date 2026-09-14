@@ -75,7 +75,7 @@ namespace AURA.Mobile
                     await PushAsync(entry.Page);
                 else
                 {
-                    while (Navigation.NavigationStack.Count > Navigation.NavigationStack.IndexOf(entry.Page) + 1)
+                    while (Navigation.NavigationStack.Count > Navigation.NavigationStack.ToList().IndexOf(entry.Page) + 1)
                         await Navigation.PopAsync(false);
                 }
                 return;
