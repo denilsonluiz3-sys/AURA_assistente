@@ -198,13 +198,8 @@ public partial class AgentPage : ContentPage
 
     private void UpdateProcessCardsVisibility()
     {
-        bool show = _processes.Processes.Any(p =>
-        {
-            string s = p.Status ?? "";
-            return !s.Equals("Concluído", StringComparison.OrdinalIgnoreCase)
-                && !s.Equals("Falhou", StringComparison.OrdinalIgnoreCase);
-        });
-        ProcessCardsHost.IsVisible = show;
+        // A interface aprovada mantém o estado do Agente visível mesmo em repouso.
+        ProcessCardsHost.IsVisible = true;
     }
 
     protected override void OnAppearing()
