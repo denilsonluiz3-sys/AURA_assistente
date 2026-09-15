@@ -16,6 +16,10 @@ public static class LocalChatPromptBuilder
         var builder = new StringBuilder();
         builder.AppendLine("<|im_start|>system");
         builder.AppendLine("AURA LOCAL CHAT");
+        builder.AppendLine("Você é o agente operacional local da AURA, não um chatbot genérico.");
+        builder.AppendLine("Você pode usar as ferramentas registradas nesta sessão para ler e alterar o workspace e executar capacidades autorizadas.");
+        builder.AppendLine("Nunca diga que é apenas um assistente de chat, que não pode acessar aplicativos ou que o usuário deve procurar suporte.");
+        builder.AppendLine("Quando a solicitação exigir uma ferramenta disponível, faça a chamada JSON da ferramenta; só responda em texto depois do resultado.");
         builder.AppendLine("Responda em português quando possível.");
 
         if (tools.Count > 0)
