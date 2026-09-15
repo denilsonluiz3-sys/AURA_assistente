@@ -249,7 +249,14 @@ public sealed class AgentSession
                             if (string.Equals(toolName, "read_file", StringComparison.OrdinalIgnoreCase)
                                 && result.Contains("arquivo não existe", StringComparison.OrdinalIgnoreCase))
                             {
-                                result += " Use list_dir ou search_files para confirmar o caminho antes de tentar ler novamente.";
+                                result += " Use list_dir para confirmar o caminho antes de tentar ler novamente; search_files não está disponível nesta sessão.";
+                            }
+                            else if (string.Equals(toolName, "run_shell", StringComparison.OrdinalIgnoreCase)
+                                && (result.Contains("not found", StringComparison.OrdinalIgnoreCase)
+                                    || result.Contains("não existe", StringComparison.OrdinalIgnoreCase)
+                                    || result.Contains("No such file", StringComparison.OrdinalIgnoreCase)))
+                            {
+                                result += " Não repita run_shell com caminhos presumidos. Use list_dir para localizar o arquivo e só depois read_file.";
                             }
 
                             stopAfterTool = toolFailureCounts[toolName] >= MaxFailuresPerTool
@@ -284,7 +291,7 @@ public sealed class AgentSession
                             string stopped = "Parei após falhas repetidas da ferramenta "
                                 + (call.Name ?? "desconhecida") + ". "
                                 + "Não vou continuar tentando caminhos sem evidência. "
-                                + "Use list_dir/search_files ou corrija o caminho e depois escolha Continuar.";
+                                + "Use list_dir para localizar o arquivo, corrija o caminho e depois escolha Continuar.";
                             _messages.Add(new AgentMessage { Role = "assistant", Content = stopped });
                             _memory?.Append(MemoryEntry.Answer(stopped));
                             PersistShared();
