@@ -60,8 +60,7 @@ namespace AURA.Mobile.Diagnostics
             try
             {
                 Directory.CreateDirectory(root);
-                WriteReadme(root);
-            }
+                }
             catch
             {
                 root = EnsurePrivate();
@@ -94,7 +93,6 @@ namespace AURA.Mobile.Diagnostics
         private static string EnsurePrivate()
         {
             Directory.CreateDirectory(WorkspaceRoot);
-            WriteReadme(WorkspaceRoot);
             return WorkspaceRoot;
         }
 
@@ -106,7 +104,6 @@ namespace AURA.Mobile.Diagnostics
                 string probe = Path.Combine(path, ".aura_write_test");
                 File.WriteAllText(probe, "ok");
                 File.Delete(probe);
-                WriteReadme(path);
                 return true;
             }
             catch
@@ -115,20 +112,6 @@ namespace AURA.Mobile.Diagnostics
             }
         }
 
-        private static void WriteReadme(string root)
-        {
-            try
-            {
-                string readme = Path.Combine(root, "README_AURA.txt");
-                if (!File.Exists(readme))
-                {
-                    File.WriteAllText(readme,
-                        "Workspace da AURA\n" +
-                        "Pasta visível em Download/AURA.\n" +
-                        "O agente lê e grava arquivos aqui.\n");
-                }
-            }
-            catch { /* ignore */ }
-        }
+
     }
 }

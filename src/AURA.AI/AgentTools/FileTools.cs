@@ -44,6 +44,7 @@ namespace AURA.AI
 
             var sb = new StringBuilder();
             foreach (string entry in Directory.GetFileSystemEntries(dir)
+                         .Where(e => !string.Equals(Path.GetFileName(e), "README_AURA.txt", StringComparison.OrdinalIgnoreCase))
                          .OrderBy(e => e, StringComparer.OrdinalIgnoreCase))
             {
                 ct.ThrowIfCancellationRequested();
