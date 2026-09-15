@@ -45,7 +45,7 @@ public sealed class AuraOrchestratorIntegrationTests
     public async Task ExecuteAsync_PolicyBlocksUnauthorizedIntentBeforeToolExecution()
     {
         using var fixture = new OrchestratorFixture();
-        var policy = new AgentToolPolicy(new[] { "read_file", "list_dir", "search_files" });
+        var policy = new AgentToolPolicy(new[] { "read_file", "list_dir" });
 
         string result = await fixture.Orchestrator.ExecuteAsync("execute a tarefa", toolPolicy: policy);
 

@@ -111,6 +111,11 @@ public sealed class AgentSession
         _runState = state;
         _messages.Clear();
         _messages.AddRange(state.Messages ?? new List<AgentMessage>());
+        _messages.Add(new AgentMessage
+        {
+            Role = "user",
+            Content = "A ferramenta anterior falhou. Não repita o mesmo caminho nem use run_shell para adivinhar caminhos. Use list_dir primeiro para confirmar a localização e só então tente a ferramenta específica."
+        });
         PersistShared();
         state.Status = AgentRunStatus.Running;
         state.LastError = null;
@@ -249,7 +254,7 @@ public sealed class AgentSession
                             if (string.Equals(toolName, "read_file", StringComparison.OrdinalIgnoreCase)
                                 && result.Contains("arquivo não existe", StringComparison.OrdinalIgnoreCase))
                             {
-                                result += " Use list_dir para confirmar o caminho antes de tentar ler novamente; search_files não está disponível nesta sessão.";
+                                result += " Use list_dir para confirmar o caminho antes de tentar ler novamente.";
                             }
                             else if (string.Equals(toolName, "run_shell", StringComparison.OrdinalIgnoreCase)
                                 && (result.Contains("not found", StringComparison.OrdinalIgnoreCase)
@@ -259,7 +264,9 @@ public sealed class AgentSession
                                 result += " Não repita run_shell com caminhos presumidos. Use list_dir para localizar o arquivo e só depois read_file.";
                             }
 
-                            stopAfterTool = toolFailureCounts[toolName] >= MaxFailuresPerTool
+                            bool missingPath = IsMissingPathFailure(toolName, result);
+                            stopAfterTool = missingPath
+                                || toolFailureCounts[toolName] >= MaxFailuresPerTool
                                 || consecutiveToolFailures >= MaxConsecutiveToolFailures;
                             if (stopAfterTool)
                             {
@@ -335,6 +342,19 @@ public sealed class AgentSession
             _logger.Info("agent: run pausado por cancelamento");
             return "Execução interrompida e pausada. Estado salvo; use a retomada para continuar.";
         }
+    }
+
+    private static bool IsMissingPathFailure(string toolName, string result)
+    {
+        if (toolName is not ("read_file" or "write_file" or "edit_file" or "run_shell"))
+            return false;
+
+        return result.Contains("arquivo não existe", StringComparison.OrdinalIgnoreCase)
+            || result.Contains("caminho fora do workspace", StringComparison.OrdinalIgnoreCase)
+            || result.Contains("diretório não existe", StringComparison.OrdinalIgnoreCase)
+            || result.Contains("No such file", StringComparison.OrdinalIgnoreCase)
+            || result.Contains("not found", StringComparison.OrdinalIgnoreCase)
+            || result.Contains("não existe", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsEmptyOrInvalidArguments(string? name, string? argumentsJson)
