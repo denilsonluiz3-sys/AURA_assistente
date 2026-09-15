@@ -99,7 +99,7 @@
             <WebView x:Name="BridgeWebView" Grid.Row="1" />
         </Grid>
 
-        <Border x:Name="InputBarHost" Grid.Row="4" Margin="8,4,8,18" ZIndex="50" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 20" Padding="10,6">
+        <Border x:Name="InputBarHost" Grid.Row="4" Margin="8,4,8,58" ZIndex="50" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 20" Padding="10,6">
             <VerticalStackLayout Spacing="4">
                 <Label x:Name="PendingAttachmentLabel" IsVisible="False" FontSize="11" TextColor="{DynamicResource AuraAccent}" LineBreakMode="TailTruncation" />
                 <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
