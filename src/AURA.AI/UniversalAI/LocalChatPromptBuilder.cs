@@ -14,13 +14,15 @@ public static class LocalChatPromptBuilder
         IReadOnlyList<AgentToolDefinition> tools)
     {
         var builder = new StringBuilder();
+        // AgentSession fornece o prompt operacional completo como uma mensagem
+        // system. Não substituí-lo por um segundo prompt genérico: isso fazia o
+        // modelo local perder as regras e a identidade do agente.
+        var systemMessage = messages.FirstOrDefault(x =>
+            string.Equals(x.Role, "system", StringComparison.OrdinalIgnoreCase));
         builder.AppendLine("<|im_start|>system");
-        builder.AppendLine("AURA LOCAL CHAT");
-        builder.AppendLine("Você é o agente operacional local da AURA, não um chatbot genérico.");
-        builder.AppendLine("Você pode usar as ferramentas registradas nesta sessão para ler e alterar o workspace e executar capacidades autorizadas.");
-        builder.AppendLine("Nunca diga que é apenas um assistente de chat, que não pode acessar aplicativos ou que o usuário deve procurar suporte.");
-        builder.AppendLine("Quando a solicitação exigir uma ferramenta disponível, faça a chamada JSON da ferramenta; só responda em texto depois do resultado.");
-        builder.AppendLine("Responda em português quando possível.");
+        builder.AppendLine(string.IsNullOrWhiteSpace(systemMessage?.Content)
+            ? "Você é o agente operacional local da AURA. Use as ferramentas registradas quando necessário."
+            : systemMessage.Content.Trim());
 
         if (tools.Count > 0)
         {
@@ -50,6 +52,9 @@ public static class LocalChatPromptBuilder
         // generic [ROLE] prompt and makes the end-of-turn token observable.
         foreach (var message in messages)
         {
+            if (string.Equals(message.Role, "system", StringComparison.OrdinalIgnoreCase))
+                continue;
+
             string role = string.IsNullOrWhiteSpace(message.Role) ? "user" : message.Role.Trim().ToLowerInvariant();
             builder.Append("<|im_start|>").Append(role).Append('\n');
             if (!string.IsNullOrWhiteSpace(message.Content))
