@@ -74,6 +74,10 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: 12266719
+          # A action ainda tenta instalar o pacote legado "tools" por padrão,
+          # que não existe no catálogo atual do SDK. O workflow instala os
+          # componentes necessários no passo seguinte.
+          packages: platform-tools
 
       - name: Install required Android SDK components
         shell: bash
