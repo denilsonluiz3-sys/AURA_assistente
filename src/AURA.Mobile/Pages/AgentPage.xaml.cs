@@ -205,7 +205,10 @@ public partial class AgentPage : ContentPage
     {
         // O estado detalhado só ocupa espaço enquanto há uma execução ativa.
         // Em repouso, a conversa deve usar toda a área disponível.
-        ProcessCardsHost.IsVisible = _processes.Processes.Count > 0;
+        ProcessCardsHost.IsVisible = _processes.Processes.Any(p =>
+            string.Equals(p.Status, "Executando", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(p.Status, "Tentando novamente", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(p.Status, "Pausado", StringComparison.OrdinalIgnoreCase));
     }
 
     protected override void OnAppearing()
@@ -633,12 +636,9 @@ public partial class AgentPage : ContentPage
         if (ConversationContainer.Children.Count > 0)
             return;
 
-        int memCount = 0;
-        try { memCount = _memory.Read(tail: 64).Count; } catch { /* ignore */ }
-        string welcome = memCount > 0
-            ? $"Pronto. Memória ({memCount}). Atalhos: ls · diagnóstico · memória X · continue. Chips na barra."
-            : "Pronto. Atalhos: ls · diagnóstico · memória X · continue. 📋 Contexto → Web AI → ▶ Colar plano.";
-        _ = AppendBubbleAsync(welcome, user: false);
+        // A conversa começa limpa para preservar espaço do compositor e não
+        // inserir texto de onboarding no contexto visual/histórico do agente.
+        UpdateProcessCardsVisibility();
     }
 
     private async Task<PermissionDecision> AskPermissionAsync(string toolName, CancellationToken cancellationToken)
