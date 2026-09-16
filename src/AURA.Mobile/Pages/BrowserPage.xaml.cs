@@ -4,6 +4,7 @@ using AURA.Core.Runtime;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.ApplicationModel.DataTransfer;
 using AURA.Core.Security;
+using AURA.Mobile.Extensions;
 
 namespace AURA.Mobile.Pages
 {
@@ -57,13 +58,16 @@ namespace AURA.Mobile.Pages
         private bool _initialized;
         private bool _isolated;
         private string? _isolatedCellId;
+        private readonly BrowserExtensionCoordinator _extensionCoordinator;
+        private readonly Dictionary<int, CancellationTokenSource> _extensionNavigationCancellations = new();
 
-        public BrowserPage(ImageSearchPage imageSearch, SimulationRuntime runtime, EventBus events)
+        public BrowserPage(ImageSearchPage imageSearch, SimulationRuntime runtime, EventBus events, BrowserExtensionCoordinator extensionCoordinator)
         {
             InitializeComponent();
             _imageSearch = imageSearch;
             _runtime = runtime;
             _events = events;
+            _extensionCoordinator = extensionCoordinator;
 
             NavigationPage.SetHasNavigationBar(this, false);
 
@@ -203,6 +207,7 @@ namespace AURA.Mobile.Pages
                     RefreshTabsChrome();
                     InjectAdBlocker(tab.View);
                     InjectStealth(tab.View);
+                    ScheduleExtensionInjection(tab, e.Url);
                 }
             };
             view.Navigating += (s, e) =>
@@ -218,6 +223,43 @@ namespace AURA.Mobile.Pages
 
             ActivateTab(tab);
             view.Source = url;
+        }
+
+        private void ScheduleExtensionInjection(BrowserTab tab, string url)
+        {
+            if (_extensionNavigationCancellations.TryGetValue(tab.Id, out CancellationTokenSource? previous))
+            {
+                previous.Cancel();
+                previous.Dispose();
+            }
+
+            var current = new CancellationTokenSource();
+            _extensionNavigationCancellations[tab.Id] = current;
+            _ = InjectExtensionsAsync(tab, url, current);
+        }
+
+        private async Task InjectExtensionsAsync(BrowserTab tab, string url, CancellationTokenSource owner)
+        {
+            try
+            {
+                await _extensionCoordinator.InjectAsync(tab.View, url, tab.Id, owner.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (owner.IsCancellationRequested)
+            {
+            }
+            catch (Exception ex)
+            {
+                AuraLog.Exception("Browser.Extensions", ex);
+            }
+        }
+
+        private void CancelExtensionInjection(BrowserTab tab)
+        {
+            if (_extensionNavigationCancellations.Remove(tab.Id, out CancellationTokenSource? cts))
+            {
+                cts.Cancel();
+                cts.Dispose();
+            }
         }
 
         private void ActivateTab(BrowserTab tab)
@@ -256,6 +298,7 @@ namespace AURA.Mobile.Pages
             }
 
             int idx = _tabs.IndexOf(tab);
+            CancelExtensionInjection(tab);
             _tabs.Remove(tab);
             TabHost.Remove(tab.View);
 

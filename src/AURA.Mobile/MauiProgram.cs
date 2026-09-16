@@ -19,6 +19,7 @@ using AURA.Network;
 using AURA.SystemInfo;
 using AURA.Mobile.Speech;
 using AURA.Mobile.Services;
+using AURA.Mobile.Extensions;
 using CommunityToolkit.Maui;
 
 namespace AURA.Mobile;
@@ -115,6 +116,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<AgentPage>(sp => new AgentPage(sp.GetRequiredService<IUniversalAiClient>(), sp.GetRequiredService<MemoryStore>(), sp.GetRequiredService<ISpeechService>(), sp.GetRequiredService<ShellExecutor>(), sp.GetRequiredService<ProcessRegistry>(), sp.GetRequiredService<AuraOrchestrator>(), sp.GetRequiredService<AgentExecutionCoordinator>(), sp.GetRequiredService<WorkGroupCoordinator>(), sp.GetRequiredService<WorkGroupRegistry>(), sp.GetService<LocalPlaybook>(), sp.GetRequiredService<SolutionStore>(), sp.GetService<GitExecutor>(), sp.GetService<PythonExecutor>(), sp.GetService<NodeExecutor>(), sp.GetService<CellProgramRegistry>(), sp.GetRequiredService<SimulationRuntime>(), sp.GetService<IAndroidCapabilityService>(), sp.GetRequiredService<AgentRunStore>(), sp.GetRequiredService<LocalModelStore>(), sp.GetService<ILocalModelEngine>()));
         builder.Services.AddSingleton<TerminalPage>();
+        builder.Services.AddSingleton<BrowserExtensionCoordinator>();
         builder.Services.AddSingleton<BrowserPage>();
         builder.Services.AddSingleton<ImageSearchPage>();
         builder.Services.AddSingleton<CellsPage>();
