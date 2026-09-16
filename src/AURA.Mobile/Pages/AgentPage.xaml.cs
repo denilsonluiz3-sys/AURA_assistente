@@ -207,8 +207,13 @@ public partial class AgentPage : ContentPage
     {
         // O estado detalhado só ocupa espaço enquanto há uma execução ativa.
         // Em repouso, a conversa deve usar toda a área disponível.
-        // O estado detalhado só aparece como popup sob demanda.
-        ProcessCardsHost.IsVisible = _processPopupVisible;
+        // Durante uma execução, o popup aparece automaticamente; em repouso,
+        // só permanece aberto se o usuário o solicitou pelo menu ⚙️.
+        bool active = _processes.Processes.Any(p =>
+            string.Equals(p.Status, "Executando", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(p.Status, "Tentando novamente", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(p.Status, "Pausado", StringComparison.OrdinalIgnoreCase));
+        ProcessCardsHost.IsVisible = _processPopupVisible || active;
     }
 
     protected override void OnAppearing()
