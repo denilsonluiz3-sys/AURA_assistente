@@ -24,10 +24,16 @@ namespace AURA.AI
                 throw new ArgumentException("Caminho vazio.");
             }
 
-            string full = Path.GetFullPath(Path.Combine(WorkspaceRoot, raw.Replace('\\', '/')));
+            string normalized = raw.Replace('\\', '/');
+            // O usuário pode copiar o caminho absoluto exibido pelo Android.
+            // Caminhos absolutos só são aceitos quando apontam para dentro do
+            // workspace ativo; os demais continuam bloqueados.
+            string full = Path.IsPathRooted(normalized)
+                ? Path.GetFullPath(normalized)
+                : Path.GetFullPath(Path.Combine(WorkspaceRoot, normalized));
             if (!IsInsideWorkspace(full))
             {
-                throw new InvalidOperationException("Caminho fora do workspace: " + raw + ". Use o botão de importação da AURA para adicionar o arquivo ao workspace.");
+                throw new InvalidOperationException("Caminho fora do workspace: " + raw + ". Use o workspace ativo ou importe o arquivo pela AURA.");
             }
 
             return full;

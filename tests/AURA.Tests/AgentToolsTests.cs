@@ -118,6 +118,21 @@ public class AgentToolsTests
         finally { Directory.Delete(root, recursive: true); }
     }
 
+    [Fact]
+    public async Task AbsolutePathInsideWorkspaceIsAccepted()
+    {
+        string root = CreateTempWorkspace();
+        try
+        {
+            string path = Path.Combine(root, "absolute.txt");
+            var writer = new WriteFileTool(root);
+            string result = await writer.ExecuteAsync(JsonSerializer.Serialize(new { path, content = "ok" }));
+            Assert.Contains("OK", result);
+            Assert.Equal("ok", File.ReadAllText(path));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
     [Theory]
     [InlineData("../../fora.txt")]
     [InlineData("/etc/passwd")]
