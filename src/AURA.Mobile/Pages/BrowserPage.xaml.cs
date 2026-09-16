@@ -382,7 +382,7 @@ namespace AURA.Mobile.Pages
 
         private void OnNewTabClicked(object sender, EventArgs e) => NewTab(HomeUrl());
 
-        private async Task ManageExtensionsAsync()
+        private async Task ManageExtensionsAsync(string? currentUrl = null)
         {
             try
             {
@@ -392,29 +392,30 @@ namespace AURA.Mobile.Pages
                 foreach (BundledAuraExtension package in catalog)
                 {
                     BrowserExtensionStatus? state = installed.FirstOrDefault(x => x.Id == package.Id);
-                    actions.Add(state is null ? "Instalar " + package.Name : (state.Enabled ? "Desativar " + package.Name : "Ativar " + package.Name));
+                    if (state is null)
+                        actions.Add("Instalar " + package.Name + " nesta origem");
+                    else
+                    {
+                        actions.Add("Reconfigurar " + package.Name + " nesta origem");
+                        actions.Add(state.Enabled ? "Desativar " + package.Name : "Ativar " + package.Name);
+                    }
                 }
-                actions.Add("Abrir página de teste");
                 string action = await DisplayActionSheetAsync("Extensões AURA", "Fechar", null, actions.ToArray());
-                BundledAuraExtension? selected = catalog.FirstOrDefault(x => action.EndsWith(x.Name, StringComparison.Ordinal));
+                BundledAuraExtension? selected = catalog.FirstOrDefault(x => action.Contains(x.Name, StringComparison.Ordinal));
                 if (selected is not null)
                 {
                     BrowserExtensionStatus? state = installed.FirstOrDefault(x => x.Id == selected.Id);
-                    if (state is null)
+                    if (action.StartsWith("Instalar ", StringComparison.Ordinal) || action.StartsWith("Reconfigurar ", StringComparison.Ordinal))
                     {
-                        await _extensionCoordinator.InstallBundledAsync(selected.Key, selected.Name);
-                        await DisplayAlertAsync("Extensão instalada", selected.Name + " foi instalada desativada.", "OK");
+                        await _extensionCoordinator.InstallBundledAsync(selected.Key, selected.Name, currentUrl);
+                        await DisplayAlertAsync("Extensão preparada", selected.Name + " foi configurada para a origem atual e permanece desativada.", "OK");
                     }
-                    else
+                    else if (state is not null)
                     {
-                        bool enable = !state.Enabled;
+                        bool enable = action.StartsWith("Ativar ", StringComparison.Ordinal);
                         await _extensionCoordinator.SetEnabledAsync(selected.Id, enable);
                         await DisplayAlertAsync(enable ? "Extensão ativada" : "Extensão desativada", selected.Name, "OK");
                     }
-                }
-                else if (action == "Abrir página de teste")
-                {
-                    LoadInActive("https://example.com/");
                 }
             }
             catch (Exception ex)
@@ -537,7 +538,7 @@ namespace AURA.Mobile.Pages
                     await OpenExternallyAsync();
                     break;
                 case "Extensões":
-                    await ManageExtensionsAsync();
+                    await ManageExtensionsAsync(_active?.Url);
                     break;
                 case "Configurações":
                     await Navigation.PushAsync(new BrowserSettingsPage());

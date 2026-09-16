@@ -62,9 +62,9 @@ public sealed class BrowserExtensionCoordinator
 
     public IReadOnlyList<BundledAuraExtension> GetBundledCatalog() => BundledCatalog;
 
-    public Task<BrowserExtensionStatus> InstallBundledDemoAsync(CancellationToken ct = default) => InstallBundledAsync("demo", "Demonstração AURA", ct);
+    public Task<BrowserExtensionStatus> InstallBundledDemoAsync(CancellationToken ct = default) => InstallBundledAsync("demo", "Demonstração AURA", null, ct);
 
-    public async Task<BrowserExtensionStatus> InstallBundledAsync(string key, string? fallbackName = null, CancellationToken ct = default)
+    public async Task<BrowserExtensionStatus> InstallBundledAsync(string key, string? fallbackName = null, string? originUrl = null, CancellationToken ct = default)
     {
         string package = key == "demo" ? "demo" : key;
         string staging = Path.Combine(FileSystem.CacheDirectory, "aura-extension-" + key + "-" + Guid.NewGuid().ToString("N"));
@@ -76,6 +76,13 @@ public sealed class BrowserExtensionCoordinator
             await CopyBundledAsync("Extensions/" + package + "/manifest.json", Path.Combine(staging, "manifest.json"), ct);
             await CopyBundledAsync("Extensions/" + package + "/content/main.js", Path.Combine(staging, "content", "main.js"), ct);
             AuraExtensionManifest? manifest = JsonSerializer.Deserialize<AuraExtensionManifest>(await File.ReadAllTextAsync(Path.Combine(staging, "manifest.json"), ct), _json);
+            if (!string.IsNullOrWhiteSpace(originUrl))
+            {
+                if (!WebSecurityPolicy.TryValidateHttpUrl(originUrl, out Uri exactOrigin, rejectLocalHost: true))
+                    throw new InvalidOperationException("A origem atual não é permitida para uma extensão privada.");
+                manifest!.Matches = new List<string> { exactOrigin.GetLeftPart(UriPartial.Authority) + "/*" };
+                manifest.Exclude = new List<string>();
+            }
             AuraExtensionValidationResult validation = AuraExtensionManifestValidator.Validate(manifest);
             if (manifest is null || !validation.Valid) throw new InvalidOperationException(string.Join(", ", validation.Errors));
             destination = Path.Combine(_installedRoot, manifest.Id);
