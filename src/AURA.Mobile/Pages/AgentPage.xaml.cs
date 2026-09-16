@@ -213,6 +213,13 @@ public partial class AgentPage : ContentPage
             string.Equals(p.Status, "Executando", StringComparison.OrdinalIgnoreCase)
             || string.Equals(p.Status, "Tentando novamente", StringComparison.OrdinalIgnoreCase)
             || string.Equals(p.Status, "Pausado", StringComparison.OrdinalIgnoreCase));
+        var activeItems = _processes.Processes.Where(p =>
+            string.Equals(p.Status, "Executando", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(p.Status, "Tentando novamente", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(p.Status, "Pausado", StringComparison.OrdinalIgnoreCase)).ToList();
+        ProcessSummary.Text = activeItems.Count == 0
+            ? "Nenhuma execução ativa"
+            : $"{activeItems.Count} ativo(s) · {string.Join(", ", activeItems.Take(2).Select(p => Shorten(p.Title, 24)))}";
         ProcessCardsHost.IsVisible = _processPopupVisible || active;
     }
 
