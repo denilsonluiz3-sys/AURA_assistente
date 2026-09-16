@@ -8,7 +8,7 @@
     <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0" Padding="0,1,0,2">
 
         <!-- Barra de abas -->
-        <Grid ColumnDefinitions="*,Auto,Auto,Auto"
+        <Grid ColumnDefinitions="*,Auto,Auto"
               ColumnSpacing="0"
               BackgroundColor="{DynamicResource AuraSurface}">
             <ScrollView Orientation="Horizontal"
@@ -19,15 +19,6 @@
                                        Padding="6,2" />
             </ScrollView>
             <Button Grid.Column="1"
-                    x:Name="ExtensionsButton"
-                    Text="🧩"
-                    Clicked="OnExtensionsClicked"
-                    BackgroundColor="{DynamicResource AuraSurface}"
-                    TextColor="{DynamicResource AuraAccent}"
-                    Padding="8,0"
-                    HeightRequest="30"
-                    Margin="0,2,2,2" />
-            <Button Grid.Column="2"
                     x:Name="NewTabButton"
                     Text="＋"
                     Clicked="OnNewTabClicked"
@@ -36,7 +27,7 @@
                     Padding="12,0"
                     HeightRequest="30"
                     Margin="0,2,5,2" />
-            <Label Grid.Column="3"
+            <Label Grid.Column="2"
                    x:Name="IsolatedLabel"
                    Text="🛡"
                    FontSize="14"

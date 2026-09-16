@@ -382,7 +382,7 @@ namespace AURA.Mobile.Pages
 
         private void OnNewTabClicked(object sender, EventArgs e) => NewTab(HomeUrl());
 
-        private async void OnExtensionsClicked(object sender, EventArgs e)
+        private async Task ManageExtensionsAsync()
         {
             try
             {
@@ -501,6 +501,7 @@ namespace AURA.Mobile.Pages
                 "Compartilhar link",
                 "Copiar link",
                 "Abrir externamente",
+                "Extensões",
                 "Configurações");
 
             switch (action)
@@ -534,6 +535,9 @@ namespace AURA.Mobile.Pages
                     break;
                 case "Abrir externamente":
                     await OpenExternallyAsync();
+                    break;
+                case "Extensões":
+                    await ManageExtensionsAsync();
                     break;
                 case "Configurações":
                     await Navigation.PushAsync(new BrowserSettingsPage());
