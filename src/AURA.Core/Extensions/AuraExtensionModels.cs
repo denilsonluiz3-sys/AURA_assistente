@@ -104,7 +104,8 @@ public static class AuraExtensionOriginMatcher
         if (uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || uri.Host.EndsWith(".local", StringComparison.OrdinalIgnoreCase)) return false;
         string pathPrefix = uri.AbsolutePath;
         if (wildcard >= 0 && !pathPrefix.EndsWith("/", StringComparison.Ordinal)) pathPrefix += "/";
-        origin = new(uri.Scheme.ToLowerInvariant(), uri.Host.ToLowerInvariant(), uri.Port, pathPrefix.Length == 0 ? "/" : pathPrefix);
+        int port = uri.IsDefaultPort ? -1 : uri.Port;
+        origin = new(uri.Scheme.ToLowerInvariant(), uri.Host.ToLowerInvariant(), port, pathPrefix.Length == 0 ? "/" : pathPrefix);
         return true;
     }
 
