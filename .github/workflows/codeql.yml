@@ -1,4 +1,5 @@
-# CodeQL — só schedule semanal ou manual. Não roda em todo push.
+# CodeQL — análise estrutural de C# sem depender do workload MAUI/Android.
+# O build completo do APK continua sendo validado pelo workflow próprio.
 name: "CodeQL Advanced"
 
 on:
@@ -25,17 +26,11 @@ jobs:
       matrix:
         include:
         - language: csharp
-          build-mode: manual
+          build-mode: none
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-
-    - name: Setup .NET
-      if: matrix.language == 'csharp'
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '10.0.x'
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
@@ -43,15 +38,7 @@ jobs:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
 
-    - name: Manual build (csharp)
-      if: matrix.build-mode == 'manual'
-      shell: bash
-      run: |
-        dotnet build src/AURA.Mobile/AURA.Mobile.csproj -c Release || \
-          dotnet build AURA.sln -c Release
-
     - name: Perform CodeQL Analysis
-      continue-on-error: true
       uses: github/codeql-action/analyze@v3
       with:
         category: "/language:${{matrix.language}}"
