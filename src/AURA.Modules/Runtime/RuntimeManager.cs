@@ -40,7 +40,8 @@ public sealed class RuntimeManager : IRuntimeManager
         TimeSpan? timeout = null,
         bool autoInstall = false,
         string? workdir = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool confirmInstall = false)
     {
         var report = new PipelineReport { File = filePath };
 
@@ -115,6 +116,15 @@ public sealed class RuntimeManager : IRuntimeManager
         if (report.Plan.Empty)
         {
             report.Log("Nada a instalar.");
+        }
+        else if (autoInstall && !confirmInstall)
+        {
+            // Conteúdo analisado nunca pode autorizar instalação sozinho.
+            // A confirmação precisa vir de uma camada de UI/PolicyGuard.
+            report.Ok = false;
+            report.Log("Instalação automática bloqueada: confirme explicitamente cada plano antes de executar.");
+            report.Finish();
+            return report;
         }
         else if (autoInstall)
         {

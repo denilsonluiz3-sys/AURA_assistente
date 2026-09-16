@@ -77,7 +77,8 @@ public interface IRuntimeManager
         TimeSpan? timeout = null,
         bool autoInstall = false,
         string? workdir = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        bool confirmInstall = false);
 
     Task<PipelineReport> InspectAsync(string filePath, CancellationToken cancellationToken = default);
 }
