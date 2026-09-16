@@ -91,8 +91,9 @@ public static class AuraExtensionOriginMatcher
     public static bool TryParse(string? pattern, out AuraExtensionOrigin origin)
     {
         origin = null!;
-        if (string.IsNullOrWhiteSpace(pattern) || pattern.Contains('*', StringComparison.Ordinal)) return false;
+        if (string.IsNullOrWhiteSpace(pattern)) return false;
         string raw = pattern.Trim();
+        if (raw.Contains('*', StringComparison.Ordinal) && !raw.EndsWith("/*", StringComparison.Ordinal)) return false;
         int wildcard = raw.IndexOf("/*", StringComparison.Ordinal);
         string uriText = wildcard >= 0 ? raw[..wildcard] : raw;
         if (!Uri.TryCreate(uriText, UriKind.Absolute, out Uri? uri) ||
