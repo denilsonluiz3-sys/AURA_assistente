@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using AURA.Core.Abstractions;
+using AURA.Core.Security;
 
 namespace AURA.Core
 {
@@ -58,9 +59,13 @@ namespace AURA.Core
                 return "Não foi possível obter resultados da web agora. " +
                        "Verifique a conexão ou configure uma chave de API / Ollama.";
             }
-            catch (Exception ex)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                return "Erro na busca web: " + ex.Message;
+                return "Busca web cancelada ou excedeu o prazo.";
+            }
+            catch (Exception)
+            {
+                return "Erro na busca web.";
             }
         }
 
@@ -70,6 +75,9 @@ namespace AURA.Core
                 return "Digite uma pergunta para buscar.";
 
             string originalQuery = query.Trim();
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            deadline.CancelAfter(TimeSpan.FromSeconds(45));
+            ct = deadline.Token;
             string currentQuery = originalQuery;
             string lastAnswer = "";
 
@@ -131,6 +139,9 @@ namespace AURA.Core
             foreach (Match m in Regex.Matches(html, BingAlgoPattern, RegexOptions.IgnoreCase))
             {
                 string link = WebUtility.HtmlDecode(m.Groups[1].Value.Trim());
+                if (!WebSecurityPolicy.TryValidateHttpUrl(link, out Uri safeLink))
+                    continue;
+                link = safeLink.AbsoluteUri;
                 string title = StripTags(m.Groups[2].Value);
                 string snippet = StripTags(m.Groups[3].Value);
                 if (string.IsNullOrWhiteSpace(title))
@@ -145,6 +156,9 @@ namespace AURA.Core
                 foreach (Match m in Regex.Matches(html, BingTitlePattern, RegexOptions.IgnoreCase))
                 {
                     string link = WebUtility.HtmlDecode(m.Groups[1].Value.Trim());
+                    if (!WebSecurityPolicy.TryValidateHttpUrl(link, out Uri safeLink))
+                        continue;
+                    link = safeLink.AbsoluteUri;
                     string title = StripTags(m.Groups[2].Value);
                     if (string.IsNullOrWhiteSpace(title) ||
                         link.Contains("javascript:", StringComparison.OrdinalIgnoreCase))
@@ -203,8 +217,8 @@ namespace AURA.Core
                 if (!string.IsNullOrWhiteSpace(heading))
                     sb.AppendLine(heading);
                 sb.AppendLine(abstractText);
-                if (!string.IsNullOrWhiteSpace(abstractUrl))
-                    sb.AppendLine(abstractUrl);
+                if (WebSecurityPolicy.TryValidateHttpUrl(abstractUrl, out Uri safeAbstract))
+                    sb.AppendLine(safeAbstract.AbsoluteUri);
                 sb.AppendLine();
             }
 
@@ -220,6 +234,13 @@ namespace AURA.Core
                     string firstUrl = "";
                     if (t.TryGetProperty("FirstURL", out var fu))
                         firstUrl = fu.GetString() ?? "";
+                    if (!string.IsNullOrWhiteSpace(firstUrl))
+                    {
+                        if (WebSecurityPolicy.TryValidateHttpUrl(firstUrl, out Uri safeTopic))
+                            firstUrl = safeTopic.AbsoluteUri;
+                        else
+                            firstUrl = "";
+                    }
                     if (string.IsNullOrWhiteSpace(text))
                         continue;
                     if (n == 0)

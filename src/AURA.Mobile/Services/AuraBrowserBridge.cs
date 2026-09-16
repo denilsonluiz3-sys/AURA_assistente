@@ -1,4 +1,5 @@
 using AURA.Mobile.Pages;
+using AURA.Core.Security;
 
 namespace AURA.Mobile.Services;
 
@@ -12,7 +13,9 @@ public static class AuraBrowserBridge
 
     public static void SetPendingUrl(string? url)
     {
-        _pendingUrl = string.IsNullOrWhiteSpace(url) ? null : url.Trim();
+        _pendingUrl = WebSecurityPolicy.TryValidateHttpUrl(url, out Uri validated)
+            ? validated.AbsoluteUri
+            : null;
     }
 
     public static string? TakePendingUrl()
@@ -24,12 +27,9 @@ public static class AuraBrowserBridge
 
     public static async Task OpenInAppBrowserAsync(string url, Page? fromPage = null)
     {
-        if (string.IsNullOrWhiteSpace(url))
+        if (!WebSecurityPolicy.TryValidateHttpUrl(url, out Uri validated))
             return;
-
-        if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-            !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            url = "https://" + url.Trim();
+        url = validated.AbsoluteUri;
 
         SetPendingUrl(url);
 

@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Storage;
+using AURA.Core.Security;
 
 namespace AURA.Mobile.Pages
 {
@@ -16,8 +17,7 @@ namespace AURA.Mobile.Pages
             MainThread.InvokeOnMainThreadAsync(() =>
             {
                 ct.ThrowIfCancellationRequested();
-                if (!Uri.TryCreate(url?.Trim(), UriKind.Absolute, out var uri) ||
-                    (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+                if (!WebSecurityPolicy.TryValidateHttpUrl(url, out Uri uri))
                     return false;
 
                 if (!_initialized)
@@ -101,7 +101,7 @@ namespace AURA.Mobile.Pages
     if (tag === 'a') { item.href = e.href || e.getAttribute('href') || ''; item.kind='link'; }
     if (tag === 'button' || e.getAttribute('role') === 'button') item.kind='button';
     if (['input','textarea','select'].includes(tag)) {
-      item.kind='input'; item.type=e.type || tag; item.value=(e.value || '').slice(0,500);
+      item.kind='input'; item.type=e.type || tag; item.value=e.type === 'password' ? '[redacted]' : (e.value || '').slice(0,500);
       item.placeholder=e.getAttribute('placeholder') || '';
       item.disabled=!!e.disabled;
     }
@@ -116,7 +116,7 @@ namespace AURA.Mobile.Pages
   const rootNode=node(root);
   const links=Array.from(root.querySelectorAll('a')).slice(0,100).map((e,i)=>({id:ids.get(e)||('link-'+(i+1)),text:text(e.innerText),href:e.href||e.getAttribute('href')||'',label:e.getAttribute('aria-label')||''}));
   const buttons=Array.from(root.querySelectorAll('button,[role=button]')).slice(0,100).map((e,i)=>({id:ids.get(e)||('button-'+(i+1)),text:text(e.innerText),label:e.getAttribute('aria-label')||'',disabled:!!e.disabled}));
-  const inputs=Array.from(root.querySelectorAll('input,textarea,select')).slice(0,100).map((e,i)=>({id:ids.get(e)||('input-'+(i+1)),tag:(e.tagName||'').toLowerCase(),type:e.type||'',name:e.getAttribute('name')||'',placeholder:e.getAttribute('placeholder')||'',value:(e.value||'').slice(0,500),label:e.getAttribute('aria-label')||'',disabled:!!e.disabled}));
+  const inputs=Array.from(root.querySelectorAll('input,textarea,select')).slice(0,100).map((e,i)=>({id:ids.get(e)||('input-'+(i+1)),tag:(e.tagName||'').toLowerCase(),type:e.type||'',name:e.getAttribute('name')||'',placeholder:e.getAttribute('placeholder')||'',value:e.type==='password'?'[redacted]':(e.value||'').slice(0,500),label:e.getAttribute('aria-label')||'',disabled:!!e.disabled}));
   return JSON.stringify({ok:true,url:location.href,title:document.title||'',selector:__SELECTOR_JSON__,nodeCount:count,truncated:count>=maxNodes,dom:rootNode,links:links,buttons:buttons,inputs:inputs});
 })()
 """;
@@ -138,7 +138,7 @@ namespace AURA.Mobile.Pages
                 if (view == null || string.IsNullOrWhiteSpace(selector)) return false;
                 string s = JsonSerializer.Serialize(selector);
                 string value = JsonSerializer.Serialize(text ?? string.Empty);
-                string script = $"(function(){{var e=document.querySelector({s});if(!e)return false;e.focus();if('value' in e)e.value={value};else e.textContent={value};e.dispatchEvent(new Event('input',{{bubbles:true}}));e.dispatchEvent(new Event('change',{{bubbles:true}}));return true;}})()";
+                string script = $"(function(){{var e=document.querySelector({s});if(!e||e.type==='password')return false;e.focus();if('value' in e)e.value={value};else e.textContent={value};e.dispatchEvent(new Event('input',{{bubbles:true}}));e.dispatchEvent(new Event('change',{{bubbles:true}}));return true;}})()";
                 string result = await view.EvaluateJavaScriptAsync(script);
                 return result == "true" || result == "True";
             });

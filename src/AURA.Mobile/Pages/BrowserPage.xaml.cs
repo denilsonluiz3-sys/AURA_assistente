@@ -3,6 +3,7 @@ using AURA.Core.Events;
 using AURA.Core.Runtime;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.ApplicationModel.DataTransfer;
+using AURA.Core.Security;
 
 namespace AURA.Mobile.Pages
 {
@@ -174,6 +175,12 @@ namespace AURA.Mobile.Pages
 
         private void NewTab(string url)
         {
+            if (!WebSecurityPolicy.TryValidateHttpUrl(url, out Uri validated))
+            {
+                AuraLog.Info("Browser: nova aba bloqueada por URL inválida: " + WebSecurityPolicy.RedactForLog(url));
+                return;
+            }
+            url = validated.AbsoluteUri;
             var view = new WebView
             {
                 HorizontalOptions = LayoutOptions.Fill,
@@ -198,7 +205,16 @@ namespace AURA.Mobile.Pages
                     InjectStealth(tab.View);
                 }
             };
-            view.Navigating += (s, e) => AuraLog.Info("Browser: navegando para " + e.Url);
+            view.Navigating += (s, e) =>
+            {
+                if (!WebSecurityPolicy.TryValidateHttpUrl(e.Url, out _))
+                {
+                    e.Cancel = true;
+                    AuraLog.Info("Browser: navegação bloqueada: " + WebSecurityPolicy.RedactForLog(e.Url));
+                    return;
+                }
+                AuraLog.Info("Browser: navegando para " + WebSecurityPolicy.RedactForLog(e.Url));
+            };
 
             ActivateTab(tab);
             view.Source = url;
@@ -342,13 +358,14 @@ namespace AURA.Mobile.Pages
 
         private void LoadInActive(string url)
         {
-            if (_active == null)
+            if (_active == null || !WebSecurityPolicy.TryValidateHttpUrl(url, out Uri validated))
             {
+                AuraLog.Info("Browser: carregamento bloqueado: " + WebSecurityPolicy.RedactForLog(url));
                 return;
             }
 
-            _active.View.Source = url;
-            UrlEntry.Text = url;
+            _active.View.Source = validated.AbsoluteUri;
+            UrlEntry.Text = validated.AbsoluteUri;
         }
 
         private void OnBackClicked(object sender, EventArgs e)
@@ -591,7 +608,9 @@ namespace AURA.Mobile.Pages
 
             try
             {
-                await Browser.Default.OpenAsync(_active.Url, BrowserLaunchMode.External);
+                if (!WebSecurityPolicy.TryValidateHttpUrl(_active.Url, out Uri validated))
+                    return;
+                await Browser.Default.OpenAsync(validated, BrowserLaunchMode.External);
             }
             catch (Exception ex)
             {
@@ -836,7 +855,9 @@ namespace AURA.Mobile.Pages
         private string HomeUrl()
         {
             string home = (Preferences.Default.Get(HomeUrlKey, string.Empty) ?? string.Empty).Trim();
-            return string.IsNullOrWhiteSpace(home) ? DefaultHome : home;
+            return WebSecurityPolicy.TryValidateHttpUrl(home, out Uri validated)
+                ? validated.AbsoluteUri
+                : DefaultHome;
         }
 
         // --- Onion (.onion) ---

@@ -1,4 +1,5 @@
 using AURA.Mobile.Services;
+using AURA.Core.Security;
 using Microsoft.Maui.Storage;
 using System.Text.Json;
 
@@ -30,6 +31,16 @@ public partial class AgentPage
         _webEventsHooked = true;
         LoadCustomWebProviders();
         BridgeWebView.Navigated += OnWebNavigated;
+        BridgeWebView.Navigating += OnWebNavigating;
+    }
+
+    private void OnWebNavigating(object? sender, WebNavigatingEventArgs e)
+    {
+        if (!WebSecurityPolicy.TryValidateHttpUrl(e.Url, out _))
+        {
+            e.Cancel = true;
+            AuraLog.Info("Web AI: navegação bloqueada: " + WebSecurityPolicy.RedactForLog(e.Url));
+        }
     }
 
     private async void OnWebNavigated(object? sender, WebNavigatedEventArgs e)
@@ -81,8 +92,7 @@ public partial class AgentPage
 
     private static bool IsValidCustomProvider(CustomWebProvider? item) =>
         item != null && !string.IsNullOrWhiteSpace(item.Id) && !string.IsNullOrWhiteSpace(item.Label)
-        && Uri.TryCreate(item.Url, UriKind.Absolute, out var uri)
-        && uri.Scheme is "http" or "https" && !string.IsNullOrWhiteSpace(uri.Host);
+        && WebSecurityPolicy.TryValidateHttpUrl(item.Url, out _);
 
     private IEnumerable<(string Id, string Label, string Url)> AllWebProviders()
     {
@@ -96,8 +106,7 @@ public partial class AgentPage
         url = string.Empty;
         if (string.IsNullOrWhiteSpace(text)) return false;
         var match = System.Text.RegularExpressions.Regex.Match(text, @"https?://[^\s<>""']+", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        if (!match.Success || !Uri.TryCreate(match.Value.TrimEnd('.', ',', ';', ')', ']'), UriKind.Absolute, out var parsed)) return false;
-        if (parsed.Scheme is not ("http" or "https") || string.IsNullOrWhiteSpace(parsed.Host)) return false;
+        if (!match.Success || !WebSecurityPolicy.TryValidateHttpUrl(match.Value.TrimEnd('.', ',', ';', ')', ']'), out Uri parsed)) return false;
         url = parsed.AbsoluteUri;
         return true;
     }
@@ -110,7 +119,8 @@ public partial class AgentPage
 
     private void OpenWebProvider(string id, string url)
     {
-        if (string.IsNullOrWhiteSpace(url)) return;
+        if (!WebSecurityPolicy.TryValidateHttpUrl(url, out Uri validated)) return;
+        url = validated.AbsoluteUri;
         try { BridgeWebView.Source = url; _webLoaded = true; _activeWebProviderId = id ?? string.Empty; HighlightActiveWebProvider(); }
         catch (Exception ex) { AuraLog.Exception("WebProvider.Open", ex); }
     }

@@ -1,3 +1,5 @@
+using AURA.Core.Security;
+
 namespace AURA.Mobile.Pages;
 
 /// <summary>
@@ -8,8 +10,9 @@ public partial class BrowserPage
     /// <summary>Abre URL numa aba (nova ou ativa). Seguro para chamar de outra página.</summary>
     public void OpenFromBridge(string url)
     {
-        if (string.IsNullOrWhiteSpace(url))
+        if (!WebSecurityPolicy.TryValidateHttpUrl(url, out Uri validated))
             return;
+        url = validated.AbsoluteUri;
 
         MainThread.BeginInvokeOnMainThread(() =>
         {

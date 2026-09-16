@@ -1,3 +1,5 @@
+using System;
+using AURA.Core.Security;
 namespace AURA.Mobile.Platforms.Android.WebView
 {
     /// <summary>
@@ -14,8 +16,15 @@ namespace AURA.Mobile.Platforms.Android.WebView
             string? mimeType,
             long contentLength)
         {
-            if (string.IsNullOrEmpty(url))
+            if (!WebSecurityPolicy.TryValidateHttpUrl(url, out _))
             {
+                AURA.Mobile.AuraLog.Info("WebView: download bloqueado por URL inválida: " + WebSecurityPolicy.RedactForLog(url));
+                return;
+            }
+
+            if (contentLength > 100L * 1024 * 1024 || IsExecutableMime(mimeType))
+            {
+                AURA.Mobile.AuraLog.Info("WebView: download bloqueado por tipo/tamanho: " + (mimeType ?? "?") + " / " + contentLength);
                 return;
             }
 
@@ -34,12 +43,18 @@ namespace AURA.Mobile.Platforms.Android.WebView
                 intent.AddFlags(global::Android.Content.ActivityFlags.NewTask);
                 context.StartActivity(intent);
 
-                AURA.Mobile.AuraLog.Info("WebView: download/recurso aberto externamente: " + url);
+                AURA.Mobile.AuraLog.Info("WebView: download/recurso aberto externamente: " + WebSecurityPolicy.RedactForLog(url));
             }
             catch (System.Exception ex)
             {
                 AURA.Mobile.AuraLog.Exception("WebView.Download", ex);
             }
         }
+        private static bool IsExecutableMime(string? mimeType) =>
+            mimeType is not null && (mimeType.Contains("android.package-archive", StringComparison.OrdinalIgnoreCase) ||
+            mimeType.Contains("x-msdownload", StringComparison.OrdinalIgnoreCase) ||
+            mimeType.Contains("x-sh", StringComparison.OrdinalIgnoreCase) ||
+            mimeType.Contains("java-archive", StringComparison.OrdinalIgnoreCase) ||
+            mimeType.Contains("dex", StringComparison.OrdinalIgnoreCase));
     }
 }

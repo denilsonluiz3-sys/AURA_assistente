@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AURA.AI;
 using AURA.Mobile.Services;
+using AURA.Core.Security;
 
 namespace AURA.Mobile.Pages;
 
@@ -33,9 +34,9 @@ public sealed class AgentBrowserTool : AgentTool
         if (string.IsNullOrWhiteSpace(url))
             return "ERRO: URL vazia.";
 
-        if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-            !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            return "ERRO: URL deve começar com http:// ou https://";
+        if (!WebSecurityPolicy.TryValidateHttpUrl(url, out Uri validated))
+            return "ERRO: URL HTTP(S) inválida, com host, porta ou credenciais não permitidos.";
+        url = validated.AbsoluteUri;
 
         try
         {

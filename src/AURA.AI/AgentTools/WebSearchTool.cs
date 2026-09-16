@@ -52,9 +52,13 @@ namespace AURA.AI
                     ? "Nenhum resultado encontrado para: " + query
                     : result;
             }
-            catch (Exception ex)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                return "ERRO na busca web: " + ex.Message;
+                return "ERRO: busca web cancelada.";
+            }
+            catch (Exception)
+            {
+                return "ERRO na busca web.";
             }
         }
     }

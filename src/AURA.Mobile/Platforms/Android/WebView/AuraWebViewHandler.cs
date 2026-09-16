@@ -11,7 +11,7 @@ namespace AURA.Mobile.Platforms.Android.WebView
     /// dispara Navigating/Navigated), apenas endurece o WebView Android:
     ///   - rolagem: trava a interceptação do gesto pelos pais (fix de scroll);
     ///   - target=_blank abre na mesma aba (sem janela órfã/branca);
-    ///   - conteúdo misto permitido (http dentro de https);
+    ///   - conteúdo misto bloqueado (http dentro de https);
     ///   - downloads/recurso externos abertos no app padrão do sistema.
     /// </summary>
     public sealed class AuraWebViewHandler : WebViewHandler
@@ -39,13 +39,17 @@ namespace AURA.Mobile.Platforms.Android.WebView
             {
                 var settings = webView.Settings;
                 settings.DomStorageEnabled = true;
-                settings.JavaScriptCanOpenWindowsAutomatically = true;
+                settings.AllowFileAccess = false;
+                settings.AllowContentAccess = false;
+                settings.AllowFileAccessFromFileURLs = false;
+                settings.AllowUniversalAccessFromFileURLs = false;
+                settings.JavaScriptCanOpenWindowsAutomatically = false;
                 settings.SetSupportMultipleWindows(false);
                 settings.SetSupportZoom(false);
 
                 if (OperatingSystem.IsAndroidVersionAtLeast(21))
                 {
-                    settings.MixedContentMode = MixedContentHandling.AlwaysAllow;
+                    settings.MixedContentMode = MixedContentHandling.NeverAllow;
                 }
 
                 webView.SetDownloadListener(new AuraDownloadListener());
