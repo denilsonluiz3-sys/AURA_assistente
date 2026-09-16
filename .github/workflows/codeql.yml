@@ -1,5 +1,5 @@
-# CodeQL — análise estrutural de C# sem depender do workload MAUI/Android.
-# O build completo do APK continua sendo validado pelo workflow próprio.
+# CodeQL avançado — configuração padrão desativada no repositório.
+# A análise C# usa o modo none para não depender do workload MAUI/Android.
 name: "CodeQL Advanced"
 
 on:
@@ -30,15 +30,15 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
+      uses: github/codeql-action/init@v4
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+      uses: github/codeql-action/analyze@v4
       with:
         category: "/language:${{matrix.language}}"
