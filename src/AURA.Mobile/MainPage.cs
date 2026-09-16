@@ -37,7 +37,22 @@ public class MainPage : TabbedPage
 
         BarBackgroundColor = Color.FromArgb("#0d0f18");
         BarTextColor = Color.FromArgb("#eef0f5");
+        HideNativeTitleBar();
         AuraLog.Info("MainPage.ctor OK (abas Agente/Navegador)");
+    }
+
+    private static void HideNativeTitleBar()
+    {
+#if ANDROID
+        try
+        {
+            Microsoft.Maui.ApplicationModel.Platform.CurrentActivity?.ActionBar?.Hide();
+        }
+        catch (Exception ex)
+        {
+            AuraLog.Exception("MainPage.HideNativeTitleBar", ex);
+        }
+#endif
     }
 
     private static NavigationPage CreateTab(Page page, string title, string icon)
