@@ -113,6 +113,7 @@ public partial class AgentPage : ContentPage
 
         UpdateProcessCardsVisibility();
         ApplyModeUi();
+        SetRunButtonBusy(false);
     }
 
     // ------------------------------------------------------------------

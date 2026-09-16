@@ -81,7 +81,7 @@
 
         <Grid x:Name="AgentPane" Grid.Row="3" IsVisible="True">
             <ScrollView x:Name="ConversationScroll">
-                <VerticalStackLayout x:Name="ConversationContainer" Spacing="8" Padding="16,14,16,20" />
+                <VerticalStackLayout x:Name="ConversationContainer" Spacing="8" Padding="16,68,16,20" />
             </ScrollView>
         </Grid>
 
