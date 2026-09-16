@@ -7,12 +7,20 @@ using AURA.Core.Security;
 namespace AURA.Mobile.Extensions;
 
 public sealed record BrowserExtensionStatus(string Id, string Name, string Version, bool Enabled, bool Valid, string? Error);
+public sealed record BundledAuraExtension(string Key, string Id, string Name);
 
 /// <summary>Executa content scripts próprios somente no BrowserPage. Não é usado pelo Web AI.</summary>
 public sealed class BrowserExtensionCoordinator
 {
     private const int MaxScriptBytes = 256 * 1024;
     private const string DemoPackage = "Extensions/demo/";
+    private static readonly IReadOnlyList<BundledAuraExtension> BundledCatalog = new[]
+    {
+        new BundledAuraExtension("demo", "com.aura.demo.extension", "Demonstração AURA"),
+        new BundledAuraExtension("security", "com.aura.security.guard", "AURA Segurança da Página"),
+        new BundledAuraExtension("integration", "com.aura.integration.context", "AURA Contexto da Página"),
+        new BundledAuraExtension("tools", "com.aura.tools.reading", "AURA Ferramentas de Leitura")
+    };
     private readonly string _installedRoot = Path.Combine(FileSystem.AppDataDirectory, "extensions", "installed");
     private readonly AuraExtensionStateStore _states;
     private readonly JsonSerializerOptions _json = new() { PropertyNameCaseInsensitive = true };
@@ -52,19 +60,25 @@ public sealed class BrowserExtensionCoordinator
         return result;
     }
 
-    public async Task<BrowserExtensionStatus> InstallBundledDemoAsync(CancellationToken ct = default)
+    public IReadOnlyList<BundledAuraExtension> GetBundledCatalog() => BundledCatalog;
+
+    public Task<BrowserExtensionStatus> InstallBundledDemoAsync(CancellationToken ct = default) => InstallBundledAsync("demo", "Demonstração AURA", ct);
+
+    public async Task<BrowserExtensionStatus> InstallBundledAsync(string key, string? fallbackName = null, CancellationToken ct = default)
     {
-        string staging = Path.Combine(FileSystem.CacheDirectory, "aura-extension-demo-" + Guid.NewGuid().ToString("N"));
-        string destination = Path.Combine(_installedRoot, "com.aura.demo.extension");
+        string package = key == "demo" ? "demo" : key;
+        string staging = Path.Combine(FileSystem.CacheDirectory, "aura-extension-" + key + "-" + Guid.NewGuid().ToString("N"));
+        string destination;
         try
         {
             Directory.CreateDirectory(staging);
             Directory.CreateDirectory(Path.Combine(staging, "content"));
-            await CopyBundledAsync(DemoPackage + "manifest.json", Path.Combine(staging, "manifest.json"), ct);
-            await CopyBundledAsync(DemoPackage + "content/main.js", Path.Combine(staging, "content", "main.js"), ct);
+            await CopyBundledAsync("Extensions/" + package + "/manifest.json", Path.Combine(staging, "manifest.json"), ct);
+            await CopyBundledAsync("Extensions/" + package + "/content/main.js", Path.Combine(staging, "content", "main.js"), ct);
             AuraExtensionManifest? manifest = JsonSerializer.Deserialize<AuraExtensionManifest>(await File.ReadAllTextAsync(Path.Combine(staging, "manifest.json"), ct), _json);
             AuraExtensionValidationResult validation = AuraExtensionManifestValidator.Validate(manifest);
             if (manifest is null || !validation.Valid) throw new InvalidOperationException(string.Join(", ", validation.Errors));
+            destination = Path.Combine(_installedRoot, manifest.Id);
             Directory.CreateDirectory(_installedRoot);
             if (Directory.Exists(destination)) Directory.Delete(destination, true);
             Directory.Move(staging, destination);

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "com.aura.tools.reading",
+  "name": "AURA Ferramentas de Leitura",
+  "version": "1.0.0",
+  "enabledByDefault": false,
+  "matches": [
+    "https://example.com/*",
+    "https://github.com/*",
+    "https://developer.mozilla.org/*"
+  ],
+  "exclude": [],
+  "contentScripts": [
+    { "id": "main", "path": "content/main.js", "runAt": "document-end" }
+  ],
+  "permissions": ["page.read", "page.dom", "extension.storage"]
+}

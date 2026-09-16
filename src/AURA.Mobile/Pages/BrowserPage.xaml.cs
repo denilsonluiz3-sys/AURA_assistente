@@ -387,35 +387,40 @@ namespace AURA.Mobile.Pages
             try
             {
                 IReadOnlyList<BrowserExtensionStatus> installed = await _extensionCoordinator.GetInstalledAsync();
-                BrowserExtensionStatus? demo = installed.FirstOrDefault(x => x.Id == "com.aura.demo.extension");
-                var actions = new List<string> { "Instalar pacote de demonstração" };
-                if (demo is { Valid: true, Enabled: false }) actions.Add("Ativar demonstração");
-                if (demo is { Valid: true, Enabled: true }) actions.Add("Desativar demonstração");
-                if (demo is not null) actions.Add("Abrir página de teste");
-                string action = await DisplayActionSheetAsync("Extensões privadas", "Fechar", null, actions.ToArray());
-                switch (action)
+                IReadOnlyList<BundledAuraExtension> catalog = _extensionCoordinator.GetBundledCatalog();
+                var actions = new List<string>();
+                foreach (BundledAuraExtension package in catalog)
                 {
-                    case "Instalar pacote de demonstração":
-                        await _extensionCoordinator.InstallBundledDemoAsync();
-                        await DisplayAlertAsync("Extensão instalada", "A demonstração foi instalada desativada. Ative-a e abra a página de teste.", "OK");
-                        break;
-                    case "Ativar demonstração":
-                        await _extensionCoordinator.SetEnabledAsync("com.aura.demo.extension", true);
-                        await DisplayAlertAsync("Extensão ativada", "Abra ou recarregue a página de teste para executar o content.js.", "OK");
-                        break;
-                    case "Desativar demonstração":
-                        await _extensionCoordinator.SetEnabledAsync("com.aura.demo.extension", false);
-                        await DisplayAlertAsync("Extensão desativada", "Nenhuma nova injeção será executada.", "OK");
-                        break;
-                    case "Abrir página de teste":
-                        LoadInActive("https://example.com/");
-                        break;
+                    BrowserExtensionStatus? state = installed.FirstOrDefault(x => x.Id == package.Id);
+                    actions.Add(state is null ? "Instalar " + package.Name : (state.Enabled ? "Desativar " + package.Name : "Ativar " + package.Name));
+                }
+                actions.Add("Abrir página de teste");
+                string action = await DisplayActionSheetAsync("Extensões AURA", "Fechar", null, actions.ToArray());
+                BundledAuraExtension? selected = catalog.FirstOrDefault(x => action.EndsWith(x.Name, StringComparison.Ordinal));
+                if (selected is not null)
+                {
+                    BrowserExtensionStatus? state = installed.FirstOrDefault(x => x.Id == selected.Id);
+                    if (state is null)
+                    {
+                        await _extensionCoordinator.InstallBundledAsync(selected.Key, selected.Name);
+                        await DisplayAlertAsync("Extensão instalada", selected.Name + " foi instalada desativada.", "OK");
+                    }
+                    else
+                    {
+                        bool enable = !state.Enabled;
+                        await _extensionCoordinator.SetEnabledAsync(selected.Id, enable);
+                        await DisplayAlertAsync(enable ? "Extensão ativada" : "Extensão desativada", selected.Name, "OK");
+                    }
+                }
+                else if (action == "Abrir página de teste")
+                {
+                    LoadInActive("https://example.com/");
                 }
             }
             catch (Exception ex)
             {
                 AuraLog.Exception("Browser.ExtensionsUi", ex);
-                await DisplayAlertAsync("Extensões", "Não foi possível atualizar o pacote privado.", "OK");
+                await DisplayAlertAsync("Extensões", "Não foi possível atualizar as extensões privadas.", "OK");
             }
         }
 
