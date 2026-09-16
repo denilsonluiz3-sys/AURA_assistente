@@ -1,0 +1,13 @@
+# Saidas e caches
+bin/
+obj/
+
+# Testes: analisados pelo CodeQL/.NET em seus próprios workflows
+tests/
+
+# CLI legado isolado do fluxo Android principal
+src/AURA.CLI/
+
+# Artefatos locais
+artifacts/
+.aura/
