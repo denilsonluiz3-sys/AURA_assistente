@@ -6,13 +6,13 @@ using AURA.Core.Security;
 
 namespace AURA.Mobile.Extensions;
 
-/// <summary>
-/// Executa content scripts próprios somente no BrowserPage. Não é usado pelo Web AI.
-/// A ausência de estado enabled mantém extensões desativadas por padrão.
-/// </summary>
+public sealed record BrowserExtensionStatus(string Id, string Name, string Version, bool Enabled, bool Valid, string? Error);
+
+/// <summary>Executa content scripts próprios somente no BrowserPage. Não é usado pelo Web AI.</summary>
 public sealed class BrowserExtensionCoordinator
 {
     private const int MaxScriptBytes = 256 * 1024;
+    private const string DemoPackage = "Extensions/demo/";
     private readonly string _installedRoot = Path.Combine(FileSystem.AppDataDirectory, "extensions", "installed");
     private readonly AuraExtensionStateStore _states;
     private readonly JsonSerializerOptions _json = new() { PropertyNameCaseInsensitive = true };
@@ -24,65 +24,112 @@ public sealed class BrowserExtensionCoordinator
         _states = new AuraExtensionStateStore(Path.Combine(FileSystem.AppDataDirectory, "extensions", "state"));
     }
 
-    public async Task InjectAsync(WebView view, string url, int tabId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<BrowserExtensionStatus>> GetInstalledAsync(CancellationToken ct = default)
     {
-        if (!WebSecurityUrl(url, out Uri? pageUri)) return;
-        if (!Directory.Exists(_installedRoot)) return;
-
+        var result = new List<BrowserExtensionStatus>();
+        if (!Directory.Exists(_installedRoot)) return result;
         foreach (string packageRoot in Directory.EnumerateDirectories(_installedRoot))
         {
             ct.ThrowIfCancellationRequested();
             string manifestPath = Path.Combine(packageRoot, "manifest.json");
             if (!File.Exists(manifestPath)) continue;
-
-            AuraExtensionManifest? manifest;
             try
             {
-                string raw = await File.ReadAllTextAsync(manifestPath, ct).ConfigureAwait(false);
-                manifest = JsonSerializer.Deserialize<AuraExtensionManifest>(raw, _json);
+                AuraExtensionManifest? manifest = JsonSerializer.Deserialize<AuraExtensionManifest>(await File.ReadAllTextAsync(manifestPath, ct), _json);
+                AuraExtensionValidationResult validation = AuraExtensionManifestValidator.Validate(manifest);
+                if (manifest is null)
+                {
+                    result.Add(new("", Path.GetFileName(packageRoot), "", false, false, "manifesto ausente"));
+                    continue;
+                }
+                result.Add(new(manifest.Id, manifest.Name, manifest.Version, _states.IsEnabled(manifest.Id), validation.Valid, validation.Valid ? null : string.Join(", ", validation.Errors)));
             }
             catch (Exception ex)
             {
-                AURA.Mobile.AuraLog.Exception("Extension.Manifest", ex);
-                continue;
+                result.Add(new("", Path.GetFileName(packageRoot), "", false, false, ex.Message));
             }
+        }
+        return result;
+    }
 
+    public async Task<BrowserExtensionStatus> InstallBundledDemoAsync(CancellationToken ct = default)
+    {
+        string staging = Path.Combine(FileSystem.CacheDirectory, "aura-extension-demo-" + Guid.NewGuid().ToString("N"));
+        string destination = Path.Combine(_installedRoot, "com.aura.demo.extension");
+        try
+        {
+            Directory.CreateDirectory(staging);
+            Directory.CreateDirectory(Path.Combine(staging, "content"));
+            await CopyBundledAsync(DemoPackage + "manifest.json", Path.Combine(staging, "manifest.json"), ct);
+            await CopyBundledAsync(DemoPackage + "content/main.js", Path.Combine(staging, "content", "main.js"), ct);
+            AuraExtensionManifest? manifest = JsonSerializer.Deserialize<AuraExtensionManifest>(await File.ReadAllTextAsync(Path.Combine(staging, "manifest.json"), ct), _json);
+            AuraExtensionValidationResult validation = AuraExtensionManifestValidator.Validate(manifest);
+            if (manifest is null || !validation.Valid) throw new InvalidOperationException(string.Join(", ", validation.Errors));
+            Directory.CreateDirectory(_installedRoot);
+            if (Directory.Exists(destination)) Directory.Delete(destination, true);
+            Directory.Move(staging, destination);
+            await _states.SetEnabledAsync(manifest.Id, false, ct);
+            return new(manifest.Id, manifest.Name, manifest.Version, false, true, null);
+        }
+        finally
+        {
+            if (Directory.Exists(staging)) Directory.Delete(staging, true);
+        }
+    }
+
+    public async Task SetEnabledAsync(string extensionId, bool enabled, CancellationToken ct = default)
+    {
+        if (!AuraExtensionManifestValidator.IsSafeRelativeScriptPath(extensionId + ".js") || extensionId.Contains('/'))
+            throw new ArgumentException("ID de extensão inválido", nameof(extensionId));
+        string manifestPath = Path.Combine(_installedRoot, extensionId, "manifest.json");
+        if (!File.Exists(manifestPath)) throw new FileNotFoundException("Extensão não instalada", extensionId);
+        await _states.SetEnabledAsync(extensionId, enabled, ct);
+        if (!enabled)
+        {
+            lock (_gate) _injected.RemoveWhere(key => key.StartsWith(extensionId + ":", StringComparison.Ordinal));
+        }
+    }
+
+    public async Task InjectAsync(WebView view, string url, int tabId, CancellationToken ct = default)
+    {
+        if (!WebSecurityUrl(url, out Uri? pageUri) || !Directory.Exists(_installedRoot)) return;
+        foreach (string packageRoot in Directory.EnumerateDirectories(_installedRoot))
+        {
+            ct.ThrowIfCancellationRequested();
+            string manifestPath = Path.Combine(packageRoot, "manifest.json");
+            if (!File.Exists(manifestPath)) continue;
+            AuraExtensionManifest? manifest;
+            try { manifest = JsonSerializer.Deserialize<AuraExtensionManifest>(await File.ReadAllTextAsync(manifestPath, ct), _json); }
+            catch (Exception ex) { AURA.Mobile.AuraLog.Exception("Extension.Manifest", ex); continue; }
             AuraExtensionValidationResult validation = AuraExtensionManifestValidator.Validate(manifest);
             if (!validation.Valid || manifest is null || !_states.IsEnabled(manifest.Id) ||
                 !manifest.Permissions.Contains(AuraExtensionPermissions.PageDom, StringComparer.Ordinal) ||
-                !AuraExtensionOriginMatcher.IsAllowed(pageUri.AbsoluteUri, manifest))
-                continue;
-
+                !AuraExtensionOriginMatcher.IsAllowed(pageUri.AbsoluteUri, manifest)) continue;
             foreach (AuraContentScript script in manifest.ContentScripts)
             {
                 ct.ThrowIfCancellationRequested();
                 string scriptPath = Path.GetFullPath(Path.Combine(packageRoot, script.Path.Replace('/', Path.DirectorySeparatorChar)));
                 string packageFull = Path.GetFullPath(packageRoot) + Path.DirectorySeparatorChar;
-                if (!scriptPath.StartsWith(packageFull, StringComparison.Ordinal) || !File.Exists(scriptPath)) continue;
-                FileInfo info = new(scriptPath);
-                if (info.Length > MaxScriptBytes) continue;
-
+                if (!scriptPath.StartsWith(packageFull, StringComparison.Ordinal) || !File.Exists(scriptPath) || new FileInfo(scriptPath).Length > MaxScriptBytes) continue;
                 string injectionKey = manifest.Id + ":" + script.Id + ":" + tabId + ":" + pageUri.AbsoluteUri;
-                lock (_gate)
-                {
-                    if (!_injected.Add(injectionKey)) continue;
-                }
-
-                string content = await File.ReadAllTextAsync(scriptPath, ct).ConfigureAwait(false);
-                string wrapped = "(function(){\n" + content + "\n})();";
+                lock (_gate) if (!_injected.Add(injectionKey)) continue;
                 try
                 {
-                    await MainThread.InvokeOnMainThreadAsync(() => view.EvaluateJavaScriptAsync(wrapped)).WaitAsync(ct).ConfigureAwait(false);
+                    string wrapped = "(function(){\n" + await File.ReadAllTextAsync(scriptPath, ct) + "\n})();";
+                    await MainThread.InvokeOnMainThreadAsync(() => view.EvaluateJavaScriptAsync(wrapped)).WaitAsync(ct);
                     AURA.Mobile.AuraLog.Info("Extension content.js executado: " + manifest.Id);
                 }
                 catch (OperationCanceledException) { throw; }
-                catch (Exception ex)
-                {
-                    lock (_gate) _injected.Remove(injectionKey);
-                    AURA.Mobile.AuraLog.Exception("Extension.Inject", ex);
-                }
+                catch (Exception ex) { lock (_gate) _injected.Remove(injectionKey); AURA.Mobile.AuraLog.Exception("Extension.Inject", ex); }
             }
         }
+    }
+
+    private static async Task CopyBundledAsync(string asset, string destination, CancellationToken ct)
+    {
+        await using Stream source = await FileSystem.OpenAppPackageFileAsync(asset);
+        await using FileStream target = File.Create(destination);
+        await source.CopyToAsync(target, ct);
     }
 
     private static bool WebSecurityUrl(string raw, out Uri? uri)

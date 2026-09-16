@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "com.aura.demo.extension",
+  "name": "Demonstração AURA",
+  "version": "1.0.0",
+  "enabledByDefault": false,
+  "matches": [
+    "https://example.com/*"
+  ],
+  "exclude": [],
+  "contentScripts": [
+    {
+      "id": "main",
+      "path": "content/main.js",
+      "runAt": "document-end"
+    }
+  ],
+  "permissions": [
+    "page.read",
+    "page.dom",
+    "extension.storage"
+  ]
+}

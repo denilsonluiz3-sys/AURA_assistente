@@ -382,6 +382,43 @@ namespace AURA.Mobile.Pages
 
         private void OnNewTabClicked(object sender, EventArgs e) => NewTab(HomeUrl());
 
+        private async void OnExtensionsClicked(object sender, EventArgs e)
+        {
+            try
+            {
+                IReadOnlyList<BrowserExtensionStatus> installed = await _extensionCoordinator.GetInstalledAsync();
+                BrowserExtensionStatus? demo = installed.FirstOrDefault(x => x.Id == "com.aura.demo.extension");
+                var actions = new List<string> { "Instalar pacote de demonstração" };
+                if (demo is { Valid: true, Enabled: false }) actions.Add("Ativar demonstração");
+                if (demo is { Valid: true, Enabled: true }) actions.Add("Desativar demonstração");
+                if (demo is not null) actions.Add("Abrir página de teste");
+                string action = await DisplayActionSheetAsync("Extensões privadas", "Fechar", null, actions.ToArray());
+                switch (action)
+                {
+                    case "Instalar pacote de demonstração":
+                        await _extensionCoordinator.InstallBundledDemoAsync();
+                        await DisplayAlertAsync("Extensão instalada", "A demonstração foi instalada desativada. Ative-a e abra a página de teste.", "OK");
+                        break;
+                    case "Ativar demonstração":
+                        await _extensionCoordinator.SetEnabledAsync("com.aura.demo.extension", true);
+                        await DisplayAlertAsync("Extensão ativada", "Abra ou recarregue a página de teste para executar o content.js.", "OK");
+                        break;
+                    case "Desativar demonstração":
+                        await _extensionCoordinator.SetEnabledAsync("com.aura.demo.extension", false);
+                        await DisplayAlertAsync("Extensão desativada", "Nenhuma nova injeção será executada.", "OK");
+                        break;
+                    case "Abrir página de teste":
+                        LoadInActive("https://example.com/");
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                AuraLog.Exception("Browser.ExtensionsUi", ex);
+                await DisplayAlertAsync("Extensões", "Não foi possível atualizar o pacote privado.", "OK");
+            }
+        }
+
         private void OnGoClicked(object sender, EventArgs e)
         {
             string input = UrlEntry.Text?.Trim() ?? string.Empty;
