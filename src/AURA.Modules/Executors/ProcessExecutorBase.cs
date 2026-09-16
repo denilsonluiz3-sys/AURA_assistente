@@ -98,8 +98,12 @@ public abstract class ProcessExecutorBase : IToolExecutor
 
     private static List<string> BuildShellCommand(string fileName, IEnumerable<string> arguments)
     {
-        var escapedArgs = string.Join(" ", arguments.Select(a => a.Contains(' ') ? $"'{a}'" : a));
-        return ["-c", $"{fileName} {escapedArgs}"];
+        // Não concatenar executável e argumentos em uma string de shell:
+        // argumentos controlados pelo usuário poderiam alterar o comando.
+        // O bash recebe o executável como $0 e cada argumento separadamente.
+        var command = new List<string> { "-c", "exec \"$0\" \"$@\"", fileName };
+        command.AddRange(arguments);
+        return command;
     }
 
     private static async Task<ExecutionResult> RunProcessAsync(string fileName, IEnumerable<string> arguments, ExecutionRequest request, CancellationToken cancellationToken)
