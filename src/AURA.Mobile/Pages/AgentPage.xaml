@@ -16,7 +16,7 @@
     </ContentPage.Resources>
 
     <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="0">
-        <Border x:Name="StatusBarHost" Grid.Row="0" Margin="6,2,6,0" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 18" Padding="8,3">
+        <Border x:Name="StatusBarHost" Grid.Row="0" IsVisible="False" Margin="6,2,6,0" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 18" Padding="8,3">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                 <VerticalStackLayout Spacing="2">
                     <HorizontalStackLayout Spacing="6">
@@ -48,7 +48,7 @@
             </HorizontalStackLayout>
         </ScrollView>
 
-        <Border x:Name="ProcessCardsHost" Grid.Row="2" IsVisible="True" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 14" Padding="10,8">
+        <Border x:Name="ProcessCardsHost" Grid.Row="2" IsVisible="False" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 14" Padding="10,8">
             <VerticalStackLayout Spacing="3">
                 <Grid ColumnDefinitions="*,Auto">
                     <Label Text="Estado do Agente" FontSize="11" TextColor="{DynamicResource AuraTextSecondary}" />
@@ -98,6 +98,25 @@
             </ScrollView>
             <WebView x:Name="BridgeWebView" Grid.Row="1" />
         </Grid>
+
+        <Button x:Name="UtilityMenuButton"
+                Grid.RowSpan="5"
+                Text="⚙️"
+                Clicked="OnAgentMenuClicked"
+                SemanticProperties.Description="Abrir menu da AURA"
+                HorizontalOptions="End"
+                VerticalOptions="Start"
+                Margin="0,8,8,0"
+                Padding="0"
+                WidthRequest="42"
+                HeightRequest="42"
+                CornerRadius="21"
+                FontSize="18"
+                BackgroundColor="#55101923"
+                BorderColor="#5579C9E8"
+                BorderWidth="1"
+                TextColor="#D9F5FF"
+                ZIndex="90" />
 
         <Border x:Name="InputBarHost" Grid.Row="4" Margin="8,4,8,58" ZIndex="50" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 20" Padding="10,6">
             <VerticalStackLayout Spacing="4">

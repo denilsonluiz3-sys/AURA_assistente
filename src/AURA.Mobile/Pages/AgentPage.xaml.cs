@@ -205,10 +205,8 @@ public partial class AgentPage : ContentPage
     {
         // O estado detalhado só ocupa espaço enquanto há uma execução ativa.
         // Em repouso, a conversa deve usar toda a área disponível.
-        ProcessCardsHost.IsVisible = _processes.Processes.Any(p =>
-            string.Equals(p.Status, "Executando", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(p.Status, "Tentando novamente", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(p.Status, "Pausado", StringComparison.OrdinalIgnoreCase));
+        // O estado detalhado não ocupa a conversa; fica disponível pelo menu ⚙️.
+        ProcessCardsHost.IsVisible = false;
     }
 
     protected override void OnAppearing()
@@ -270,7 +268,10 @@ public partial class AgentPage : ContentPage
 
     private void ApplyModeUi()
     {
-        ModeChipsHost.IsVisible = true;
+        // Modo, estado e comandos ficam no menu ⚙️ para manter a conversa limpa.
+        ModeChipsHost.IsVisible = false;
+        StatusBarHost.IsVisible = false;
+        ProcessCardsHost.IsVisible = false;
         HookWebViewEvents();
         AgentPane.IsVisible = !_webMode;
         WebPane.IsVisible = _webMode;
@@ -392,7 +393,8 @@ public partial class AgentPage : ContentPage
         try
         {
             string action = await DisplayActionSheetAsync(
-                "⚡ AURA Agent", "Fechar", null,
+                "⚙️ AURA", "Fechar", null,
+                "Estado do agente",
                 "▶ Continuar",
                 "🌐 Abrir Web AI",
                 "🌐 Abrir navegador",
@@ -405,6 +407,7 @@ public partial class AgentPage : ContentPage
 
             switch (action)
             {
+                case "Estado do agente": await ShowAgentStatusAsync(); break;
                 case "▶ Continuar": OnChipContinue(sender, e); break;
                 case "🌐 Abrir Web AI": OnModeWebUiClicked(sender, e); break;
                 case "🌐 Abrir navegador":
@@ -422,6 +425,16 @@ public partial class AgentPage : ContentPage
         {
             AuraLog.Exception("AgentMenu", ex);
         }
+    }
+
+    private async Task ShowAgentStatusAsync()
+    {
+        string mode = _webMode ? "Web AI" : "Agente local";
+        string run = _runInFlight ? "Executando" : "Pronto";
+        string workspace = ProjectAccessService.IsLinked ? "Projeto vinculado" : "Workspace local";
+        string model = string.IsNullOrWhiteSpace(ModelLabel.Text) ? "Status do modelo não informado" : ModelLabel.Text;
+        int active = _processes.Processes.Count(p => string.Equals(p.Status, "Executando", StringComparison.OrdinalIgnoreCase));
+        await SafeAlertAsync("Estado", $"{run} · {mode}\\n{workspace}\\n{model}\\nProcessos ativos: {active}");
     }
 
     private async Task OnCellsSubmenuAsync()
