@@ -108,10 +108,11 @@ public abstract class ProcessExecutorBase : IToolExecutor
 
     private static async Task<ExecutionResult> RunProcessAsync(string fileName, IEnumerable<string> arguments, ExecutionRequest request, CancellationToken cancellationToken)
     {
-        var workingDirectory = request.WorkingDirectory ?? Directory.GetCurrentDirectory();
+        string safeFileName = ValidateExecutablePath(fileName);
+        string workingDirectory = ValidateWorkingDirectory(request.WorkingDirectory);
         var psi = new ProcessStartInfo
         {
-            FileName = fileName,
+            FileName = safeFileName,
             WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -179,6 +180,24 @@ public abstract class ProcessExecutorBase : IToolExecutor
         };
         ProcessCompleted?.Invoke(null, new ProcessCompletedEventArgs(fileName, workingDirectory, correlationId, result));
         return result;
+    }
+
+    private static string ValidateExecutablePath(string fileName)
+    {
+        string fullPath = Path.GetFullPath(fileName);
+        string executable = Path.GetFileName(fullPath);
+        string[] allowed = { "sh", "bash", "toybox", "git", "python", "python3", "node" };
+        if (!allowed.Contains(executable, StringComparer.OrdinalIgnoreCase) || !File.Exists(fullPath))
+            throw new InvalidOperationException("Executável não permitido pelo executor AURA.");
+        return fullPath;
+    }
+
+    private static string ValidateWorkingDirectory(string? workingDirectory)
+    {
+        string fullPath = Path.GetFullPath(workingDirectory ?? Directory.GetCurrentDirectory());
+        if (!Directory.Exists(fullPath))
+            throw new DirectoryNotFoundException("Diretório de trabalho não encontrado.");
+        return fullPath;
     }
 
     protected static string? ResolveBinary(params string[] candidates)
