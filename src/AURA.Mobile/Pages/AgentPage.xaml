@@ -48,11 +48,12 @@
             </HorizontalStackLayout>
         </ScrollView>
 
-        <Border x:Name="ProcessCardsHost" Grid.Row="2" IsVisible="False" BackgroundColor="#101318" Stroke="#26303D" StrokeThickness="1" StrokeShape="RoundRectangle 14" Padding="10,8">
+        <Border x:Name="ProcessCardsHost" Grid.RowSpan="5" IsVisible="False" HorizontalOptions="End" VerticalOptions="Start" WidthRequest="320" MaximumHeightRequest="300" Margin="8,58,8,0" ZIndex="80" BackgroundColor="#EE101318" Stroke="#5079C9E8" StrokeThickness="1" StrokeShape="RoundRectangle 16" Padding="10,8">
             <VerticalStackLayout Spacing="3">
-                <Grid ColumnDefinitions="*,Auto">
-                    <Label Text="Estado do Agente" FontSize="11" TextColor="{DynamicResource AuraTextSecondary}" />
-                    <Label Grid.Column="1" Text="● pronto" FontSize="10" TextColor="{DynamicResource AuraAccent}" />
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                    <Label Text="Processos da IA" FontSize="11" FontAttributes="Bold" TextColor="{DynamicResource AuraTextPrimary}" />
+                    <Label Grid.Column="1" Text="● ao vivo" FontSize="10" TextColor="{DynamicResource AuraAccent}" />
+                    <Button Grid.Column="2" Text="×" Clicked="OnProcessPopupClose" FontSize="16" Padding="8,0" HeightRequest="28" BackgroundColor="Transparent" TextColor="{DynamicResource AuraTextSecondary}" />
                 </Grid>
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
                     <Label Text="✓" FontSize="16" TextColor="{DynamicResource AuraAccent}" />

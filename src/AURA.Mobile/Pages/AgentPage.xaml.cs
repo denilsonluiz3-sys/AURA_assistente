@@ -50,6 +50,7 @@ public partial class AgentPage : ContentPage
     private AgentSession? _session;
     private string? _activeProcessId;
     private bool _configVisible;
+    private bool _processPopupVisible;
     private bool _runInFlight;
     private bool _webMode;
     private bool _webLoaded;
@@ -205,8 +206,8 @@ public partial class AgentPage : ContentPage
     {
         // O estado detalhado só ocupa espaço enquanto há uma execução ativa.
         // Em repouso, a conversa deve usar toda a área disponível.
-        // O estado detalhado não ocupa a conversa; fica disponível pelo menu ⚙️.
-        ProcessCardsHost.IsVisible = false;
+        // O estado detalhado só aparece como popup sob demanda.
+        ProcessCardsHost.IsVisible = _processPopupVisible;
     }
 
     protected override void OnAppearing()
@@ -407,7 +408,7 @@ public partial class AgentPage : ContentPage
 
             switch (action)
             {
-                case "Estado do agente": await ShowAgentStatusAsync(); break;
+                case "Estado do agente": ToggleProcessPopup(); break;
                 case "▶ Continuar": OnChipContinue(sender, e); break;
                 case "🌐 Abrir Web AI": OnModeWebUiClicked(sender, e); break;
                 case "🌐 Abrir navegador":
@@ -427,14 +428,17 @@ public partial class AgentPage : ContentPage
         }
     }
 
-    private async Task ShowAgentStatusAsync()
+    private void ToggleProcessPopup()
     {
-        string mode = _webMode ? "Web AI" : "Agente local";
-        string run = _runInFlight ? "Executando" : "Pronto";
-        string workspace = ProjectAccessService.IsLinked ? "Projeto vinculado" : "Workspace local";
-        string model = string.IsNullOrWhiteSpace(ModelLabel.Text) ? "Status do modelo não informado" : ModelLabel.Text;
-        int active = _processes.Processes.Count(p => string.Equals(p.Status, "Executando", StringComparison.OrdinalIgnoreCase));
-        await SafeAlertAsync("Estado", $"{run} · {mode}\\n{workspace}\\n{model}\\nProcessos ativos: {active}");
+        _processPopupVisible = !_processPopupVisible;
+        ProcessCardsHost.IsVisible = _processPopupVisible;
+        UpdateProcessCardsVisibility();
+    }
+
+    private void OnProcessPopupClose(object? sender, EventArgs e)
+    {
+        _processPopupVisible = false;
+        ProcessCardsHost.IsVisible = false;
     }
 
     private async Task OnCellsSubmenuAsync()
