@@ -265,7 +265,12 @@ public sealed class AiConfigView : ContentView
             model = Presets[idx].ModelHint;
 
         if (Presets[idx].Id == "offline")
-            model = LocalModelStore.RequiredFileName;
+        {
+            RefreshLocalModelList();
+            model = string.IsNullOrWhiteSpace(RuntimeConfig.OfflineModelId)
+                ? (FirstLocalModelId() ?? model)
+                : RuntimeConfig.OfflineModelId;
+        }
         _modelEntry.Text = model;
         _apiKeyEntry.IsVisible = Presets[idx].RequiresKey || Presets[idx].Id == "custom";
         ApplyProviderUi(Presets[idx]);
@@ -359,26 +364,48 @@ public sealed class AiConfigView : ContentView
         ApplyModelList(mapped);
     }
 
+    private string? FirstLocalModelId()
+    {
+        var store = Handler?.MauiContext?.Services.GetService<LocalModelStore>();
+        return store?.List().FirstOrDefault()?.Id;
+    }
+
+    private void RefreshLocalModelList()
+    {
+        var store = Handler?.MauiContext?.Services.GetService<LocalModelStore>();
+        var local = store?.List() ?? Array.Empty<LocalModelDescriptor>();
+        _models.Clear();
+        _displayToId.Clear();
+        foreach (var model in local)
+        {
+            string display = string.IsNullOrWhiteSpace(model.DisplayName) ? model.FileName : model.DisplayName;
+            _displayToId[display] = model.Id;
+            _models.Add(display);
+        }
+        _modelPicker.ItemsSource = null;
+        _modelPicker.ItemsSource = _models.ToList();
+        _modelPicker.SelectedItem = local.FirstOrDefault(x =>
+            string.Equals(x.Id, RuntimeConfig.OfflineModelId, StringComparison.OrdinalIgnoreCase))?.DisplayName;
+        _modelPicker.IsVisible = local.Count > 0;
+    }
+
     private void ApplyProviderUi(Preset preset)
     {
         bool offline = string.Equals(preset.Id, "offline", StringComparison.OrdinalIgnoreCase);
-        _modelPicker.IsVisible = !offline && _models.Count > 0;
         _loadModelsButton.IsVisible = !offline;
-        _connectButton.IsVisible = !offline;
+        _connectButton.IsVisible = true;
         _advancedToggle.IsVisible = !offline;
         _baseUrlEntry.IsVisible = !offline && _advancedOpen;
         _modelsUrlEntry.IsVisible = !offline && _advancedOpen;
 
         if (offline)
         {
-            _models.Clear();
-            _displayToId.Clear();
-            _modelPicker.ItemsSource = null;
-            _status.Text = string.Empty;
+            RefreshLocalModelList();
             _modelEntry.IsEnabled = false;
         }
         else
         {
+            _modelPicker.IsVisible = _models.Count > 0;
             _modelEntry.IsEnabled = true;
         }
     }
@@ -417,10 +444,12 @@ public sealed class AiConfigView : ContentView
             bool offline = _presetPicker.SelectedIndex >= 0 &&
                            string.Equals(Presets[_presetPicker.SelectedIndex].Id, "offline", StringComparison.OrdinalIgnoreCase);
             _connectButton.IsEnabled = !offline || models.Count > 0;
-            _connectButton.Text = offline && models.Count == 0 ? "Importe o modelo primeiro" : offline ? "Ativar IA offline" : "Conectar";
+            _connectButton.Text = offline && models.Count == 0 ? "Importe o modelo primeiro" : offline ? "Conectar ao modelo selecionado" : "Conectar";
             _localModelStatus.Text = models.Count == 0
-                ? "Offline: nenhum modelo GGUF importado. O arquivo ainda não foi carregado pela AURA."
-                : "Offline: " + string.Join(", ", models.Select(x => x.DisplayName)) + " — pronto; será carregado somente ao iniciar a primeira execução.";
+                ? "Offline: nenhum modelo GGUF importado."
+                : "Offline: " + string.Join(" · ", models.Select(x => x.DisplayName)) + " — selecione um modelo e conecte; o carregamento ocorre na primeira execução.";
+            if (offline)
+                RefreshLocalModelList();
         }
         catch (Exception ex)
         {
@@ -460,7 +489,10 @@ public sealed class AiConfigView : ContentView
                 DisplayName = file.FileName,
                 FileName = file.FileName
             });
-            _localModelStatus.Text = $"Offline: {imported.DisplayName} importado ({imported.SizeBytes / (1024 * 1024)} MB). Inferência ainda não ativada.";
+            RuntimeConfig.OfflineModelId = imported.Id;
+            _modelEntry.Text = imported.Id;
+            RefreshLocalModelList();
+            _localModelStatus.Text = $"Offline: {imported.DisplayName} importado ({imported.SizeBytes / (1024 * 1024)} MB). Selecione e conecte para ativá-lo.";
         }
         catch (Exception ex)
         {
@@ -578,23 +610,27 @@ public sealed class AiConfigView : ContentView
             if (preset.Id == "offline")
             {
                 var store = Handler?.MauiContext?.Services.GetService<LocalModelStore>();
-                var requested = "qwen2.5-1.5b-instruct-q4_k_m.gguf";
-                var local = store?.List().FirstOrDefault(x =>
-                    x.DisplayName.Equals(requested, StringComparison.OrdinalIgnoreCase) ||
-                    x.Id.Equals(requested, StringComparison.OrdinalIgnoreCase));
+                var models = store?.List() ?? Array.Empty<LocalModelDescriptor>();
+                string selected = StripDisplaySuffix(_modelEntry.Text);
+                var local = models.FirstOrDefault(x =>
+                    string.Equals(x.Id, selected, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(x.DisplayName, selected, StringComparison.OrdinalIgnoreCase))
+                    ?? models.FirstOrDefault(x => string.Equals(x.Id, RuntimeConfig.OfflineModelId, StringComparison.OrdinalIgnoreCase));
                 if (local == null)
                 {
-                    SetStatus("Importe o arquivo qwen2.5-1.5b-instruct-q4_k_m.gguf antes de conectar.", false);
+                    SetStatus("Importe e selecione um modelo GGUF antes de conectar.", false);
                     return;
                 }
                 RuntimeConfig.Provider = "offline";
                 RuntimeConfig.BaseUrlOverride = "";
                 RuntimeConfig.ModelsUrlOverride = "";
                 RuntimeConfig.RequiresApiKey = false;
+                RuntimeConfig.OfflineModelId = local.Id;
                 RuntimeConfig.Model = local.Id;
                 RuntimeConfig.Apply((Handler?.MauiContext?.Services.GetService(typeof(IUniversalAiClient)) as IUniversalAiClient));
-                _modelEntry.Text = requested;
-                SetStatus("Conectado ao modelo local " + requested, true);
+                _modelEntry.Text = local.Id;
+                SetStatus("Conectado ao modelo local: " + local.DisplayName, true);
+                RefreshLocalModelStatus();
                 return;
             }
             var provider = preset.Id == "custom"

@@ -42,6 +42,12 @@ public static class RuntimeConfig
         set => Preferences.Default.Set("ai_model", (value ?? string.Empty).Trim());
     }
 
+    public static string OfflineModelId
+    {
+        get => Preferences.Default.Get("ai_offline_model_id", string.Empty);
+        set => Preferences.Default.Set("ai_offline_model_id", (value ?? string.Empty).Trim());
+    }
+
     public static string BaseUrlOverride
     {
         get => Preferences.Default.Get("ai_base_url", string.Empty);

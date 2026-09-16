@@ -532,7 +532,8 @@ public partial class AgentPage : ContentPage
 
     private bool HasLocalLlmWithoutKey()
     {
-        if (_localModels != null && _localEngine != null)
+        if (string.Equals(RuntimeConfig.Provider, "offline", StringComparison.OrdinalIgnoreCase)
+            && _localModels != null && _localEngine != null)
         {
             try
             {
@@ -552,12 +553,19 @@ public partial class AgentPage : ContentPage
 
     private IUniversalAiClient CreateExecutionClient()
     {
-        if (_localModels != null && _localEngine != null)
+        // A existência de GGUF importado não ativa o offline. O provedor
+        // explicitamente conectado é a única fonte de roteamento.
+        if (string.Equals(RuntimeConfig.Provider, "offline", StringComparison.OrdinalIgnoreCase)
+            && _localModels != null && _localEngine != null)
         {
-            LocalModelDescriptor? model = _localModels.List().FirstOrDefault();
+            string selectedId = RuntimeConfig.OfflineModelId.Trim();
+            LocalModelDescriptor? model = _localModels.List().FirstOrDefault(x =>
+                (!string.IsNullOrWhiteSpace(selectedId) && string.Equals(x.Id, selectedId, StringComparison.OrdinalIgnoreCase))
+                || (string.IsNullOrWhiteSpace(selectedId) && string.Equals(x.Id, RuntimeConfig.Model, StringComparison.OrdinalIgnoreCase)))
+                ?? _localModels.List().FirstOrDefault();
             if (model != null)
             {
-                AuraLog.Info($"AgentPage: usando runtime local {model.Id}");
+                AuraLog.Info($"AgentPage: usando runtime local selecionado {model.Id}");
                 return new LocalAiClient(new StoredModelAiRuntime(_localModels, _localEngine, model.Id));
             }
         }

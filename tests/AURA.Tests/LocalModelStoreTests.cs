@@ -36,6 +36,31 @@ public sealed class LocalModelStoreTests
     }
 
     [Fact]
+    public async Task SupportsMultipleSelectableGgufModels()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "aura-models-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new LocalModelStore(root);
+            await store.ImportAsync(new MemoryStream(new byte[] { 1 }), new LocalModelDescriptor
+            {
+                Id = "qwen-mini", DisplayName = "Qwen Mini", FileName = "qwen-mini.gguf"
+            });
+            await store.ImportAsync(new MemoryStream(new byte[] { 2, 3 }), new LocalModelDescriptor
+            {
+                Id = "phi-mini", DisplayName = "Phi Mini", FileName = "phi-mini.gguf"
+            });
+
+            Assert.Equal(2, store.List().Count);
+            Assert.True(File.Exists(store.GetModelPath("phi-mini")));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
     public async Task RejectsNonGgufAndTraversalNames()
     {
         string root = Path.Combine(Path.GetTempPath(), "aura-models-" + Guid.NewGuid().ToString("N"));
