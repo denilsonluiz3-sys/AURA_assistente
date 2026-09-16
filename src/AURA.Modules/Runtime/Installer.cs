@@ -49,19 +49,9 @@ public sealed class Installer : IRuntimeInstaller
             return new List<string> { "(nada a instalar)" };
         }
 
-        if (confirm)
+        if (!confirm)
         {
-            Console.WriteLine("Plano de instalação:");
-            foreach (InstallStep step in plan.Steps)
-            {
-                Console.WriteLine($"  - {step.What}: {step.Command}");
-            }
-            Console.Write("Executar agora? [s/N] ");
-            string? answer = Console.ReadLine();
-            if (!IsAffirmative(answer))
-            {
-                return new List<string> { "(instalação cancelada pelo usuário)" };
-            }
+            return new List<string> { "(instalação bloqueada: confirmação explícita obrigatória)" };
         }
 
         var results = new List<string>();
@@ -109,9 +99,4 @@ public sealed class Installer : IRuntimeInstaller
         }
     }
 
-    private static bool IsAffirmative(string? answer)
-    {
-        answer = answer?.Trim().ToLowerInvariant();
-        return answer is "s" or "sim" or "y" or "yes";
-    }
 }

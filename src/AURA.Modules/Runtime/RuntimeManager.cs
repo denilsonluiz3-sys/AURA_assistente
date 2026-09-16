@@ -130,7 +130,7 @@ public sealed class RuntimeManager : IRuntimeManager
         {
             report.Installed = true;
             IReadOnlyList<string> results = await _installer.ExecuteAsync(
-                report.Plan, confirm: false, cancellationToken);
+                report.Plan, confirm: confirmInstall, cancellationToken);
             report.Log("Instalação: " + string.Join("; ", results));
             // Re-resolver runtime após instalar
             report.Runtime = _resolver.Resolve(language);
