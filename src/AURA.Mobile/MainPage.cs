@@ -42,6 +42,9 @@ public class MainPage : TabbedPage
 
     private static NavigationPage CreateTab(Page page, string title, string icon)
     {
+        // O título grande "Agente" vinha da barra de navegação da NavigationPage
+        // interna. A aba mantém o título, mas a barra visual fica totalmente oculta.
+        NavigationPage.SetHasNavigationBar(page, false);
         var navigation = new NavigationPage(page)
         {
             Title = title,
